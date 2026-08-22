@@ -55,3 +55,8 @@ ymx/test/emu/.work/
 
 # rig scratch: assembled probes and packed tunes
 ymx/test/emu/.work*/
+
+# gendata.py's output for the real-hardware harness
+ymx/test/tune.ymx
+ymx/test/ymxdata.inc
+ymx/test/YMXTEST.PRG
