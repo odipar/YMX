@@ -1229,6 +1229,36 @@ def run_live_retune() -> str:
     return ''
 
 
+def run_readme_sizes() -> str:
+    """The README's two byte counts, against what the assembler just produced.
+
+    A size written into prose goes stale the first time the code moves, and
+    nothing else would notice. Both numbers come out of one build: YMX.S runs
+    from the start of the binary to ST4_wrap.S's first symbol, and ST4_wrap.S
+    is the rest of it. The README names the ST4_UNIT they hold for, because
+    the decoder's size moves with it.
+    """
+    text = (REPO / 'README.md').read_text()
+    player_said = re.search(r'is the player, ([\d,]+) bytes at the '
+                            r'`ST4_UNIT` (\d)', text)
+    wrap_said = re.search(r'plus the ([\d,]+) of \[68k/ST4_wrap\.S\]', text)
+    if not player_said or not wrap_said:
+        return ('README sizes: the sentence carrying them has been reworded. '
+                'It must still read "is the player, N bytes at the `ST4_UNIT` '
+                'k" and "plus the M of [68k/ST4_wrap.S]", which is what this '
+                'check reads them out of')
+    unit = int(player_said.group(2))
+    binary, symbols = assemble(unit)
+    player = symbols['ST4_init']        # where YMX.S stops and the decoder starts
+    wrap = len(binary) - player
+    said = (int(player_said.group(1).replace(',', '')),
+            int(wrap_said.group(1).replace(',', '')))
+    if said != (player, wrap):
+        return (f'README sizes: it says {said[0]:,} + {said[1]:,} bytes at '
+                f'ST4_UNIT {unit}; this build is {player:,} + {wrap:,}')
+    return ''
+
+
 def main() -> int:
     # frames, ring, chunk, label, loop frame (None = play once), passes, unit
     shapes = [
@@ -1302,6 +1332,13 @@ def main() -> int:
         failures += 1
     else:
         print('OK   the live retune          (the timer is never stopped)')
+
+    problem = run_readme_sizes()
+    if problem:
+        print(f'FAIL {problem}')
+        failures += 1
+    else:
+        print('OK   the README sizes         (the two byte counts, measured)')
 
     for super_host, perf in ((False, False), (True, False), (False, True)):
         problem = run_effects(super_host, perf)
