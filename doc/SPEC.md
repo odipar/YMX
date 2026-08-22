@@ -409,7 +409,8 @@ rate = 2457600 / prescaler[index] / count
 | divider | — | 4 | 10 | 16 | 50 | 64 | 100 | 200 |
 
 Index 0 is not a divider but the MFP's **stopped** state, so a code that
-selects it starts nothing. A count of 0 is likewise stopped.
+selects it starts nothing. A count of 0 is not: the MFP reads it as 256, the
+slowest tick a prescaler gives.
 
 The encodable range is 48 Hz — prescaler 200, count 255 — to 614,400 Hz,
 prescaler 4 and count 1. What a packer emits is narrower: a rate that costs

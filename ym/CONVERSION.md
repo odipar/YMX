@@ -51,7 +51,7 @@ the host's.
 | What changes | What it costs | Reported |
 |---|---|---|
 | A Sinus-SID code | the effect is dropped to idle: nothing plays | yes |
-| A code with a prescaler or count of 0 | dropped to idle — the MFP's stopped state starts nothing | yes |
+| A code with a prescaler or count of 0 | dropped to idle: prescaler 0 is the MFP's stopped state, and count 0 is 256 | yes |
 | A SID or buzzer rate above what a real machine can run | dropped to idle | yes |
 | A drum number with no sample behind it | dropped to idle | yes |
 | A drum above the rate ceiling | bandwidth only: the sample is resampled and every trigger's divisor scaled by the same ratio | yes |

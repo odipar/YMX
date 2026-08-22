@@ -415,7 +415,8 @@ class Ymr:
 
         A timer that never ticks owns nothing, and three configurations never
         tick: an effect type the format reserves, a prescaler index of 0 (the
-        MFP's stopped state) or a counter of 0, and a Sample pointing at a block
+        MFP's stopped state) or a counter of 0, which the converter drops
+        rather than run at 256, and a Sample pointing at a block
         the file does not carry. A sample that has played out gives its
         register back as well, which is why the window is recomputed at every
         trigger and the code goes quiet when it closes.
@@ -484,7 +485,7 @@ class Ymr:
         if kind is None:
             return 0                    # idle, or a type the format reserves
         if PRESCALE[want.prescaler & 7] == 0 or want.counter == 0:
-            return 0                    # the MFP's stopped state: it never ticks
+            return 0                    # prescaler 0 stops it; counter 0 is dropped
         head = kind | ((channel + 1) << 4) | (want.prescaler & 7)
         if kind != KIND_PCM:
             return head

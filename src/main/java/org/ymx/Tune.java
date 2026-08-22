@@ -111,7 +111,7 @@ public record Tune(int frames, int frameRate, long masterClock, int loopFrame,
     public static final int PRESCALERS = 8;
 
     /** The MFP prescaler table. Index 0 is not a divider at all but the
-     * MFP's stopped state, so a code naming it starts nothing. */
+     * MFP's stopped state, so a code that selects it starts nothing. */
     private static final int[] PRESCALER_TABLE = {0, 4, 10, 16, 50, 64, 100, 200};
 
     /** The divisor prescaler {@code index} stands for - a lookup rather
