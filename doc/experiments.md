@@ -2,10 +2,9 @@
 
 Ideas measured against the real corpus and the real tools, and what the
 measurements said. Most are declines — an idea can be good, measurable and
-still not worth its complexity, and writing the number down is what keeps it
-from being proposed, measured and declined a second time. The rest are
-diagnoses: bugs whose causes were buried deep enough that finding them taught
-something.
+still not worth its complexity, and writing the number down keeps it from
+being proposed, measured and declined a second time. The rest are diagnoses:
+bugs whose causes were buried deep enough that finding them taught something.
 
 These are the results only. The full logs — the false trails, the instrument
 readings, the method — were kept while the work was live and are in the
@@ -61,9 +60,9 @@ Cause: the frame write was writing the voice's volume register mid-phase,
 under a timer stream that owned it. Fixed by the retune path plus the burst
 skip; confirmed by ear against ST-Sound with ym2149-rs as a second reference.
 
-The durable rule, and the reason the skip exists at all: **a frame player may
-not write any register a timer stream currently owns** — not a volume
-register under a toggle stream, and not under a PCM stream either.
+The durable rule, and the reason the skip exists: **a frame player may not
+write any register a timer stream currently owns** — not a volume register
+under a toggle stream, and not under a PCM stream either.
 
 **The Synergy Credits hunt** (2026-08-20). A bass line every write-level
 instrument called correct, and the ear called wrong. Cause: the square's
@@ -192,5 +191,5 @@ volume curve's linear domain — pitch and duration exact — and `-drumhz` abov
 
 **The door left open:** a "pack from the original" path — trace a subtune's
 register and timer activity under emulation and feed that to the packer
-instead of a YM dump — would free YMX from dump quality entirely. A real
+instead of a YM dump — would free YMX from dump quality. A real
 project, not started.

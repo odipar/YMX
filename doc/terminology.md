@@ -341,8 +341,8 @@ the same shape every tick, so the values say nothing - the point is the
 restart. Do it fast enough and the envelope never finishes its shape; the
 sweep repeats at the tick rate and is heard as a pitch.
 
-It reaches a voice indirectly: there is one envelope generator, and a
-voice takes its level from it only while following the envelope. Put two
+It reaches a voice indirectly: one envelope generator serves all three, and
+a voice takes its level from it only while following the envelope. Put two
 voices there and both carry it, which real tunes do - 15 of the corpus's
 543. This is the one timer stream not tied to a single voice.
 
@@ -402,7 +402,7 @@ emitted.
 
 ## Common techniques
 
-Most of what a composer does needs no timer stream at all:
+Most of what a composer does needs no timer stream:
 
 | technique | what it is here |
 |---|---|
@@ -480,7 +480,7 @@ compiler can check.
 |---|---|
 | **frame clock**, **timer clocks** | **control rate** and **audio rate**; k-rate and a-rate in Csound and SuperCollider |
 | **PCM stream** | **sample playback**, as a sampler does it |
-| **toggle** and **wave streams** | **wavetable** oscillators. A toggle stream is the smallest one there is, two entries wide |
+| **toggle** and **wave streams** | **wavetable** oscillators. A toggle stream is the smallest possible one, two entries wide |
 | **derived** rate | **key follow**, or key tracking |
 | **coupling** | the **harmonicity ratio** of FM synthesis |
 | **retrigger stream** | **hard sync** |
@@ -503,7 +503,8 @@ beside the offset and the length: `$FFFF` means one-shot, and anything
 else is an offset the tick jumps back to on meeting the end marker
 instead of stopping the timer - 0 among them, the sample that repeats
 whole. `YMX_init` resolves each pair to addresses once, so the tick that
-meets the end has one long to load and no arithmetic to do. That makes a sample an instrument's sustain.
+meets the end has one long to load and no arithmetic to do. That makes a
+sample an instrument's sustain.
 
 **A rate can move under a running timer.** The action byte's voice field
 holds three voices in two bits, so 3 names none of them, and a retune
