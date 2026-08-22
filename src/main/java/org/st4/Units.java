@@ -10,7 +10,7 @@ package org.st4;
  *
  * <p>Input that is not a multiple of k is padded with zeros. The padding is
  * part of the output the decoder produces, so the packer records the padded
- * length; a caller that cares about the original size keeps it elsewhere.
+ * length; a caller that needs the original size keeps it elsewhere.
  */
 public final class Units {
 

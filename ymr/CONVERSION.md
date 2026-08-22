@@ -1,7 +1,7 @@
 # What a `.YMR` conversion costs
 
 RhYMe's own export packed into a `.ymx`. This is what the front end changes
-on the way, what it counts, and what it tells you it did.
+on the way, what it counts, and what it reports.
 [../README.md](../README.md) is how to run it, [../doc/SPEC.md](../doc/SPEC.md)
 the container it writes, and [../ym/CONVERSION.md](../ym/CONVERSION.md) the
 same account for a YM file.
@@ -70,29 +70,29 @@ on which the player skips the register entirely. Two formats reached one
 convention from one constraint, so the register vector is handed straight on.
 
 **The shadow volume and the burst gate.** The .YMR spec suppresses the frame
-write to a volume register owned by a running PWM or Sample — the value goes
-to the player's shadow and never to the chip, so the frame write cannot fight
-the effect's own timer-rate writes — and says nothing of the sort about an
+write to a volume register owned by a running PWM or Sample — the value goes to
+the player's shadow and never to the chip, so the frame write cannot contend
+with the effect's own timer-rate writes — and says nothing of the sort about an
 RTE, which writes R13 and leaves the voice's volume to the song. That is the
-`.ymx` burst gate exactly: M's gate mask, one bit per voice, which a toggle
-arm and a PCM arm set and a retrigger arm does not. It is also what decides
+`.ymx` burst gate exactly: M's gate mask, one bit per voice, which a toggle arm
+and a PCM arm set and a retrigger arm does not. It is also what determines
 which of a stream's parameters can ride in a register that already means
-something. A PCM stream's sample number can sit in the volume byte because
-the gate is shut over it — `ymx_gates` has overwritten that write with two
-`nop`s, so it does not reach the chip at all. A retrigger stream's shape
-cannot: an RTE leaves the voice's volume to the song, so that byte is
-delivered, and a shape hidden in its low nibble would cost the voice its
-level on any frame not already following the envelope. Format v9 is the
-answer to that — see **Where a retrigger stream's shape comes from** — and
-the shape rides in X whatever the source, so the only parameter this
-conversion writes is a PCM stream's sample number.
+something. A PCM stream's sample number can sit in the volume byte because the
+gate is shut over it — `ymx_gates` has overwritten that write with two `nop`s,
+so it does not reach the chip at all. A retrigger stream's shape cannot: an RTE
+leaves the voice's volume to the song, so that byte is delivered, and a shape
+hidden in its low nibble would cost the voice its level on any frame not
+already following the envelope. Format v9 is the answer to that — see **Where a
+retrigger stream's shape comes from** — and the shape rides in X whatever the
+source, so the only parameter this conversion writes is a PCM stream's sample
+number.
 
 One engine reads both dialects, and four flags say which. A held PCM code
 does not retrigger, because a .YMR's trigger is a pop and not the code's
 continued presence — that is what stops a sustained sample being chopped into
 frame-long pieces, where a YM dump's held drum code fires again every frame.
 A voice playing a sample keeps its mixer bits, because RhYMe's player never
-touches R7 for an effect: the mixer is the song's, and a song that wants its
+touches R7 for an effect: the mixer is the song's, and a song needing its
 sample clean has already disconnected the voice itself, where a YM drum's
 voice is forced off the mixer for it. A channel's own commands end the
 sample running on it — an effect pop of 0 stops the timer, an effect pop of
@@ -171,8 +171,8 @@ parameter moved on the same frame as the rate, which is the row.
   converter's to choose. A `.ymx` has four timer channels and a stream saying
   which MFP timer each runs on, so the converter simply writes that binding
   into T: channels 0, 1 and 2 take Timers A, B and D, and the fourth channel,
-  which no .YMR fills, takes the Timer C nobody asked for, which keeps the map
-  a permutation and costs nothing — the header never flags an idle channel and
+  which no .YMR fills, takes the leftover Timer C, which keeps the map a
+  permutation and costs nothing — the header never flags an idle channel and
   the player claims no timer for it. So a `.ymr` tune leaves Timer C, the
   system's 200 Hz clock, alone, and does take Timer B wherever it runs an
   effect there, which the YM packer's default map keeps free for rasters.
@@ -202,8 +202,8 @@ parameter moved on the same frame as the rate, which is the row.
 * **Moving a prescaler under a running timer.** RhYMe pops a rate on
   its own to slide a pitch: control register, then data register, the timer
   never stopped, so a running PWM keeps its phase and a running sample its
-  place and only the rate moves. From **v10** all of that survives the
-  conversion.
+  place and only the rate moves. From **v10** all of that is preserved by
+  the conversion.
   A .YMR rate entry is a prescaler and a counter, only the prescaler is in the
   code byte, and a pop that moves the counter alone therefore leaves the code
   where it was: the script emits a HOLD carrying the reload flag, and
@@ -226,24 +226,24 @@ parameter moved on the same frame as the rate, which is the row.
 * **A sample the song stops early is stopped a sliver late.** A .YMR can end
   a sample before its data runs out — an effect pop of 0, or a different
   effect arriving on the same timer, which is the same voice, since a .YMR
-  binds each timer to one — and the conversion obeys it on the frame it is
-  said. Where the frame hands the voice back, it hands it back at once: the
+  binds each timer to one — and the conversion applies it on the frame it
+  appears. Where the frame returns the voice, it returns it at once: the
   timer is stopped on that frame — by a RELEASE where the song popped 0, by
   the arriving verb's own `ymx_program` where an RTE took the channel — the
   voice stops being the sample's, and its gate reopens. The player applies a
   frame's gate state BEFORE the
   register burst and the script's actions after it, so the frame write this
   reopens is that same frame's, and the voice's own volume is on the chip
-  inside the 20 ms the song asked for it with no skew to correct. Where the
-  frame hands the voice to a PWM instead, the gate stays shut, because the
-  square wants it shut too, and the song's volume is not due back at all.
+  inside the 20 ms the song placed it in, with no skew to correct. Where the
+  frame passes the voice to a PWM instead, the gate stays shut, because the
+  square requires it shut too, and the song's volume is not due back at all.
   What the ordering cannot cover is the sliver between the burst and the
   action: a tick landing in it writes one more sample byte over the volume
   just written, and that byte stands until the next frame. It is one wrong
   level for most of one frame, against the whole frames of a sample that
   should not be playing at all. No ordering of the verbs closes it either:
   the actions sit after the burst so their varying cost cannot jitter the
-  register writes, which is a promise worth more than this sliver costs.
+  register writes, which is a guarantee worth more than this sliver costs.
 
 Everything else the conversion has to change, it counts and names the same way:
 

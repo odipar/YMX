@@ -27,7 +27,7 @@ What is checked, frame by frame:
   * R0-R6 and R11-R12 exactly, masked the way a YM2149 masks them.
   * R7 as the .YMR's mixer with the ST's two port-direction bits and NOTHING
     ELSE. The .ymr front end turns forceMixerOnPcm off - RhYMe's engine
-    already bakes the mixer a sample wants into the exported mixer stream -
+    already bakes the mixer a sample needs into the exported mixer stream -
     so any bit beyond $C0 that the .YMR did not ask for is a divergence.
   * R13 as an EVENT, not only a value: the .YMR writes R13 on a frame that
     pops envelope_shape and on no other, so the register must be written
@@ -43,7 +43,7 @@ What is checked, frame by frame:
   * The MFP: the player must claim exactly the timers the .YMR names - A, B
     and D, never C - and a channel the tune leaves idle must claim nothing.
 
-WHAT IS EXCLUDED, and why. This test sees one thing: the writes YMX_play
+WHAT IS EXCLUDED, and why. This test checks one thing: the writes YMX_play
 makes. Everything below is outside that window, and is named here rather than
 quietly skipped.
 
@@ -79,7 +79,7 @@ ISSUE. Needs mvn compile, rmac and unicorn, like the rigs.
 """
 import collections, os, struct, subprocess, sys, tempfile
 
-# The tune names are resolved before the chdir below, because the rig wants to
+# The tune names are resolved before the chdir below, because the rig needs to
 # run from its own directory and a relative argument would stop meaning what
 # the caller typed the moment it does.
 TUNES = [os.path.abspath(p) for p in sys.argv[1:]] \
@@ -93,7 +93,7 @@ os.chdir(EMU)
 import test_ymx as T                                                # noqa: E402
 
 # The bits a YM2149 actually keeps, which is what the packer masks a register
-# down to before it ever reaches a stream. R13 is the exception: $FF survives
+# down to before it ever reaches a stream. R13 is the exception: $FF passes through
 # as the marker that means "do not write it at all".
 MASK = [0xFF, 0x0F, 0xFF, 0x0F, 0xFF, 0x0F, 0x1F, 0x3F,
         0x1F, 0x1F, 0x1F, 0xFF, 0xFF, 0x0F]
@@ -303,7 +303,7 @@ class Ymr:
         actually plays. A looped block plays until something else
         takes the timer, because the file says where the sample comes back to
         and the tick does the coming back; only a one-shot has a length at
-        all. Only the length matters here, since nothing in this test hears
+        all. Only the length matters here, since nothing in this test plays
         the bytes.
         """
         data, looped, start = block
@@ -538,7 +538,7 @@ class Stage:
         which is what keeps the square's place in the cycle.
 
     A .YMR binds each timer to one voice - A to A, B to B, D to C, and the
-    binding is normative - so no two channels ever want one voice and the
+    binding is normative - so no two channels ever contend for one voice and the
     whole of the arbitration the YM dialect needs is absent here. What is
     left is a channel's own succession, which is why every branch below reads
     only its own voice.
@@ -587,7 +587,7 @@ class Stage:
                 continue                # a buzzer writes R13, never a volume
             if kind == KIND_TOGGLE:
                 # The sample this channel was playing ends here too, but its
-                # gate stays shut: the square wants it shut as well.
+                # gate stays shut: the square requires it shut as well.
                 if self.owner[voice] == channel:
                     self.owner[voice] = -1
                     self.end[voice] = -1
@@ -625,7 +625,7 @@ TIMERS = {
 
 # The spec's normative binding, as the T stream carries it: channel 0 runs on
 # Timer A, 1 on B, 2 on D, and the fourth channel no .YMR fills takes the
-# Timer C nobody asked for.
+# leftover Timer C.
 CHANNEL_TIMER = ['A', 'B', 'D', 'C']
 
 TCDCR = 0xFFFFFA1D
@@ -818,7 +818,7 @@ def compare(dump, frame, source, writes, gated, started):
 
     # R7 is the mixer plus the ST's port directions and nothing else. The
     # .ymr front end runs with forceMixerOnPcm off - RhYMe's engine bakes the
-    # mixer a sample wants into the exported mixer stream - so a bit here
+    # mixer a sample needs into the exported mixer stream - so a bit here
     # that the .YMR did not ask for is a bit nobody can account for.
     want = (dump.registers[7][source] & MASK[7]) | PORTS
     if counted[7] != 1:

@@ -158,7 +158,7 @@ public final class St4Format {
                             byte[] byteOffsets, byte[] wordOffsets) {}
 
     /**
-     * Reads a container, checking everything a decoder would otherwise trust.
+     * Reads a container, checking everything a decoder would otherwise accept.
      * The streams it returns may carry up to three bytes of alignment padding,
      * since no length is stored and each stream simply runs to the next.
      *

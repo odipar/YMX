@@ -43,7 +43,7 @@ public final class MkPrg {
 
         // The subtune count and, for a lone tune that ends, its frame count:
         // the shell needs one to bind the number keys and the other to notice
-        // the tune is over. A set is endless as far as the shell cares.
+        // the tune is over. A set never ends on its own.
         int tunes = options.tunes().size();
         int frames = 0;
         try {

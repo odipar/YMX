@@ -109,10 +109,10 @@ public final class YmxEncoder {
     public static Result encode(Tune tune, int ringSize, int chunk,
                                 int loopFrame, boolean progress, int unit) {
         // The default map is a YM tune's, and only a YM tune's: it puts
-        // channel 2 on Timer B, where a .ymr wants Timer D. A front end whose
+        // channel 2 on Timer B, where a .ymr needs Timer D. A front end whose
         // format binds its timers passes its own map to the overload below,
-        // and both CLIs do; this shorthand is for callers that have no opinion
-        // - which in practice means tests.
+        // and both CLIs do; this shorthand is for callers with no such map -
+        // which in practice means tests.
         return encode(tune, ringSize, chunk, loopFrame, progress, unit,
                 YmxFormat.DEFAULT_TIMERS);
     }
@@ -266,7 +266,7 @@ public final class YmxEncoder {
     private static byte[] build(Tune tune, int ringSize, int chunk, int frames,
                                 int split, boolean loops, byte[][] intro, byte[][] loop,
                                 byte[][] samples, int channels) {
-        // Containers carry alignment promises of their own - stream A and D
+        // Containers carry alignment guarantees of their own - stream A and D
         // are read a word at a time - so each is placed on a long boundary.
         int total = YmxFormat.HEADER_SIZE;
         for (byte[] container : intro) {

@@ -24,9 +24,9 @@ import java.util.List;
  * that costs is random access: no frame can be reached by index, because where
  * each stream stands depends on every pop before it, and because a compressed
  * stream can only be read forwards. Replaying the command stream from the start
- * is the only way in. A player does not mind - it runs forward - but a
- * converter wants the whole picture, so this reader replays it once and hands
- * back the flat per-frame view the rest of the pipeline asks for.
+ * is the only way in. A player is unaffected - it runs forward - but a
+ * converter needs the whole picture, so this reader replays it once and hands
+ * back the flat per-frame view the rest of the pipeline reads.
  *
  * <p>Position carries the addressing throughout. A stream's identity is its
  * index in the header's stream map, a frame's identity is its position in the
@@ -184,7 +184,7 @@ public final class YmrReader {
     /**
      * What one frame asked of one timer, and which of its three streams said so.
      *
-     * <p>The values are the timer's wanted configuration: whatever its
+     * <p>The values are the timer's requested configuration: whatever its
      * {@code timer_*_effect}, {@code timer_*_rate} and {@code timer_*_sample}
      * streams last popped, held from frame to frame like any other stream. The
      * three flags are the events, and they are not the same information: popping
@@ -370,7 +370,7 @@ public final class YmrReader {
      * that many pre-converted volume levels, then a four-byte trailer. The size
      * is the padded one - the data is padded to an even byte count - so a reader
      * advances exactly that far to reach the trailer and every block after the
-     * first starts word-aligned, which is what the 68000 player wants.
+     * first starts word-aligned, which is what the 68000 player requires.
      */
     private List<Sample> readSamples(int count) {
         at = HEADER_SIZE;                               // the blocks follow the map

@@ -19,14 +19,14 @@ import org.ymx.YmxFormat;
  * front ends drive the same player, and someone who has test driven a .ym
  * should not have to learn a second set of habits to hear a .ymr.
  *
- * <p>Everything downstream of the packed files is format-blind and is called
+ * <p>Everything downstream of the packed files is format-agnostic and is called
  * rather than copied: {@link MkPrg#build} makes the program, {@link Tools}
  * finds the repo. Two pieces refused to be borrowed, and for the same reason:
  * {@code Packing.pack} shells into {@link org.ym6.Ymx} and {@code TuneSet.of}
  * reads a YM header with {@link org.ym6.Ym6Reader}, so both are .ym to the
  * bone and have small .ymr equivalents here. The Hatari invocation and the
  * marker wait are Play's own private methods, and stand here unchanged - the
- * emulator does not care what the tune was converted from, so neither should
+ * emulator does not depend on what the tune was converted from, so neither should
  * they diverge.
  *
  * <p>A .YMR carries no title, no author and no comment: the format stores

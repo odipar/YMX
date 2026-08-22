@@ -168,7 +168,7 @@ class Model:
 
         A voice in the silenced mask is one whose SID starts this frame:
         the ym2149-rs gap model writes its volume register to zero before
-        installing the loud half, so a closed gate expects exactly that
+        installing the loud half, so a closed gate leaves exactly that
         one write instead of none."""
         regs, drums = self.regs, self.drums
         self.silenced = 0

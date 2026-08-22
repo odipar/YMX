@@ -20,7 +20,7 @@ public record YmxHeader(int ring, int chunk, int unit, int hz, int flags, int fr
         return (flags & YmxFormat.FLAG_LOOPS) != 0;
     }
 
-    /** What SNDH's FRMS tag wants: a looping tune is endless, so zero. */
+    /** What SNDH's FRMS tag requires: a looping tune is endless, so zero. */
     public int frms() {
         return loops() ? 0 : frames;
     }

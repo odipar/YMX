@@ -56,7 +56,7 @@ final class YmxEncoderTest {
         assertEquals(24, word(file, YmxFormat.OFFSET_CHUNK));
 
         // The table is in register order, long-aligned per section (each is a
-        // complete ST4 container with alignment promises of its own), and
+        // complete ST4 container with alignment guarantees of its own), and
         // covers the whole file up to the final alignment pad.
         int expected = YmxFormat.HEADER_SIZE;
         for (int register = 0; register < YmxFormat.STREAMS; register++) {

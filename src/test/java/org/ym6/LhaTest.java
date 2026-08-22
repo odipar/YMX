@@ -82,7 +82,7 @@ final class LhaTest {
 
         byte[] wrongLevel = stored(raw, "-lh0-");
         wrongLevel[20] = 1;
-        wrongLevel[1] += 1;                         // keep the checksum honest
+        wrongLevel[1] += 1;                         // keep the checksum valid
         Ym6Reader.FormatException level = assertThrows(Ym6Reader.FormatException.class,
                 () -> Ym6Reader.read(wrongLevel));
         assertTrue(String.valueOf(level.getMessage()).contains("level"));

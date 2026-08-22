@@ -62,7 +62,7 @@ import org.jspecify.annotations.Nullable;
  * say it, and {@code org.ymr} writes {@code frames} there, while
  * {@code org.ym6} writes whatever the header held even when that is past the
  * end. Both are ranges the field cannot distinguish from a real loop frame,
- * so a third consumer that trusts it will be wrong about one format or the
+ * so a third consumer that relies on it will be wrong about one format or the
  * other. {@code name}, {@code author} and
  * {@code comment} are what a report and the SNDH tags need, empty where a
  * format carries no such thing, and {@code notes} is what the front end had

@@ -169,7 +169,7 @@ public final class YmrEffects {
      * and not the code's continued presence. A voice playing a sample keeps its
      * mixer bits, because RhYMe's player never touches R7 for an effect: the
      * mixer is the song's, written by the {@code mixer} stream like any other
-     * register, and a song that wants its sample clean has already disconnected
+     * register, and a song needing its sample clean has already disconnected
      * the voice itself. And a channel's own commands end the sample running on
      * it: an effect pop of 0 routes to {@code _ymr_stop_channel}, which stops
      * the timer, forgets the effect and the sample and writes the voice's
@@ -273,7 +273,7 @@ public final class YmrEffects {
      * with {@code $08} - so the shape in force is simply the last value the
      * envelope-shape stream popped. The reader marks a frame that popped
      * nothing with {@link YmrReader#NO_ENVELOPE_SHAPE}, which is the marker
-     * the frame write means by it, so what a retrigger wants is the last
+     * the frame write means by it, so what a retrigger needs is the last
      * value before it rather than this frame's absence of one.
      *
      * <p>Before the song has popped a shape at all the spec says to assume

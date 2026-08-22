@@ -11,7 +11,7 @@ package org.ymx;
  *
  * <pre>
  *   0   4  'YMX!'
- *   4   2  format version (7)
+ *   4   2  format version (1)
  *   6   2  flags: bit 0 set when the tune loops, bits 1-4 one per timer
  *           channel, set when the tune uses it
  *   8   4  O, the number of frames
@@ -25,7 +25,7 @@ package org.ymx;
  *  32   2  sample count
  *  34   4*S  byte offset of each intro section, covering frames [0, L)
  * 134   4*S  byte offset of each loop section, covering frames [L, O)
- * 234   ...  the packed sections, then the sample table
+ * 234   ...  the body: the packed sections, then the sample table
  * </pre>
  *
  * <p>Streams 14-24 carry the compiled effect script, one byte per frame
@@ -52,7 +52,7 @@ package org.ymx;
  *
  * <p>Each section is a complete, standard ST4 container - twenty-byte header,
  * then its four streams - packed at unit size 1, placed on a long boundary so
- * the container's own alignment promises hold. The player opens each with the
+ * the container's own alignment guarantees hold. The player opens each with the
  * eight-instruction sequence ST4.S documents, and {@code dst4} can unpack any
  * section straight out of the file for debugging.
  *
@@ -174,7 +174,7 @@ public final class YmxFormat {
      * <p>A loop point is an offset into the sample and a sample cannot reach
      * 64 KB, so a word holds any real one and leaves {@code $FFFF} spare to
      * mean none. That keeps the entry eight bytes and long-aligned, which is
-     * what the player's table of resolved pairs wants.
+     * what the player's table of resolved pairs requires.
      */
     public static final int SAMPLE_ONE_SHOT = 0xFFFF;
 

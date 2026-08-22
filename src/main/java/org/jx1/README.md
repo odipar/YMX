@@ -15,7 +15,7 @@ either is touched.
 [jx1](https://github.com/odipar/jx1), which is itself a port of `dzx1.c`. It
 streams its output through a caller-supplied ring, which is exactly the
 contract `.YMR` is packed for — the ring is at once the decoder's window and
-its output queue, and the packer was told never to look further back than it.
+its output queue, and the packer never looks further back than it.
 
 ## What was changed
 

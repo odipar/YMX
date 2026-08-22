@@ -41,7 +41,7 @@ final class YmrEffectsTest {
     private static final int TIMER_D_EFFECT = 17;
     private static final int TIMER_D_RATE = 18;
 
-    /** A rate no test has an opinion about: prescaler 3, counter 200. */
+    /** A rate no test depends on: prescaler 3, counter 200. */
     private static final int PRESCALER = 3;
     private static final int COUNTER = 200;
 
@@ -54,7 +54,7 @@ final class YmrEffectsTest {
     void eachTimerBecomesTheChannelTheSpecBindsItsVoiceTo() {
         // Timer A drives voice A, Timer B voice B, and Timer D - not C - voice
         // C. The spec's Timer Effects table calls that binding normative, so
-        // the only thing a converter may do with it is obey.
+        // the only thing a converter may do with it is apply it.
         byte[] image = new Ymr()
                 .frame(TIMER_A_EFFECT, TIMER_A_RATE, TIMER_B_EFFECT, TIMER_B_RATE,
                         TIMER_D_EFFECT, TIMER_D_RATE)
@@ -548,7 +548,7 @@ final class YmrEffectsTest {
 
         assertEquals(EffectScript.action(EffectScript.VERB_START_TOGGLE, 0, PRESCALER),
                 script.actions()[0][5] & 0xFF);
-        // The gate never opens: the sample wanted voice A muted and so does the
+        // The gate never opens: the sample needed voice A muted and so does the
         // square, so this is a change of owner and not a sample-end edge.
         assertEquals(EffectScript.M_CHANNEL_0, script.m()[5] & 0xFF);
         assertTrue(script.reopens().isEmpty(), script.reopens().toString());

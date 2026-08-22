@@ -29,7 +29,7 @@
 ;   - the USP is never touched (YMX_SUPER_HOST stays 0), and every buffer
 ;     lives inside the blob.
 ;
-; One honest limitation: a native host that dispatches PLAY from its Timer C
+; One real limitation: a native host that dispatches PLAY from its Timer C
 ; hook holds the MFP's Timer C in-service for the length of the call, which
 ; delays Timer D ticks (timer channel 1's) by up to that length - pending, not
 ; lost. VBL- and emulator-hosted playback has no such window.

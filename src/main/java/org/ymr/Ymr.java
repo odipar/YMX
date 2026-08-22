@@ -18,7 +18,7 @@ import org.ymx.YmxFormat;
  * deliberately so: every flag that means the same thing is spelled the same
  * way, and the report answers the same questions in the same order, because
  * the two tools feed the same player and a build script should not have to
- * care which one made a file.
+ * depend on which one made a file.
  *
  * <p>What is missing from that list is what a .YMR does not have. There is no
  * {@code -drumhz}: a YM digidrum carries the rate it was sampled at and can be
