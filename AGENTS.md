@@ -1,13 +1,12 @@
 # House style
 
-Rules for prose: documents, code comments, commit messages. Each rule appears
-once.
+Rules for prose: documents, code comments, commit messages. Each appears once.
 
 ## Plain words
 
-Standard terms, not coinages. A compound that names one thing twice is a term
-the reader has to decode, and the plain description is usually shorter than
-the compound it replaces.
+Standard terms, not coinages. A compound that says one thing twice is a term
+the reader has to decode, and the plain description is shorter than the
+compound it replaces.
 
 ## One vocabulary
 
@@ -18,7 +17,7 @@ to keep in step.
 ## Nothing acts on its own
 
 No file, program or algorithm wants, knows, decides, expects or refuses. The
-plain verb is always available: a source *needs*, a header *declares*, a stage
+plain verb is there: a source *needs*, a header *declares*, a stage
 *resolves*, a reader *does not validate*.
 
 Established technical vocabulary is not this. A resource has an *owner*, a
@@ -26,10 +25,10 @@ caller *claims* it, a register *survives* a call.
 
 ## Say it once
 
-Four ways one thing gets said more than once:
+Four habits that state an idea twice:
 
-- **the triple.** `no stale value, no zero, no bus cycle` — say what happens
-  and stop.
+- **three of a kind.** `no stale value, no zero, no bus cycle` — say what
+  happens and stop.
 - **the cleft.** `X is what makes Y` is `X makes Y`.
 - **the restatement.** `— which is a compile-time edit` is `— a compile-time
   edit`. Drop `which is` where a comma already carries the appositive; keep it
@@ -49,17 +48,16 @@ thing is called.
 
 ## A specification states operations
 
-Describe what happens, in terms the reader can observe: what is written, in
-what order, and what is left alone. Name no product, routine or source file.
-An implementation follows the specification; the specification does not defer
-to an implementation, and a rule that needs a cross-reference to be understood
-is not yet stated operationally.
+Describe what happens, in terms an implementer can check: what is written, in
+what order, and what is left alone. Name no product, routine or source file —
+an implementation follows the specification, not the other way round. A rule
+that needs a cross-reference to be understood is not yet stated operationally.
 
 ## True beats accurate
 
 A sentence that is literally correct but implies something false is wrong. A
-figure given without the comparison that makes it meaningful misleads as
-thoroughly as a wrong figure.
+figure given without the comparison that makes it meaningful misleads as much
+as a wrong figure.
 
 ## Measure, do not recall
 
