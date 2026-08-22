@@ -29,7 +29,7 @@ import org.ymx.YmxFormat;
  * caller break it would only produce a file that plays the wrong voices. And
  * there is no {@code -sidresume}, because the phase model it selects is a YM
  * argument: RhYMe's PWM handler restarts at its loud half whenever the effect
- * is configured, which is the default model already.
+ * is configured, the default model already.
  *
  * <p>Three timer channels is one more than a YM tune uses, so the player
  * decodes 23 of the format's 25 streams rather than 21, and the chunk C has to
@@ -38,7 +38,7 @@ import org.ymx.YmxFormat;
 public final class Ymr {
 
     /** How many of the format's streams a three-channel tune makes the player
-     * decode, which is the floor the chunk size has to clear. */
+     * decode, the floor the chunk size has to clear. */
     private static final int LIVE_STREAMS = YmxFormat.liveStreams(YmxFormat.flagChannel(0)
             | YmxFormat.flagChannel(1) | YmxFormat.flagChannel(2));
 
@@ -332,7 +332,7 @@ public final class Ymr {
      *
      * <p>Returns the tune itself when the shape already fits, the padded tune
      * otherwise - or null when no safe frame exists near a boundary that needs
-     * one, which is the caller's cue to drop to {@code -k1}.
+     * one, the caller's cue to drop to {@code -k1}.
      */
     private static @Nullable Tune padToUnit(Tune tune, int loopFrame, int unit) {
         Tune padded = Tune.padToUnit(tune, loopFrame, unit, safeToDuplicate(tune));
@@ -472,7 +472,7 @@ public final class Ymr {
         }
     }
 
-    /** The file's own name, which is the only name a .YMR has. */
+    /** The file's own name, the only name a .YMR has. */
     private static String stem(String path) {
         return Path.of(path).getFileName().toString().replaceAll("(?i)\\.ymr$", "");
     }

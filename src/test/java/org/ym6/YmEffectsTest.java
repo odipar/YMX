@@ -158,7 +158,7 @@ final class YmEffectsTest {
     @Test
     void theLevelHeldEffectRepeatsItsBytes() {
         // SID held for three frames with a count change mid-way: the stream
-        // carries the code every frame, which is the format's own contract -
+        // carries the code every frame, the format's own contract -
         // and what lets the player treat "same code" as reprogram-count-only.
         byte[][] r = blank();
         for (int frame = 2; frame <= 4; frame++) {

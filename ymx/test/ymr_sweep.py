@@ -54,12 +54,11 @@ quietly skipped.
   * Nothing about a volume register under a running RTE. The
     retrigger stream's shape travels in the script, so the front end writes
     nothing over that byte and it is the .YMR's own on every frame: it is
-    compared whole, like any other open register, which is stricter than the
+    compared whole, like any other open register, stricter than the
     half-comparison it replaced. What is NOT checked is the shape itself,
     since the value only reaches the chip through a tick handler this rig
     never runs - the last value envelope_shape popped, or $08 before the song
-    has popped one - which is a
-    claim about the file rather than about the converter.
+    has popped one - a claim about the file rather than about the converter.
   * R14 and R15. They are the chip's I/O ports, a .YMR has no stream for
     them, and the rig faults on a write above R13 in any case.
   * A timer's data register as read back. It reads as the count the timer has
@@ -107,7 +106,7 @@ MFP_CLOCK = 2457600
 # Effect types, as the timer_*_effect stream carries them.
 FX_NONE, FX_PWM, FX_SAMPLE, FX_RTE = 0, 1, 2, 3
 
-# The engine's code-byte kinds, which is the vocabulary the skip is decided
+# The engine's code-byte kinds, the vocabulary the skip is decided
 # in: a PWM becomes a toggle stream, a Sample a PCM stream, an RTE a
 # retrigger stream. Only the first two own a volume register.
 KIND_TOGGLE, KIND_PCM, KIND_RETRIGGER = 0x00, 0x40, 0xC0
@@ -529,7 +528,7 @@ class Stage:
         the dump's own byte. The shape a retrigger stream
         restarts is carried in the script, and the .ymr front end reads it
         off R13, so nothing is hidden in the nibble and this is
-        an ordinary open register: it is compared whole, which is a stricter
+        an ordinary open register: it is compared whole, a stricter
         check than the half-comparison a smuggled shape used to allow.
       * STARTED - a fresh square arms this frame. It restarts at phase zero,
         so the player writes the voice silent itself, after the register

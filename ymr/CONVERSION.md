@@ -185,7 +185,7 @@ on the same frame as the rate, which is the row.
   keeps to it loses exactly the one byte; nothing in the reader enforces that
   ceiling, and a file that breaks it loses whatever it is over by.
 * **A PCM tick still has no compare, and loops anyway.** It walks forward and
-  stops on the first byte with bit 7 set, which is the whole of its end
+  stops on the first byte with bit 7 set, the whole of its end
   condition and the reason it costs no compare per tick. From **v10** the
   sample table carries a loop word beside each sample, `YMX_init` resolves it
   to an address once, and the tick that meets the end marker moves that
@@ -241,7 +241,7 @@ on the same frame as the rate, which is the row.
   level for most of one frame, against the whole frames of a sample that
   should not be playing. No ordering of the verbs closes it either:
   the actions sit after the burst so their varying cost cannot jitter the
-  register writes, which is a guarantee worth more than this sliver costs.
+  register writes, a guarantee worth more than this sliver costs.
 
 Everything else the conversion has to change, it counts and names the same way:
 

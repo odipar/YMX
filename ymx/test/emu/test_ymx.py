@@ -89,7 +89,7 @@ def assemble(unit: int = 1, super_host: bool = False, perf: bool = False):
                       + ('YMX_SUPER_HOST equ  1\n' if super_host else '')
                       + ('YMX_PERF    equ     1\n' if perf else '')
     # The frame write masks interrupts by default; YMX_NOMASK=1 runs the
-    # whole rig against the variant that does not, which is the tools'
+    # whole rig against the variant that does not, the tools'
     # -nomask.
     + ('YMX_MASK_BURST equ  0\n' if os.environ.get('YMX_NOMASK') else '')
                       + '        include "YMX.S"\n'
@@ -1041,7 +1041,7 @@ def run_shape_source() -> str:
     and reading the tick's own patched immediate, which no chip write reveals
     and no other rig looks at.
     """
-    # The flag-clear path, which is every YM tune. A buzzer on voice B with
+    # The flag-clear path, every YM tune. A buzzer on voice B with
     # R9's nibble at 11, and R13 never written: if the player were
     # reading the shadow it would restart 8, the value a tune that has
     # written no shape is taken to mean.

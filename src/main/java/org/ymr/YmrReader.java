@@ -47,7 +47,7 @@ import java.util.List;
  * register, count) and writes the bytes to consecutive registers in the order
  * they arrive - and so does any real file. Take the 16463 tone entries of the
  * {@code signals-grouped.ymr} export: read as big-endian words, 15895 of them
- * land above the YM's 12-bit period range, which is most of the song; read in
+ * land above the YM's 12-bit period range, most of the song; read in
  * register order, not one of their coarse bytes exceeds the four bits R1, R3
  * and R5 have. The spec is wrong to imply otherwise, and this reader follows
  * the bytes.
@@ -139,11 +139,11 @@ public final class YmrReader {
      *                   value; R13 carries {@link #NO_ENVELOPE_SHAPE} on every
      *                   frame that did not pop {@code envelope_shape}. Laid out
      *                   one vector per register rather than one record per
-     *                   frame, which is the shape a frame stream has downstream,
+     *                   frame, the shape a frame stream has downstream,
      *                   so the conversion hands them on rather than transposing
      *                   them.
      * @param samples    the sample blocks, in the order the file stores them,
-     *                   which is the order a {@code timer_*_sample} entry indexes
+     *                   the order a {@code timer_*_sample} entry indexes
      * @param timerA     what every frame asked of Timer A, one entry per frame
      * @param timerB     the same for Timer B
      * @param timerD     the same for Timer D
@@ -462,7 +462,7 @@ public final class YmrReader {
                 timers.get(0), timers.get(1), timers.get(2));
     }
 
-    /** Applies one stream's next entry, which is the whole of what a pop does. */
+    /** Applies one stream's next entry, the whole of what a pop does. */
     private void pop(int stream, int frame, byte[][] entries, boolean[] present) {
         if (!present[stream]) {
             throw new FormatException("frame " + frame + " pops " + NAME[stream]

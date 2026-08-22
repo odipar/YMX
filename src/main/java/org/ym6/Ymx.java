@@ -412,7 +412,7 @@ public final class Ymx {
      *
      * <p>Returns the tune itself when the shape already fits, the padded tune
      * otherwise - or null when no safe frame exists near a boundary that needs
-     * one, which is the caller's cue to drop to {@code -k1}.
+     * one, the caller's cue to drop to {@code -k1}.
      */
     static @Nullable Tune padToUnit(Ym6Reader.Song song, Tune tune, int loopFrame,
                                     int unit) {

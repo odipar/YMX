@@ -233,7 +233,7 @@ public record Tune(int frames, int frameRate, long masterClock, int loopFrame,
     }
 
     /** Which two frames are duplicated and how often - one plan, applied to
-     * every stream, which is the only way they stay one timeline. */
+     * every stream, the only way they stay one timeline. */
     private record Padding(int frames, int atSplit, int splitPad, int atEnd,
                            int endPad, int total) {
 

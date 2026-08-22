@@ -25,7 +25,7 @@ public final class St4Optimizer {
     public static final int INITIAL_OFFSET = 1;
 
     /**
-     * Inner-loop steps this parse will take, which is known before it starts.
+     * Inner-loop steps this parse will take, known before it starts.
      *
      * <p>The COUNT is exact and owes nothing to the data: position {@code
      * index} is tried against every offset from 1 to {@code clamp(index, 1,

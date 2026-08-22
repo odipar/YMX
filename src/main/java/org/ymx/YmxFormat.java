@@ -169,7 +169,7 @@ public final class YmxFormat {
     public static final int SAMPLE_ENTRY_SIZE = 8;
 
     /**
-     * A sample's {@code loopStart} when it does not loop, which is most of
+     * A sample's {@code loopStart} when it does not loop, most of
      * them: a digidrum is a hit and stops.
      *
      * <p>A loop point is an offset into the sample and a sample cannot reach

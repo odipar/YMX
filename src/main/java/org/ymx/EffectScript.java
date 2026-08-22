@@ -611,7 +611,7 @@ public final class EffectScript {
      * continued presence) says so in bit 3, and then a code that differs
      * ONLY in its prescaler is a rate change: the same kind, the same voice,
      * the same sample, and no new trigger. Reading it as a trigger restarts
-     * a sample the song meant to bend, which is the loudest thing the
+     * a sample the song meant to bend, the loudest thing the
      * conversion used to get wrong.
      */
     private boolean retunesPcm(int old, int code) {
@@ -721,7 +721,7 @@ public final class EffectScript {
         // one timer runs both, so arming the square necessarily ends the
         // sample, and there is nothing to wait for. Retrying instead would
         // wait out the sample's whole computed length - the arbitration below
-        // is for a sample another channel owns, which is the only case a YM
+        // is for a sample another channel owns, the only case a YM
         // dump can produce. The voice stays skipped, because the square
         // requires it shut too, and no reopen edge is recorded.
         if (semantics.channelEndsPcm()) {

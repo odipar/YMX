@@ -272,7 +272,7 @@ public final class YmrEffects {
      * the player's own copy of the shape - {@code _ymr_shadow+R_ENVS}, primed
      * with {@code $08} - so the shape in force is the last value the
      * envelope-shape stream popped. The reader marks a frame that popped
-     * nothing with {@link YmrReader#NO_ENVELOPE_SHAPE}, which is the marker
+     * nothing with {@link YmrReader#NO_ENVELOPE_SHAPE}, the marker
      * the frame write means by it, so what a retrigger needs is the last
      * value before it rather than this frame's absence of one.
      *

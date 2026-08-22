@@ -199,7 +199,7 @@ series, and it is ticked.)
 A property of the tune, fixed for the whole of it:
 
 - **50 a second** usually - the screen refresh, the **VBL** or vertical
-  blank, which is the PAL and SECAM rate. All 543 readable files of the
+  blank, the PAL and SECAM rate. All 543 readable files of the
   544-file **corpus** run at 50.
 - **60 a second** on NTSC machines.
 - **200 a second** for four times the detail in arpeggios, volume shapes
@@ -263,7 +263,7 @@ writing the same register:
 - **tearing**. A tick lands between a register's select and its value,
   and the value reaches whatever register the tick selected. Two cures:
   write select and value in one instruction, which an interrupt cannot
-  split, or mask interrupts for the burst - which is safe but delays
+  split, or mask interrupts for the burst - safe but delays
   every tick that falls inside it.
 - **contention**. Frame write and timer stream target the same register.
   Prevented by giving the register an owner and skipping it in the burst.
@@ -471,7 +471,7 @@ downstream of the other.
 The packages say the same thing: `org.ym6` is the YM front end, and
 `org.ymx` holds the engine, the format and the tools that work on a `.ymx`
 file whatever made it. A front end is compiled against the engine, and the
-engine against no front end - which is the layering said in a way the
+engine against no front end - the layering said in a way the
 compiler can check.
 
 ## If you know these ideas from elsewhere
@@ -487,7 +487,7 @@ compiler can check.
 | the noise generator | an **LFSR**, a linear-feedback shift register |
 
 **Phase policy** is the one idea without a settled name elsewhere. Synths
-have free-running and retriggered LFOs, which is the same question.
+have free-running and retriggered LFOs, the same question.
 Chiptune players are rarely explicit about it though each is consistent -
 which is why two players can disagree audibly on the same file and both
 be self-consistent.

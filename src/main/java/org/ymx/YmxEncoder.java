@@ -48,7 +48,7 @@ public final class YmxEncoder {
     public record Stream(int register, boolean loop, int frames, int packedSize, int longestOp) {}
 
     /** The finished file plus the per-stream numbers the CLI reports; the
-     * tune is the one that was actually packed, which is the padded one
+     * tune is the one that was actually packed, the padded one
      * where the shape needed padding. */
     public record Result(byte[] file, List<Stream> streams, int ringSize, int chunk,
                          int loopFrame, boolean loops, int unit, Tune tune,
@@ -140,7 +140,7 @@ public final class YmxEncoder {
             throw new IllegalArgumentException("loop frame " + loopFrame
                     + " is not inside a tune of " + tune.frames() + " frames");
         }
-        // Without a loop the intro covers everything, which is the same thing
+        // Without a loop the intro covers everything, the same thing
         // as looping at the end - so the player needs only one rule.
         if (tune.frames() % unit != 0 || (loops ? loopFrame : 0) % unit != 0) {
             throw new IllegalArgumentException("a tune of " + tune.frames()
