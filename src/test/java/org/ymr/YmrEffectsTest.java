@@ -348,7 +348,7 @@ final class YmrEffectsTest {
     @Test
     void aSampleThatDoesNotLoopIsHandedOverExactlyAsTheFileStoresIt() {
         // RhYMe's exporter has already reduced a sample to the 4-bit levels the
-        // volume register takes, which is the one thing a .ymr hands over that
+        // volume register takes, the one thing a .ymr hands over that
         // needs no conversion.
         byte[] levels = {0x08, 0x0F, 0x00, 0x08};
         byte[] image = new Ymr()

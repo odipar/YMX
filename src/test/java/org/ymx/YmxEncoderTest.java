@@ -71,7 +71,7 @@ final class YmxEncoderTest {
     /** Every vector as the encoder should build them: registers
      * source-mapped through the split rotation with R7 carrying the baked
      * mixer force, then the compiled script streams with their unread
-     * bytes repeating. The same assembly the encoder performs - which is
+     * bytes repeating. The same assembly the encoder performs -
      * the point: the file must decode back to exactly this. */
     static byte[][] expectedVectors(Tune source, int loopFrame, int unit) {
         EffectScript.Result script = EffectScript.compile(source, loopFrame, unit);

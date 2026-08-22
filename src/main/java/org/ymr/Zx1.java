@@ -29,7 +29,7 @@ import org.jx1.Decompressor;
  * little ahead of where the frame tick reads, and the tick reads the bytes out
  * before the write pointer laps them. That ring is all the memory the stream
  * ever gets on a half-megabyte machine, and it is the same number the packer
- * was handed as its offset limit - which is the whole of the format's memory
+ * was handed as its offset limit - the whole of the format's memory
  * claim. Ring size and compression ratio are one decision, and the exporter
  * shares a fixed budget out between the streams to pay for it.
  *
@@ -38,7 +38,7 @@ import org.jx1.Decompressor;
  * overreached its ring is the one case where that matters: the ring has already
  * overwritten what the match points at, so the Atari copies out whatever the
  * ring holds now. Rather than pass that on, a stream long enough to lap its
- * ring is decoded twice - once through a window nothing can outrun, which is
+ * ring is decoded twice - once through a window nothing can outrun,
  * the decode the packer meant, and once through the ring the map declares, which
  * is the decode the Atari performs - and the stream is refused unless the two
  * agree. They agree for every well-formed file; when they do not, the file is
@@ -53,7 +53,7 @@ import org.jx1.Decompressor;
  *
  * <h2>Assertions are a build flag, not a diagnosis</h2>
  *
- * <p>Upstream reports malformed data by tripping a Java assertion, which is the
+ * <p>Upstream reports malformed data by tripping a Java assertion, the
  * right stance for a decoder whose caller packed the data it is handing over.
  * Here the data is a file somebody else wrote, and two things follow from that.
  * The rejection cannot be worded by the assertion, which fires inside a decoder
@@ -114,7 +114,7 @@ import org.jx1.Decompressor;
  * <p>A {@code ring_size} of 0 is not a small ring but a different thing
  * entirely: the stream is stored uncompressed and its bytes are the data. The
  * exporter stores a stream that way whenever packing it would not make it
- * smaller, which is routine for the short ones - five bytes pack to six.
+ * smaller, routine for the short ones - five bytes pack to six.
  *
  * <p>Everything this class rejects is a {@link YmrReader.FormatException},
  * because a stream that will not decode is a malformed .YMR image like any

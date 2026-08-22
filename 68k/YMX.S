@@ -468,7 +468,7 @@ YMX_init:
         move.l  d0,YS_END(a2)
 
 ; A tune that loops from frame 0 has no intro streams, so its registers start
-; on the loop section - which is then the whole tune. The load of L comes
+; on the loop section - then the whole tune. The load of L comes
 ; last because it is the branch condition: a move to a data register writes
 ; the flags, a lesson the original version of this choice taught by always
 ; picking the intro table and leaning on the section-exhausted path to

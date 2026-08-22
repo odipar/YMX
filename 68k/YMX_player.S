@@ -56,7 +56,7 @@ start:
 ; From here to the handback the machine is ours alone: every TOS interrupt
 ; silenced, the VBL unshared, the keyboard read straight off the ACIA. The
 ; SNDH blob does its own save/restore of the timers it claims - two,
-; for a YM tune - which is redundant under this takeover and exactly right
+; for a YM tune - redundant under this takeover and exactly right
 ; when the same bytes run under a jukebox.
         move.l  #play,-(sp)
         move.w  #Supexec,-(sp)
@@ -101,7 +101,7 @@ play:
         clr.b   $FFFFFA15.w
 ; And every timer STOPPED, not merely silenced. Clearing the enable bits
 ; leaves TOS's timers counting underneath - Timer D is its RS232 baud
-; generator and keeps ticking at a few hundred kHz - which is machine state
+; generator and keeps ticking at a few hundred kHz - machine state
 ; the tune did not name. A host that takes the machine over should give
 ; the player a quiet MFP; the player itself claims only what its tune
 ; names. Data registers are saved too: a timer reloads from them.

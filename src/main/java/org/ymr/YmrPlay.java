@@ -239,7 +239,7 @@ public final class YmrPlay {
         }
     }
 
-    /** The file's own name, which is the only name a .YMR has: it becomes the
+    /** The file's own name, the only name a .YMR has: it becomes the
      * work directory, the packed file, and the subtune the number keys pick. */
     private static String stem(Path ymr) {
         return ymr.getFileName().toString().replaceAll("(?i)\\.ymr$", "");

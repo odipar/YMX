@@ -63,7 +63,7 @@ final class YmxTest {
     @Test
     void givesUpOnAShapeWithNoSafeFrameNearTheBoundary() {
         // Every frame writes R13, so no frame may be duplicated: an envelope
-        // restarted twice is audible, which is the whole of the predicate.
+        // restarted twice is audible, the whole of the predicate.
         byte[][] registers = Ym6TestData.registers(FRAMES);
         for (int frame = 0; frame < FRAMES; frame++) {
             registers[13][frame] = 0x0A;
@@ -143,7 +143,7 @@ final class YmxTest {
         // this CLI's error(), which prints and calls System.exit - so a test
         // that provoked it would take the JVM with it rather than fail. What
         // it now says is "Empty trim window: frames 0..0 of 900" instead of
-        // "Invalid parameter value 0", which is the point of moving the check
+        // "Invalid parameter value 0", the point of moving the check
         // off the parser, and it is checked by hand.
         //
         // The same exit is why a regression here does not read as a failed
