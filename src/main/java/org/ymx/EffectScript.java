@@ -733,7 +733,7 @@ public final class EffectScript {
         }
         int value = parameter(f, voice);
         // The gap models fork on {@code masked}, which only a resume-mode
-        // release sets (doc/experiments/2026-08-20-sid-phase-semantics.md):
+        // release sets (doc/experiments.md, "SID phase semantics"):
         // a re-arrival on a channel whose masked timer still runs this stream's
         // square at the same prescaler RESUMES - unmask, reload only what
         // changed, the phase ran on through the gap. A prescaler change

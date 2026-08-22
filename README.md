@@ -15,15 +15,15 @@ re-derive on every frame what it means. YMX resolves all of that when the
 file is packed and writes down the outcome, so the player compares nothing
 and every frame costs the same.
 
-[**SPEC.md**](SPEC.md) is the format: the container, the streams, the verbs
-and the frame contract.
+[**doc/SPEC.md**](doc/SPEC.md) is the format: the container, the streams, the
+verbs and the frame contract. Everything else worth reading is beside it.
 
 | | |
 |---|---|
-| [SPEC.md](SPEC.md) | the format specification |
-| [CONVERSION.md](CONVERSION.md) | what a YM file or a `.YMR` loses on the way in |
+| [doc/SPEC.md](doc/SPEC.md) | the format specification |
+| [doc/CONVERSION.md](doc/CONVERSION.md) | what a YM file or a `.YMR` loses on the way in |
 | [doc/terminology.md](doc/terminology.md) | the vocabulary both use |
-| [doc/experiments](doc/experiments/README.md) | ideas measured against the real corpus, and what the measurements said |
+| [doc/experiments.md](doc/experiments.md) | ideas measured against the real corpus, and what the measurements said |
 
 ## Test driving one
 
@@ -118,11 +118,14 @@ bugs in this player were found.
 YMX is the `.yx6` container from the
 [ST4](https://github.com/odipar/ST4) repository, adopted whole and renumbered
 to version 1. ST4 is the compression format underneath, and stays there; this
-repository vendors the parts it needs and has its own life-cycle. The
-measurements that shaped the player came across too, in
-[doc/experiments](doc/experiments/README.md); what stayed behind is the
+repository vendors the parts it needs and has its own life-cycle.
+
+The results of the experiments that shaped the player came across too, in
+[doc/experiments.md](doc/experiments.md). What stayed behind is their full
+logs — the false trails and the instrument readings — and the
 version-by-version argument for a container that now simply is what
-[SPEC.md](SPEC.md) says, and it is in ST4's history if anyone wants it.
+[doc/SPEC.md](doc/SPEC.md) says. Both are in ST4's history if anyone wants
+them.
 
 ## License and attribution
 

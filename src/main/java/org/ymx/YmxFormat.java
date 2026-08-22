@@ -40,7 +40,7 @@ package org.ymx;
  * where the player can stop decoding. O and L count PLAYED frames: a loop
  * whose wrap state differs from its first arrival is rotated until the two
  * agree, so the file may carry a few frames twice, compiled differently.
- * {@link EffectScript} owns the byte semantics; see SPEC.md for the
+ * {@link EffectScript} owns the byte semantics; see doc/SPEC.md for the
  * design.
  *
  * <p>The sample table is {@code count} entries of {byte offset (long),

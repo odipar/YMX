@@ -21,7 +21,7 @@
 ; TIMER STREAMS: series of values written to one register between frames,
 ; timer-driven, as against the FRAME STREAMS that carry the music itself.
 ; Sinus-SID, which no player has ever implemented, is dropped at pack time.
-; SPEC.md is the format and doc/terminology.md the vocabulary.
+; doc/SPEC.md is the format and doc/terminology.md the vocabulary.
 ;
 ; REQUIRES ST4_wrap.S, built for the SAME unit size the tune was packed with
 ; (YMX -kK; the packer's default is 2). Include both, in either order, with

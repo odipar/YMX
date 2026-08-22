@@ -2,7 +2,7 @@
 
 A `.ymx` is packed out of a YM file or a `.YMR` register dump — RhYMe's own
 export — and neither crosses whole. This is what each front end changes, what
-it counts, and what it tells you it did. [README.md](README.md) is how to run
+it counts, and what it tells you it did. [../README.md](../README.md) is how to run
 the packers, [SPEC.md](SPEC.md) the container they write.
 
 ## What the conversion is
@@ -13,8 +13,8 @@ byte or two per frame, so the music never exists in memory as a whole; both
 give every stream a ring that is the whole of its memory; both are packed
 against that ring so no back-reference can reach outside it. The lineage is
 literally shared — a .YMR's streams are ZX1, which is what ST4 grew out of,
-which is why [`org.ymr.Zx1`](src/main/java/org/ymr/Zx1.java) reads them
-through the [vendored jx1 decoder](src/main/java/org/jx1/README.md) rather
+which is why [`org.ymr.Zx1`](../src/main/java/org/ymr/Zx1.java) reads them
+through the [vendored jx1 decoder](../src/main/java/org/jx1/README.md) rather
 than a second implementation of a format that already has one.
 
 What differs is what a frame costs. A .YMR stores one entry per CHANGE and a
@@ -23,7 +23,7 @@ nothing after the frame it arrives on — and no frame can be reached except by
 replaying every frame before it. A `.ymx` stores one value per frame per
 stream and lets ST4 find the repetition, which is why a frame is a read from
 each ring and no bookkeeping at all. So the conversion's shape is:
-[`YmrReader`](src/main/java/org/ymr/YmrReader.java) replays the command
+[`YmrReader`](../src/main/java/org/ymr/YmrReader.java) replays the command
 stream once, from the start, and hands on the flat per-frame view. The pops
 become frames.
 
@@ -159,7 +159,7 @@ that settled it, and the tune that got it wrong.
 ### What a .ymr gives up
 
 Everything not on this list is exact, and
-[test/ymr_sweep.py](ymx/test/ymr_sweep.py) is what says so: it replays a converted
+[test/ymr_sweep.py](../ymx/test/ymr_sweep.py) is what says so: it replays a converted
 tune on the real player and compares every write `YMX_play` makes to the sound
 chip, plus which MFP timers it claimed, against its own decoder and replay of
 the .YMR image. It walks 1,200 frames of a long tune, and the whole of one —

@@ -22,7 +22,7 @@ revisions inside the [ST4](https://github.com/odipar/ST4) repository, adopted
 whole and renumbered to 1. There is no older YMX version to stay compatible
 with.
 
-**Vocabulary.** This document uses [doc/terminology.md](doc/terminology.md)
+**Vocabulary.** This document uses [terminology.md](terminology.md)
 throughout. The four words it leans on hardest:
 
 | word | meaning |
