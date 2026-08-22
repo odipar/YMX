@@ -201,6 +201,8 @@ A property of the tune, fixed for the whole of it:
 - **50 a second** usually - the screen refresh, the **VBL** or vertical
   blank, the PAL and SECAM rate. All 543 readable files of the
   544-file **corpus** run at 50.
+  <!-- The corpus figures in this file are re-measured by CorpusNumbersTest,
+       which reads them back out of these sentences: keep the shape of them. -->
 - **60 a second** on NTSC machines.
 - **200 a second** for four times the detail in arpeggios, volume shapes
   and pitch slides. Not the screen but a timer in the **MFP**, the ST's
