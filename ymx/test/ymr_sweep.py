@@ -237,7 +237,7 @@ class Ymr:
     A .YMR stores no frames. Everything a frame can change lives in a stream,
     a stream holds one entry per change rather than one per frame, and a
     separate command stream lists for every frame the streams to pop. Popping
-    is what applies an entry, so a held note costs nothing after the frame it
+    applies an entry, so a held note costs nothing after the frame it
     arrives on - and no frame can be reached by index, which is why the only
     way in is to replay the command stream from the start, once, and write
     down what the chip held on every frame as it goes.
@@ -831,7 +831,7 @@ def compare(dump, frame, source, writes, skipped, started):
 
     # The volumes, against the skips. A skipped voice's register must be absent
     # from the frame's writes - the player mutes the burst write, so nothing
-    # at all reaches the chip for it - and an open one must be exact.
+    # reaches the chip for it - and an open one must be exact.
     for voice in range(3):
         register = 8 + voice
         if started & (1 << voice):

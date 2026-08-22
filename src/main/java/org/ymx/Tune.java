@@ -29,8 +29,8 @@ import org.jspecify.annotations.Nullable;
  * is why {@link #padToUnit} lives here rather than in each front end.
  *
  * <p>A code byte carries the kind in bits 7-6, the voice plus one in bits
- * 5-4 (so zero voice bits mean an idle channel and a zero byte means nothing
- * at all), and the MFP prescaler index in bits 2-0; the count byte is the
+ * 5-4 (so zero voice bits mean an idle channel and a zero byte means nothing),
+ * and the MFP prescaler index in bits 2-0; the count byte is the
  * MFP timer count that finishes the rate. Bit 3 is free, and a front end
  * whose triggers are events rather than repeated codes uses it to make two
  * triggers of one thing differ. The streams are as wide as

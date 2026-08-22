@@ -19,8 +19,8 @@ import java.util.List;
  * <p>A .YMR stores no frames. Everything a frame can change lives in a STREAM,
  * and a stream holds one entry per change rather than one per frame; a separate
  * COMMAND STREAM lists, for every frame, the streams to POP, and popping a
- * stream is what applies its next entry. A held note, a static mixer and an
- * idle timer therefore cost nothing at all after the frame they arrive on. What
+ * stream applies its next entry. A held note, a static mixer and an idle
+ * timer therefore cost nothing after the frame they arrive on. What
  * that costs is random access: no frame can be reached by index, because where
  * each stream stands depends on every pop before it, and because a compressed
  * stream can only be read forwards. Replaying the command stream from the start
@@ -310,7 +310,7 @@ public final class YmrReader {
 
     /**
      * Reads the map, whose entries are (offset, loop offset, ring size,
-     * reserved). An offset of 0 means the stream is not in the file at all -
+     * reserved). An offset of 0 means the stream is not in the file -
      * nothing ever popped it - and a song that runs no timer effect leaves out
      * all nine timer streams that way.
      *

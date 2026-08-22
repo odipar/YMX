@@ -524,7 +524,7 @@ public final class YmrEffects {
         }
         // A sample that has played out leaves the channel idle rather than
         // holding a code nothing acts on: the script releases a PCM channel
-        // without emitting anything at all - the marker tick is what ended it -
+        // without emitting anything - the marker tick ended it -
         // and letting the code go frees the volume register's frame write,
         // which is where the voice's own volume comes back from.
         return started || frame < armedTo ? head | trigger : 0;

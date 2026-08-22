@@ -416,7 +416,7 @@ final class YmrEffectsTest {
 
         // A .ymr's trigger is a pop, not the code's continued presence, so the
         // frames after it are silent in the script: no second START_PCM, and
-        // nothing at all where a YM dump would have re-fired the sample.
+        // nothing where a YM dump would have re-fired the sample.
         assertEquals(EffectScript.action(EffectScript.VERB_START_PCM, 0, 7),
                 script.actions()[0][0] & 0xFF);
         for (int frame = 1; frame < script.frames(); frame++) {
@@ -475,9 +475,10 @@ final class YmrEffectsTest {
         assertEquals(EffectScript.action(EffectScript.VERB_RELEASE, 0, 0),
                 script.actions()[0][5] & 0xFF);
         // And the voice rejoins the frame write on that same frame. The player
-        // applies the skip bits before the register burst and the script's actions after it, so
-        // the voice's own volume is back on the chip inside the frame the song
-        // placed it in - no skew to correct anywhere.
+        // applies the skip bits before the register burst and the script's
+        // actions after it, so the voice's own volume is back on the chip
+        // inside the frame the song placed it in - no skew to correct
+        // anywhere.
         assertEquals(EffectScript.M_CHANNEL_0 | EffectScript.M_SKIPS,
                 script.m()[5] & 0xFF);
         assertEquals(0x0D, tune.registers()[8][5] & 0xFF);
