@@ -12,7 +12,7 @@ a rotated tune's played timeline shows some source frames twice, and the
 walk follows the same map the packer compiled.
 
 The effect-owned registers are checked against an INDEPENDENT model of the
-script semantics, written here in Python: a gated voice's volume register
+script semantics, written here in Python: a skipped voice's volume register
 must be absent from the frame's writes, an open one exact; R7 must carry
 exactly the baked mixer force of the drums the model says are running. The
 model recomputes drum windows - downsample factors, durations, retriggers,
@@ -145,7 +145,7 @@ def drum_scales(fmt, frames, drums, regs):
 
 class Model:
     """An independent replay of the script semantics: which voices are
-    gated and which drums force the mixer, per played frame. The same
+    skipped and which drums force the mixer, per played frame. The same
     decision rules as the packer's simulator, written a second time so the
     two implementations check each other through the player in between."""
 
@@ -157,18 +157,18 @@ class Model:
                         if n < len(lengths) else 1 for n in range(drums)]
         self.elast = [0, 0]
         self.owner = [-1, -1, -1]       # per voice: the owning slot
-        self.left = [0, 0, 0]           # frames until the gate reopens;
-        self.gated = 0                  # -1 = stuck (a cut drum)
+        self.left = [0, 0, 0]           # frames until the skip lifts;
+        self.skipped = 0                  # -1 = stuck (a cut drum)
         self.silenced = 0               # voices whose SID starts this frame
         STUCK = None
 
     def step(self, f):
         """Advances one played frame showing source frame f; returns
-        (gated_mask, forced_mask, silenced_mask) for the frame's writes.
+        (skipped_mask, forced_mask, silenced_mask) for the frame's writes.
 
         A voice in the silenced mask is one whose SID starts this frame:
         the ym2149-rs gap model writes its volume register to zero before
-        installing the loud half, so a closed gate leaves exactly that
+        installing the loud half, so a skipped voice leaves exactly that
         one write instead of none."""
         regs, drums = self.regs, self.drums
         self.silenced = 0
@@ -177,7 +177,7 @@ class Model:
                 self.left[v] -= 1
                 if self.left[v] == 0:
                     self.owner[v] = -1
-                    self.gated &= ~(1 << v)
+                    self.skipped &= ~(1 << v)
         for slot in (0, 1):
             code, tp, tc = slot_codes(self.fmt, regs, f)[slot]
             valid = validate(code, tp, tc, regs, f, drums, self.scale)
@@ -190,7 +190,7 @@ class Model:
             old, self.elast[slot] = self.elast[slot], code
             if code == 0:
                 if (old & 0xC0) == 0x00 and old:
-                    self.gated &= ~(1 << (((old >> 4) & 3) - 1))
+                    self.skipped &= ~(1 << (((old >> 4) & 3) - 1))
                 if (old & 0xC0) != 0x40:
                     self._cut(slot)
                 continue
@@ -200,22 +200,22 @@ class Model:
                 if self.owner[v] >= 0:
                     self.elast[slot] = 0                    # suppressed
                     if (old & 0xC0) == 0x00 and old:
-                        self.gated &= ~(1 << (((old >> 4) & 3) - 1))
+                        self.skipped &= ~(1 << (((old >> 4) & 3) - 1))
                     continue
                 if (old & 0xC0) == 0x00 and old:
-                    self.gated &= ~(1 << (((old >> 4) & 3) - 1))
+                    self.skipped &= ~(1 << (((old >> 4) & 3) - 1))
                 self._cut(slot)
-                self.gated |= 1 << v
+                self.skipped |= 1 << v
                 self.silenced |= 1 << v         # SID_START silences first
             elif kind == 0x40:                              # drum
                 if (old & 0xC0) == 0x00 and old:
-                    self.gated &= ~(1 << (((old >> 4) & 3) - 1))
+                    self.skipped &= ~(1 << (((old >> 4) & 3) - 1))
                 elif (old & 0xC0) == 0x40 and old and ((old ^ code) & 0x30):
                     o = ((old >> 4) & 3) - 1
                     if self.owner[o] == slot:
                         self.owner[o] = -1                  # orphan cleanup
                         self.left[o] = 0
-                        self.gated &= ~(1 << o)
+                        self.skipped &= ~(1 << o)
                 other = self.elast[1 - slot]
                 if (other & 0xC0) == 0x00 and other \
                         and ((other >> 4) & 3) - 1 == v:
@@ -228,7 +228,7 @@ class Model:
         for v in range(3):
             if self.owner[v] >= 0:
                 forced |= 1 << v
-        return self.gated, forced, self.silenced
+        return self.skipped, forced, self.silenced
 
     def _drum(self, slot, code, divisor, f):
         v = ((code >> 4) & 3) - 1
@@ -239,11 +239,11 @@ class Model:
         frames = -(-(ticks * divisor * self.hz + MFP_CLOCK // 16) // MFP_CLOCK)
         self.owner[v] = slot
         self.left[v] = frames
-        self.gated |= 1 << v
+        self.skipped |= 1 << v
 
     def _cut(self, slot, skip=-1):
         """A program on this slot's timer: a drum it still owes ticks to is
-        cut, its marker never runs, its voice stays gated - v1 semantics."""
+        cut, its marker never runs, its voice stays skipped - v1 semantics."""
         for v in range(3):
             if v != skip and self.owner[v] == slot and self.left[v] > 0:
                 self.left[v] = -1                           # stuck
@@ -298,7 +298,7 @@ def sweep(path):
                 break
             if result == 1:
                 wrapped = True
-            gated, forced, silenced = model.step(src)
+            skipped, forced, silenced = model.step(src)
             got = dict(writes)
             for r in strict:
                 want = regs[r][src] & MASK[r]
@@ -315,10 +315,10 @@ def sweep(path):
                         return (f'ISSUE {name}: frame {f} started a SID on '
                                 f'voice {"ABC"[v]} without silencing R{r} '
                                 f'(wrote {got.get(r)})')
-                elif gated & (1 << v):
+                elif skipped & (1 << v):
                     if r in got:
                         return (f'ISSUE {name}: frame {f} wrote R{r} '
-                                'through a closed gate')
+                                'while it was skipped')
                 else:
                     want = regs[r][src] & MASK[r]
                     if got.get(r) != want:

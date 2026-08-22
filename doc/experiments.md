@@ -59,9 +59,9 @@ script's A/P pairs would likely join for the same correlation reason.
 **The SID ticking** (2026-08-19). A toggle stream's square audibly ticked.
 Cause: the frame write was writing the voice's volume register mid-phase,
 under a timer stream that owned it. Fixed by the retune path plus the burst
-gate; confirmed by ear against ST-Sound with ym2149-rs as a second reference.
+skip; confirmed by ear against ST-Sound with ym2149-rs as a second reference.
 
-The durable rule, and the reason the gate exists at all: **a frame player may
+The durable rule, and the reason the skip exists at all: **a frame player may
 not write any register a timer stream currently owns** — not a volume
 register under a toggle stream, and not under a PCM stream either.
 
@@ -81,7 +81,7 @@ format never specified what a re-started square does, so every player renders
 these sections differently, and the composers heard whatever their own driver
 did.
 
-Shipped: the **ym2149-rs model** — a gap restarts at phase zero, gate-off
+Shipped: the **ym2149-rs model** — a gap restarts at phase zero, silence
 first. A fresh start writes the voice silent immediately and installs the
 loud half; the first tick, one timer period out, begins the alternation. Held
 codes free the phase; a retune keeps the installed half.
@@ -99,7 +99,7 @@ Four things worth keeping:
 1. **A differential must compare event *timing*, not event counts.** An audit
    can verify every count, marker and invariant in both builds and still miss
    a one-frame shift. Diff the frame indices of window edges.
-2. **One frame is audible.** A deliberate late bias on a gate around a
+2. **One frame is audible.** A deliberate late bias on a skip around a
    percussive event is a click at the release. "At most one extra frame" in a
    design note calls for an ear test, not a shrug.
 3. **Distrust the capture before the player.** A glitched recording of correct

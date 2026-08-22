@@ -106,7 +106,7 @@ faithful, not what makes it lossy.
   comes back, does it restart at phase zero or resume where it got to? The YM
   format never specified it, every player renders it differently, and the
   composers heard whatever their own driver did. The default is the ym2149-rs
-  model — a gap restarts at phase zero, gate-off first — and `-sidresume`
+  model — a gap restarts at phase zero, silence first — and `-sidresume`
   selects maxYMiser's, where a release only masks the interrupt and the
   counter keeps counting. Both are ordinary stream verbs the player always
   carries, so the choice is per tune rather than per build.

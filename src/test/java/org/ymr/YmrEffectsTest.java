@@ -393,9 +393,9 @@ final class YmrEffectsTest {
         assertEquals(EffectScript.action(EffectScript.VERB_START_TOGGLE, 2, PRESCALER),
                 script.actions()[2][0] & 0xFF);
         assertEquals(0, script.actions()[3][0]);
-        // Voices A and C are gated for their toggle streams; B is not, because
+        // Voices A and C are skipped for their toggle streams; B is not, since
         // a retrigger stream writes R13 and never touches a volume register.
-        assertEquals(0b101, (script.m()[0] & 0xFF) >> EffectScript.M_GATE_SHIFT);
+        assertEquals(0b101, (script.m()[0] & 0xFF) >> EffectScript.M_SKIP_SHIFT);
     }
 
     @Test
@@ -474,11 +474,11 @@ final class YmrEffectsTest {
         // set would only mask a toggle stream's interrupt and leave it running.
         assertEquals(EffectScript.action(EffectScript.VERB_RELEASE, 0, 0),
                 script.actions()[0][5] & 0xFF);
-        // And the gate opens on that same frame. The player applies the gate
-        // state before the register burst and the script's actions after it, so
+        // And the voice rejoins the frame write on that same frame. The player
+        // applies the skip bits before the register burst and the script's actions after it, so
         // the voice's own volume is back on the chip inside the frame the song
         // placed it in - no skew to correct anywhere.
-        assertEquals(EffectScript.M_CHANNEL_0 | EffectScript.M_GATES,
+        assertEquals(EffectScript.M_CHANNEL_0 | EffectScript.M_SKIPS,
                 script.m()[5] & 0xFF);
         assertEquals(0x0D, tune.registers()[8][5] & 0xFF);
         assertTrue(script.reopens().stream()
@@ -493,7 +493,7 @@ final class YmrEffectsTest {
     void aSampleThatRanOutIsNotStoppedAgainWhenItsCodeLetsGo() {
         // The code goes idle at the computed end whether or not the song ever
         // stopped it, and there the marker tick has already stopped the timer
-        // and the script has already reopened the gate. Spending a RELEASE on
+        // and the script has already lifted the skip. Spending a RELEASE on
         // that would be a stream byte for stopping a stopped timer.
         Ymr builder = drumOnFrameZero();
         quiet(builder, 49);
@@ -502,7 +502,7 @@ final class YmrEffectsTest {
 
         EffectScript.Result script = compile(convert(builder.build()));
 
-        assertEquals(EffectScript.M_GATES, script.m()[43] & 0xFF);
+        assertEquals(EffectScript.M_SKIPS, script.m()[43] & 0xFF);
         for (int frame = 1; frame < script.frames(); frame++) {
             assertEquals(0, script.m()[frame] & EffectScript.M_CHANNEL_0,
                     "channel 0 acted at frame " + frame);
@@ -548,7 +548,7 @@ final class YmrEffectsTest {
 
         assertEquals(EffectScript.action(EffectScript.VERB_START_TOGGLE, 0, PRESCALER),
                 script.actions()[0][5] & 0xFF);
-        // The gate never opens: the sample needed voice A gated and so does the
+        // The skip never lifts: the sample needed voice A skipped and so does
         // square, so this is a change of owner and not a sample-end edge.
         assertEquals(EffectScript.M_CHANNEL_0, script.m()[5] & 0xFF);
         assertTrue(script.reopens().isEmpty(), script.reopens().toString());

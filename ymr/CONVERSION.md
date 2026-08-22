@@ -69,16 +69,16 @@ and `$FF` is precisely what [SPEC.md](../doc/SPEC.md)'s **The frame** means by i
 on which the player skips the register entirely. Two formats reached one
 convention from one constraint, so the register vector is handed straight on.
 
-**The shadow volume and the burst gate.** The .YMR spec suppresses the frame
+**The shadow volume and the skip.** The .YMR spec suppresses the frame
 write to a volume register owned by a running PWM or Sample — the value goes to
 the player's shadow and never to the chip, so the frame write cannot contend
 with the effect's own timer-rate writes — and says nothing of the sort about an
 RTE, which writes R13 and leaves the voice's volume to the song. That is the
-`.ymx` burst gate exactly: M's gate mask, one bit per voice, which a toggle arm
+`.ymx` skip exactly: M's skip bits, one per voice, which a toggle arm
 and a PCM arm set and a retrigger arm does not. It is also what determines
 which of a stream's parameters can ride in a register that already means
 something. A PCM stream's sample number can sit in the volume byte because the
-gate is shut over it — `ymx_gates` has overwritten that write with two `nop`s,
+write is skipped — `ymx_skips` has overwritten it with two `nop`s,
 so it does not reach the chip at all. A retrigger stream's shape cannot: an RTE
 leaves the voice's volume to the song, so that byte is delivered, and a shape
 hidden in its low nibble would cost the voice its level on any frame not
@@ -230,12 +230,12 @@ parameter moved on the same frame as the rate, which is the row.
   appears. Where the frame returns the voice, it returns it at once: the
   timer is stopped on that frame — by a RELEASE where the song popped 0, by
   the arriving verb's own `ymx_program` where an RTE took the channel — the
-  voice stops being the sample's, and its gate reopens. The player applies a
-  frame's gate state BEFORE the
+  voice stops being the sample's, and its skip lifts. The player applies a
+  frame's skip bits BEFORE the
   register burst and the script's actions after it, so the frame write this
   reopens is that same frame's, and the voice's own volume is on the chip
   inside the 20 ms the song placed it in, with no skew to correct. Where the
-  frame passes the voice to a PWM instead, the gate stays shut, because the
+  frame passes the voice to a PWM instead, the skip stands, because the
   square requires it shut too, and the song's volume is not due back at all.
   What the ordering cannot cover is the sliver between the burst and the
   action: a tick landing in it writes one more sample byte over the volume

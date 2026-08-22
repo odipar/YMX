@@ -38,8 +38,8 @@ import java.util.List;
  * stream 14  M   master byte. 0 = nothing anywhere this frame.
  *                bits 0-3 = timer channel 0, 1, 2, 3 acts (read its A,
  *                           maybe P)
- *                bit 4 = apply the gate state in bits 7-5
- *                bits 7-5 = one bit per voice A/B/C; a set bit GATES that
+ *                bit 4 = apply the skip bits in 7-5
+ *                bits 7-5 = one bit per voice A/B/C; a set bit SKIPS that
  *                           voice - its volume register is left out of the
  *                           frame write. State, not an edge: idempotent to
  *                           re-assert
@@ -101,10 +101,9 @@ import java.util.List;
  * the one envelope generator - so it is CARRIED, in X, resolved by whichever
  * front end knew where its format filed it. That is the whole of why the
  * player is independent of sources: an operand it cannot derive is one it
- * is handed. The ring
- * byte of a voice playing a sample is NOT sanitized: its frame write is
- * gated (ymx_gates has overwritten the write with two nops, so the byte
- * never reaches the chip), so nothing edits the
+ * is handed. The ring byte of a voice playing a sample is NOT sanitized: the
+ * frame write skips it ({@code ymx_skips} has overwritten that one write with
+ * two nops, so the byte never reaches the chip), so nothing edits the
  * ring at runtime and v1's whole borrow/patch/restore machinery has no v2
  * counterpart. R7 arrives with the disconnection of sample-playing voices
  * baked in ({@link Result#r7force}), which disconnects the voice.
@@ -113,7 +112,7 @@ import java.util.List;
  *
  * A PCM stream's end is the one genuinely asynchronous event: its sample
  * runs out at tick rate, mid-frame, and only the marker tick lands on the
- * instant. The script reopens the voice's gate, reconnects it and
+ * instant. The script returns the voice to the frame write, reconnects it and
  * re-starts a suppressed toggle stream at the frame boundary AFTER the
  * computed end - never before, so a frame write can never race a live
  * sample. The computation
@@ -121,12 +120,12 @@ import java.util.List;
  * frame) and no more: v1 reopened at the marker tick itself, and a whole
  * frame of grace on top of that parks the voice at the sample's tail
  * volume, disconnected, 20ms longer than v1 - an audible click after
- * every sample.
+ * every sample. (v1 reopened at the marker tick itself.)
  *
  * <p>A source that can end a sample itself ({@link Semantics#channelEndsPcm})
  * has no such event to wait for: the end is a frame's own command, so the
- * gate reopens on that frame and the voice's volume comes back out of that
- * frame's register burst.
+ * voice rejoins the frame write on that frame and its volume comes back out
+ * of that frame's register burst.
  *
  * <h2>The split rotation</h2>
  *
@@ -170,15 +169,15 @@ public final class EffectScript {
 
     // The master byte.
     /** M's bit per timer channel, numbered as the format numbers them,
-     * from zero. Four channels take bits 0 to 3, so the gate flag and its
+     * from zero. Four channels take bits 0 to 3, so the skip flag and its
      * mask moved up again when v7 made room; {@code M_CHANNEL_0 << c} is
      * channel c's, and the byte is now full. */
     public static final int M_CHANNEL_0 = 1;
     public static final int M_CHANNEL_1 = 2;
     public static final int M_CHANNEL_2 = 4;
     public static final int M_CHANNEL_3 = 8;
-    public static final int M_GATES = 16;
-    public static final int M_GATE_SHIFT = 5;
+    public static final int M_SKIPS = 16;
+    public static final int M_SKIP_SHIFT = 5;
 
     public static int action(int verb, int voice, int low) {
         return verb | (voice << 3) | low;
@@ -266,9 +265,9 @@ public final class EffectScript {
         }
     }
 
-    /** A voice's gate never reopens: its sample was cut mid-play and the
-     * marker that would have cleared it will never run (v1's stuck flag,
-     * replicated for differential exactness). */
+    /** A voice never rejoins the frame write: its sample was cut mid-play and
+     * the marker that would have cleared the skip will never run (v1's stuck
+     * flag, replicated for differential exactness). */
     private static final int STUCK = Integer.MAX_VALUE;
 
 
@@ -304,8 +303,8 @@ public final class EffectScript {
     // need them, and the compiler walks all of them regardless.
     private final Channel[] channels = new Channel[YmxFormat.CHANNELS];
     private final int[] drumEnd = {-1, -1, -1};   // played frame the voice's
-    private final int[] drumOwner = {-1, -1, -1}; // gate reopens; -1 = free
-    private int gates;                            // bit v = gated
+    private final int[] drumOwner = {-1, -1, -1}; // the skip lifts; -1 = free
+    private int skips;                            // bit v = skipped
     private final List<int[]> reopens = new ArrayList<>();
     private final List<String> notes = new ArrayList<>();
     private final Semantics semantics;  // what the source format fixes
@@ -397,12 +396,12 @@ public final class EffectScript {
                 notes.add("loop split rotated by " + (cut - loopFrame)
                         + " frames so the wrap state matches");
             }
-            // Belt and braces: the loop's first frame re-asserts the gate
-            // state both arrivals agree on, unless it sets gates itself.
-            if ((m[split] & M_GATES) == 0) {
+            // Belt and braces: the loop's first frame re-asserts the skip
+            // bits both arrivals agree on, unless it sets them itself.
+            if ((m[split] & M_SKIPS) == 0) {
                 int mask = snaps[split][snaps[split].length - 1];
                 if (mask != 0 || m[split] != 0) {
-                    m[split] |= M_GATES | (mask << M_GATE_SHIFT);
+                    m[split] |= M_SKIPS | (mask << M_SKIP_SHIFT);
                 }
             }
         }
@@ -470,7 +469,7 @@ public final class EffectScript {
             out[at++] = drumEnd[v] < 0 ? -1
                     : drumEnd[v] == STUCK ? STUCK : drumEnd[v] - frame;
         }
-        out[at] = gates;                // last: run() reads the mask here
+        out[at] = skips;                // last: run() reads the mask here
         return out;
     }
 
@@ -481,11 +480,11 @@ public final class EffectScript {
     // voice is decided by.
     // -------------------------------------------------------------------------
 
-    private int gatesBefore;
+    private int skipsBefore;
 
 
     private void frame(int p, int f) {
-        gatesBefore = gates;
+        skipsBefore = skips;
         // X's high nibble is simply this frame's shape - the packer resolved
         // it, so the player never has to look for it. It changes rarely, which is
         // what keeps a stream carrying one value on almost every frame.
@@ -494,8 +493,8 @@ public final class EffectScript {
         for (int v = 0; v < 3; v++) {
             if (drumOwner[v] >= 0 && drumEnd[v] == p) {
                 drumOwner[v] = -1;      // the marker has run by now: the
-                drumEnd[v] = -1;        // gate reopens, the mixer frees
-                gates &= ~(1 << v);
+                drumEnd[v] = -1;        // the skip lifts, the mixer frees
+                skips &= ~(1 << v);
                 reopens.add(new int[] {p, v});
             }
         }
@@ -511,8 +510,8 @@ public final class EffectScript {
                 }
             }
         }
-        if (gates != gatesBefore) {
-            m[p] |= M_GATES | (gates << M_GATE_SHIFT);
+        if (skips != skipsBefore) {
+            m[p] |= M_SKIPS | (skips << M_SKIP_SHIFT);
         }
     }
 
@@ -687,12 +686,12 @@ public final class EffectScript {
             if (!semantics.channelEndsPcm()) {
                 return;                 // timer left running: the marker ends it
             }
-            // A source that says stop is obeyed on the frame it says it, and
+            // A source that says stop is applied on the frame it says it, and
             // the whole cut lands there: RELEASE with bit 0 clear stops the
             // timer outright (ymx_release), the voice stops being a sample's
-            // and its gate opens again. The player applies the frame's gate
+            // and it rejoins the frame write. The player applies the frame's
             // state BEFORE the register burst and the script's actions after
-            // it, so the frame write this reopens is THIS frame's - the
+            // it, so the frame write the voice rejoins is THIS frame's - the
             // voice's own volume is back on the chip in the same 20 ms the
             // source placed it in, with no skew to correct for. What the
             // burst cannot cover is the sliver between it and the release: a
@@ -724,7 +723,7 @@ public final class EffectScript {
         // sample, and there is nothing to wait for. Retrying instead would
         // wait out the sample's whole computed length - the arbitration below
         // is for a sample another channel owns, which is the only case a YM
-        // dump can produce. The voice's gate is left shut, because the square
+        // dump can produce. The voice stays skipped, because the square
         // requires it shut too, and no reopen edge is recorded.
         if (semantics.channelEndsPcm()) {
             endOwnPcm(p, index, voice);
@@ -743,8 +742,8 @@ public final class EffectScript {
         // across a masked gap needs the hardware's stop/load/start
         // (RETUNE, half kept). Everything else - and everything in the
         // default model - is a full START: phase zero, one silent timer
-        // period, then the loud half. The gate bit is set on every path:
-        // M carries the gates.
+        // period, then the loud half. The skip bit is set on every path:
+        // M carries the skips.
         boolean sameSid = channel.vec == KIND_TOGGLE && channel.vecVoice == voice
                 && channel.sel == voice;
         boolean resume = channel.masked && sameSid && channel.prescaler == (code & 7);
@@ -752,7 +751,7 @@ public final class EffectScript {
                 || channel.masked && sameSid && channel.prescaler != (code & 7);
         cut(p, index, -1);
         openOld(old);
-        gates |= 1 << voice;
+        skips |= 1 << voice;
         channel.masked = false;
         if (resume) {
             int low = 0;
@@ -791,7 +790,7 @@ public final class EffectScript {
                 if (drumOwner[orphan] == index) {
                     drumOwner[orphan] = -1;   // cut mid-sample: its marker
                     drumEnd[orphan] = -1;     // never runs, so the start
-                    gates &= ~(1 << orphan);  // cleans up for it
+                    skips &= ~(1 << orphan);  // cleans up for it
                 }
             }
         }
@@ -816,7 +815,7 @@ public final class EffectScript {
         channel.prescaler = code & 7;
         channel.vec = KIND_PCM;
         channel.vecVoice = voice;
-        gates |= 1 << voice;
+        skips |= 1 << voice;
         drumOwner[voice] = index;
         drumEnd[voice] = p + duration(f, code, count, voice);
         emit(p, index, action(verb, voice, code & 7), count);
@@ -824,7 +823,7 @@ public final class EffectScript {
 
     private void retrigger(int p, int f, int index, Channel channel, int code, int count,
                       int voice) {
-        // The same takeover the toggle arm does, with the opposite gate: a
+        // The same takeover the toggle arm does, with the opposite skip: a
         // retrigger stream writes R13 and never a volume register, so the
         // voice a sample was holding goes straight back to the frame write.
         if (semantics.channelEndsPcm()) {
@@ -840,21 +839,21 @@ public final class EffectScript {
         emit(p, index, action(VERB_START_RETRIGGER, voice, code & 7), count);
     }
 
-    /** ymx_burst_open_old: only an old toggle stream's voice gate reopens. */
+    /** Only an old toggle stream's voice rejoins the frame write. */
     private void openOld(int old) {
         if (old != 0 && (old & 0xC0) == KIND_TOGGLE) {
-            gates &= ~(1 << (((old >> 4) & 3) - 1));
+            skips &= ~(1 << (((old >> 4) & 3) - 1));
         }
     }
 
     /**
      * Any action that programs or stops this channel's timer cuts a sample the
      * channel still owes ticks to: its marker will never run, so its voice
-     * stays gated and forced - v1's stuck flag, replicated and logged.
+     * stays skipped and forced - v1's stuck flag, replicated and logged.
      */
-    private void cut(int p, int index, int skip) {
+    private void cut(int p, int index, int keep) {
         for (int v = 0; v < 3; v++) {
-            if (v == skip) {
+            if (v == keep) {
                 continue;
             }
             if (drumOwner[v] == index && drumEnd[v] > p && drumEnd[v] != STUCK) {
@@ -863,7 +862,7 @@ public final class EffectScript {
                     stuckNoted = true;
                     notes.add("an effect armed over its own channel's running "
                             + "drum: voice " + (char) ('A' + v)
-                            + " stays gated (v1 semantics)");
+                            + " stays skipped (v1 semantics)");
                 }
             }
         }
@@ -878,10 +877,10 @@ public final class EffectScript {
      *
      * <p>{@code taken} names the voice the arriving stream keeps for itself,
      * or -1 when none does - the shape {@link #cut} uses for the same reason.
-     * Every other voice gets its gate back on this frame and an entry in
-     * {@code reopens}, because its volume register is the frame write's again;
-     * a voice a toggle stream is taking needs the gate shut, so its gate and
-     * its edge are that stream's to set, two lines further on.
+     * Every other voice rejoins the frame write on this frame and gets an
+     * entry in {@code reopens}, because its volume register is the frame
+     * write's again; a voice a toggle stream is taking must stay skipped, so
+     * its skip bit and its edge are that stream's to set, two lines on.
      *
      * <p>Returns whether anything was actually taken away, which is how a
      * release tells an early stop from a sample that had already finished: at
@@ -899,7 +898,7 @@ public final class EffectScript {
             drumEnd[v] = -1;
             ended = true;
             if (v != taken) {
-                gates &= ~(1 << v);
+                skips &= ~(1 << v);
                 reopens.add(new int[] {p, v});
             }
         }
@@ -942,7 +941,7 @@ public final class EffectScript {
      * rate, plus a sixteenth of a frame for the arming phase - the trigger
      * action runs a bounded slice into its VBL, so the last tick lands that
      * much later than the tick count alone says. A whole frame here instead
-     * held every voice gated 20ms past its drum: the click v1 never had.
+     * held every voice skipped 20ms past its drum: the click v1 never had.
      */
     private int duration(int f, int code, int count, int voice) {
         int number = tune.registers()[8 + voice][f] & 31;
