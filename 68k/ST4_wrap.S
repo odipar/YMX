@@ -29,8 +29,8 @@
 ; The copy engine runs two ladders. Match segments of at most sixteen units -
 ; measured to be four of every five segments a small-budget streamer makes,
 ; with the whole-chunk segment the most common of all - take a counter-free
-; ladder that falls straight into the match epilogue: no full-pass shift, no
-; loop counter, no post-copy kind test. Literals and longer segments take the
+; ladder that falls straight into the match epilogue, with nothing shifted,
+; counted or tested on the way. Literals and longer segments take the
 ; classic counted ladder. And there is no first-call test: ST4_init seeds the
 ; bit queue with one virtual 0 flag ($4000), so a fresh state decodes itself
 ; through a zero-unit match segment and reads that flag as "begin literals"
@@ -168,7 +168,7 @@ fast_ladder:
         .rept   16
         ST4_MOVE
         .endr
-fast_end:                               ; no counter, no kind test: fall into
+fast_end:                               ; uncounted and untested: fall into
 match_copied:                           ; the match epilogue
         tst.w   d1
         beq.s   match_transition

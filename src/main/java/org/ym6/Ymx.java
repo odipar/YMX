@@ -31,7 +31,7 @@ public final class Ymx {
 
     public static void main(String[] args) {
         // -meta: the YM header's strings and rate, one per line, for the
-        // build scripts to carry into SNDH tags - no banner, no packing.
+        // build scripts to carry into SNDH tags. Nothing else runs.
         if (args.length == 2 && args[0].equals("-meta")) {
             Ym6Reader.Song song;
             try {

@@ -29,8 +29,8 @@ import org.ymx.YmxFormat;
  * emulator does not depend on what the tune was converted from, so neither should
  * they diverge.
  *
- * <p>A .YMR carries no title, no author and no comment: the format stores
- * streams and a command stream, not credits. So a set is titled and its
+ * <p>A .YMR carries no metadata: the format stores streams and a command
+ * stream, not credits. So a set is titled and its
  * subtunes named from the file stems - the only name a .YMR has - and the
  * SNDH's composer is left absent rather than invented.
  *

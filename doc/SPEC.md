@@ -248,11 +248,11 @@ place for all three kinds and that voice, following the envelope, leaves the
 nibble spare. Another source may file it in R13, where the chip keeps it. The
 front end resolves which, and simply writes the number down.
 
-So the player does not look for it at all: `ymx_shape` is five instructions
-with no branch, there is no header flag, no shadow and no priming. A tune
-that arms a retrigger stream before it has set any shape carries whatever its
-own format defaults to — `0` for a YM dump — because that is a fact of the
-source, resolved at the front end.
+So the shape is never searched for: it is read straight out of X, and the
+format carries no flag, shadow or priming for it. A tune that arms a retrigger
+stream before it has set any shape carries whatever its own format defaults to
+— `0` for a YM dump — because that is a fact of the source, resolved at the
+front end.
 
 ### 2.3 T — the channel-to-timer map
 
@@ -506,7 +506,7 @@ value. Those operations, in full:
 | interpreted | the operation |
 |---|---|
 | M bit 4 with bits 7-5 | the three skip bits take the value in 7-5. On a frame with bit 4 clear they keep the value they had; nothing else changes them |
-| skip bit set for voice v | R8+v is not written by the frame write: no stale value, no zero, no bus cycle |
+| skip bit set for voice v | no write to R8+v occurs in the frame write |
 | R7 bits 7-6 | the value written there comes from the host. Bits 5-0 come from the stream |
 | R13 = `$FF` | R13 is not written this frame |
 | X bits 7-4 | the value written to R13 when a retrigger stream starts, and when a `HOLD` with flag 4 runs |

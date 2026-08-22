@@ -27,8 +27,8 @@ knowing the scene. This file maps one set to the other.
 A word in **bold** is a term with a precise meaning here, defined where
 it first appears. Words in quotes, like "digidrum" and "effect", belong
 to the YM format. The new names come from digital systems: counters,
-streams, rates, phases. None come from analogue synths - no carriers, no
-modulators, no LFOs, because the YM2149 has none of those. A piece of
+streams, rates, phases. None come from analogue synthesis, because the
+YM2149 has none of that machinery. A piece of
 music is a **tune**; "song" is what a **tracker** - the program a
 composer writes music in - calls its own file.
 

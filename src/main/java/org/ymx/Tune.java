@@ -14,10 +14,9 @@ import org.jspecify.annotations.Nullable;
  * format's own words - {@code org.ym6} in YM's, {@code org.ymr} in RhYMe's -
  * and stops here, at a record whose every field is a term from
  * {@code doc/terminology.md}. Nothing downstream of this line can ask which
- * format the bytes came from, because nothing here records it: no dialect
- * string, no attribute bits, no count of what one format's extractor had to
- * throw away. That is the point. A second front end is a PEER of the first,
- * and two peers can only meet on ground neither one owns.
+ * format the bytes came from, because no field here records it. That is the
+ * point. A second front end is a PEER of the first, and two peers can only
+ * meet on ground neither one owns.
  *
  * <p>The two kinds of stream sit side by side because they are one timeline.
  * {@code registers[r][frame]} is the FRAME STREAM targeting register
