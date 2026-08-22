@@ -98,8 +98,8 @@ displacement.
 `C` is how many values are decoded per call. It must
 
 - be at least one refill slot per stream the tune **decodes** —
-  17 when it names no timer channel, then 19, 21, 23 or 25 by the *highest*
-  channel it names, since a player stops at the last channel rather than
+  17 when it uses no timer channel, then 19, 21, 23 or 25 by the *highest*
+  channel it uses, since a player stops at the last channel rather than
   counting them; and
 - divide `N`, which lets a player use a counted-wrap ring decoder
   rather than a general one; and
@@ -146,17 +146,17 @@ which puts the payload at a constant offset. Three different counts get called
 | | |
 |---|---|
 | **stored** — always 25 | the size of the section tables. Absent sections have offset 0 |
-| **decoded** — 17, 19, 21, 23 or 25 | what a player reads per cycle: 17 for a tune naming no timer channel, then two more per channel, up to and including the **highest** channel it names |
+| **decoded** — 17, 19, 21, 23 or 25 | what a player reads per cycle: 17 for a tune that uses no timer channel, then two more per channel, up to and including the **highest** channel in use |
 | **carrying** — fewer still | an idle channel's pair is stored, and packs to almost nothing |
 
-`C` has to cover the middle one, and it steps by the highest channel named
-rather than by the count of channels used, because a player stops at the last
-channel rather than counting them. A tune using only channel 3 still decodes
+`C` has to cover the middle one, and it steps by the highest channel in use
+rather than by how many are in use, because a player stops at the last channel
+rather than counting them. A tune using only channel 3 still decodes
 25.
 
 So a `.ymx` always has twenty-five slots and rarely twenty-five streams worth
 reading. The channel pairs come last so the difference costs nothing: what a
-tune does not name is a tail no player ever touches.
+tune leaves idle is a tail no player ever touches.
 
 ---
 
@@ -247,7 +247,7 @@ timer stream took over, and the level a toggle stream chops is the level the
 tune put in that register. A shape belongs to nothing of the kind — any number
 of voices may follow the one generator — so where a source files it is an
 accident of that source. A YM file uses the nibble of the voice the retrigger
-stream names, because the parameter field sits at one place for all three
+stream runs on, because the parameter field sits at one place for all three
 kinds and that voice, following the envelope, leaves the nibble spare. Another
 source may file it in R13, where the chip keeps it. The front end resolves
 which and writes the number down.
@@ -288,7 +288,7 @@ that clock while it plays, and cannot be driven from a Timer C interrupt.
 
 - **verb** (bits 7-5) — one of the eight in §3.
 - **voice** (bits 4-3) — 0, 1, 2 for voices A, B, C. Three voices in a
-  two-bit field, so **3 names no voice**; see `RETUNE` in §3.
+  two-bit field, so **3 is no voice**; see `RETUNE` in §3.
 - **low** (bits 2-0) — the MFP prescaler index for any verb that programs a
   timer, or a set of flags for `HOLD` and `RESUME`.
 
@@ -311,7 +311,7 @@ nothing.
 | 4 | `RETUNE` | a new rate for a running stream, keeping its place in the cycle. See below |
 | 5 | `START_RETRIGGER` | start a retrigger stream: shape, vector := the retrigger tick, then a full program |
 | 6 | `START_PCM` | a trigger, fresh or repeated: sample table lookup, select, vector, full program |
-| 7 | `START_PCM_PREEMPT` | as `START_PCM`, but first stop the timer of every channel named in X's low nibble — the stops come first, straight-line |
+| 7 | `START_PCM_PREEMPT` | as `START_PCM`, but first stop the timer of every channel marked in X's low nibble — the stops come first, straight-line |
 
 ### 3.1 The two forms of RETUNE
 
@@ -408,8 +408,8 @@ rate = 2457600 / prescaler[index] / count
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | divider | — | 4 | 10 | 16 | 50 | 64 | 100 | 200 |
 
-Index 0 is not a divider but the MFP's **stopped** state, so a code naming it
-starts nothing. A count of 0 is likewise stopped.
+Index 0 is not a divider but the MFP's **stopped** state, so a code that
+selects it starts nothing. A count of 0 is likewise stopped.
 
 The encodable range is 48 Hz — prescaler 200, count 255 — to 614,400 Hz,
 prescaler 4 and count 1. What a packer emits is narrower: a rate that costs
@@ -451,14 +451,14 @@ register, so a file may carry at most **32** samples.
 
 A player's one call per frame does this, in this order:
 
-1. **Apply the skips.** If M's bit 4 is set, skip the voices named by bits
+1. **Apply the skips.** If M's bit 4 is set, skip the voices marked by bits
    7-5 and restore the rest.
 2. **The frame write** — fourteen register writes, R0 through R13, taking
    each value from its ring. A skipped voice's volume register is left out;
    so is R13 on a frame carrying `$FF`; and R7 goes out with the host's own
    port bits in 7-6 (§2). This leaves the frame's start at a fixed offset
    whatever the frame's script costs.
-3. **The script's actions** — for each channel M names, decode its A byte and
+3. **The script's actions** — for each channel M marks, decode its A byte and
    run the verb.
 4. **One refill** — decode `C` values into one stream's ring: stream
    `k` on the frame where the frame number modulo `C` is `k`.
@@ -517,7 +517,7 @@ value. Those operations, in full:
 | R7 bits 7-6 | the value written there comes from the host. Bits 5-0 come from the stream |
 | R13 = `$FF` | R13 is not written this frame |
 | X bits 7-4 | the value written to R13 when a retrigger stream starts, and when a `HOLD` with flag 4 runs |
-| X bits 3-0 with `START_PCM_PREEMPT` | each named channel's timer is stopped before this channel's timer is programmed |
+| X bits 3-0 with `START_PCM_PREEMPT` | each marked channel's timer is stopped before this channel's timer is programmed |
 | `RELEASE` bit 0 clear | the timer is stopped. Set: the timer's interrupt is masked and the timer keeps counting |
 | `RETUNE` addressed to voice 3 | the timer is reprogrammed without being stopped, so the count in flight runs to its end |
 | a toggle stream's volume, a PCM stream's sample number | read from the voice's own register ring on the frame the stream starts |

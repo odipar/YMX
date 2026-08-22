@@ -164,7 +164,7 @@ and 2 that stop — those 2 being the frames where the effect's parameter moved
 on the same frame as the rate, which is the row.
 
 * **Three timers bound to voices, against four channels and a map.** A .YMR
-  names Timer A, Timer B and Timer D, and the spec fixes which voice each one
+  uses Timer A, Timer B and Timer D, and the spec fixes which voice each one
   drives — A to A, B to B, D to C — so the binding is normative and not the
   converter's to choose. A `.ymx` has four timer channels and a stream saying
   which MFP timer each runs on, so the converter writes that binding
@@ -212,7 +212,7 @@ on the same frame as the rate, which is the row.
   verb that carries a rate goes through `ymx_program`, which stops the timer,
   loads the count and runs it again — the period in flight truncated, whichever
   verb it was. v10 gives it an encoding of its own instead. The action byte's
-  voice field addresses three voices in two bits, so 3 names none of them, and
+  voice field addresses three voices in two bits, so 3 is none of them, and
   RETUNE spends that corner on a live rate change: `ymx_live` masks the
   timer's nibble out of the control byte it reads back, ORs the new prescaler
   in and writes it once — the timer's nibble never passes through zero — then

@@ -117,7 +117,7 @@ it mattered.
 
 The fix went to the **host**, not the player: `YMX_player.S` saves and stops
 TACR, TBCR, TCDCR and the four data registers, and restores them at exit,
-counts before controls. A player claims a timer per channel its tune names,
+counts before controls. A player claims a timer per channel its tune uses,
 and nothing else.
 
 Two things worth keeping:

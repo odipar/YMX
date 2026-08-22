@@ -381,7 +381,7 @@ def run_effects(super_host: bool = False, perf: bool = False) -> str:
     # repeated 30 frames later - the packer emits a match that copies those
     # ring positions. v2 never edits the ring at runtime, so the trap now
     # proves the drum number travels in the ring unharmed. Frame 30's
-    # value doubles as the drum number: sample 1; frame 31's names sample 0.
+    # value doubles as the drum number: sample 1; frame 31's is sample 0.
     pattern = [3, 4, 5, 6, 7, 1, 0, 6, 5, 4, 3]
     for i, v in enumerate(pattern):
         values[10][25 + i] = v
@@ -654,9 +654,9 @@ def run_effects(super_host: bool = False, perf: bool = False) -> str:
             return f'effects: stop left voice {voice} muted'
 
     # Claiming is per timer channel, and a second YMX_init must hand back
-    # what the first one took: the file names the channels it uses, so a
-    # tune that names fewer leaves the player holding timers nobody asked
-    # for unless init gives them back first. Init the effect tune, then
+    # what the first one took: the file says which channels it uses, so a
+    # tune that uses fewer leaves the player holding timers nothing needs
+    # unless init gives them back first. Init the effect tune, then
     # init an effect-free one into the same blob and workspace.
     quiet = gen_ym.ym6_file(40, [bytearray(40) for _ in range(16)])
     reused = Player(pack(gen_ym.ym6_file(frames, values, drums=drums),
@@ -909,7 +909,7 @@ def Ymx_DRUM_TABLE(player) -> int:
 
 
 def check_assignment(player) -> str:
-    """ymx_assign, driven directly: every map the T stream can name must put
+    """ymx_assign, driven directly: every map the T stream can express must put
     the right timer's row into the right channel's descriptor. The rows are
     the player's own, so this checks the copy and the two-bit decode, which
     is the whole of the mechanism."""
@@ -1035,7 +1035,7 @@ def run_shape_source() -> str:
     A sync-buzzer rewrites R13 with one shape at the timer's rate, and from
     the file CARRIES that shape rather than leaving the player to
     find it: the YM front end reads it out of the low nibble of the voice the
-    channel names, and the .ymr front end out of R13, where RhYMe keeps it.
+    channel runs on, and the .ymr front end out of R13, where RhYMe keeps it.
     The two are told apart here by making them
     DISAGREE - a voice whose nibble is one value while R13 holds another -
     and reading the tick's own patched immediate, which no chip write reveals
@@ -1064,7 +1064,7 @@ def run_shape_source() -> str:
     got = patched_shape(player, 'a')                # a YM tune's slot 1 is Timer A
     if got != 11:
         return (f'shape source: a YM buzzer restarts shape {got}, want 11 - the '
-                f'nibble of the voice it names')
+                f'nibble of the voice it runs on')
 
     # The flag-set path. R13 is popped to $0A on the very frame the RTE arms,
     # while voice B's level is $0C: the burst writes R13 before the actions
@@ -1235,7 +1235,7 @@ def run_readme_sizes() -> str:
     A size written into prose goes stale the first time the code moves, and
     nothing else would notice. Both numbers come out of one build: YMX.S runs
     from the start of the binary to ST4_wrap.S's first symbol, and ST4_wrap.S
-    is the rest of it. The README names the ST4_UNIT they hold for, because
+    is the rest of it. The README gives the ST4_UNIT they hold for, because
     the decoder's size moves with it.
     """
     text = (REPO / 'README.md').read_text()

@@ -20,8 +20,8 @@
 ;     timer vectors, TACR, TCDCR's Timer D nibble, TADR, TDDR, the four
 ;     enable/mask bits - is saved at INIT and handed back at EXIT. Two is
 ;     what a YM tune needs: its frames start at most two effects, so it
-;     names timer channels 0 and 1, which the packer's map puts on Timers
-;     A and D. A file whose T stream named Timer B or C would need those
+;     uses timer channels 0 and 1, which the packer's map puts on Timers
+;     A and D. A file whose T stream chose Timer B or C would need those
 ;     saved here too, and a Timer C tune could not be hosted from a Timer
 ;     C hook;
 ;   - INIT is defensive: called twice without an EXIT, it restores first;
@@ -54,7 +54,7 @@ sndh_init:
         bsr     sndh_stop               ; init without exit: clean up first
 .fresh:
 
-; Save what the player will touch - the list YMX.S assumption 5 names. The
+; Save what the player will touch - the list YMX.S assumption 5 gives. The
 ; four enable/mask bits are kept as bits, so EXIT can restore them without
 ; clobbering whatever the host changed in the same registers meanwhile.
         lea     sndh_saved(pc),a5
