@@ -354,7 +354,8 @@ public final class Ymr {
      * script computes where a sample ends in PLAYED frames from the length of
      * the sample and the rate it plays at, while the code byte's own window was
      * measured in dump frames. Slip an extra frame between the two and the
-     * script reopens the voice's gate one frame before the code lets go, and
+     * script returns the voice to the frame write one frame before the code
+     * lets go, and
      * the sample number sitting in the volume register is written to the chip
      * as a volume. There is no shortage of quiet frames, so the cheap rule is
      * the right one.

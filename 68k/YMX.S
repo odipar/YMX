@@ -43,7 +43,7 @@
 ; least the number of streams a tune DECODES - seventeen when it names no
 ; channel, twenty-one for a YM tune - every one is refilled once per C frames,
 ; one refill per VBL, so the work per frame is flat, and ordered for the chip's
-; benefit: the gates, then the fourteen register writes - the FRAME WRITE,
+; benefit: the skips, then the fourteen register writes - the FRAME WRITE,
 ; leaving the VBL at a FIXED offset whatever the frame's timer streams cost -
 ; then the script's actions, then one ST4_resume of C bytes. Since C divides N
 ; and a call never reaches the ring end, ST4_wrap.S is the decoder that fits:
@@ -54,7 +54,7 @@
 ; reach a register. They carry the COMPILED EFFECT SCRIPT, in which the
 ; packer replayed the reference player's whole decision logic over the
 ; timeline - held or new, retune or restart, which stops which timer, when a
-; sample's gate reopens - and wrote the outcomes down as prepared actions.
+; sample's voice rejoins it - and wrote the outcomes down as prepared actions.
 ; Ring M says what acts this frame (almost always: nothing, one test); each
 ; channel's A/P pair carries its action byte and timer count, and ring X
 ; the operand an action byte has no room for.
@@ -245,7 +245,7 @@ YMX_CHAN0       equ     17              ; stream index of channel 0's action
                                         ; byte: R0..R13, then M, X and T
 YMX_WRITE_READ  equ     6               ; inside a YMX_WRITE: the ring read's
                                         ; displacement, patched at init
-YMX_WRITE_MOVEP equ     8               ; and the movep, which a gate swaps
+YMX_WRITE_MOVEP equ     8               ; and the movep, which a skip swaps
                                         ; for two nops
 YMX_WRITE_SIZE  equ     12              ; the whole write
 YMX_STATE_SIZE  equ     64              ; per stream, so the index is a shift
@@ -586,7 +586,7 @@ YMX_init:
         dbra    d0,.wpatchB
         lea     ymx_w13+2(pc),a0
         move.w  d1,(a0)
-        bsr     ymx_link                ; gates open, handlers linked
+        bsr     ymx_link                ; no skips, handlers linked
 
 ; Read the map before claiming anything: stream T's first byte says which
 ; timer each channel runs on, and the rings are primed by now, so it is
@@ -782,7 +782,7 @@ ymx_open:
         bra     ST4_init
 
 ; -----------------------------------------------------------------------------
-; YMX_play: a0 = workspace. One frame: gate, write fourteen registers, run
+; YMX_play: a0 = workspace. One frame: skips, write fourteen registers, run
 ; the script's actions, refill one stream. No ring byte is ever edited.
 ; -----------------------------------------------------------------------------
 YMX_play:
@@ -828,20 +828,20 @@ YMX_play:
         bsr     ymx_act
         .endm
 
-; The gates first, then the burst, then everything else: the fourteen chip
+; The skips first, then the burst, then everything else: the fourteen chip
 ; writes leave the VBL at a FIXED offset, whatever the frame's effects cost.
-; Only the gate state must precede the burst (a trigger frame's voice must
-; be gated before the burst would write its sample number); the actions -
+; Only the skip bits must precede the burst (a trigger frame's voice must be
+; skipped before the burst would write its sample number); the actions -
 ; timer programs, handler patches - happen after, where their varying cost
-; cannot jitter the writes. Gate changes are rare, so the burst's offset
+; cannot jitter the writes. Skip changes are rare, so the burst's offset
 ; moves only on those frames, and by a fixed amount.
         movea.l YMX_CURSOR(a3),a0
         adda.l  YMX_EFXOFF(a3),a0       ; ring M, at this frame's offset
         move.b  (a0),d0                 ; a0 survives everything below
-        btst    #4,d0                   ; a new gate state this frame?
+        btst    #4,d0                   ; new skip bits this frame?
         beq.s   .burst                  ; bits 7-5 hold it
         lsr.b   #5,d0
-        bsr     ymx_gates
+        bsr     ymx_skips
 .burst:
         movea.l YMX_CURSOR(a3),a1       ; the cursor: every register's ring
         lea     YMX_PSG,a2              ; byte is a patched k*N above it
@@ -928,7 +928,7 @@ ymx_w13:
         bsr     ymx_assign              ; leaves a0 and d3 alone
 .map_ready:
         move.b  (a0),d0
-        andi.b  #(1<<YMX_CHANNELS)-1,d0 ; the channels' bits; gates are done
+        andi.b  #(1<<YMX_CHANNELS)-1,d0 ; the channels' bits; skips are done
         beq.s   .effects_done
         YMX_ACT _0,0,3,.channel0,.channel1
         YMX_ACT _1,1,5,.channel1,.channel2
@@ -1025,8 +1025,8 @@ YMX_stop:
         bsr.s   ymx_handback
         lea     CH_SIZE(a5),a5
         dbra    d2,.channel
-        moveq   #0,d0                   ; every gate open again
-        bsr     ymx_gates
+        moveq   #0,d0                   ; no voice skipped again
+        bsr     ymx_skips
 ; The silence stays inside the mask: selecting a register and writing it are
 ; two bus cycles, and a host's system interrupts - about to be restored - use
 ; the chip too.
@@ -1228,7 +1228,7 @@ ymx_pcm\{chan}:
         move.b  #$D,$FFFF8802.w         ; middle volume: no click
         andi.b  #\keep,\tctrl.w         ; the sample ran out: stop the timer -
         .if YMX_PERF                    ; the script compiled this frame in
-        move.l  a0,-(sp)                ; advance: gate and mixer follow at
+        move.l  a0,-(sp)                ; advance: skip and mixer follow at
         lea     ymx_perf_acc(pc),a0     ; the next frame boundary
         add.w   #23,(a0)
         movea.l (sp)+,a0
@@ -1340,14 +1340,14 @@ ISR_RETRIGGER_SHAPE  equ     ISR_RETRIGGER+PERF_PAD+4
 
 ; -----------------------------------------------------------------------------
 ; ymx_link, from YMX_init: the run-time addresses that exist only once the
-; player is loaded. Every gate opens (a previous session's gate must not
-; leak), each descriptor gets its ISR block, and the toggle halves get each
+; player is loaded. Every skip lifts (a previous session's must not leak),
+; each descriptor gets its ISR block, and the toggle halves get each
 ; other's whole vector - it never changes, so it is patched once here rather
 ; than on every toggle start. One pass over the channel table does all of it.
 ; -----------------------------------------------------------------------------
 ymx_link:
         moveq   #0,d0
-        bsr     ymx_gates
+        bsr     ymx_skips
         lea     ymx_timers(pc),a1
         lea     ymx_pcm_a(pc),a2
         moveq   #YMX_TIMERS-1,d1
@@ -1653,27 +1653,27 @@ ymx_program:
         rts
 
 ; -----------------------------------------------------------------------------
-; ymx_gates: apply the gate state. Bit v of d0 gates voice v: its volume
-; write is overwritten with two nops, so the byte never reaches the chip and
-; no branch ever enters the burst. Opening it again copies the movep
-; back from a template. The script computed every edge at pack time.
+; ymx_skips: apply the skip bits. Bit v of d0 skips voice v: its volume write
+; is overwritten with two nops, so the byte never reaches the chip and no
+; branch ever enters the burst. Restoring it copies the movep back from a
+; template. The script computed every edge at pack time.
 ; in: d0 bits 2-0 = the state, voices A/B/C; clobbers d0-d2/a1.
 ; -----------------------------------------------------------------------------
-ymx_gates:
+ymx_skips:
         lea     ymx_wB+YMX_WRITE_MOVEP(pc),a1   ; R8's movep, then R9's, R10's
         moveq   #3-1,d1
-.gate:
-        move.l  ymx_movep(pc),d2        ; open: the instruction itself, copied
+.skip:
+        move.l  ymx_movep(pc),d2        ; kept: the instruction itself, copied
         lsr.b   #1,d0                   ; from a template so no hand-encoded
         bcc.s   .set                    ; opcode can drift
-        move.l  #$4E714E71,d2           ; gated: two nops - the displacement
+        move.l  #$4E714E71,d2           ; skipped: two nops - the displacement
 .set:                                   ; word is part of the instruction
         move.l  d2,(a1)
         lea     YMX_WRITE_SIZE(a1),a1
-        dbra    d1,.gate
+        dbra    d1,.skip
         rts
 
-; The template, never executed: ymx_gates copies these two words back over
-; a gated write to open it again.
+; The template, never executed: ymx_skips copies these two words back over
+; a skipped write to restore it.
 ymx_movep:
         movep.w d1,0(a2)

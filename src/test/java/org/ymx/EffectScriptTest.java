@@ -8,8 +8,8 @@ import static org.ymx.EffectScript.RESUME_RELOAD;
 import static org.ymx.EffectScript.RELEASE_MASK;
 import static org.ymx.EffectScript.VERB_RESUME;
 import static org.ymx.EffectScript.HOLD_VOLUME;
-import static org.ymx.EffectScript.M_GATES;
-import static org.ymx.EffectScript.M_GATE_SHIFT;
+import static org.ymx.EffectScript.M_SKIPS;
+import static org.ymx.EffectScript.M_SKIP_SHIFT;
 import static org.ymx.EffectScript.M_CHANNEL_0;
 import static org.ymx.EffectScript.M_CHANNEL_1;
 import static org.ymx.EffectScript.VERB_START_RETRIGGER;
@@ -32,7 +32,7 @@ import org.ym6.YmEffects;
  * the rig cannot reach.
  *
  * <p>Where v2's frame-aligned semantics deliberately differ from v1 (a
- * drum's gate reopens at the computed end's frame boundary), the
+ * drum's voice rejoins the frame write at the computed end's boundary), the
  * expectations here encode the v2 side; everything else is v1's, the
  * loud-half phase reset on every SID arrival included.
  */
@@ -123,11 +123,11 @@ final class EffectScriptTest {
         EffectScript.Result r = compile(rigScene(), -1);
         assertEquals(72, r.frames());
 
-        // Idle until the SID starts; its gate closes the same frame.
+        // Idle until the SID starts; its voice is skipped the same frame.
         for (int f = 0; f < 5; f++) {
             expect(r, f, 0, 0, 0, 0, 0);
         }
-        expect(r, 5, M_CHANNEL_0 | M_GATES | (1 << M_GATE_SHIFT),
+        expect(r, 5, M_CHANNEL_0 | M_SKIPS | (1 << M_SKIP_SHIFT),
                 action(VERB_START_TOGGLE, 0, 1), 100, 0, 0);
         for (int f = 6; f <= 14; f++) {         // held: the slide emits a
             if (f % 2 == 0) {                   // volume track exactly on
@@ -142,26 +142,26 @@ final class EffectScriptTest {
         for (int f = 16; f <= 20; f++) {
             expect(r, f, 0, 0, 0, 0, 0);
         }
-        expect(r, 21, M_CHANNEL_0 | M_GATES, action(VERB_RELEASE, 0, 0), 0, 0, 0);
+        expect(r, 21, M_CHANNEL_0 | M_SKIPS, action(VERB_RELEASE, 0, 0), 0, 0, 0);
 
         // The default (ym2149-rs) gap model: a re-arrival is a full START -
         // phase zero, one silent period, then the loud half.
-        expect(r, 22, M_CHANNEL_0 | M_GATES | (1 << M_GATE_SHIFT),
+        expect(r, 22, M_CHANNEL_0 | M_SKIPS | (1 << M_SKIP_SHIFT),
                 action(VERB_START_TOGGLE, 0, 1), 90, 0, 0);
         expect(r, 23, 0, 0, 0, 0, 0);
         expect(r, 24, 0, 0, 0, 0, 0);
         expect(r, 25, M_CHANNEL_0, action(VERB_RETUNE, 0, 2), 90, 0, 0);
         expect(r, 26, 0, 0, 0, 0, 0);
-        expect(r, 27, M_CHANNEL_0 | M_GATES, action(VERB_RELEASE, 0, 0), 0, 0, 0);
+        expect(r, 27, M_CHANNEL_0 | M_SKIPS, action(VERB_RELEASE, 0, 0), 0, 0, 0);
 
         // The drum: trigger, retrigger with that frame's number, computed
         // end. Sample 0 has 2 values + marker at 4*122: well inside the
         // retrigger's own frame, so the reopen lands on the next boundary.
-        expect(r, 30, M_CHANNEL_1 | M_GATES | (4 << M_GATE_SHIFT),
+        expect(r, 30, M_CHANNEL_1 | M_SKIPS | (4 << M_SKIP_SHIFT),
                 0, 0, action(VERB_START_PCM, 2, 1), 122);
         expect(r, 31, M_CHANNEL_1, 0, 0, action(VERB_START_PCM, 2, 1), 122);
         assertEquals(0x24, r.r7force()[31] & 0xFF, "voice C forced while owned");
-        expect(r, 32, M_GATES, 0, 0, 0, 0);     // the frame-aligned reopen
+        expect(r, 32, M_SKIPS, 0, 0, 0, 0);     // the frame-aligned reopen
         assertEquals(0, r.r7force()[32] & 0xFF);
         expect(r, 33, 0, 0, 0, 0, 0);
         assertTrue(r.reopens().stream().anyMatch(x -> x[0] == 32 && x[1] == 2));
@@ -172,9 +172,9 @@ final class EffectScriptTest {
         expect(r, 43, M_CHANNEL_0, action(VERB_RELEASE, 0, 0), 0, 0, 0);
 
         // Arbitration: the takeover drum stops the SID's timer first, holds
-        // the voice's gate (no mask change - it was already closed), and
+        // the voice's skip bit (no change - it was already set), and
         // the suppressed SID re-starts when the window ends.
-        expect(r, 45, M_CHANNEL_1 | M_GATES | (2 << M_GATE_SHIFT),
+        expect(r, 45, M_CHANNEL_1 | M_SKIPS | (2 << M_SKIP_SHIFT),
                 0, 0, action(VERB_START_TOGGLE, 1, 1), 90);
         expect(r, 48, M_CHANNEL_0, action(VERB_START_PCM_PREEMPT, 1, 1), 60, 0, 0);
         assertEquals(0x12, r.r7force()[48] & 0xFF, "voice B forced");
@@ -183,7 +183,7 @@ final class EffectScriptTest {
         expect(r, 50, 0, 0, 0, 0, 0);
         expect(r, 51, 0, 0, 0, 0, 0);
         expect(r, 52, 0, 0, 0, 0, 0);
-        expect(r, 53, M_CHANNEL_1 | M_GATES, 0, 0, action(VERB_RELEASE, 0, 0), 0);
+        expect(r, 53, M_CHANNEL_1 | M_SKIPS, 0, 0, action(VERB_RELEASE, 0, 0), 0);
     }
 
     /** The -sidresume gap model on the same scene: releases mask, the
@@ -192,14 +192,14 @@ final class EffectScriptTest {
     @Test
     void theResumeModelMasksAndResumes() {
         EffectScript.Result r = compileResume(rigScene(), -1);
-        expect(r, 21, M_CHANNEL_0 | M_GATES, action(VERB_RELEASE, 0, RELEASE_MASK),
+        expect(r, 21, M_CHANNEL_0 | M_SKIPS, action(VERB_RELEASE, 0, RELEASE_MASK),
                 0, 0, 0);
-        expect(r, 22, M_CHANNEL_0 | M_GATES | (1 << M_GATE_SHIFT),
+        expect(r, 22, M_CHANNEL_0 | M_SKIPS | (1 << M_SKIP_SHIFT),
                 action(VERB_RESUME, 0, RESUME_RELOAD), 90, 0, 0);
-        expect(r, 27, M_CHANNEL_0 | M_GATES, action(VERB_RELEASE, 0, RELEASE_MASK),
+        expect(r, 27, M_CHANNEL_0 | M_SKIPS, action(VERB_RELEASE, 0, RELEASE_MASK),
                 0, 0, 0);
         expect(r, 49, M_CHANNEL_1, 0, 0, action(VERB_START_TOGGLE, 1, 1), 90);
-        expect(r, 53, M_CHANNEL_1 | M_GATES, 0, 0,
+        expect(r, 53, M_CHANNEL_1 | M_SKIPS, 0, 0,
                 action(VERB_RELEASE, 0, RELEASE_MASK), 0);
     }
 
@@ -220,7 +220,7 @@ final class EffectScriptTest {
         // The wrap replays frames 20..39: all held, no actions - and the
         // square's phase free-runs round the loop, exactly v1.
         for (int f = 21; f < 40; f++) {
-            assertEquals(0, r.m()[f] & 0xFF & ~M_GATES, "quiet at " + f);
+            assertEquals(0, r.m()[f] & 0xFF & ~M_SKIPS, "quiet at " + f);
         }
     }
 
@@ -269,7 +269,7 @@ final class EffectScriptTest {
     }
 
     /** The stuck-flag quirk, replicated: a buzzer arming over its own
-     * channel's running drum leaves the voice gated, and says so. */
+     * channel's running drum leaves the voice skipped, and says so. */
     @Test
     void armingOverOwnRunningDrumSticksTheVoice() {
         int frames = 24;
@@ -287,7 +287,7 @@ final class EffectScriptTest {
         for (int f = 6; f < frames; f++) {      // voice A never frees
             assertEquals(0x09, r.r7force()[f] & 0x09, "stuck at " + f);
         }
-        assertTrue(r.notes().stream().anyMatch(n -> n.contains("stays gated")));
+        assertTrue(r.notes().stream().anyMatch(n -> n.contains("stays skipped")));
     }
 
     // ------------------------------------------- a source that can say stop
@@ -330,7 +330,7 @@ final class EffectScriptTest {
 
         // A YM-shaped source: nothing acts when the code goes away, because
         // nothing can - the marker tick is the only thing that ends a sample,
-        // and the gate reopens at the computed end.
+        // and the voice rejoins the frame write at the computed end.
         EffectScript.Result runs = compile(longDrum(8), RUNS_ON);
         assertEquals(action(VERB_START_PCM, 0, 1), runs.actions()[1][4] & 0xFF);
         for (int f = 8; f < 17; f++) {
@@ -340,11 +340,11 @@ final class EffectScriptTest {
 
         // The same code with a source that can say stop: the whole cut lands
         // on the frame it says it. RELEASE with bit 0 clear stops the timer,
-        // and the gate goes with it - the player applies gates before the
+        // and the skip goes with it - the player applies skips before the
         // register burst, so the voice's own volume is back on that frame.
         EffectScript.Result stops = compile(longDrum(8), STOPS);
         assertEquals(action(VERB_RELEASE, 0, 0), stops.actions()[1][8] & 0xFF);
-        assertEquals(M_CHANNEL_1 | M_GATES, stops.m()[8] & 0xFF);
+        assertEquals(M_CHANNEL_1 | M_SKIPS, stops.m()[8] & 0xFF);
         assertTrue(stops.reopens().stream().anyMatch(x -> x[0] == 8 && x[1] == 0));
         for (int f = 9; f < 24; f++) {
             assertEquals(0, stops.m()[f] & 0xFF, "something acted at " + f);
@@ -373,9 +373,9 @@ final class EffectScriptTest {
         assertEquals(action(VERB_START_TOGGLE, 0, 1), runs.actions()[1][17] & 0xFF);
 
         // One timer runs both, so there was never anything to arbitrate: the
-        // square arms on the frame the source placed it in. The gate stays
+        // square arms on the frame the source placed it in. The skip stays
         // shut throughout - the sample needed it shut and so does the square -
-        // so no reopen edge is recorded for a gate that never opened.
+        // so no reopen edge is recorded for a skip that never lifted.
         EffectScript.Result stops = compile(song, STOPS);
         assertEquals(action(VERB_START_TOGGLE, 0, 1), stops.actions()[1][8] & 0xFF);
         assertEquals(M_CHANNEL_1, stops.m()[8] & 0xFF);
@@ -394,7 +394,7 @@ final class EffectScriptTest {
             if ((mm & M_CHANNEL_1) != 0) {
                 assertTrue((r.actions()[1][f] & 0xFF) != 0, "A2 empty at " + f);
             }
-            // v7 filled the byte: channels 0-3, the gate flag, and a
+            // v7 filled the byte: channels 0-3, the skip flag, and a
             // three-bit mask reaching bit 7. Nothing is reserved.
         }
     }

@@ -443,13 +443,13 @@ def run_effects(super_host: bool = False, perf: bool = False) -> str:
     sid_off = CODE + sym['ymx_toggle_a_off']
 
     # A burst write is twelve bytes and ends in the movep that sends it;
-    # muting replaces that instruction with two nops, so the gate reads as
+    # a skip replaces that instruction with two nops, so the state reads as
     # the opcode itself against $4E71.
     WRITE_SIZE, WRITE_MOVEP = 12, 8
     movep_opcode = int.from_bytes(
         player.uc.mem_read(CODE + sym['ymx_movep'], 2), 'big')
 
-    def gate(voice):
+    def skipped(voice):
         """2 when the voice's burst write is open, 0 when it is muted -
         the same two values the old displacement trick reported."""
         at = CODE + sym['ymx_wB'] + WRITE_MOVEP + WRITE_SIZE * voice
@@ -470,7 +470,7 @@ def run_effects(super_host: bool = False, perf: bool = False) -> str:
             if mfp != [(TACR, 0), (TADR, 100), (TACR, 1),   # run, enabled
                        (0xFFFFFA07, 0x20)]:
                 return f'effects: frame 5 programmed {mfp}'
-            if gate(0) != 0:
+            if skipped(0) != 0:
                 return 'effects: frame 5 left the SID voice open'
         elif 6 <= frame <= 20 and frame != 15:      # held: the slide patches
             if mfp:                                 # the tick's immediate,
@@ -487,10 +487,10 @@ def run_effects(super_host: bool = False, perf: bool = False) -> str:
             if mfp != [(TADR, 80)]:                 # HELD reload, data only
                 return f'effects: frame 15 wrote {mfp}'
         elif frame == 21:                           # released: stopped, and
-            if mfp != [(TACR, 0)]:                  # the gate reopens with
+            if mfp != [(TACR, 0)]:                  # the skip lifts with
                 return f'effects: frame 21 wrote {mfp}'         # the frame
             if 8 not in registers:
-                return 'effects: frame 21 kept the SID volume gate shut'
+                return 'effects: frame 21 kept skipping the SID volume'
         elif frame == 22:                           # a re-start is a FULL
             if mfp != [(TACR, 0), (TADR, 90), (TACR, 1),    # start at phase
                        (0xFFFFFA07, 0x20)]:                 # zero...
@@ -544,12 +544,12 @@ def run_effects(super_host: bool = False, perf: bool = False) -> str:
             if position != player.file + drum:
                 return 'effects: the retrigger points at the wrong sample'
         elif frame == 32:                           # the computed end, frame
-            if mfp:                                 # aligned: gate and mixer
+            if mfp:                                 # aligned: skip and mixer
                 return f'effects: frame 32 wrote {mfp}'     # come back as one
             if registers.get(7) != 0x38 | 0xC0:
                 return 'effects: frame 32 mixer still forced'
             if 10 not in registers:
-                return 'effects: frame 32 kept the drum gate shut'
+                return 'effects: frame 32 kept skipping the drum voice'
         elif frame == 40:                           # buzzer start on slot 1
             if mfp != [(TACR, 0), (TADR, 200), (TACR, 6),
                        (0xFFFFFA07, 0x20)]:
@@ -564,9 +564,9 @@ def run_effects(super_host: bool = False, perf: bool = False) -> str:
             if mfp != [(TCDCR, 0), (TDDR, 90), (TCDCR, 1),
                        (0xFFFFFA09, 0x10)]:
                 return f'effects: frame 45 programmed {mfp}'
-        elif frame in (46, 47):                     # held: its volume is gated
+        elif frame in (46, 47):                     # held: its volume is skipped
             if 9 in registers:
-                return f'effects: frame {frame} wrote the gated volume'
+                return f'effects: frame {frame} wrote the skipped volume'
         elif frame == 48:                           # START_PCM_PREEMPT: the SID's
             want = [(TCDCR, 0),                     # timer stops FIRST,
                     (TACR, 0), (TADR, 60), (TACR, 1),   # then the drum arms
@@ -594,7 +594,7 @@ def run_effects(super_host: bool = False, perf: bool = False) -> str:
             if mfp != [(TCDCR, 0)]:                 # releases
                 return f'effects: frame 53 wrote {mfp}'
             if 9 not in registers:
-                return 'effects: frame 53 kept the voice gate shut'
+                return 'effects: frame 53 kept skipping the voice'
         elif mfp:
             return f'effects: frame {frame} unexpectedly wrote {mfp}'
         if frame == 60 and registers.get(10) != 1:
@@ -604,7 +604,7 @@ def run_effects(super_host: bool = False, perf: bool = False) -> str:
     # Both drums, tick by tick, by direct invocation: frame 31's on Timer D
     # (voice C), frame 48's on Timer A (voice B). Sample 0 is 0x80, 0x40 ->
     # nibbles 8, 4, then the marker parks the volume and stops the timer -
-    # and nothing else: the script already scheduled the gate and mixer
+    # and nothing else: the script already scheduled the skip and mixer
     # edges at the frame boundary.
     problem = drum_ticks(player, drum_d, 10, TCDCR, 0xFFFFFA11, 0xEF)
     if problem:
@@ -640,7 +640,7 @@ def run_effects(super_host: bool = False, perf: bool = False) -> str:
         return 'effects: the frame did not clear the perf accumulator'
 
     # The library's stop contract: it quiesces its claim - timers stopped,
-    # their interrupt bits disabled and masked, every gate open - and
+    # their interrupt bits disabled and masked, no voice skipped - and
     # restores nothing; the host owns the machine state (assumption 5).
     player.stop()
     mfp = lambda a: player.uc.mem_read(a, 1)[0]
@@ -650,7 +650,7 @@ def run_effects(super_host: bool = False, perf: bool = False) -> str:
             or mfp(0xFFFFFA09) & 0x10 or mfp(0xFFFFFA15) & 0x10:
         return 'effects: stop left its claim enabled'
     for voice in range(3):
-        if gate(voice) != 2:
+        if skipped(voice) != 2:
             return f'effects: stop left voice {voice} muted'
 
     # Claiming is per timer channel, and a second YMX_init must hand back
@@ -697,7 +697,7 @@ def run_effects(super_host: bool = False, perf: bool = False) -> str:
                 return ('effects: resume-model frame 21 wrote '
                         f'{resumed.mfp}')
             if 8 not in registers:
-                return 'effects: resume-model frame 21 kept the gate shut'
+                return 'effects: resume-model frame 21 kept the voice skipped'
         elif frame == 22:
             if resumed.mfp != [(TADR, 90), (0xFFFFFA07, 0x20)]:
                 return ('effects: resume-model frame 22 programmed '

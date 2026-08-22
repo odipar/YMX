@@ -79,8 +79,8 @@ import org.ymx.YmxFormat;
  *       volume is what {@code volume_a}/{@code b}/{@code c} already popped into
  *       that register - so the toggle stream's volume is already in place.</li>
  *   <li>A Sample's index is written over the volume byte on every frame the
- *       PCM code is armed. That is invisible: the script gates the voice for
- *       the whole time a sample owns it, and {@code ymx_gates} gates a write
+ *       PCM code is armed. That is invisible: the script skips the voice for
+ *       the whole time a sample owns it, and {@code ymx_skips} drops a write
  *       by overwriting it with two {@code nop}s, so the byte never reaches
  *       the chip. It is also load-bearing - the script recomputes a sample's
  *       length wherever its code changes, so the index has to be
@@ -558,7 +558,7 @@ public final class YmrEffects {
      * they are computing it from the same four numbers - the sample's length
      * plus its end marker, the timer divisor, the frame rate, and the
      * sixteenth of a frame the trigger action itself runs into. If they
-     * disagree the code would still be armed on the frame the gate reopens,
+     * disagree the code would still be armed on the frame the skip lifts,
      * and the sample number sitting in the volume register would be written to
      * the chip as a volume.
      */

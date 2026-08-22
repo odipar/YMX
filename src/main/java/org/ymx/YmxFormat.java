@@ -98,7 +98,7 @@ public final class YmxFormat {
 
     /** Stream indices of the script data: the master byte, then
      * each timer channel's action and timer-count bytes. The byte semantics -
-     * the verb vocabulary, the master bits, the gate bits - are
+     * the verb vocabulary, the master bits, the skip bits - are
      * {@link EffectScript}'s ABI, which packer, player and rigs all cite. */
     public static final int STREAM_M = 14;
     public static final int STREAM_X = 15;

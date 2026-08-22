@@ -22,9 +22,7 @@ YM5 carries digidrum and SID voice; YM6 adds sync buzzer and sinus SID.
 streams in a compressed container. The 6 is YM6's; the X marks the
 departure. YM names stay in the code that reads YM files; everywhere else
 the names are plain digital ones, so the engine can be read without
-knowing the scene. This file maps one set to the other. A second source,
-RhYMe's `.YMR`, has its own names for the same things; those are in **The
-rest of the mapping** below.
+knowing the scene. This file maps one set to the other.
 
 A word in **bold** is a term with a precise meaning here, defined where
 it first appears. Words in quotes, like "digidrum" and "effect", belong
@@ -158,12 +156,12 @@ the beginning (**zero-restart**). The difference is audible.
 (Trackers use "effect" for the per-row commands a composer types. Where
 both readings are possible, this file says **timer stream**.)
 
-(A warning for anyone reading `org.ymr`: the .YMR format uses "stream"
-for a change list - one entry per change, not one per frame - advanced by
-an explicit "pop" from a command stream rather than by a clock, and some
-of its streams carry timer settings rather than register values. That
-front end has to keep its own format's names, so this collision cannot be
-settled by choosing a word. Here a stream is the per-register value
+(A warning for anyone reading a front end: a source format may use
+"stream" for a change list - one entry per change, not one per frame -
+advanced by an explicit "pop" rather than by a clock, and some such
+streams carry timer settings rather than register values. A front end has
+to keep its own format's names, so this collision cannot be settled by
+choosing a word. Here a stream is the per-register value
 series, and it is ticked.)
 
 ## Three clocks
@@ -251,8 +249,8 @@ one after another. That burst is the **frame write**.
 YMX writes all fourteen registers every frame, because a write costs
 about what the comparison to avoid it would cost. Two rules bend it: the
 envelope shape is left alone where a restart would be wrong, and any
-voice's volume is skipped while a timer stream holds it. That skip is the
-voice's **gate**: `ymx_gates` overwrites the burst's write with two nops,
+voice's volume is left out while a timer stream holds it. That is the
+voice's **skip**: `ymx_skips` overwrites the burst's write with two nops,
 so that byte never reaches the chip - though the player can still write
 the register outside the burst, and does. A tracker writes only what
 changed, because its own format records which registers those are. A YM
@@ -361,7 +359,7 @@ voices there and both carry it, which real tunes do - 15 of the corpus's
 always something else on the same voice, with the ratio being what you
 hear. Nothing in the hardware enforces it; it is how the music was
 written, and what the **packer** - the tool that turns a source file, a
-`.ym` or a `.ymr`, into a YMX file - has to preserve.
+`.ym`, into a YMX file - has to preserve.
 
 | stream | coupled to | why |
 |---|---|---|
@@ -443,23 +441,10 @@ series of writes.
 | MFP timers A, B, C and D | what the file's map puts behind **timer channels** 0 to 3 |
 | the MFP's prescaler and data register | **prescaler** and **timer count** |
 
-RhYMe's `.YMR` is the second source, and its three effects - plus the
-field that sets their rate - are the same things under other names:
-
-| RhYMe .YMR | YMX |
-|---|---|
-| PWM | **toggle stream** |
-| Sample | **PCM stream** |
-| RTE | **retrigger stream** |
-| counter | **timer count** |
-
-Beware two words that do not carry across. A .YMR "stream" is a
-change list, not this file's value series, and its "pop" is what advances
-one - see the parenthetical in **Streams** above. The reasoning behind
-each row, and what the conversion costs, is in
-[../ymr/CONVERSION.md](../ymr/CONVERSION.md) under **What the conversion
-is**; [../ym/CONVERSION.md](../ym/CONVERSION.md) is the same account for a
-YM file. Neither is repeated here.
+A front end for another source format maps its own names onto these same
+things, and keeps them on its own side of the `Tune`. What each conversion
+costs is in its own account - [../ym/CONVERSION.md](../ym/CONVERSION.md)
+for a YM file - and is not repeated here.
 
 ## The names in the code
 
@@ -472,21 +457,21 @@ YM file. Neither is repeated here.
 | the actions the script runs | `ymx_pcm`, `ymx_pcm_preempt`, `ymx_toggle_start`, `ymx_retrigger_start`, `ymx_retune`, `ymx_live` - the live retune it branches to - `ymx_resume`, `ymx_hold`, `ymx_release` |
 | where a retrigger stream's shape comes from | `ymx_shape`, reading stream X's high nibble, because a shape belongs to the one envelope generator and not to a voice |
 | a sample's loop point | `YMX_ONE_SHOT` for one that has none, `ymx_pcmloop` for the address the tick jumps back to |
-| the frame write, the gates, the mixer | `ymx_wA`, `ymx_w7`, `ymx_wB`, `ymx_gates`, `YMX_MIXER` |
+| the frame write, the skips, the mixer | `ymx_wA`, `ymx_w7`, `ymx_wB`, `ymx_skips`, `YMX_MIXER` |
 | a tune as the engine has one | `Tune` - the frame streams, the timer streams, the samples and the rate, and nothing a format would recognise |
 
 `Ym6Reader` and `YmEffects` keep the YM names on their input side: those
-are the names of the bytes. So do `YmrReader` and `YmrEffects` on theirs.
-Each pair is a **front end**, each stops at a `Tune`, and neither is
-downstream of the other; everything past that point - `EffectScript`, the
-encoder, the player - has no way to ask which format a tune was read out
-of.
+are the names of the bytes. Together they are a **front end**; it stops at
+a `Tune`, and everything past that point - `EffectScript`, the encoder,
+the player - has no way to ask which format a tune was read out of. A
+second front end for another source format is another such pair, neither
+downstream of the other.
 
-The packages say the same thing: `org.ym6` is the YM front end and
-`org.ymr` the RhYMe one, and `org.ymx` holds the engine, the format and the
-tools that work on a `.ymx` file whatever made it. Each front end is
-compiled against the engine, and the engine against neither front end -
-which is the layering said in a way the compiler can check.
+The packages say the same thing: `org.ym6` is the YM front end, and
+`org.ymx` holds the engine, the format and the tools that work on a `.ymx`
+file whatever made it. A front end is compiled against the engine, and the
+engine against no front end - which is the layering said in a way the
+compiler can check.
 
 ## If you know these ideas from elsewhere
 
@@ -529,8 +514,8 @@ its place in the cycle *and* its place inside the half it is in.
 
 Neither reaches a YM tune. YM has no way to say a sample loops, so the YM
 front end marks every one of them one-shot, and a YM rate change stays
-the reference player's stop-load-run. Both arrive through the `.ymr`
-front end, which is where they are needed.
+the reference player's stop-load-run. Both are there for a source that
+can express them.
 
 Still ahead is the other half of the rate idea: a PCM stream with a
 **derived** rate, a sample tracking the note the way a toggle stream
@@ -587,8 +572,8 @@ sense.
 | **disconnect** | mix no generator into a voice, leaving only its volume writes |
 | **frame write** | the once-a-frame round of register writes |
 | **verb** | the code's name for an action the script hands the player. Three bits of an action byte, all eight spent |
-| **packer** | the tool that turns a source file, a `.ym` or a `.ymr`, into a YMX file. One per front end |
-| **front end** | the pair of classes that reads one source format and stops at a `Tune`. `org.ym6` for YM, `org.ymr` for RhYMe |
+| **packer** | the tool that turns a source file, a `.ym`, into a YMX file. One per front end |
+| **front end** | the pair of classes that reads one source format and stops at a `Tune`. `org.ym6` for YM |
 | **tracker** | the program a composer writes music in, with its own file format |
 | **corpus** | the 544 YM files YMX is tested against; 543 readable |
 | **script data** | per-frame instructions saying which streams start when. Stored like a stream, never written to a register |
@@ -597,7 +582,7 @@ sense.
 
 | term | meaning |
 |---|---|
-| **PCM stream** | a stored sample, played once or looped from a stored loop point, rate independent. The YM front end disconnects the voice; the `.ymr` front end leaves the mixer to the song. Was: digidrum |
+| **PCM stream** | a stored sample, played once or looped from a stored loop point, rate independent. The YM front end disconnects the voice. Was: digidrum |
 | **toggle stream** | a PCM stream of two values, repeating, voice connected. Cheap to run. Was: SID voice |
 | **wave stream** | a PCM stream of a waveform, repeating, voice connected. Was: sinus SID |
 | **retrigger stream** | not a volume stream: one shape written over and over, each write restarting the envelope. Was: sync buzzer |
@@ -613,5 +598,5 @@ suppress - defined in the section of that name.
 |---|---|
 | **tearing** | a tick splits a select from its value; the value lands in the wrong register. One instruction per write prevents it, masking hides it |
 | **contention** | frame write and timer stream target the same register |
-| **gate** | a voice's place in the frame write, shut while a timer stream owns its volume |
+| **skip** | a voice's volume left out of the frame write, for as long as a timer stream owns that register |
 | **quantisation** | something happens between frames; only the next frame can act |

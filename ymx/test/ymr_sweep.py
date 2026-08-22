@@ -32,13 +32,13 @@ What is checked, frame by frame:
   * R13 as an EVENT, not only a value: the .YMR writes R13 on a frame that
     pops envelope_shape and on no other, so the register must be written
     exactly once on a pop frame and not at all on a held one.
-  * R8/R9/R10 against the gate. A voice running PWM or Sample is GATED - the
+  * R8/R9/R10 against the skips. A voice running PWM or Sample is SKIPPED - the
     same rule ymr_write_register applies in lib_data.s, and the player
     implements it by muting the voice's burst write - so its volume register
     must be ABSENT from that frame's writes. A voice running RTE or nothing
-    is not gated and its value must be exact. The one frame in between is a
+    is not skipped and its value must be exact. The one frame in between is a
     PWM's first: a fresh square restarts at phase zero, so the player writes
-    that voice silent itself, after the burst and through the closed gate,
+    that voice silent itself, after the burst and past the skipped write,
     and exactly that one write of zero is expected there.
   * The MFP: the player must claim exactly the timers the .YMR names - A, B
     and D, never C - and a channel the tune leaves idle must claim nothing.
@@ -107,7 +107,7 @@ MFP_CLOCK = 2457600
 # Effect types, as the timer_*_effect stream carries them.
 FX_NONE, FX_PWM, FX_SAMPLE, FX_RTE = 0, 1, 2, 3
 
-# The engine's code-byte kinds, which is the vocabulary the gate is decided
+# The engine's code-byte kinds, which is the vocabulary the skip is decided
 # in: a PWM becomes a toggle stream, a Sample a PCM stream, an RTE a
 # retrigger stream. Only the first two own a volume register.
 KIND_TOGGLE, KIND_PCM, KIND_RETRIGGER = 0x00, 0x40, 0xC0
@@ -299,7 +299,7 @@ class Ymr:
         """How many bytes a PCM stream plays before it stops, or None for a
         block that never stops.
 
-        The gate window below is measured in the length of the sample that
+        The skip window below is measured in the length of the sample that
         actually plays. A looped block plays until something else
         takes the timer, because the file says where the sample comes back to
         and the tick does the coming back; only a one-shot has a length at
@@ -496,11 +496,11 @@ class Ymr:
     def _armed(self, want):
         """How many frames a sample armed with this rate stays armed for: the
         sample plus its end marker at the timer's rate, plus a sixteenth of a
-        frame for the arming phase, rounded up so the gate never reopens
-        early. The gate is what this test observes, so getting the frame
-        wrong here would read as the player writing through a closed gate."""
+        frame for the arming phase, rounded up so the skip never lifts
+        early. The skip is what this test observes, so getting the frame
+        wrong here would read as the player writing a skipped register."""
         if self.samples[want.sample] is None:
-            return 1 << 30              # a looped sample: the gate never
+            return 1 << 30              # a looped sample: the skip never
         ticks = self.samples[want.sample] + 1    # reopens on its own
         divisor = PRESCALE[want.prescaler & 7] * want.counter
         scaled = ticks * divisor * self.rate + MFP_CLOCK // 16
@@ -510,7 +510,7 @@ class Ymr:
 class Stage:
     """The effect stage, replayed frame by frame on the PLAYED timeline.
 
-    The gate is state, not a property of a dump frame: what a code byte does
+    The skip is state, not a property of a dump frame: what a code byte does
     depends on the code before it, and the played timeline is where "before"
     means anything. It matters at exactly one place - the frames the split
     rotation added, which show dump frames the walk has already been past -
@@ -520,7 +520,7 @@ class Stage:
 
     What it reports is the whole of what a frame's volume writes depend on:
 
-      * GATED - the voice is running a PWM or a sample, so its volume
+      * SKIPPED - the voice is running a PWM or a sample, so its volume
         register belongs to that effect's timer and the frame write is muted.
         This is ymr_write_register's rule in lib_data.s, arrived at from the
         other side.
@@ -533,7 +533,7 @@ class Stage:
         check than the half-comparison a smuggled shape used to allow.
       * STARTED - a fresh square arms this frame. It restarts at phase zero,
         so the player writes the voice silent itself, after the register
-        burst and through the closed gate: one write, carrying zero. A PWM
+        burst and past the skipped write: one write, carrying zero. A PWM
         whose prescaler merely moved is retuned instead and writes nothing,
         which is what keeps the square's place in the cycle.
 
@@ -550,17 +550,17 @@ class Stage:
         self.last = [0] * 3             # the code each channel ran last frame
         self.owner = [-1] * 3           # the channel a voice's sample belongs to
         self.end = [-1] * 3             # the played frame its window closes on
-        self.gates = 0
+        self.skips = 0
 
     def step(self, frame):
         """Advances one played frame showing dump frame `frame`; returns
-        (gated, buzzing, started), each a voice mask."""
+        (skipped, buzzing, started), each a voice mask."""
         played, self.played = self.played, self.played + 1
         for voice in range(3):
             if self.owner[voice] >= 0 and self.end[voice] == played:
                 self.owner[voice] = -1      # the marker tick has run by now
                 self.end[voice] = -1
-                self.gates &= ~(1 << voice)
+                self.skips &= ~(1 << voice)
         started = 0
         buzzing = 0
         for channel in range(3):
@@ -579,7 +579,7 @@ class Stage:
                 # this same frame's burst.
                 self._drop(channel, voice)
                 if (old & 0xC0) == KIND_TOGGLE and old:
-                    self.gates &= ~(1 << voice)
+                    self.skips &= ~(1 << voice)
                 continue
             kind = code & 0xC0
             if kind == KIND_RETRIGGER:
@@ -587,7 +587,7 @@ class Stage:
                 continue                # a buzzer writes R13, never a volume
             if kind == KIND_TOGGLE:
                 # The sample this channel was playing ends here too, but its
-                # gate stays shut: the square requires it shut as well.
+                # the skip stands: the square requires it as well.
                 if self.owner[voice] == channel:
                     self.owner[voice] = -1
                     self.end[voice] = -1
@@ -598,16 +598,16 @@ class Stage:
             else:
                 self.owner[voice] = channel
                 self.end[voice] = played + self.dump.window[channel][frame]
-            self.gates |= 1 << voice
-        return self.gates, buzzing, started
+            self.skips |= 1 << voice
+        return self.skips, buzzing, started
 
     def _drop(self, channel, voice):
         """The sample this channel still owns, ended because the channel was
-        told to do something else: its gate opens on this frame."""
+        told to do something else: its skip lifts on this frame."""
         if self.owner[voice] == channel:
             self.owner[voice] = -1
             self.end[voice] = -1
-            self.gates &= ~(1 << voice)
+            self.skips &= ~(1 << voice)
 
 
 # ------------------------------------------------------------------ the MFP
@@ -753,7 +753,7 @@ def play(name, dump, packed, warns):
     # What the walk actually got to see, so a cap that crossed nothing
     # interesting says so on its own status line rather than reading OK.
     edges = pops = buzzers = starts = 0
-    was_gated = 0
+    was_skipped = 0
     for frame in range(budget):
         # The played timeline: the packer's rotation replayed. Frames past
         # the file's own length are the loop, and the source frame each shows
@@ -767,15 +767,15 @@ def play(name, dump, packed, warns):
             return 'ISSUE %s: ended early at frame %d/%d' % (name, frame, played)
         if result == 1:
             wrapped = True
-        gated, buzzing, started = stage.step(source)
-        problem = compare(dump, frame, source, writes, gated, started)
+        skipped, buzzing, started = stage.step(source)
+        problem = compare(dump, frame, source, writes, skipped, started)
         if problem:
             return 'ISSUE %s: %s' % (name, problem)
         problem = mfp_problem(claim + player.mfp, dump.named)
         if problem:
             return 'ISSUE %s: frame %d %s' % (name, frame, problem)
-        edges += bin(gated ^ was_gated).count('1')
-        was_gated = gated
+        edges += bin(skipped ^ was_skipped).count('1')
+        was_skipped = skipped
         pops += dump.registers[13][source] != NO_SHAPE
         buzzers += buzzing != 0
         starts += bin(started).count('1')
@@ -785,7 +785,7 @@ def play(name, dump, packed, warns):
 
     timers = ''.join(CHANNEL_TIMER[c] for c in range(3) if dump.named & (1 << c))
     where = 'looped' if wrapped else 'partial' if walked < played else 'once'
-    crossings = ('%d gate edge%s, %d PWM start%s, %d buzzer frame%s, %d shape pop%s'
+    crossings = ('%d skip edge%s, %d PWM start%s, %d buzzer frame%s, %d shape pop%s'
                  % (edges, '' if edges == 1 else 's', starts, '' if starts == 1 else 's',
                     buzzers, '' if buzzers == 1 else 's', pops, '' if pops == 1 else 's'))
     extra = (' [' + '; '.join(warns)[:90] + ']') if warns else ''
@@ -796,7 +796,7 @@ def play(name, dump, packed, warns):
                '' if dump.triggers == 1 else 's', extra))
 
 
-def compare(dump, frame, source, writes, gated, started):
+def compare(dump, frame, source, writes, skipped, started):
     """One frame's chip writes against the .YMR's own frame, with the effect
     stage's verdict on the three volume registers."""
     counted = collections.Counter(register for register, _ in writes)
@@ -829,7 +829,7 @@ def compare(dump, frame, source, writes, gated, started):
             frame, got[7], want,
             ' (unexplained bits %#04x)' % unexplained if unexplained else ''))
 
-    # The volumes, against the gate. A gated voice's register must be absent
+    # The volumes, against the skips. A skipped voice's register must be absent
     # from the frame's writes - the player mutes the burst write, so nothing
     # at all reaches the chip for it - and an open one must be exact.
     for voice in range(3):
@@ -837,15 +837,15 @@ def compare(dump, frame, source, writes, gated, started):
         if started & (1 << voice):
             # A fresh square starts silent, and that write comes from the
             # start action rather than from the burst: through the closed
-            # gate, exactly once, carrying zero.
+            # skipped write, exactly once, carrying zero.
             if counted[register] != 1 or got[register] != 0:
                 return ('frame %d started a PWM on voice %s and wrote R%d %r, '
                         'want one write of 0' % (frame, 'ABC'[voice], register,
                                                  [v for r, v in writes if r == register]))
             continue
-        if gated & (1 << voice):
+        if skipped & (1 << voice):
             if register in counted:
-                return ('frame %d wrote R%d through a closed gate (voice %s is '
+                return ('frame %d wrote R%d that a skip covers (voice %s is '
                         'running a PWM or a sample)' % (frame, register, 'ABC'[voice]))
             continue
         if counted[register] != 1:
