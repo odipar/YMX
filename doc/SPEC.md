@@ -165,10 +165,26 @@ edits a ring at runtime.
 
 The shape is **one per frame, not one per channel**. The chip has a single
 envelope generator, so two retrigger streams could not hold different shapes
-if they tried. Carrying it in the file rather than deriving it is what keeps
-a player free of any opinion about the source format: a YM file files that
-nibble in the voice's volume register, a `.YMR` files it in R13, and the
-front end that knows which resolves it before the player ever sees it.
+if they tried — a player that let each channel restart its own would give one
+generator two shapes at two rates.
+
+Carrying it rather than deriving it is what keeps a player free of any
+opinion about the source format. A toggle stream's volume and a PCM stream's
+sample number are read off the voice's own register ring, and that is right:
+both belong to the voice the effect took over, and the level a square chops
+is the level the tune put in that register. A shape belongs to nothing of the
+kind — any number of voices may follow the one generator — so where a source
+files it is an accident of that source. A YM file uses the nibble of the
+voice the buzzer names, because the parameter field sits at one place for all
+three kinds and a buzzer's voice, following the envelope, leaves that nibble
+spare. A `.YMR` uses R13, where the chip keeps it. The front end that read
+the file knows which, and simply writes the number down.
+
+So the player does not look for it at all: `ymx_shape` is five instructions
+with no branch, there is no header flag, no shadow and no priming. A tune
+that arms a retrigger stream before it has set any shape carries whatever its
+own format assumes — `$08` for a `.YMR`, `0` for a YM dump — because that is
+the front end's fact to know.
 
 ### 2.3 T — the channel-to-timer map
 

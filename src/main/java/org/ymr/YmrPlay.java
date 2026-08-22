@@ -44,21 +44,21 @@ public final class YmrPlay {
     private YmrPlay() {}
 
     private static final String USAGE = """
-            ymr.sh - test drive a RhYMe tune: pack it, build a player, run it under Hatari.
+            ymr.sh - test drive a .YMR tune: pack it, build a player, run it under Hatari.
 
-              ymx/ymr.sh song.ymr                # 960-byte rings, 24 values per call
-              ymx/ymr.sh -n2048 -c32 song.ymr    # longer calls: cheaper on average
-              ymx/ymr.sh -l0 song.ymr            # loop from the start, whatever the
+              ymr/ymr.sh song.ymr                # 960-byte rings, 24 values per call
+              ymr/ymr.sh -n2048 -c32 song.ymr    # longer calls: cheaper on average
+              ymr/ymr.sh -l0 song.ymr            # loop from the start, whatever the
                                                    # .ymr header says
-              ymx/ymr.sh -o song.ymr             # play once and stop
-              ymx/ymr.sh -min13 -sec52 song.ymr  # trim: start deep in a long tune
-              ymx/ymr.sh -startframe41403 -frames1729 song.ymr
-              ymx/ymr.sh one.ymr two.ymr         # a set: subtunes, number keys pick
-              ymx/ymr.sh -perf song.ymr          # the raster monitor: the frame step
+              ymr/ymr.sh -o song.ymr             # play once and stop
+              ymr/ymr.sh -min13 -sec52 song.ymr  # trim: start deep in a long tune
+              ymr/ymr.sh -startframe41403 -frames1729 song.ymr
+              ymr/ymr.sh one.ymr two.ymr         # a set: subtunes, number keys pick
+              ymr/ymr.sh -perf song.ymr          # the raster monitor: the frame step
                                                    # works in red, the ticks paint green
                                                    # (A), red (B) and blue (D), and a
                                                    # yellow bar estimates their scanlines
-              ymx/ymr.sh -nomask song.ymr        # drop the interrupt mask around the
+              ymr/ymr.sh -nomask song.ymr        # drop the interrupt mask around the
                                                    # frame write, which the writes do
                                                    # not need: ticks then interleave
                                                    # with it instead of waiting ~500
@@ -71,7 +71,7 @@ public final class YmrPlay {
             23 of the format's 25 streams and C must cover them: the default 24 clears it
             by one slot, and C above that buys headroom no .ymr can use.
 
-              HATARI=/path/to/hatari TOS=/path/to/tos.img ymx/ymr.sh song.ymr""";
+              HATARI=/path/to/hatari TOS=/path/to/tos.img ymr/ymr.sh song.ymr""";
 
     public static void main(String[] args) {
         int ring = YmxFormat.DEFAULT_RING_SIZE;

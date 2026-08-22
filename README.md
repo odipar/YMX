@@ -21,7 +21,8 @@ verbs and the frame contract. Everything else worth reading is beside it.
 | | |
 |---|---|
 | [doc/SPEC.md](doc/SPEC.md) | the format specification |
-| [doc/CONVERSION.md](doc/CONVERSION.md) | what a YM file or a `.YMR` loses on the way in |
+| [ym/CONVERSION.md](ym/CONVERSION.md) | what a YM file loses on the way in |
+| [ymr/CONVERSION.md](ymr/CONVERSION.md) | what a `.YMR` loses on the way in |
 | [doc/terminology.md](doc/terminology.md) | the vocabulary both use |
 | [doc/experiments.md](doc/experiments.md) | ideas measured against the real corpus, and what the measurements said |
 
@@ -29,10 +30,10 @@ verbs and the frame contract. Everything else worth reading is beside it.
 
 ```sh
 mvn -q compile
-ymx/play.sh song.ym                 # pack a YM tune, build a player, run it
-ymx/ymr.sh song.ymr                 # the same for a .YMR register dump
-ymx/play.sh -n2048 -c32 song.ym     # longer calls: cheaper on average
-ymx/play.sh -h                      # every flag
+ym/play.sh song.ym                  # pack a YM tune, build a player, run it
+ymr/ymr.sh song.ymr                 # the same for a .YMR register dump
+ym/play.sh -n2048 -c32 song.ym      # longer calls: cheaper on average
+ym/play.sh -h                       # every flag
 ```
 
 Both need `rmac`, and `hatari` with a TOS image. Press SPACE in the Hatari
@@ -50,7 +51,7 @@ mvn -q exec:exec@ymr -Dargs="song.ymr song.ymx"
 ```sh
 ymx/mksndh.sh MY.SNDH build/*.ymx        # an SNDH v2.2 file: the canonical build
 ymx/mkprg.sh MY.PRG build/*.ymx          # a TOS program around those same bytes
-ymx/ym_sndh.sh -t"My Set" my.sndh *.ym   # both steps in one
+ym/ym_sndh.sh -t"My Set" my.sndh *.ym    # both steps in one
 ```
 
 SNDH is the Atari ST's standard music container, and it is where the player

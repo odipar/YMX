@@ -29,20 +29,20 @@ public final class Play {
     private static final String USAGE = """
             play.sh - test drive a YM tune: pack it, build a player, run it under Hatari.
 
-              ymx/play.sh song.ym                  # 960-byte rings, 24 values per call
-              ymx/play.sh -n256 song.ym            # smaller rings: less RAM, worse ratio
-              ymx/play.sh -n2048 -c32 song.ym      # longer calls: cheaper on average
-              ymx/play.sh -l0 song.ym              # loop from the start, whatever the
+              ym/play.sh song.ym                  # 960-byte rings, 24 values per call
+              ym/play.sh -n256 song.ym            # smaller rings: less RAM, worse ratio
+              ym/play.sh -n2048 -c32 song.ym      # longer calls: cheaper on average
+              ym/play.sh -l0 song.ym              # loop from the start, whatever the
                                                    # YM header says
-              ymx/play.sh -o song.ym               # play once and stop
-              ymx/play.sh -min13 -sec52 song.ym    # trim: start deep in a long tune
-              ymx/play.sh -startframe41403 -frames1729 song.ym
-              ymx/play.sh one.ym two.ym            # a set: subtunes, number keys pick
-              ymx/play.sh -perf song.ym            # the raster monitor: the frame step
+              ym/play.sh -o song.ym               # play once and stop
+              ym/play.sh -min13 -sec52 song.ym    # trim: start deep in a long tune
+              ym/play.sh -startframe41403 -frames1729 song.ym
+              ym/play.sh one.ym two.ym            # a set: subtunes, number keys pick
+              ym/play.sh -perf song.ym            # the raster monitor: the frame step
                                                    # works in red, timer ticks in green
                                                    # (A) and blue (D), and a yellow bar
                                                    # estimates the ticks' scanlines
-              ymx/play.sh -nomask song.ym          # drop the interrupt mask around the
+              ym/play.sh -nomask song.ym          # drop the interrupt mask around the
                                                    # frame write, which the writes do
                                                    # not need: ticks then interleave
                                                    # with it instead of waiting ~500
@@ -51,7 +51,7 @@ public final class Play {
             Press SPACE in the Hatari window to stop. Everything it builds lands in a
             work directory next to the first tune. The trim flags take one tune.
 
-              HATARI=/path/to/hatari TOS=/path/to/tos.img ymx/play.sh song.ym""";
+              HATARI=/path/to/hatari TOS=/path/to/tos.img ym/play.sh song.ym""";
 
     public static void main(String[] args) {
         int ring = YmxFormat.DEFAULT_RING_SIZE;

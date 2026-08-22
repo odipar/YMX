@@ -1,9 +1,10 @@
-# What the conversion is — and what it costs
+# What a `.YMR` conversion costs
 
-A `.ymx` is packed out of a YM file or a `.YMR` register dump — RhYMe's own
-export — and neither crosses whole. This is what each front end changes, what
-it counts, and what it tells you it did. [../README.md](../README.md) is how to run
-the packers, [SPEC.md](SPEC.md) the container they write.
+RhYMe's own export packed into a `.ymx`. This is what the front end changes
+on the way, what it counts, and what it tells you it did.
+[../README.md](../README.md) is how to run it, [../doc/SPEC.md](../doc/SPEC.md)
+the container it writes, and [../ym/CONVERSION.md](../ym/CONVERSION.md) the
+same account for a YM file.
 
 ## What the conversion is
 
@@ -64,7 +65,7 @@ Two more correspondences say why the register vector needs so little done to it.
 `envelope_shape` must not write R13: the pop IS the retrigger, so writing the
 last shape again would restart the envelope on every frame of a held note. No
 shape value can mean "nothing", so the reader marks such a frame with `$FF` —
-and `$FF` is precisely what [SPEC.md](SPEC.md)'s **The frame** means by it, the value
+and `$FF` is precisely what [SPEC.md](../doc/SPEC.md)'s **The frame** means by it, the value
 on which the player skips the register entirely. Two formats reached one
 convention from one constraint, so the register vector is handed straight on.
 
@@ -123,38 +124,6 @@ eleven script streams, which the `.YMR` — 10,488 bytes — does not carry at
 all: RhYMe's player reconciles its three timers every frame from what popped,
 and this one replays decisions taken at pack time. That is the bookkeeping
 difference paid in bytes, and what it buys is the flat frame.
-
-### Where a retrigger stream's shape comes from
-
-A sync-buzzer restarts the hardware envelope at audio rate, so what a
-retrigger stream needs to know is which shape to restart. The two formats
-file it in different places, and neither of them is where the player looks.
-
-A toggle stream's volume and a PCM stream's sample number are read off the
-voice's own register ring, and that is right, because both belong to the
-voice the effect took over: the level a SID chops is the level the tune put
-in that register. A shape belongs to nothing of the kind. There is one
-envelope generator and any number of voices may follow it, so the shape is
-not a voice's data — YM6 keeps it in a voice's nibble because the parameter
-field sits at one place for all three kinds and a buzzer's voice, following
-the envelope, leaves that nibble spare. RhYMe keeps it where the chip does,
-in its own copy of R13.
-
-So from **v9** the player does not look for it at all: the shape is CARRIED,
-in X's high nibble, one value per frame. Whichever front end read the file
-knows where its format filed it and simply writes the number down — the same
-way the other four source differences already reach the player, as different
-values rather than as a mode. `ymx_shape` is five instructions with no branch,
-there is no header flag, no shadow, and no priming: a tune that arms a buzzer
-before it has set a shape carries whatever its format assumes, `$08` for a
-`.ymr` and `0` for a YM dump, because that is the front end's fact to know.
-
-One nibble for the whole frame is not a budget compromise. Two retrigger
-streams cannot restart different shapes — there is one generator, so there is
-one nibble. Before v9 each channel patched its own tick from its own voice,
-which on a tune running two buzzers at once gave the generator two shapes at
-two rates; [SPEC.md](SPEC.md#22-x--the-spare-operands) has the reason
-that settled it, and the tune that got it wrong.
 
 ### What a .ymr gives up
 
@@ -288,11 +257,3 @@ Everything else the conversion has to change, it counts and names the same way:
   frame already ends on, which the wrap swallows — coming round from the end
   the code has not changed, and the script acts on codes that change.
 
-## What it does not do
-
-* **Sinus-SID.** Never seen in a dump, and never implemented by any player -
-  the packer warns and drops it.
-* **YM2.** Mad Max's forty drum samples are held in the player, not the file;
-  supporting them means embedding the bank in the converter. Not yet.
-* **Trusted input.** Beyond the magic, version and stream count, the player
-  checks nothing, like the ST4 decoders it is built on.

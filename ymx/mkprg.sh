@@ -11,7 +11,7 @@
 # canonical form of the player) and the PRG is a thin shell around those
 # same bytes: takeover, one play call per VBL, SPACE to quit, number keys
 # to switch subtunes. -m makes the program drop YMXDONE.MRK as it exits,
-# which is how ymx/play.sh knows to close the emulator.
+# which is how ym/play.sh knows to close the emulator.
 #
 # The work is org.ymx.MkPrg's; this only finds the repo and the classes.
 # Needs rmac on PATH.

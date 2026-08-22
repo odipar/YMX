@@ -457,8 +457,9 @@ Beware two words that do not survive the crossing. A .YMR "stream" is a
 change list, not this file's value series, and its "pop" is what advances
 one - see the parenthetical in **Streams** above. The reasoning behind
 each row, and what the conversion costs, is in
-[CONVERSION.md](CONVERSION.md) under **What the conversion is**; it is
-not repeated here.
+[../ymr/CONVERSION.md](../ymr/CONVERSION.md) under **What the conversion
+is**; [../ym/CONVERSION.md](../ym/CONVERSION.md) is the same account for a
+YM file. Neither is repeated here.
 
 ## The names in the code
 
