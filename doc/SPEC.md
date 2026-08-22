@@ -89,7 +89,7 @@ timers a tune does not need stay the host's.
 
 ### 1.3 `N` and `C`
 
-`N` is the ring size, one ring per stream, and is what a back-reference may
+`N` is the ring size, one ring per stream, and the bound a back-reference may
 not reach past — every section is packed with that bound. `N` is capped at
 **2520**, because a player may read register `k`'s ring through an
 assembled-in displacement of `k·N` and `13·N` must fit a signed 16-bit
@@ -97,11 +97,11 @@ displacement.
 
 `C` is how many values are decoded per call. It must
 
-- be at least one refill slot per stream the tune actually **decodes** —
+- be at least one refill slot per stream the tune **decodes** —
   17 when it names no timer channel, then 19, 21, 23 or 25 by the *highest*
   channel it names, since a player stops at the last channel rather than
   counting them; and
-- divide `N`, which is what lets a player use a counted-wrap ring decoder
+- divide `N`, which lets a player use a counted-wrap ring decoder
   rather than a general one.
 
 960/24 is the usual pair and covers every tune that leaves channel 3 idle.
@@ -122,9 +122,8 @@ then all twenty-five loop sections, but nothing depends on that — a section is
 reached only through its offset.
 
 A section offset of 0 means the section is not present. A tune that loops from
-frame 0 has no intro sections at all; a tune that does not loop has no loop
-sections. Both halves of the table are always written, and the absent half is
-zero.
+frame 0 has no intro sections; a tune that does not loop has no loop sections.
+Both halves of the table are always written, and the absent half is zero.
 
 Packed sizes are not stored. ST4 counts output units rather than input bytes,
 so a decoder never needs them.
@@ -133,8 +132,8 @@ so a decoder never needs them.
 
 `S` is fixed. It is always 25, a reader must reject a file that says
 otherwise, and the two section tables are therefore always 100 bytes each,
-which is what puts the payload at a constant offset. Three different counts
-get called "streams", and only the first is `S`:
+which puts the payload at a constant offset. Three different counts get called
+"streams", and only the first is `S`:
 
 | | |
 |---|---|
@@ -142,14 +141,14 @@ get called "streams", and only the first is `S`:
 | **decoded** — 17, 19, 21, 23 or 25 | what a player reads per cycle: 17 for a tune naming no timer channel, then two more per channel, up to and including the **highest** channel it names |
 | **carrying** — fewer still | an idle channel's pair is stored, and packs to almost nothing |
 
-The middle one is what `C` has to cover, and it steps by the highest channel
-named rather than by the count of channels used, because a player stops at
-the last channel rather than counting them. A tune using only channel 3 still
-decodes 25.
+`C` has to cover the middle one, and it steps by the highest channel named
+rather than by the count of channels used, because a player stops at the last
+channel rather than counting them. A tune using only channel 3 still decodes
+25.
 
 So a `.ymx` always has twenty-five slots and rarely twenty-five streams worth
-reading. The channel pairs come last precisely so the difference costs
-nothing: what a tune does not name is a tail no player ever touches.
+reading. The channel pairs come last so the difference costs nothing: what a
+tune does not name is a tail no player ever touches.
 
 ---
 
@@ -173,10 +172,9 @@ script data whose bytes never reach a chip register.
 The channel pairs come last so a tune using fewer of them leaves a tail no
 player ever decodes.
 
-Register streams hold exactly what the chip should see: the spare bits older
-YM formats carried effect fields in are stripped at pack time, so a player
-masks nothing. Two registers are not plain values, and a player must handle
-both.
+Register streams hold what the chip should see: the spare bits older YM
+formats carried effect fields in are stripped at pack time, so a player masks
+nothing. Two registers are not plain values, and a player must handle both.
 
 **R7 carries no port bits.** The mixer register's top two bits are the chip's
 I/O port directions, not sound, so the stream carries bits 5-0 and a player
@@ -185,21 +183,19 @@ outputs, because port A drives the floppy select lines — and taking those two
 bits from the file instead would leave the drive selected or deselected by
 whatever the tune happened to carry there. Bits 5-0 arrive with every
 sample-playing voice already **disconnected** — no generator mixed into it, so
-its volume register alone is its output — which is a packing-time edit, not a
-player's.
+its volume register alone is its output — a packing-time edit, not a player's.
 
 **R13 has a value that means "do not write".** Writing R13 restarts the
-envelope, whatever value is written, so a stream that simply repeated the
-current shape would restart the envelope on every frame. `$FF` is therefore
-not a shape but a marker: on a frame carrying it the frame write leaves R13
-alone. No real shape can be confused with it — R13 is four bits wide, so
-every genuine value is `$00`-`$0F` — and `$FF` is the one value that reaches
-a stream unmasked, for exactly this reason.
+envelope, whatever value is written, so a stream that repeated the current
+shape would restart the envelope on every frame. `$FF` is therefore not a
+shape but a marker: on a frame carrying it the frame write leaves R13 alone.
+No real shape can be confused with it — R13 is four bits wide, so every
+genuine value is `$00`-`$0F` — and `$FF` is the one value that reaches a
+stream unmasked, for this reason.
 
 ### 2.1 M — the master byte
 
-`0` means nothing anywhere this frame, which is the common case and costs one
-test.
+`0` means nothing anywhere this frame — the common case, and one test.
 
 | bits | meaning |
 |---:|---|
@@ -236,17 +232,17 @@ envelope generator, so two retrigger streams cannot hold different shapes:
 a player that let each channel restart its own would give one generator two
 shapes at two rates.
 
-Carrying it rather than deriving it is what keeps the source format out of
-the player entirely. A toggle stream's volume and a PCM stream's sample
-number are read off the voice's own register ring, and that is right: both
-belong to the voice the timer stream took over, and the level a toggle stream
-chops is the level the tune put in that register. A shape belongs to nothing
-of the kind — any number of voices may follow the one generator — so where a
-source files it is an accident of that source. A YM file uses the nibble of
-the voice the retrigger stream names, because the parameter field sits at one
-place for all three kinds and that voice, following the envelope, leaves the
-nibble spare. Another source may file it in R13, where the chip keeps it. The
-front end resolves which, and simply writes the number down.
+Carrying it rather than deriving it keeps the source format out of the player.
+A toggle stream's volume and a PCM stream's sample number are read off the
+voice's own register ring, and that is right: both belong to the voice the
+timer stream took over, and the level a toggle stream chops is the level the
+tune put in that register. A shape belongs to nothing of the kind — any number
+of voices may follow the one generator — so where a source files it is an
+accident of that source. A YM file uses the nibble of the voice the retrigger
+stream names, because the parameter field sits at one place for all three
+kinds and that voice, following the envelope, leaves the nibble spare. Another
+source may file it in R13, where the chip keeps it. The front end resolves
+which and writes the number down.
 
 So the shape is never searched for: it is read straight out of X, and the
 format carries no flag, shadow or priming for it. A tune that arms a retrigger
@@ -283,8 +279,8 @@ that clock while it plays, and cannot be driven from a Timer C interrupt.
 ```
 
 - **verb** (bits 7-5) — one of the eight in §3.
-- **voice** (bits 4-3) — 0, 1, 2 for voices A, B, C. There are three voices
-  in a two-bit field, so **3 names no voice**; see `RETUNE` in §3.
+- **voice** (bits 4-3) — 0, 1, 2 for voices A, B, C. Three voices in a
+  two-bit field, so **3 names no voice**; see `RETUNE` in §3.
 - **low** (bits 2-0) — the MFP prescaler index for any verb that programs a
   timer, or a set of flags for `HOLD` and `RESUME`.
 
@@ -301,7 +297,7 @@ nothing.
 | # | verb | what it does |
 |---:|---|---|
 | 0 | `RESUME` | a masked toggle stream comes back. Flags: 1 = reload the count, 2 = reload the volume. Its phase ran on through the gap |
-| 1 | `HOLD` | a running stream's upkeep. Flags: 1 = reload the count from P, 2 = track the toggle stream's volume, 4 = track the retrigger stream's shape. Emitted only on frames where a value actually changed |
+| 1 | `HOLD` | a running stream's upkeep. Flags: 1 = reload the count from P, 2 = track the toggle stream's volume, 4 = track the retrigger stream's shape. Emitted only on frames where a value changed |
 | 2 | `RELEASE` | stop this channel's timer. Bit 0 set masks the interrupt instead, leaving the timer counting |
 | 3 | `START_TOGGLE` | start a toggle stream: select, volume, vector := the loud half, then a full program |
 | 4 | `RETUNE` | a new rate for a running stream, keeping its place in the cycle. See below |
@@ -382,7 +378,7 @@ both front ends write and the compiler reads:
 
 - **kind** — as above.
 - **voice + 1** — so a zero voice field means an idle channel, and a zero
-  byte means nothing at all.
+  byte means nothing.
 - **t** (bit 3) — free for the front end. A source whose triggers are events
   rather than repeated codes flips it on every trigger, so two triggers of
   one sample at one rate are two different bytes and the compiler starts the
@@ -429,8 +425,8 @@ the marker — nothing is counted and nothing compared per tick.
 The **loop point** is a position in the sample, not an address. On meeting the
 end marker a tick whose loop point is not `$FFFF` moves that position's
 address into its own pointer and plays on; a one-shot stops its timer. `0` is
-a real loop point — the sample that repeats whole — which is why the
-not-looping value has to be one no length can reach.
+a real loop point — the sample that repeats whole — so the not-looping value
+must be one no length can reach.
 
 The end tick has already written the marker as a level by the time it tests
 it, so a loop costs one sample of silence at the seam.
@@ -453,7 +449,7 @@ A player's one call per frame does this, in this order:
    whatever the frame's script costs.
 3. **The script's actions** — for each channel M names, decode its A byte and
    run the verb.
-4. **One refill** — decode `C` values into exactly one stream's ring: stream
+4. **One refill** — decode `C` values into one stream's ring: stream
    `k` on the frame where the frame number modulo `C` is `k`.
 
 Actions come *after* the frame write so their varying cost cannot jitter the
