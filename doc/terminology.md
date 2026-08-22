@@ -169,7 +169,7 @@ series, and it is ticked.)
 | clock | speed | what runs there |
 |---|---|---|
 | **frame clock** | the tune's own rate | frame streams. Also the **control rate**: how often the deciding code runs |
-| **timer clocks** | 48 to 25,600 a second | timer streams. Also the **audio rate**: how often a sound-shaping write lands |
+| **timer clocks** | 48 to 25,600 a second in practice | timer streams. Also the **audio rate**: how often a sound-shaping write lands |
 | **YM2149 clock** | 2,000,000 a second | the generators. Software has no access |
 
     frame streams (frame clock)     timer streams (timer clocks)
@@ -236,9 +236,9 @@ The timer counts down at the divided speed and raises an interrupt at
 zero. That interrupt is the tick. (Both numbers are divisors; a
 generator's *counter* is a different thing.)
 
-The slowest rate is 48 a second, the fastest 614,400. YMX rejects
-anything above 25,600: on an 8 MHz 68000 the interrupt alone would take a
-quarter of the machine. For scale, 69 corpus tunes play samples, mostly
+The slowest rate is 48 a second, the fastest 614,400. The YM front end
+rejects anything above 25,600: on an 8 MHz 68000 the interrupt alone would
+take a quarter of the machine. For scale, 69 corpus tunes play samples, mostly
 between 5,000 and 6,100 a second.
 
 ### Conflicts between the two clocks
@@ -565,7 +565,7 @@ sense.
 | **derived rate** | set against the note playing, so it moves with the melody |
 | **coupling** | what a derived rate is set against. The ratio is what you hear |
 | **frame clock, control rate** | the rate the tune is stepped at. How often the deciding code runs |
-| **timer clock, audio rate** | 48 to 25,600 a second. How often a sound-shaping write lands |
+| **timer clock, audio rate** | 48 to 25,600 a second in practice. How often a sound-shaping write lands |
 | **YM2149 clock** | 2,000,000 a second. Runs the generators; software has no access |
 | **timer channel** | one place a timer stream can run, numbered 0 to 3. The file says which timer each gets |
 | **volume stream** | a timer stream writing a voice's volume. Three of the four kinds are one |
