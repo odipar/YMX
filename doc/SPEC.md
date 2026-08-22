@@ -102,17 +102,25 @@ displacement.
   channel it names, since a player stops at the last channel rather than
   counting them; and
 - divide `N`, which lets a player use a counted-wrap ring decoder
-  rather than a general one.
+  rather than a general one; and
+- fit twice in a ring: `N` is at least `2C`.
+
+At a unit size above 1, `C`, the frame count `O` and the loop frame `L` are
+each a whole number of units, so every budget a player hands the decoder
+divides cleanly.
 
 960/24 is the usual pair and covers every tune that leaves channel 3 idle.
 
 ### 1.4 The sections
 
 Each section is a complete, standard ST4 container — its own twenty-byte
-header, then its four streams — packed at unit size 1 and placed on a long
-boundary, so the container's own alignment rules hold where it sits. A player
-opens one with the eight-instruction sequence ST4.S documents, and `dst4`
-unpacks any section straight out of a `.ymx` for debugging.
+header, then its four streams — placed on a long boundary, so the container's
+own alignment rules hold where it sits. Every section in a file is packed at
+one **unit size**, 1, 2 or 4 bytes, recorded in each section's own ST4
+signature rather than in the YMX header; a reader accepts only the size it was
+built for (§9.1). A player opens one with the eight-instruction sequence ST4.S
+documents, and `dst4` unpacks any section straight out of a `.ymx` for
+debugging.
 
 Every stream is packed twice, because restarting it at the loop frame means
 starting a decoder over: the intro section covers `[0, L)`, the loop section
@@ -403,7 +411,10 @@ rate = 2457600 / prescaler[index] / count
 Index 0 is not a divider but the MFP's **stopped** state, so a code naming it
 starts nothing. A count of 0 is likewise stopped.
 
-The reachable range is roughly 48 Hz to 25,600 Hz.
+The encodable range is 48 Hz — prescaler 200, count 255 — to 614,400 Hz,
+prescaler 4 and count 1. What a packer emits is narrower: a rate that costs
+more of the machine than a tune can spare is a packing-time decision, not a
+format limit.
 
 ---
 
