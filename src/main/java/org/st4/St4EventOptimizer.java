@@ -41,11 +41,11 @@ import java.util.TreeSet;
  * so the chain (and the packed bytes) can differ from the fast optimizer's
  * while the packed size cannot: both are optimal parses of the same cost.
  *
- * <p>The trade is per-event overhead for per-step savings, so this wins where
- * runs are long (repetitive, aligned data) and loses where nearly every match
- * run is a step or two long. {@link #optimize} therefore counts the events
- * first - one cheap pass - and falls back to {@link St4FastOptimizer} when
- * the data is run-churny.
+ * <p>The trade is per-event overhead for per-step savings, so this is ahead
+ * where runs are long (repetitive, aligned data) and behind where nearly every
+ * match run is a step or two long. {@link #optimize} therefore counts the
+ * events first - one cheap pass - and falls back to {@link St4FastOptimizer}
+ * when the runs are that short.
  */
 public final class St4EventOptimizer {
 
@@ -110,8 +110,8 @@ public final class St4EventOptimizer {
     /**
      * Returns the last block of an optimal parse of {@code units} - the same
      * cost as {@link St4FastOptimizer}, not necessarily the same chain. Falls
-     * back to the fast optimizer when a cheap event count says the data is
-     * run-churny and the DP would be faster.
+     * back to the fast optimizer when a cheap event count says the runs are
+     * short enough that the DP would be faster.
      */
     public static St4Block optimize(int[] units, int unit, int offsetLimit,
                                     boolean progress) {

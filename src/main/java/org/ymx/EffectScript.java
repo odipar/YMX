@@ -20,7 +20,7 @@ import java.util.List;
  * front end has already put its format's bytes into - so the names here are
  * the engine's throughout. Every code on a timer channel is a TIMER STREAM,
  * values written to one register between frames at a rate a timer sets, and
- * what this class decides for each is exactly a stream's lifecycle: start,
+ * what this class resolves for each is exactly a stream's lifecycle: start,
  * hold, retune (a new rate, the same place in the cycle), release, resume,
  * and which stream preempts which when two contend for one register.
  * {@code doc/terminology.md} is the dictionary. The streams it emits are
@@ -39,13 +39,15 @@ import java.util.List;
  *                bits 0-3 = timer channel 0, 1, 2, 3 acts (read its A,
  *                           maybe P)
  *                bit 4 = apply the gate state in bits 7-5
- *                bits 7-5 = burst-gate mask, voices A/B/C, 1 = muted;
- *                           absolute state, idempotent to re-assert
+ *                bits 7-5 = one bit per voice A/B/C; a set bit GATES that
+ *                           voice - its volume register is left out of the
+ *                           frame write. State, not an edge: idempotent to
+ *                           re-assert
  * stream 15  X   the operands an action byte has no room for.
  *                bits 7-4 = the envelope shape a retrigger stream restarts.
  *                           One per frame, not one per channel: the chip has
  *                           one envelope generator, so two retrigger streams
- *                           could not hold different shapes if they tried
+ *                           cannot hold different shapes
  *                bits 3-0 = what START_PCM_PREEMPT stops, a bit per timer
  *                           channel whose timer must stop first
  * stream 16  T   the channel-to-timer map, two bits a channel: 0 = Timer
@@ -85,8 +87,9 @@ import java.util.List;
  *
  * <p>A toggle stream that went away and comes back - a released note, or
  * a PCM stream that took the voice - always re-enters through
- * START_TOGGLE, which restarts the square at phase zero: the player writes the voice silent, and the
- * first tick - one timer period later - plays the loud half. Free-running
+ * START_TOGGLE, which restarts the square at phase zero: the player writes
+ * the voice silent, and the first tick - one timer period later - plays the
+ * loud half. Free-running
  * phase belongs only to a held code (and its retunes): the ym2149-rs
  * reference model, deterministic at every gap. RETUNE is ONLY the held
  * prescaler-slide.
@@ -109,7 +112,7 @@ import java.util.List;
  * <h2>Frame alignment</h2>
  *
  * A PCM stream's end is the one genuinely asynchronous event: its sample
- * runs out at tick rate, mid-frame, and only the marker tick knows the
+ * runs out at tick rate, mid-frame, and only the marker tick lands on the
  * instant. The script reopens the voice's gate, reconnects it and
  * re-starts a suppressed toggle stream at the frame boundary AFTER the
  * computed end - never before, so a frame write can never race a live
@@ -240,9 +243,9 @@ public final class EffectScript {
      * The compiled script: {@code frames} played frames splitting at
      * {@code split}, {@code source[p]} naming the dump frame each played
      * frame shows, the script streams - M plus an action and a count byte
-     * per timer channel - and the mixer bits to OR into R7. {@code reopens} lists {playedFrame, voice} for every sample end
-     * edge - the differential test's skew windows - and {@code notes} what
-     * a packer should tell the user.
+     * per timer channel - and the mixer bits to OR into R7. {@code reopens}
+     * lists {playedFrame, voice} for every sample end edge - the differential
+     * test's skew windows - and {@code notes} what a packer should report.
      */
     public record Result(int frames, int split, int[] source,
                          byte[] m, byte[][] actions, byte[][] counts, byte[] x,
@@ -302,10 +305,10 @@ public final class EffectScript {
     private final Channel[] channels = new Channel[YmxFormat.CHANNELS];
     private final int[] drumEnd = {-1, -1, -1};   // played frame the voice's
     private final int[] drumOwner = {-1, -1, -1}; // gate reopens; -1 = free
-    private int gates;                            // bit v = muted
+    private int gates;                            // bit v = gated
     private final List<int[]> reopens = new ArrayList<>();
     private final List<String> notes = new ArrayList<>();
-    private final Semantics semantics;  // what the source format decides
+    private final Semantics semantics;  // what the source format fixes
 
     // The emission arrays, over the full simulated horizon; cut at the end.
     private final byte[] m;
@@ -354,10 +357,10 @@ public final class EffectScript {
      * As above, with the channel-to-timer map the T stream will carry: two
      * bits a channel, {@link YmxFormat#DEFAULT_TIMERS} being the one a YM
      * tune is packed with. Naming a different timer changes nothing the
-     * script decides - the channels are the same, and only which hardware
+     * script computes - the channels are the same, and only which hardware
      * ticks them moves.
      *
-     * <p>What the source format decides is not a parameter here at all: the
+     * <p>What the source format fixes is not a parameter here at all: the
      * tune carries its own {@link Semantics}, because the answer follows from
      * the format the codes were read out of and travels with them. The codes
      * arrive already normalized, and the semantics say only what the codes
@@ -483,8 +486,8 @@ public final class EffectScript {
 
     private void frame(int p, int f) {
         gatesBefore = gates;
-        // X's high nibble is simply this frame's shape - the packer knows it,
-        // so the player never has to look for it. It changes rarely, which is
+        // X's high nibble is simply this frame's shape - the packer resolved
+        // it, so the player never has to look for it. It changes rarely, which is
         // what keeps a stream carrying one value on almost every frame.
         x[p] = (byte) (shape(f) << 4);
 
@@ -551,7 +554,7 @@ public final class EffectScript {
      * Whether a rate pop can move the prescaler with the timer left running.
      *
      * <p>A source whose own player reprograms live - RhYMe writes the
-     * control register and then the data register without stopping - hears
+     * control register and then the data register without stopping - renders
      * a rate change as a bend, not as a restart. The period already in
      * flight runs to its own end at the new prescaler and the reload lands
      * at the next underflow, so a square keeps both its phase and its place
@@ -691,7 +694,7 @@ public final class EffectScript {
             // state BEFORE the register burst and the script's actions after
             // it, so the frame write this reopens is THIS frame's - the
             // voice's own volume is back on the chip in the same 20 ms the
-            // source asked for it, with no skew to correct for. What the
+            // source placed it in, with no skew to correct for. What the
             // burst cannot cover is the sliver between it and the release: a
             // tick landing there writes one more sample byte over the volume
             // just written, and it stands until the next frame. That is a
@@ -847,7 +850,7 @@ public final class EffectScript {
     /**
      * Any action that programs or stops this channel's timer cuts a sample the
      * channel still owes ticks to: its marker will never run, so its voice
-     * stays muted and forced - v1's stuck flag, replicated and logged.
+     * stays gated and forced - v1's stuck flag, replicated and logged.
      */
     private void cut(int p, int index, int skip) {
         for (int v = 0; v < 3; v++) {
@@ -860,7 +863,7 @@ public final class EffectScript {
                     stuckNoted = true;
                     notes.add("an effect armed over its own channel's running "
                             + "drum: voice " + (char) ('A' + v)
-                            + " stays muted (v1 semantics)");
+                            + " stays gated (v1 semantics)");
                 }
             }
         }
@@ -870,12 +873,12 @@ public final class EffectScript {
      * The samples this channel still owns, ended here because the channel was
      * told to do something else - the {@link Semantics#channelEndsPcm} rule.
      * A channel has one timer, the sample was ticking on it, and whatever the
-     * source just asked for is about to program it: the marker tick that would
+     * source just popped is about to program it: the marker tick that would
      * have ended the sample can no longer run, so the end is now.
      *
      * <p>{@code taken} names the voice the arriving stream keeps for itself,
      * or -1 when none does - the shape {@link #cut} uses for the same reason.
-     * Every other voice gets its burst gate back on this frame and an entry in
+     * Every other voice gets its gate back on this frame and an entry in
      * {@code reopens}, because its volume register is the frame write's again;
      * a voice a toggle stream is taking needs the gate shut, so its gate and
      * its edge are that stream's to set, two lines further on.
@@ -939,7 +942,7 @@ public final class EffectScript {
      * rate, plus a sixteenth of a frame for the arming phase - the trigger
      * action runs a bounded slice into its VBL, so the last tick lands that
      * much later than the tick count alone says. A whole frame here instead
-     * held every voice muted 20ms past its drum: the click v1 never had.
+     * held every voice gated 20ms past its drum: the click v1 never had.
      */
     private int duration(int f, int code, int count, int voice) {
         int number = tune.registers()[8 + voice][f] & 31;

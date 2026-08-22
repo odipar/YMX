@@ -36,7 +36,7 @@ import org.jx1.Decompressor;
  * <p>{@link Decompressor} takes that ring as an argument, so a decode through
  * it is the decode the Atari does, byte for byte. A stream whose packer
  * overreached its ring is the one case where that matters: the ring has already
- * overwritten what the match asks for, so the Atari copies out whatever the
+ * overwritten what the match points at, so the Atari copies out whatever the
  * ring holds now. Rather than pass that on, a stream long enough to lap its
  * ring is decoded twice - once through a window nothing can outrun, which is
  * the decode the packer meant, and once through the ring the map declares, which
@@ -206,8 +206,8 @@ public final class Zx1 {
      * is worth. With {@code -ea} it arrives as an {@link AssertionError} naming
      * a condition in a decoder that cannot name the stream it was given, and
      * without {@code -ea} the same stream arrives as the array index that
-     * assertion was guarding, or does not arrive at all; the caller above knows
-     * what it was asking, and asks in a way that does not need the difference.
+     * assertion was guarding, or does not arrive at all; the caller above has
+     * the context, and calls in a way that does not need the difference.
      *
      * @param window how many bytes of ring to decode through
      * @param fill   what the ring holds before the decode starts, so that a

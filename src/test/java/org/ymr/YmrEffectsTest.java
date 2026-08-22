@@ -82,7 +82,7 @@ final class YmrEffectsTest {
         assertEquals(YmxFormat.TIMER_A, YmxFormat.timerOf(YmrEffects.TIMERS, 0));
         assertEquals(YmxFormat.TIMER_B, YmxFormat.timerOf(YmrEffects.TIMERS, 1));
         assertEquals(YmxFormat.TIMER_D, YmxFormat.timerOf(YmrEffects.TIMERS, 2));
-        // The channel nobody fills takes the timer nobody asked for, which
+        // The channel no .YMR fills takes the leftover timer, which
         // keeps the map a permutation and costs the host nothing: the header
         // never flags a channel the tune leaves idle.
         assertEquals(YmxFormat.TIMER_C, YmxFormat.timerOf(YmrEffects.TIMERS, 3));
@@ -171,7 +171,7 @@ final class YmrEffectsTest {
     void theShapeCarriedIsTheOneTheEnvelopeStreamLastPopped() {
         // A .YMR files the shape where the chip does, so the front end
         // resolves it here and the tune carries the answer: nothing
-        // downstream needs to know which format asked.
+        // downstream depends on which format it came from.
         byte[] image = new Ymr()
                 .frame(VOLUME_C, TIMER_D_EFFECT, TIMER_D_RATE)
                 .frame(ENVELOPE_SHAPE)
@@ -393,7 +393,7 @@ final class YmrEffectsTest {
         assertEquals(EffectScript.action(EffectScript.VERB_START_TOGGLE, 2, PRESCALER),
                 script.actions()[2][0] & 0xFF);
         assertEquals(0, script.actions()[3][0]);
-        // Voices A and C are muted for their toggle streams; B is not, because
+        // Voices A and C are gated for their toggle streams; B is not, because
         // a retrigger stream writes R13 and never touches a volume register.
         assertEquals(0b101, (script.m()[0] & 0xFF) >> EffectScript.M_GATE_SHIFT);
     }
@@ -454,7 +454,7 @@ final class YmrEffectsTest {
     @Test
     void anExplicitStopEndsARunningSampleOnTheFrameThatSaysSo() {
         // RhYMe routes an effect pop of 0 to _ymr_stop_channel, which stops the
-        // timer, forgets the sample and writes the voice's volume back out of
+        // timer, drops the sample and writes the voice's volume back out of
         // the shadow. Leaving the drum to its marker instead would play 38
         // frames - 760 ms - of it that the song ended.
         Ymr builder = drumOnFrameZero();
@@ -477,7 +477,7 @@ final class YmrEffectsTest {
         // And the gate opens on that same frame. The player applies the gate
         // state before the register burst and the script's actions after it, so
         // the voice's own volume is back on the chip inside the frame the song
-        // asked for it - no skew to correct anywhere.
+        // placed it in - no skew to correct anywhere.
         assertEquals(EffectScript.M_CHANNEL_0 | EffectScript.M_GATES,
                 script.m()[5] & 0xFF);
         assertEquals(0x0D, tune.registers()[8][5] & 0xFF);
@@ -548,7 +548,7 @@ final class YmrEffectsTest {
 
         assertEquals(EffectScript.action(EffectScript.VERB_START_TOGGLE, 0, PRESCALER),
                 script.actions()[0][5] & 0xFF);
-        // The gate never opens: the sample needed voice A muted and so does the
+        // The gate never opens: the sample needed voice A gated and so does the
         // square, so this is a change of owner and not a sample-end edge.
         assertEquals(EffectScript.M_CHANNEL_0, script.m()[5] & 0xFF);
         assertTrue(script.reopens().isEmpty(), script.reopens().toString());

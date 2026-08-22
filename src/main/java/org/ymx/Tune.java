@@ -53,8 +53,9 @@ import org.jspecify.annotations.Nullable;
  * 0..15 one per byte, and {@code sampleLoops} says for each of them where a
  * PCM stream goes back to when it runs out - an offset into that sample, or
  * {@link YmxFormat#SAMPLE_ONE_SHOT} for one that stops. The two are one
- * thing in two arrays, which the compact constructor is what keeps true. {@code semantics} is what the source dialect implies
- * about triggering and stopping and cannot be read out of the codes - see
+ * thing in two arrays, which the compact constructor is what keeps true.
+ * {@code semantics} is what the source dialect implies about triggering and
+ * stopping and cannot be read out of the codes - see
  * {@link EffectScript.Semantics}. {@code loopFrame} is the SOURCE's loop
  * frame, which is a default and not a decision: a CLI may override it, drop
  * it, or find it outside the tune. READ IT ONLY THROUGH A CLI THAT HAS DONE
@@ -77,7 +78,7 @@ public record Tune(int frames, int frameRate, long masterClock, int loopFrame,
 
     /**
      * The same tune under other semantics. A front end sets the ones its
-     * format decides; where a format decides nothing - no YM file records
+     * format fixes; where a format fixes nothing - no YM file records
      * which gap model its own player used - a caller may say instead, and
      * this is how it says so without every layer between carrying a flag.
      */
@@ -143,8 +144,8 @@ public record Tune(int frames, int frameRate, long masterClock, int loopFrame,
         // three bits: it floods the verb above it and the player would read
         // the result as another verb entirely. Nothing this repository writes
         // can produce one - both front ends drop a voiceless code to idle -
-        // which is exactly why it is worth refusing here rather than trusting
-        // the next front end to remember.
+        // which is exactly why it is worth rejecting here rather than leaving
+        // it to the next front end.
         for (int channel = 0; channel < codes.length; channel++) {
             for (int frame = 0; frame < frames; frame++) {
                 int code = codes[channel][frame] & 0xFF;

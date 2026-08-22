@@ -31,7 +31,7 @@ import org.ymx.YmxFormat;
  * 200 Hz clock - drives voice C. That binding is normative, so it is a
  * constant here rather than an option: channel 0 takes Timer A, channel 1
  * Timer B, channel 2 Timer D, and the fourth channel, which no .YMR fills,
- * takes the Timer C nobody asked for. {@link #TIMERS} is that map in the T
+ * takes the leftover Timer C. {@link #TIMERS} is that map in the T
  * stream's own two-bits-a-channel encoding, ready for the encoder.
  *
  * <h2>The code byte</h2>
@@ -45,7 +45,7 @@ import org.ymx.YmxFormat;
  * <p>In a YM dump an effect is a code sitting in a register, and a digidrum
  * fires again on every frame that repeats it. In a .YMR an effect is state and
  * a trigger is an event: popping {@code timer_*_sample} restarts the sample
- * whether or not the index changed, and a sample nobody pops keeps playing.
+ * whether or not the index changed, and a sample nothing pops keeps playing.
  * The two halves of that are handled in two places. {@link EffectScript} is
  * told, through {@link EffectScript.Semantics}, that a held PCM code does not
  * retrigger - which is what stops a sustained sample being chopped into
@@ -79,11 +79,11 @@ import org.ymx.YmxFormat;
  *       volume is what {@code volume_a}/{@code b}/{@code c} already popped into
  *       that register - so the toggle stream's volume is already in place.</li>
  *   <li>A Sample's index is written over the volume byte on every frame the
- *       PCM code is armed. That is invisible: the script mutes the voice's
- *       burst gate for the whole time a sample owns it, and {@code ymx_gates}
- *       mutes a write by overwriting it with two {@code nop}s, so the byte
- *       never reaches the chip. It is also load-bearing - the script recomputes a
- *       sample's length wherever its code changes, so the index has to be
+ *       PCM code is armed. That is invisible: the script gates the voice for
+ *       the whole time a sample owns it, and {@code ymx_gates} gates a write
+ *       by overwriting it with two {@code nop}s, so the byte never reaches
+ *       the chip. It is also load-bearing - the script recomputes a sample's
+ *       length wherever its code changes, so the index has to be
  *       readable on every one of those frames and not only on the first.</li>
  * </ul>
  *
@@ -94,7 +94,7 @@ import org.ymx.YmxFormat;
  * volume byte a .YMR popped reaches the chip exactly as the dump had it.
  *
  *
- * <h2>What a .YMR asks for and a .ymx cannot give</h2>
+ * <h2>What a .YMR can express and a .ymx cannot</h2>
  *
  * <p>One thing is converted rather than carried, and it leaves a note. The
  * format allows 65535 samples and a YMX sample number is five bits, so
@@ -172,7 +172,7 @@ public final class YmrEffects {
      * register, and a song needing its sample clean has already disconnected
      * the voice itself. And a channel's own commands end the sample running on
      * it: an effect pop of 0 routes to {@code _ymr_stop_channel}, which stops
-     * the timer, forgets the effect and the sample and writes the voice's
+     * the timer, drops the effect and the sample and writes the voice's
      * volume back out of the shadow, and an effect pop of anything else
      * reprograms the one timer the sample was ticking on. Either way the sample
      * ends on that frame, so the script must not leave it running to its marker.

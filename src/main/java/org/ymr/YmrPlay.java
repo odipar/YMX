@@ -34,8 +34,8 @@ import org.ymx.YmxFormat;
  * subtunes named from the file stems - the only name a .YMR has - and the
  * SNDH's composer is left absent rather than invented.
  *
- * <p>The program is built with the exit marker, which is how this knows the
- * tune has stopped: the emulator has no other way to tell us that SPACE was
+ * <p>The program is built with the exit marker, which is how this detects the
+ * tune has stopped: the emulator has no other way to report that SPACE was
  * pressed inside it. Whichever comes first - the marker or the window being
  * closed by hand - ends the wait.
  */
@@ -103,7 +103,7 @@ public final class YmrPlay {
                 loop = "-l" + a.substring(2);
             } else {
                 extra.add(a);           // the packer's: the trim window, and
-            }                           // whatever it learns next
+            }                           // whatever it reads next
         }
         List<Path> ymrs = new ArrayList<>();
         for (; i < args.length; i++) {
@@ -173,7 +173,7 @@ public final class YmrPlay {
      * trim options still mean something. A set goes through its trailing-
      * directory form, which is what pins them all to one unit size and one
      * workspace - the shape a single player build can hold as subtunes - and
-     * which is why the directory has to exist before the packer sees it.
+     * which is why the directory has to exist before the packer runs.
      *
      * <p>The packer's per-stream table is left where it lands. The .ym front
      * ends filter it out because a build script on its way to an SNDH does not

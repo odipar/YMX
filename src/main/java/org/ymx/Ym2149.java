@@ -1,7 +1,7 @@
 package org.ymx;
 
 /**
- * What a plain YM2149 actually sees.
+ * What a plain YM2149 actually receives.
  *
  * <p>A YM6 file carries its special effects (SID voice, digidrum, sinus-SID,
  * sync-buzzer) in bits that the sound chip itself does not use: the top nibbles

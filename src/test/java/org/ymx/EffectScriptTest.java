@@ -269,7 +269,7 @@ final class EffectScriptTest {
     }
 
     /** The stuck-flag quirk, replicated: a buzzer arming over its own
-     * channel's running drum leaves the voice muted, and says so. */
+     * channel's running drum leaves the voice gated, and says so. */
     @Test
     void armingOverOwnRunningDrumSticksTheVoice() {
         int frames = 24;
@@ -287,7 +287,7 @@ final class EffectScriptTest {
         for (int f = 6; f < frames; f++) {      // voice A never frees
             assertEquals(0x09, r.r7force()[f] & 0x09, "stuck at " + f);
         }
-        assertTrue(r.notes().stream().anyMatch(n -> n.contains("stays muted")));
+        assertTrue(r.notes().stream().anyMatch(n -> n.contains("stays gated")));
     }
 
     // ------------------------------------------- a source that can say stop
@@ -373,7 +373,7 @@ final class EffectScriptTest {
         assertEquals(action(VERB_START_TOGGLE, 0, 1), runs.actions()[1][17] & 0xFF);
 
         // One timer runs both, so there was never anything to arbitrate: the
-        // square arms on the frame the source asked for it. The gate stays
+        // square arms on the frame the source placed it in. The gate stays
         // shut throughout - the sample needed it shut and so does the square -
         // so no reopen edge is recorded for a gate that never opened.
         EffectScript.Result stops = compile(song, STOPS);

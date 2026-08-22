@@ -17,8 +17,8 @@ import org.ymx.YmxFormat;
  * kept next to the first tune, so two ring sizes can be compared by ear and
  * both kept.
  *
- * <p>The program is built with the exit marker, which is how this knows the
- * tune has stopped: the emulator has no other way to tell us that SPACE was
+ * <p>The program is built with the exit marker, which is how this detects the
+ * tune has stopped: the emulator has no other way to report that SPACE was
  * pressed inside it. Whichever comes first - the marker or the window being
  * closed by hand - ends the wait.
  */
@@ -83,7 +83,7 @@ public final class Play {
                 loop = "-l" + a.substring(2);
             } else {
                 extra.add(a);           // the packer's: trim, -drumhz, whatever
-            }                           // it learns next
+            }                           // it reads next
         }
         List<Path> yms = new ArrayList<>();
         for (; i < args.length; i++) {
