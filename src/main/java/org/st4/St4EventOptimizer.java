@@ -145,7 +145,7 @@ public final class St4EventOptimizer {
     /**
      * Run starts at j: offsets whose unit matches at j but not at j-1. Those
      * are the in-window occurrences p of units[j] whose predecessor differs
-     * from units[j-1] - or that have no predecessor at all - so the chains
+     * from units[j-1] - or that have no predecessor - so the chains
      * keyed by (value, predecessor) enumerate exactly them, newest first,
      * stopping at the window's edge.
      */

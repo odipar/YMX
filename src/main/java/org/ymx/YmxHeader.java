@@ -8,7 +8,7 @@ import java.nio.file.Path;
  * The handful of {@code .ymx} header fields the build tools need: what the
  * player must be assembled for, and what the SNDH tags declare.
  *
- * <p>The unit size is not in the YMX header at all - it lives in the low byte
+ * <p>The unit size is not in the YMX header - it lives in the low byte
  * of the first embedded ST4 container's signature, which is why this reads a
  * section offset first. A tune that loops from the start has no intro
  * sections, so the loop table answers when the intro table is empty.

@@ -192,7 +192,7 @@ final class YmxEncoderTest {
         // FRAMES is even, so k=2 works end to end; each section must carry
         // k=2 in its signature, which is what the player checks its build
         // against. A loop frame that is not a whole number of units cannot be
-        // packed at all - a padded section would decode one extra value into
+        // packed - a padded section would decode one extra value into
         // the ring, and it would be played.
         Tune source = tune(true);
         YmxEncoder.Result result = YmxEncoder.encode(source, 960, 24, -1, false, 2);

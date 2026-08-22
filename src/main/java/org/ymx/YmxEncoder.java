@@ -31,7 +31,7 @@ import org.st4.Units;
  * restarted from its beginning - so the frames from the loop point on become
  * sections of their own, which the player re-inits every time round. The split
  * costs a little ratio, since the loop half cannot reference the intro half,
- * and costs nothing at all for the common case of a tune that loops from
+ * and costs nothing for the common case of a tune that loops from
  * frame 0.
  *
  * <p>Each section is packed the way {@code st4} would with

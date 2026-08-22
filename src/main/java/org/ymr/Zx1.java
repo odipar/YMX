@@ -186,7 +186,7 @@ public final class Zx1 {
         }
         // A match can reach no further back than the stream has already
         // written, which the fill above has just established, so a stream that
-        // never grows past its ring cannot overreach it - and nothing at all
+        // never grows past its ring cannot overreach it - and nothing
         // can overreach MAX_OFFSET. Most streams skip the ring decode on one of
         // those two counts.
         if (decoded.length > ringSize && ringSize < MAX_OFFSET

@@ -85,7 +85,7 @@ def masked(frames, source=None):
 def expected_writes(frames, source=None):
     """The (register, value) pairs the player must send, frame by frame.
 
-    R7 gets the ST's port bits back, and R13 is not written at all on a frame
+    R7 gets the ST's port bits back, and R13 is not written on a frame
     that says "leave the envelope alone" - writing it would restart it.
     """
     vectors = masked(frames, source)
@@ -125,7 +125,7 @@ def chip_states(frames, source=None, loop_frame=None, count=None):
     """What the sound chip must hold after each played frame.
 
     A player is free to skip writing a register whose value has not changed -
-    the chip cannot tell - so state, not the write sequence, is what has to
+    the chip cannot tell - so state, not the write sequence, has to
     match. R13 is the exception: writing it restarts the envelope, so each
     frame also reports whether R13 was written, which is observable.
     """
