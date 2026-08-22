@@ -37,7 +37,7 @@ The vocabulary changes here too, and that is most of the point:
 * a **sync-buzzer** is a **retrigger stream** — R13 rewritten at the timer's
   rate, restarting the envelope.
 
-The register streams come out holding exactly what the chip should see: the
+The register streams come out holding what the chip should see: the
 effect bits are stripped, and R7 arrives with the voices a sample owns
 already disconnected.
 
@@ -92,7 +92,7 @@ faithful, not what makes it lossy.
 
 * **Samples never loop.** A YM file has no way to say that a digidrum
   repeats, so every sample crosses marked one-shot. This costs nothing —
-  nothing in a YM dump was asking for it — but it is the one
+  nothing in a YM dump needs it — but it is the one
   [format](../doc/SPEC.md#6-the-sample-table) feature a YM tune cannot reach.
 
 * **A rate change is always a stop, load and run.** The format has a live
@@ -100,7 +100,7 @@ faithful, not what makes it lossy.
   uses it. That is not a limit of the conversion: a YM file records a code
   sitting in a register, not the moment a player reprogrammed anything, so
   there is no live reprogram to be faithful to. How a period in flight ends
-  is the player's business, and the reference player stopped the timer.
+  is not in the file, and the reference player stopped the timer.
 
 * **The SID gap model is a choice, not a fact.** When a square goes away and
   comes back, does it restart at phase zero or resume where it got to? The YM
@@ -108,7 +108,7 @@ faithful, not what makes it lossy.
   composers heard whatever their own driver did. The default is the ym2149-rs
   model — a gap restarts at phase zero, silence first — and `-sidresume`
   selects maxYMiser's, where a release only masks the interrupt and the
-  counter keeps counting. Both are ordinary stream verbs the player always
+  timer keeps counting. Both are ordinary stream verbs the player always
   carries, so the choice is per tune rather than per build.
   [../doc/experiments.md](../doc/experiments.md) has the survey.
 
