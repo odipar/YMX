@@ -167,7 +167,7 @@ public final class YmEffects {
 
     /**
      * A dump as the engine has it, over an extraction already made - which is
-     * how a caller that wants both keeps the one it can report on.
+     * how a caller that needs both keeps the one it can report on.
      *
      * <p>Only the fourteen sound registers cross: R14 and R15 are the chip's
      * I/O ports, which this format borrowed as effect data and which the
@@ -482,7 +482,7 @@ public final class YmEffects {
             // and duration exact. A divisor no prescaler/count pair
             // represents is dropped - the survey rules it out for the
             // ratio path, but the power-of-two fallback keeps the branch
-            // honest.
+            // correct.
             if (num[number] > den[number]) {
                 long scaled = (long) Tune.prescaler(prescaler) * count * num[number]
                         / den[number];

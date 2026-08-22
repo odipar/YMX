@@ -66,7 +66,7 @@ import org.jx1.Decompressor;
  * merely terse.
  *
  * <p>So nothing here is diagnosed by catching an assertion. Every condition
- * this class refuses, it establishes for itself from outside the decoder, out
+ * this class rejects, it establishes for itself from outside the decoder, out
  * of what the decoder does rather than what it says: the stream is decoded
  * several times over, with the window, the ring fill and the stored length
  * varied one at a time, and the results are compared. A throw from the decoder
@@ -105,7 +105,7 @@ import org.jx1.Decompressor;
  * sentence names all three, and both builds print it for all three.
  *
  * <p>The ring comparison is the one distinction that survives that argument,
- * because it is not a fault the decoder ever gets to have an opinion about:
+ * because it is not a fault the decoder is ever in a position to judge:
  * the reference decode has already run to the end before the ring decode is
  * started, so whichever way the ring decode ends - a different string of bytes
  * without {@code -ea}, a stop with it - the answer is the same one and the
@@ -116,7 +116,7 @@ import org.jx1.Decompressor;
  * exporter stores a stream that way whenever packing it would not make it
  * smaller, which is routine for the short ones - five bytes pack to six.
  *
- * <p>Everything this class refuses is a {@link YmrReader.FormatException},
+ * <p>Everything this class rejects is a {@link YmrReader.FormatException},
  * because a stream that will not decode is a malformed .YMR image like any
  * other and a caller has one thing to catch.
  */

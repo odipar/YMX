@@ -453,7 +453,7 @@ field that sets their rate - are the same things under other names:
 | RTE | **retrigger stream** |
 | counter | **timer count** |
 
-Beware two words that do not survive the crossing. A .YMR "stream" is a
+Beware two words that do not carry across. A .YMR "stream" is a
 change list, not this file's value series, and its "pop" is what advances
 one - see the parenthetical in **Streams** above. The reasoning behind
 each row, and what the conversion costs, is in
@@ -530,7 +530,7 @@ its place in the cycle *and* its place inside the half it is in.
 Neither reaches a YM tune. YM has no way to say a sample loops, so the YM
 front end marks every one of them one-shot, and a YM rate change stays
 the reference player's stop-load-run. Both arrive through the `.ymr`
-front end, which is what wanted them.
+front end, which is where they are needed.
 
 Still ahead is the other half of the rate idea: a PCM stream with a
 **derived** rate, a sample tracking the note the way a toggle stream

@@ -1,7 +1,7 @@
 # What a YM conversion costs
 
 A `YM5!` or `YM6!` register dump packed into a `.ymx`. This is what the front
-end changes on the way, what it counts, and what it tells you it did.
+end changes on the way, what it counts, and what it reports.
 [../README.md](../README.md) is how to run it, [../doc/SPEC.md](../doc/SPEC.md)
 the container it writes, and [../ymr/CONVERSION.md](../ymr/CONVERSION.md) the
 same account for a `.YMR`.
@@ -52,7 +52,7 @@ the host's.
 |---|---|---|
 | A Sinus-SID code | the effect is dropped to idle: nothing plays | yes |
 | A code with a prescaler or count of 0 | dropped to idle — the MFP's stopped state starts nothing | yes |
-| A SID or buzzer rate above what a real machine survives | dropped to idle | yes |
+| A SID or buzzer rate above what a real machine can run | dropped to idle | yes |
 | A drum number with no sample behind it | dropped to idle | yes |
 | A drum above the rate ceiling | bandwidth only: the sample is resampled and every trigger's divisor scaled by the same ratio | yes |
 | A tune whose length or loop frame is not a whole unit | one duplicated frame, chosen to be inaudible | yes |
@@ -71,7 +71,7 @@ faithful, not what makes it lossy.
   the chip's volume curve and with a windowed-sinc filter, so no aliased
   fold-back brightens it. Every trigger of that drum has its timer divisor
   scaled by the same exact ratio, so **pitch and duration stay what the dump
-  asked for** and only bandwidth falls, by as little as the ceiling allows. A
+  specified** and only bandwidth falls, by as little as the ceiling allows. A
   29 kHz conversion-family drum lands at 25.6 kHz, not at the old half-rate
   14.6. Where a drum's triggers cannot all take the exact ratio, a
   power-of-two factor is the fallback. `-drumhz` moves the ceiling; each
@@ -118,7 +118,7 @@ faithful, not what makes it lossy.
   buzzer's voice, following the envelope, leaves that nibble spare. The front
   end resolves it and writes the number into stream X, so the player never
   looks. A tune that arms a buzzer before it has written any shape carries 0,
-  which is what a YM dump assumes. See
+  which is a YM dump's own default. See
   [SPEC.md](../doc/SPEC.md#22-x--the-spare-operands).
 
 ## What it does not do

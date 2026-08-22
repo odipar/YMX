@@ -36,7 +36,7 @@ public final class St4Compressor {
                          byte[] wordOffsets, int unit, int paddedSize, int longestOp,
                          int operations) {
 
-        /** Bytes all four streams take together, which is what a comparison wants. */
+        /** Bytes all four streams take together, which is what a comparison needs. */
         public int packedSize() {
             return control.length + literal.length + byteOffsets.length
                     + wordOffsets.length;

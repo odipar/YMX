@@ -4,7 +4,7 @@ Ideas measured against the real corpus and the real tools, and what the
 measurements said. Most are declines — an idea can be good, measurable and
 still not worth its complexity, and writing the number down is what keeps it
 from being proposed, measured and declined a second time. The rest are
-diagnoses: bugs whose causes hid well enough that finding them taught
+diagnoses: bugs whose causes were buried deep enough that finding them taught
 something.
 
 These are the results only. The full logs — the false trails, the instrument
@@ -35,8 +35,8 @@ burst*.
 
 **Register clustering** (2026-08-19). Would packing correlated registers into
 one stream — the envelope pair, the volume triple — save bytes? The
-prediction held exactly: joint streams win where registers change together
-(the envelope pair almost always) and lose badly where they do not (the
+prediction held exactly: joint streams save where registers change together
+(the envelope pair almost always) and cost heavily where they do not (the
 volume triple jointly is a catastrophe, since a match must cover every
 clustered register's history at once).
 
@@ -59,7 +59,7 @@ script's A/P pairs would likely join for the same correlation reason.
 **The SID ticking** (2026-08-19). A toggle stream's square audibly ticked.
 Cause: the frame write was writing the voice's volume register mid-phase,
 under a timer stream that owned it. Fixed by the retune path plus the burst
-gate; confirmed by ear against ST-Sound with ym2149-rs as a second witness.
+gate; confirmed by ear against ST-Sound with ym2149-rs as a second reference.
 
 The durable rule, and the reason the gate exists at all: **a frame player may
 not write any register a timer stream currently owns** — not a volume
@@ -72,9 +72,9 @@ half-parity was random per re-start.
 The lesson that outlived the bug: **phase is chip-visible state that a write
 comparison cannot see.** A state snapshot cannot distinguish "wrote X" from
 "left X", so a self-modifying player needs write-*event* comparison where
-interrupts are live. Normalised spectral distance is blind inside beating
-material. And when a fix "changes nothing", diff the artifacts before
-trusting the metric that says so.
+interrupts are live. Normalised spectral distance is insensitive inside
+beating material. And when a fix "changes nothing", diff the artifacts before
+relying on the metric that says so.
 
 **SID phase semantics** (2026-08-20). A survey rather than a bug: the YM
 format never specified what a re-started square does, so every player renders
@@ -101,7 +101,7 @@ Four things worth keeping:
    a one-frame shift. Diff the frame indices of window edges.
 2. **One frame is audible.** A deliberate late bias on a gate around a
    percussive event is a click at the release. "At most one extra frame" in a
-   design note deserves an ear test, not a shrug.
+   design note calls for an ear test, not a shrug.
 3. **Distrust the capture before the player.** A glitched recording of correct
    playback is indistinguishable from a broken player until the capture chain
    is validated.
@@ -111,9 +111,10 @@ Four things worth keeping:
 **The timers left running** (2026-08-21). Two builds sending byte-identical
 chip traffic, and one of them audibly wrong.
 
-Cause: the player had stopped claiming timers it did not need — an honest
-change — and taking Timer A and D unconditionally had been quiescing the
-host's machine as a side effect. Nothing had written down that it mattered.
+Cause: the player had stopped claiming timers it did not need — a correct
+change in itself — and taking Timer A and D unconditionally had been
+quiescing the host's machine as a side effect. Nothing had written down that
+it mattered.
 
 The fix went to the **host**, not the player: `YMX_player.S` saves and stops
 TACR, TBCR, TCDCR and the four data registers, and restores them at exit,
@@ -156,7 +157,7 @@ chip.
 
 **Where hardware offers an instruction that does the whole job, it removes
 the race instead of scheduling around it, and usually costs less than the
-mask it replaces.** Any player driving audio-rate interrupts should know its
+mask it replaces.** For any player driving audio-rate interrupts, measure the
 longest interrupt-free span and compare it against the shortest tick period
 it allows.
 

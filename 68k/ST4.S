@@ -16,7 +16,7 @@
 ;      words in D. That leaves stream A holding nothing but bits, so its queue
 ;      refills a WORD at a time - impossible while an offset byte can move the
 ;      same pointer by one - and it leaves a word offset stored exactly as the
-;      decoder wants it, so installing one is a single move;
+;      decoder needs it, so installing one is a single move;
 ;   3. lengths and offsets count UNITS of ST4_UNIT bytes, so one operation
 ;      moves that many bytes at a time and there are that many fewer of them.
 ;

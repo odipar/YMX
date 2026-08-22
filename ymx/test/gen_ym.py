@@ -67,7 +67,7 @@ def registers(frames):
 
 
 def masked(frames, source=None):
-    """What a plain YM2149 sees: the fourteen streams the packer writes."""
+    """What a plain YM2149 receives: the fourteen streams the packer writes."""
     values = source if source is not None else registers(frames)
     out = []
     for register in range(PLAY_REGISTERS):

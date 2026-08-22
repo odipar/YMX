@@ -374,7 +374,7 @@ final class EffectScriptTest {
 
         // One timer runs both, so there was never anything to arbitrate: the
         // square arms on the frame the source asked for it. The gate stays
-        // shut throughout - the sample wanted it shut and so does the square -
+        // shut throughout - the sample needed it shut and so does the square -
         // so no reopen edge is recorded for a gate that never opened.
         EffectScript.Result stops = compile(song, STOPS);
         assertEquals(action(VERB_START_TOGGLE, 0, 1), stops.actions()[1][8] & 0xFF);

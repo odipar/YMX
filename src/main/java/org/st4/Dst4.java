@@ -77,7 +77,8 @@ public final class Dst4 {
                     container.size());
         } catch (AssertionError | IndexOutOfBoundsException e) {
             // With -ea a malformed stream trips a descriptive assertion; the
-            // decoder trusts its input, so report rather than pretend.
+            // decoder does not validate its input, so report rather than
+            // continue on corrupt data.
             throw error("Corrupted or truncated ST4 data in " + inputName
                     + (e.getMessage() == null ? "" : ": " + e.getMessage()));
         }

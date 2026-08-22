@@ -8,7 +8,7 @@ memory. A file carries twenty-five independently compressed streams — fourteen
 for the chip's sound registers, one value per frame, and eleven for a
 **compiled effect script** that drives the MFP's timers. Twenty-five is the
 count every file stores; how many a given tune fills, and how many a player
-reads, are smaller and are §1.4. Each stream is
+reads, are smaller and are §1.5. Each stream is
 decoded through its own small ring, refilled one stream per frame, so the
 memory a tune needs is a property of the player's configuration rather than
 of the tune's length.
@@ -58,7 +58,7 @@ throughout. The four words it leans on hardest:
 | 6 | 2 | flags (§1.2) |
 | 8 | 4 | `O`, the frame count |
 | 12 | 2 | frame rate in Hz: how often the player is called |
-| 14 | 2 | `S`, the stream count — always **25**, see §1.4 |
+| 14 | 2 | `S`, the stream count — always **25**, see §1.5 |
 | 16 | 2 | `N`, the ring size in bytes |
 | 18 | 2 | `C`, values decoded per call |
 | 20 | 4 | `L`, the loop frame; equal to `O` when the tune plays once |
@@ -67,15 +67,11 @@ throughout. The four words it leans on hardest:
 | 32 | 2 | sample count |
 | 34 | 4·S | byte offset of each **intro** section, covering frames `[0, L)` |
 | 134 | 4·S | byte offset of each **loop** section, covering frames `[L, O)` |
-| 234 | … | the packed sections, then the sample table |
 
-Packed sizes are not stored. ST4 counts output units rather than input bytes,
-so a decoder never needs them.
-
-A section offset of 0 means the section is not present. A tune that loops from
-frame 0 has no intro sections at all; a tune that does not loop has no loop
-sections. Both halves of the table are always written, and the absent half is
-zero.
+With `S` fixed at 25 the header is **234 bytes**, and everything after it is
+body: the sections (§1.4), then the sample table (§6). Nothing in the body is
+found by position — a section through its offset in one of the two tables
+above, the samples through the offset at byte 28.
 
 ### 1.2 Flags
 
@@ -110,7 +106,30 @@ displacement.
 
 960/24 is the usual pair and covers every tune that leaves channel 3 idle.
 
-### 1.4 Twenty-five is the table, not the traffic
+### 1.4 The sections
+
+Each section is a complete, standard ST4 container — its own twenty-byte
+header, then its four streams — packed at unit size 1 and placed on a long
+boundary, so the container's own alignment rules hold where it sits. A player
+opens one with the eight-instruction sequence ST4.S documents, and `dst4`
+unpacks any section straight out of a `.ymx` for debugging.
+
+Every stream is packed twice, because restarting it at the loop frame means
+starting a decoder over: the intro section covers `[0, L)`, the loop section
+covers `[L, O)`, and the player starts the loop section again every time round
+(§8). The packer writes all twenty-five intro sections in stream order and
+then all twenty-five loop sections, but nothing depends on that — a section is
+reached only through its offset.
+
+A section offset of 0 means the section is not present. A tune that loops from
+frame 0 has no intro sections at all; a tune that does not loop has no loop
+sections. Both halves of the table are always written, and the absent half is
+zero.
+
+Packed sizes are not stored. ST4 counts output units rather than input bytes,
+so a decoder never needs them.
+
+### 1.5 Twenty-five is the table, not the traffic
 
 `S` is fixed. It is always 25, a reader must reject a file that says
 otherwise, and the two section tables are therefore always 100 bytes each,
@@ -137,13 +156,13 @@ nothing: what a tune does not name is a tail no player ever touches.
 ## 2. The streams
 
 Twenty-five slots, in this order — every file has all of them, and most files
-have nothing in several (§1.4). Streams 0–13 are frame streams; 14–24 are
+have nothing in several (§1.5). Streams 0–13 are frame streams; 14–24 are
 script data whose bytes never reach a chip register.
 
 | # | name | carries |
 |---:|---|---|
 | 0-13 | R0-R13 | the YM2149's sound registers, one value per frame |
-| 14 | **M** | what acts this frame, and the burst-gate state |
+| 14 | **M** | what acts this frame, and which volume writes to skip |
 | 15 | **X** | the operands an action byte has no room for |
 | 16 | **T** | the channel-to-timer map |
 | 17,18 | **A0,P0** | timer channel 0's action byte and timer count |
@@ -169,47 +188,51 @@ test.
 | 1 | timer channel 1 acts |
 | 2 | timer channel 2 acts |
 | 3 | timer channel 3 acts |
-| 4 | apply the burst-gate state in bits 7-5 |
-| 7-5 | the gate mask: voices A, B, C — a set bit means muted |
+| 4 | bits 7-5 are meaningful this frame — apply them |
+| 7-5 | one bit per voice A, B, C — a set bit **gates** that voice |
 
-The gate is **absolute state, not an edge**: re-asserting the same mask is
-idempotent. Bit 4 says the mask in 7-5 is meaningful this frame; without it
-the gate stands as it was.
+To **gate** a voice is to leave its volume register out of the frame write:
+the player patches that one write into two `nop`s, so the frame's value never
+reaches the chip. It does not silence the voice — a timer stream owns the
+register meanwhile and writes it at its own rate.
 
-A gated voice's volume register is not written by the frame write at all — a
-player is expected to overwrite the write instruction rather than to branch —
-so the ring byte behind it is left untouched and is not sanitized. Nothing
-edits a ring at runtime.
+Bits 7-5 are **state, not an edge**: re-asserting the same value is
+idempotent. Bit 4 says those bits are meaningful this frame; without it the
+three gates stand as they were.
+
+The skipped value stays in the ring, untouched and unsanitized: nothing edits
+a ring at runtime, and the gate is a patched instruction rather than a test
+the frame write has to make.
 
 ### 2.2 X — the spare operands
 
 | bits | meaning |
 |---:|---|
 | 7-4 | the envelope shape a retrigger stream restarts |
-| 3-0 | `START_PCM_PREEMPT`'s victims: a bit per timer channel whose timer must be stopped first |
+| 3-0 | what `START_PCM_PREEMPT` preempts: a bit per timer channel whose timer must be stopped first |
 
 The shape is **one per frame, not one per channel**. The chip has a single
-envelope generator, so two retrigger streams could not hold different shapes
-if they tried — a player that let each channel restart its own would give one
-generator two shapes at two rates.
+envelope generator, so two retrigger streams cannot hold different shapes:
+a player that let each channel restart its own would give one generator two
+shapes at two rates.
 
-Carrying it rather than deriving it is what keeps a player free of any
-opinion about the source format. A toggle stream's volume and a PCM stream's
-sample number are read off the voice's own register ring, and that is right:
+Carrying it rather than deriving it is what keeps the source format out of
+the player entirely. A toggle stream's volume and a PCM stream's sample
+number are read off the voice's own register ring, and that is right:
 both belong to the voice the effect took over, and the level a square chops
 is the level the tune put in that register. A shape belongs to nothing of the
 kind — any number of voices may follow the one generator — so where a source
 files it is an accident of that source. A YM file uses the nibble of the
 voice the buzzer names, because the parameter field sits at one place for all
 three kinds and a buzzer's voice, following the envelope, leaves that nibble
-spare. A `.YMR` uses R13, where the chip keeps it. The front end that read
-the file knows which, and simply writes the number down.
+spare. A `.YMR` uses R13, where the chip keeps it. The front end resolves
+which, and simply writes the number down.
 
 So the player does not look for it at all: `ymx_shape` is five instructions
 with no branch, there is no header flag, no shadow and no priming. A tune
 that arms a retrigger stream before it has set any shape carries whatever its
-own format assumes — `$08` for a `.YMR`, `0` for a YM dump — because that is
-the front end's fact to know.
+own format defaults to — `$08` for a `.YMR`, `0` for a YM dump — because
+that is a fact of the source, resolved at the front end.
 
 ### 2.3 T — the channel-to-timer map
 
@@ -264,7 +287,7 @@ nothing.
 | 4 | `RETUNE` | a new rate for a running stream, keeping its place in the cycle. See below |
 | 5 | `START_RETRIGGER` | start a retrigger stream: shape, vector := the retrigger tick, then a full program |
 | 6 | `START_PCM` | a trigger, fresh or repeated: sample table lookup, select, vector, full program |
-| 7 | `START_PCM_PREEMPT` | as `START_PCM`, but first stop the timer of every channel named in X's low nibble — victims first, straight-line |
+| 7 | `START_PCM_PREEMPT` | as `START_PCM`, but first stop the timer of every channel named in X's low nibble — the stops come first, straight-line |
 
 ### 3.1 The two forms of RETUNE
 
@@ -309,8 +332,8 @@ the held prescaler-slide and nothing else.
 
 `RESUME` exists for the alternative gap model, in which a release only masks
 the timer interrupt and the counter keeps counting, so a re-arrival resumes
-the square where it got to. Which model a tune wants is not recoverable from
-a YM file and is chosen at pack time.
+the square where it got to. Which model applies is not recoverable from a YM
+file and is chosen at pack time.
 
 ---
 
@@ -400,7 +423,8 @@ register, so a file may carry at most **32** samples.
 
 A player's one call per frame does this, in this order:
 
-1. **Apply the gate.** If M's bit 4 is set, set the burst gate to bits 7-5.
+1. **Apply the gates.** If M's bit 4 is set, gate the voices named by bits
+   7-5 and open the rest.
 2. **The frame write** — fourteen register writes, R0 through R13, taking
    each value from its ring. A gated voice's volume register is skipped. This
    leaves the frame's start at a fixed offset whatever the frame's script
@@ -411,8 +435,8 @@ A player's one call per frame does this, in this order:
    `k` on the frame where the frame number modulo `C` is `k`.
 
 Actions come *after* the frame write so their varying cost cannot jitter the
-register writes. The gate comes *before* it so that a voice handed back this
-frame gets its own volume written in the same frame the source asked for it.
+register writes. The gates come *before* it so that a voice released back
+this frame gets its own volume written in the frame the source put it in.
 
 Selecting a register and writing it are two bus cycles, and an interrupt
 landing between them would send the value to whatever register the interrupt
@@ -427,13 +451,13 @@ A packed stream can only be restarted from its beginning, so every stream is
 split at the loop frame `L`: an intro section for `[0, L)` and a loop section
 for `[L, O)`. When a section runs out mid-refill the player starts that
 stream's loop section over — a fresh decoder writing on into the same ring —
-so the rings hold one continuous sequence and the read side never learns that
-anything happened. Nothing requires `L` to fall on a group boundary.
+so the rings hold one continuous sequence and nothing on the read side
+changes when it happens. Nothing requires `L` to fall on a group boundary.
 
 `O` and `L` count **played** frames. When the effect state arriving from the
 intro differs from the state arriving from the wrap, a packer rotates the
 split forward to a frame where the two agree; the file then carries a few
-frames twice, compiled differently. A player never knows.
+frames twice, compiled differently. Nothing at play time distinguishes them.
 
 ---
 

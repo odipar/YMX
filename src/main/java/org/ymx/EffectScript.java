@@ -22,7 +22,7 @@ import java.util.List;
  * values written to one register between frames at a rate a timer sets, and
  * what this class decides for each is exactly a stream's lifecycle: start,
  * hold, retune (a new rate, the same place in the cycle), release, resume,
- * and which stream preempts which when two want one register.
+ * and which stream preempts which when two contend for one register.
  * {@code doc/terminology.md} is the dictionary. The streams it emits are
  * script data, not frame streams: their bytes never reach the chip.
 
@@ -46,7 +46,7 @@ import java.util.List;
  *                           One per frame, not one per channel: the chip has
  *                           one envelope generator, so two retrigger streams
  *                           could not hold different shapes if they tried
- *                bits 3-0 = START_PCM_PREEMPT's victims, a bit per timer
+ *                bits 3-0 = what START_PCM_PREEMPT stops, a bit per timer
  *                           channel whose timer must stop first
  * stream 16  T   the channel-to-timer map, two bits a channel: 0 = Timer
  *                A, 1 = B, 2 = C, 3 = D. One byte covers all four, and a
@@ -79,7 +79,7 @@ import java.util.List;
  * 6 START_PCM          a trigger, fresh or repeated: sample table lookup,
  *                      select, vector, full program
  * 7 START_PCM_PREEMPT  as START_PCM, but first stop the timer of every
- *                      channel X names - the stop-the-victim-first order,
+ *                      channel X names - the stop-them-first order,
  *                      straight-line
  * </pre>
  *
@@ -97,7 +97,7 @@ import java.util.List;
  * the effect took over. A retrigger stream's shape does not - it belongs to
  * the one envelope generator - so it is CARRIED, in X, resolved by whichever
  * front end knew where its format filed it. That is the whole of why the
- * player has no opinion about sources: an operand it cannot derive is one it
+ * player is independent of sources: an operand it cannot derive is one it
  * is handed. The ring
  * byte of a voice playing a sample is NOT sanitized: its frame write is
  * gated (ymx_gates has overwritten the write with two nops, so the byte
@@ -188,14 +188,14 @@ public final class EffectScript {
      *
      * <p>YM is the reason the first three exist. A YM frame carries no trigger: a
      * digidrum is a code sitting in R1 or R3, repeated for as long as the
-     * dump wants it, so the reference player re-fires the sample on every
+     * dump repeats it, so the reference player re-fires the sample on every
      * one of those frames and the script has to compile the same stutter to
      * sound the same. A format whose trigger is an explicit pop from a
      * stream says start once and means it, and re-firing would chop its
      * sample into frame-long pieces. Likewise a YM voice playing a sample is
      * disconnected from the mixer for as long as it plays, because the
      * PSG volume register IS the sample's output; a source that plays its
-     * samples through something else wants R7 left alone.
+     * samples through something else needs R7 left alone.
      *
      * <p>{@code channelEndsPcm} is the same asymmetry at the other end. A YM
      * dump has no way to say STOP: the code simply stops being repeated, the
@@ -574,7 +574,7 @@ public final class EffectScript {
      * live retune carries no voice - the encoding room it is packed into is
      * exactly the voice field - so it cannot repatch a volume or a shape
      * on the way through. When one of those moved on the same frame the
-     * ordinary retune, which does repatch, is the honest encoding and the
+     * ordinary retune, which does repatch, is the accurate encoding and the
      * truncated period is the price. A PCM stream tracks no register at
      * all, so it is always free to go live.
      */
@@ -722,7 +722,7 @@ public final class EffectScript {
         // wait out the sample's whole computed length - the arbitration below
         // is for a sample another channel owns, which is the only case a YM
         // dump can produce. The voice's gate is left shut, because the square
-        // wants it shut too, and no reopen edge is recorded.
+        // requires it shut too, and no reopen edge is recorded.
         if (semantics.channelEndsPcm()) {
             endOwnPcm(p, index, voice);
         }
@@ -794,19 +794,19 @@ public final class EffectScript {
         }
         // Preemption: another channel holds a toggle stream on this voice.
         // Its timer stops FIRST (inside the START_PCM_PREEMPT handler), and
-        // it retries. X names the victims, because the action byte has no
-        // room to and a channel has no fixed partner.
-        int victims = 0;
+        // it retries. X names what to stop, because the action byte has no
+        // room to and a channel has no fixed voice.
+        int stops = 0;
         for (int c = 0; c < channels.length; c++) {
             Channel other = channels[c];
             if (c != index && (other.elast & 0xC0) == KIND_TOGGLE && other.elast != 0
                     && ((other.elast >> 4) & 3) - 1 == voice) {
                 other.elast = 0;
-                victims |= M_CHANNEL_0 << c;
+                stops |= M_CHANNEL_0 << c;
             }
         }
-        int verb = victims == 0 ? VERB_START_PCM : VERB_START_PCM_PREEMPT;
-        x[p] |= (byte) victims;         // a union: one frame may name more than one
+        int verb = stops == 0 ? VERB_START_PCM : VERB_START_PCM_PREEMPT;
+        x[p] |= (byte) stops;           // a union: one frame may name more than one
         cut(p, index, voice);           // the retrigger's own voice gets a
         channel.tlast = count;             // fresh window, not a stuck flag
         channel.masked = false;
@@ -877,7 +877,7 @@ public final class EffectScript {
      * or -1 when none does - the shape {@link #cut} uses for the same reason.
      * Every other voice gets its burst gate back on this frame and an entry in
      * {@code reopens}, because its volume register is the frame write's again;
-     * a voice a toggle stream is taking wants the gate shut, so its gate and
+     * a voice a toggle stream is taking needs the gate shut, so its gate and
      * its edge are that stream's to set, two lines further on.
      *
      * <p>Returns whether anything was actually taken away, which is how a
@@ -926,7 +926,7 @@ public final class EffectScript {
     /**
      * The shape a retrigger stream would restart on this frame. The front end
      * resolved where it came from, so there is one answer here and the
-     * compiler needs no opinion; the script carries it to the player in X's
+     * compiler needs no such knowledge; the script carries it to the player in X's
      * high nibble, and the player needs none either.
      */
     private int shape(int f) {

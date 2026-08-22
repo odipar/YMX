@@ -71,14 +71,15 @@
 ; and a loop stream for [L, O). When a register's section runs out mid-refill
 ; the player starts its loop stream over - a fresh decoder writing on into the
 ; same ring - so the rings always hold one continuous sequence of values and
-; the read side never learns that anything happened. Nothing requires L to fall
+; nothing on the read side changes when it happens. Nothing requires L to fall
 ; on a group boundary: a refill that straddles the split simply decodes two
 ; pieces. A tune that loops from frame 0 has no intro streams at all.
 ; The script adds one twist: when the effect state arriving from the intro
 ; differs from the state arriving from the wrap, the packer ROTATES the
 ; split forward to a frame where the two agree - the file then carries a
 ; few frames twice, compiled differently, and O and L in the header count
-; this played timeline. The player never knows; the rotation is inaudible.
+; this played timeline. Nothing at play time can distinguish it; the rotation
+; is inaudible.
 ;
 ; -----------------------------------------------------------------------------
 ; USING IT
@@ -124,7 +125,7 @@
 ;              A channel the tune does not name is left ALONE, which means
 ;              a timer the host had running keeps running: claiming used
 ;              to quiet the machine as a side effect and no longer does.
-;              A host that wants a quiet machine stops the timers itself
+;              A host needing a quiet machine stops the timers itself
 ;              before init - YMX_player.S is the worked example
 ;   YMX_play   in   a0 = workspace
 ;              out  d0 = 0 played a frame
@@ -171,7 +172,7 @@
 ;   4. a looping tune plays for as long as you keep calling: d0 = 1 marks each
 ;      time round, and YMX_init is only needed to start again from frame 0
 ;   5. the HOST owns the machine state - the player saves and restores none
-;      of it. A host that wants the machine back afterwards saves, around
+;      of it. A host needing the machine back afterwards saves, around
 ;      init..stop, exactly what the player touches: the vectors $134 and
 ;      $110, TACR, TADR, TDDR, TCDCR's low (Timer D) nibble, bit 5 of IERA
 ;      and IMRA, bit 4 of IERB and IMRB - and, built with YMX_SUPER_HOST,
@@ -254,7 +255,7 @@ YMX_STATE_SIZE  equ     64              ; per stream, so the index is a shift
                                         ; both ways: *64 in, /16 back to *4
 
 ; Workspace layout. Counters that a frame touches are kept in the form the
-; frame wants them in: a pointer to walk, and a countdown to test against zero.
+; frame needs them in: a pointer to walk, and a countdown to test against zero.
 YMX_CURSOR      equ     0               ; long  this frame's byte in ring 0
 YMX_LEFTFR      equ     4               ; long  frames before the tune ends
 YMX_NEXT        equ     8               ; long  values decoded so far
@@ -622,7 +623,7 @@ YMX_init:
 .claim:
         bsr     ymx_handback            ; an earlier init's claim on this
                                         ; channel goes back first, whether
-                                        ; or not this tune wants it again:
+                                        ; or not this tune uses it again:
                                         ; init twice without a stop and no
                                         ; timer of ours is left running
         moveq   #0,d1
@@ -661,7 +662,7 @@ YMX_init:
         rts
 
 ; -----------------------------------------------------------------------------
-; YMX_fill: d0.w = stream index * YMX_STATE_SIZE, d3.w = values wanted.
+; YMX_fill: d0.w = stream index * YMX_STATE_SIZE, d3.w = values needed.
 ; Produces exactly that many values for one register, crossing into the loop
 ; section - and around it again - as often as it takes. Straddling matters even
 ; for one group: nothing says the loop frame falls on a group boundary.
@@ -672,7 +673,7 @@ YMX_fill:
         movea.l a3,a6                   ; ST4 clobbers a3: a6 keeps the workspace
         move.l  a2,d6
         moveq   #0,d7
-        move.w  d3,d7                   ; values still wanted
+        move.w  d3,d7                   ; values still needed
 .piece:
         move.l  YS_LEFT(a2),d0
         bne.s   .section
@@ -682,7 +683,7 @@ YMX_fill:
 .section:
         cmp.l   d7,d0
         bcs.s   .piece_size
-        move.l  d7,d0                   ; the section covers all that is wanted
+        move.l  d7,d0                   ; the section covers all that is needed
 .piece_size:
         sub.l   d0,YS_LEFT(a2)
         sub.l   d0,d7
@@ -728,7 +729,7 @@ YMX_fill:
 ; -----------------------------------------------------------------------------
 ; YMX_start_loop: a2 = state block. Starts this register's loop stream over -
 ; a fresh decoder, reading from the top of the loop section, still writing
-; where the last one stopped. ST4_init wants the ring start so that its packed
+; where the last one stopped. ST4_init needs the ring start so that its packed
 ; metadata comes out right; the write pointer is restored from the block, which
 ; is why it is stored rather than held in a register.
 ; -----------------------------------------------------------------------------
@@ -802,7 +803,7 @@ YMX_play:
 .perf_sync:                             ; for the beam. The VBL fires in the
         cmp.b   $FFFF8209.w,d0          ; blanking, dozens of lines above the
         dbne    d1,.perf_sync           ; screen, and only the video counter
-                                        ; knows when the display starts: it
+                                        ; marks when the display starts: it
                                         ; moves when, and only when, the chip
                                         ; is fetching pixels. Bounded, so a
                                         ; host that plays mid-screen - or a
@@ -1083,7 +1084,7 @@ ymx_handback:
 ; That is the whole reason for KEEP and SHIFT. Timer C is also the
 ; operating system's 200 Hz clock, so a tune that names it stops the
 ; system clock and cannot be hosted from a Timer C hook - the file's
-; choice, made at pack time, and the host's problem to know about.
+; choice, made at pack time, and the host's problem to handle.
         even
 ymx_timers:
 ymx_timer_a:
@@ -1435,7 +1436,7 @@ ymx_verbs:
 ; effect took over. A shape belongs to the one envelope generator instead,
 ; and different formats file it in different places, so it is not looked
 ; for at all: the packer resolved it and X carries it, high nibble. The
-; player therefore has no opinion about where a tune came from.
+; player is therefore independent of where a tune came from.
 ; in: a0 = ring M, d3.l = N; out: d1 = the shape, 0..15. Clobbers a1.
 ymx_shape:
         movea.l a0,a1
@@ -1587,23 +1588,23 @@ ymx_retrigger_start:
         move.l  a1,d4
         bra     ymx_program
 
-ymx_pcm_preempt:                        ; arbitration, compiled: the losers'
-        movea.l a0,a1                   ; timers stop FIRST, then the sample
+ymx_pcm_preempt:                        ; arbitration, compiled: the stopped
+        movea.l a0,a1                   ; timers go FIRST, then the sample
         adda.l  d3,a1                   ; arms its own - the reference order.
-        move.b  (a1),d2                 ; A channel has no fixed partner, so
+        move.b  (a1),d2                 ; A channel has no fixed voice, so
                                         ; ring X - one stream above M - names
-                                        ; the victims, a bit per timer channel
+                                        ; what to stop, a bit per channel
         lea     ymx_desc_0(pc),a1
         moveq   #YMX_CHANNELS-1,d1      ; the table bounds the walk: a bit
-.victim:                                ; past the last channel names nobody
+.stop:                                  ; past the last channel names nothing
         lsr.b   #1,d2
-        bcc.s   .spared
+        bcc.s   .keep
         movea.w CH_CTRL(a1),a2
         move.w  CH_KEEP(a1),d4
         and.b   d4,(a2)
-.spared:
+.keep:
         lea     CH_SIZE(a1),a1
-        dbra    d1,.victim
+        dbra    d1,.stop
 ymx_pcm:
         bsr     ymx_voice
         moveq   #0,d1
