@@ -13,8 +13,8 @@ stream a YM2149 register dump past a 68000 through small rings, refilled a
 byte or two per frame, so the music never exists in memory as a whole; both
 give every stream a ring that is the whole of its memory; both are packed
 against that ring so no back-reference can reach outside it. The lineage is
-literally shared — a .YMR's streams are ZX1, which is what ST4 grew out of,
-which is why [`org.ymr.Zx1`](../src/main/java/org/ymr/Zx1.java) reads them
+literally shared — a .YMR's streams are ZX1, which ST4 grew out of, and why
+[`org.ymr.Zx1`](../src/main/java/org/ymr/Zx1.java) reads them
 through the [vendored jx1 decoder](../src/main/java/org/jx1/README.md) rather
 than a second implementation of a format that already has one.
 
@@ -23,7 +23,7 @@ command stream saying which streams each frame POPS, so a held note costs
 nothing after the frame it arrives on — and no frame can be reached except by
 replaying every frame before it. A `.ymx` stores one value per frame per
 stream and lets ST4 find the repetition, which is why a frame is a read from
-each ring and no bookkeeping at all. So the conversion's shape is:
+each ring and no bookkeeping. So the conversion's shape is:
 [`YmrReader`](../src/main/java/org/ymr/YmrReader.java) replays the command
 stream once, from the start, and hands on the flat per-frame view. The pops
 become frames.
@@ -39,17 +39,15 @@ effect for the same reason.
   replacing it. Both take the loud level from what the song last set on that
   voice: RhYMe's handler toggles between the shadow volume and zero, and the
   toggle tick reads its level out of `R(8+voice)`. Same effect, same
-  parameter, same place — which is why the converter writes nothing at all
-  for a PWM.
+  parameter, same place — which is why the converter writes nothing for a PWM.
 * **A RhYMe Sample is a PCM stream** — a digidrum. Both walk a block of 4-bit
   levels into the voice's volume register, one byte a tick, at whatever rate
   the timer is programmed to, and both hand the register back to the song when
   the block runs out. RhYMe's exporter has already folded its samples down to
-  the levels the PSG's volume register takes, which is exactly what a
-  YMX sample table holds, so the bytes cross unchanged: they need a table
-  entry and an end marker and nothing else. A YM digidrum arrives 8-bit and
-  has to be folded; this is the one thing a .YMR hands over that needs no work
-  at all.
+  the levels the PSG's volume register takes, which is exactly what a YMX
+  sample table holds, so the bytes cross unchanged: they need a table entry
+  and an end marker and nothing else. A YM digidrum arrives 8-bit and has to
+  be folded; this is the one thing a .YMR hands over that needs no work.
 * **A RhYMe RTE is a retrigger stream** — a sync-buzzer. Both rewrite R13
   from a timer interrupt, and the values say nothing: writing R13 sends the
   envelope generator back to the start of its shape, so the envelope becomes
@@ -61,13 +59,13 @@ effect for the same reason.
 
 Two more correspondences say why the register vector needs so little done to it.
 
-**R13 and the `$FF` marker.** A .YMR frame that does not pop
-`envelope_shape` must not write R13: the pop IS the retrigger, so writing the
-last shape again would restart the envelope on every frame of a held note. No
-shape value can mean "nothing", so the reader marks such a frame with `$FF` —
-and `$FF` is precisely what [SPEC.md](../doc/SPEC.md)'s **The frame** means by it, the value
-on which the player skips the register entirely. Two formats reached one
-convention from one constraint, so the register vector is handed straight on.
+**R13 and the `$FF` marker.** A .YMR frame that does not pop `envelope_shape`
+must not write R13: the pop IS the retrigger, so writing the last shape again
+would restart the envelope on every frame of a held note. No shape value can
+mean "nothing", so the reader marks such a frame with `$FF` — and `$FF` is
+what [SPEC.md](../doc/SPEC.md)'s **The frame** means by it, the value on which
+the player skips the register. Two formats reached one convention from one
+constraint, so the register vector is handed straight on.
 
 **The shadow volume and the skip.** The .YMR spec suppresses the frame
 write to a volume register owned by a running PWM or Sample — the value goes to
@@ -79,7 +77,7 @@ and a PCM arm set and a retrigger arm does not. It is also what determines
 which of a stream's parameters can ride in a register that already means
 something. A PCM stream's sample number can sit in the volume byte because the
 write is skipped — `ymx_skips` has overwritten it with two `nop`s,
-so it does not reach the chip at all. A retrigger stream's shape cannot: an RTE
+so it does not reach the chip. A retrigger stream's shape cannot: an RTE
 leaves the voice's volume to the song, so that byte is delivered, and a shape
 hidden in its low nibble would cost the voice its level on any frame not
 already following the envelope. Format v9 is the answer to that — see **Where a
@@ -89,7 +87,7 @@ number.
 
 One engine reads both dialects, and four flags say which. A held PCM code
 does not retrigger, because a .YMR's trigger is a pop and not the code's
-continued presence — that is what stops a sustained sample being chopped into
+continued presence — that stops a sustained sample being chopped into
 frame-long pieces, where a YM dump's held drum code fires again every frame.
 A voice playing a sample keeps its mixer bits, because RhYMe's player never
 touches R7 for an effect: the mixer is the song's, and a song needing its
@@ -115,20 +113,20 @@ generalisation and the T stream were built for. Packed with the default shape,
 java -ea -cp target/classes org.ymr.Ymr -f signals-grouped.ymr doc.ymx
 ```
 
-reports 252,000 bytes of register and script data packed into 12,448 (4.9%)
-in a 13,860-byte file, 25 rings of 960 bytes, decoding 23 of the 25 streams so
+reports 252,000 bytes of register and script data packed into 12,448 (4.9%) in
+a 13,860-byte file, 25 rings of 960 bytes, decoding 23 of the 25 streams so
 that one of the default `C`=24's slots is idle; the tune loops from its start,
 and the encoder rotated the split forward 96 frames so the effect state at the
 wrap matches its first arrival. 5,328 of those 12,448 packed bytes are the
-eleven script streams, which the `.YMR` — 10,488 bytes — does not carry at
-all: RhYMe's player reconciles its three timers every frame from what popped,
-and this one replays decisions taken at pack time. That is the bookkeeping
+eleven script streams, which the `.YMR` — 10,488 bytes — does not carry:
+RhYMe's player reconciles its three timers every frame from what popped, and
+this one replays decisions taken at pack time. That is the bookkeeping
 difference paid in bytes, and what it buys is the flat frame.
 
 ### What a .ymr gives up
 
 Everything not on this list is exact, and
-[test/ymr_sweep.py](../ymx/test/ymr_sweep.py) is what says so: it replays a converted
+[test/ymr_sweep.py](../ymx/test/ymr_sweep.py) says so: it replays a converted
 tune on the real player and compares every write `YMX_play` makes to the sound
 chip, plus which MFP timers it claimed, against its own decoder and replay of
 the .YMR image. It walks 1,200 frames of a long tune, and the whole of one —
@@ -144,10 +142,10 @@ the rate row below is about.
 | A sample numbered past the 32nd | the sample is dropped, and so is every trigger of it | yes |
 | A sample past 65535 bytes | everything after its 65535th, so the length fits a word | yes |
 | A sample looped from past its own end | it is played once instead | yes |
-| A sample byte above the 4-bit levels | masked, since bit 7 is what ends a PCM stream | yes |
+| A sample byte above the 4-bit levels | masked, since bit 7 ends a PCM stream | yes |
 | A rate pop that also moves the effect's parameter | the timer period in flight, truncated | no — see below |
 | A sample the song stops early | one sample byte, held until the next frame | no — the window is sub-frame |
-| A PWM or RTE re-configured with nothing changed | nothing is emitted at all | no — RhYMe's exporter cannot write one |
+| A PWM or RTE re-configured with nothing changed | nothing is emitted | no — RhYMe's exporter cannot write one |
 
 The four that are counted are named once per sample or once per channel
 rather than reported a frame at a time, because a song 9,984 frames long can
@@ -155,21 +153,21 @@ break one rule on a thousand of them and still only be doing one thing wrong.
 The three that are not divide: two there is nothing useful to say about — one
 is shorter than the frame it happens in, and the other cannot arise from a
 file RhYMe wrote — and the third, the rate pop that moves the effect's
-parameter too, is what the next paragraph is about.
+parameter too, is the next paragraph's subject.
 
 Rate pops are on almost none of these lines, because almost none of them cost
 anything; **Moving a prescaler under a running timer** below has the
 mechanism. The corpus bears it out: on `signals-grouped.ymr` the compiled
-script carries 3,827 live reloads and 325 live retunes against no verb at all
-that stops a timer to change its rate, and `bla-grouped.ymr` has 678 live
-retunes and 2 that stop — those 2 being the frames where the effect's
-parameter moved on the same frame as the rate, which is the row.
+script carries 3,827 live reloads and 325 live retunes against no verb that
+stops a timer to change its rate, and `bla-grouped.ymr` has 678 live retunes
+and 2 that stop — those 2 being the frames where the effect's parameter moved
+on the same frame as the rate, which is the row.
 
 * **Three timers bound to voices, against four channels and a map.** A .YMR
   names Timer A, Timer B and Timer D, and the spec fixes which voice each one
   drives — A to A, B to B, D to C — so the binding is normative and not the
   converter's to choose. A `.ymx` has four timer channels and a stream saying
-  which MFP timer each runs on, so the converter simply writes that binding
+  which MFP timer each runs on, so the converter writes that binding
   into T: channels 0, 1 and 2 take Timers A, B and D, and the fourth channel,
   which no .YMR fills, takes the leftover Timer C, which keeps the map a
   permutation and costs nothing — the header never flags an idle channel and
@@ -236,12 +234,12 @@ parameter moved on the same frame as the rate, which is the row.
   reopens is that same frame's, and the voice's own volume is on the chip
   inside the 20 ms the song placed it in, with no skew to correct. Where the
   frame passes the voice to a PWM instead, the skip stands, because the
-  square requires it shut too, and the song's volume is not due back at all.
+  square requires it shut too, and the song's volume is not due back.
   What the ordering cannot cover is the sliver between the burst and the
   action: a tick landing in it writes one more sample byte over the volume
   just written, and that byte stands until the next frame. It is one wrong
   level for most of one frame, against the whole frames of a sample that
-  should not be playing at all. No ordering of the verbs closes it either:
+  should not be playing. No ordering of the verbs closes it either:
   the actions sit after the burst so their varying cost cannot jitter the
   register writes, which is a guarantee worth more than this sliver costs.
 
