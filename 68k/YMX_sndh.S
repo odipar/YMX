@@ -23,7 +23,7 @@
 ;     names timer channels 0 and 1, which the packer's map puts on Timers
 ;     A and D. A file whose T stream named Timer B or C would need those
 ;     saved here too, and a Timer C tune could not be hosted from a Timer
-;     C hook at all;
+;     C hook;
 ;   - INIT is defensive: called twice without an EXIT, it restores first;
 ;   - PLAY before INIT is a no-op; PLAY is driven at the TC50 tag's 50 Hz;
 ;   - the USP is never touched (YMX_SUPER_HOST stays 0), and every buffer

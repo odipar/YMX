@@ -65,7 +65,7 @@ public final class St4Optimizer {
      * Time left, or "" until there is enough history to say.
      *
      * <p>Elapsed time is fitted as {@code a*x + b*x^2} in the percentage x,
-     * through the warm-up point, the midpoint and now. The square is what makes
+     * through the warm-up point, the midpoint and now. The square makes
      * it work on real assets: a step costs what its neighbourhood costs, so a
      * parse that finds more matches as it goes gets steadily slower, and a rate
      * measured over any window - however recent - keeps predicting the past. On

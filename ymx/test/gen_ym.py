@@ -127,7 +127,7 @@ def chip_states(frames, source=None, loop_frame=None, count=None):
     A player is free to skip writing a register whose value has not changed -
     the chip cannot tell - so state, not the write sequence, is what has to
     match. R13 is the exception: writing it restarts the envelope, so each
-    frame also reports whether R13 was written at all, which is observable.
+    frame also reports whether R13 was written, which is observable.
     """
     vectors = masked(frames, source)
     order = frame_order(frames, loop_frame, count if count is not None else frames)

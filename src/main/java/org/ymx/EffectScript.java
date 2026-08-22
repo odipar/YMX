@@ -200,7 +200,7 @@ public final class EffectScript {
      * samples through something else needs R7 left alone.
      *
      * <p>{@code channelEndsPcm} is the same asymmetry at the other end. A YM
-     * dump has no way to say STOP: the code simply stops being repeated, the
+     * dump has no way to say STOP: the code stops being repeated, the
      * sample runs to its marker, and until it does, a code arriving for the
      * same voice waits its turn. A format whose commands are events can end a
      * sample where it likes - and every one of those commands programs the one
@@ -209,7 +209,7 @@ public final class EffectScript {
      * than at the marker it will now never reach. Under this flag the script
      * gives the voice up there: a release hard-stops the timer and hands the
      * volume register back to the frame write, and an arriving toggle or
-     * retrigger stream simply takes the voice instead of retrying for the rest
+     * retrigger stream takes the voice instead of retrying for the rest
      * of the sample's computed length.
      *
      * <p>{@link #YM} is the set a YM tune is packed with. A tune carries the
@@ -359,7 +359,7 @@ public final class EffectScript {
      * script computes - the channels are the same, and only which hardware
      * ticks them moves.
      *
-     * <p>What the source format fixes is not a parameter here at all: the
+     * <p>What the source format fixes is not a parameter here: the
      * tune carries its own {@link Semantics}, because the answer follows from
      * the format the codes were read out of and travels with them. The codes
      * arrive already normalized, and the semantics say only what the codes
@@ -450,7 +450,7 @@ public final class EffectScript {
     /** Everything two arrivals must agree on before sharing loop sections.
      * Sample ends compare as frames-remaining; the toggle's half is
      * deliberately absent - phase free-runs in v1 too. Every channel is in
-     * here, in channel order: one a source never uses simply contributes its
+     * here, in channel order: one a source never uses contributes its
      * untouched initial state to both sides of every comparison.
      *
      * The envelope shape is not among them: it is a function of the frame,
@@ -485,7 +485,7 @@ public final class EffectScript {
 
     private void frame(int p, int f) {
         skipsBefore = skips;
-        // X's high nibble is simply this frame's shape - the packer resolved
+        // X's high nibble is this frame's shape - the packer resolved
         // it, so the player never has to look for it. It changes rarely, which is
         // what keeps a stream carrying one value on almost every frame.
         x[p] = (byte) (shape(f) << 4);
@@ -697,7 +697,7 @@ public final class EffectScript {
             // tick landing there writes one more sample byte over the volume
             // just written, and it stands until the next frame. That is a
             // fraction of a frame at a level the sample itself named, against
-            // a whole frame of a sample that should not be playing at all.
+            // a whole frame of a sample that should not be playing.
             if (endOwnPcm(p, index, -1)) {
                 emit(p, index, action(VERB_RELEASE, 0, 0), 0);
             }
@@ -913,7 +913,7 @@ public final class EffectScript {
      * YM6's filing convention - the format spends the spare bits of a
      * register the effect is about to take over anyway - and they stay there
      * because the player reads them from exactly this byte at run time, out
-     * of the register ring it is already holding, which is what saves the
+     * of the register ring it is already holding, which saves the
      * file a stream per parameter. So the byte has to carry the value
      * whatever wrote it: a front end for a format that files its parameters
      * somewhere else has to put them here, and {@code org.ymr} does.

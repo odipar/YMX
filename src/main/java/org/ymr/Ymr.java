@@ -208,7 +208,7 @@ public final class Ymr {
         // The trim window: -minM -secS (or -startframeF) picks where to start,
         // -framesN (or -endframeF) how much to keep. The registers and the
         // timer streams are cut together, since they are one timeline; an
-        // effect still running at the first kept frame simply starts there,
+        // effect still running at the first kept frame starts there,
         // which is what its code byte arriving out of nowhere means.
         int rate = dump.frameRate();
         int start = startFrame >= 0 ? startFrame : (startMin * 60 + startSec) * rate;

@@ -48,7 +48,7 @@ import org.ymx.YmxFormat;
  * whether or not the index changed, and a sample nothing pops keeps playing.
  * The two halves of that are handled in two places. {@link EffectScript} is
  * told, through {@link EffectScript.Semantics}, that a held PCM code does not
- * retrigger - which is what stops a sustained sample being chopped into
+ * retrigger - which stops a sustained sample being chopped into
  * frame-long pieces. And because the script acts when a code byte CHANGES, an
  * explicit re-trigger has to change one: bit 3 flips on every trigger, so two
  * pops of the same sample at the same rate produce two different codes and the
@@ -238,7 +238,7 @@ public final class YmrEffects {
     /**
      * Converts a song.
      *
-     * @param name what to call the song. A .YMR carries no metadata at all,
+     * @param name what to call the song. A .YMR carries no metadata,
      *             so the caller's file stem is the only name there is, and
      *             the title and composer come out empty.
      */
@@ -256,7 +256,7 @@ public final class YmrEffects {
         reportChannels();
         reportLostLoopTriggers();
 
-        // A .YMR carries no metadata at all, so the author and the comment
+        // A .YMR carries no metadata, so the author and the comment
         // come out empty and the caller's file stem is the only name there is.
         return new Tune(frames, source.frameRate(), source.ymClock(),
                 source.loops() ? source.loopFrame() : frames,
@@ -270,7 +270,7 @@ public final class YmrEffects {
      *
      * <p>RhYMe files it where the chip does. An RTE handler rewrites R13 with
      * the player's own copy of the shape - {@code _ymr_shadow+R_ENVS}, primed
-     * with {@code $08} - so the shape in force is simply the last value the
+     * with {@code $08} - so the shape in force is the last value the
      * envelope-shape stream popped. The reader marks a frame that popped
      * nothing with {@link YmrReader#NO_ENVELOPE_SHAPE}, which is the marker
      * the frame write means by it, so what a retrigger needs is the last
@@ -316,12 +316,12 @@ public final class YmrEffects {
     /**
      * The sample blocks as the file stores them, capped, with where they loop.
      *
-     * <p>Nothing is converted on the way: RhYMe's exporter has already reduced
-     * every sample to the 4-bit levels the PSG's volume register takes, which
-     * is what lets its timer ISR write a byte straight to the chip with no
-     * table in between - and what makes this the one thing a .YMR hands over
-     * that needs no work at all. A YM digidrum arrives 8-bit and its own
-     * front end has to fold it down; here the bytes are the levels.
+     * <p>Nothing is converted on the way: RhYMe's exporter has already
+     * reduced every sample to the 4-bit levels the PSG's volume register
+     * takes, which lets its timer ISR write a byte straight to the chip with
+     * no table in between - and what makes this the one thing a .YMR hands
+     * over that needs no work. A YM digidrum arrives 8-bit and its own front
+     * end has to fold it down; here the bytes are the levels.
      */
     private Prepared[] prepareSamples() {
         List<YmrReader.Sample> blocks = source.samples();
@@ -405,7 +405,7 @@ public final class YmrEffects {
      * One channel's whole timeline, replayed the way {@code _ymr_process_tmr}
      * reconciles it once a frame's commands have been read.
      *
-     * <p>The rule is entirely about pops, because a value that did not pop did
+     * <p>The rule is about pops, because a value that did not pop did
      * not change: popping the effect stream with something in it CONFIGURES
      * the timer - which restarts a sample even when the index it names is the
      * one already playing - popping it with 0 stops the timer, popping the

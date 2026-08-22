@@ -86,7 +86,7 @@ import org.jx1.Decompressor;
  *
  * <p><b>Does it ever reach back past its own first byte?</b> A window nothing
  * can outrun is still full of bytes the stream did not put there, and a match
- * that reaches into them is invisible from outside - the decoder simply copies
+ * that reaches into them is invisible from outside - the decoder copies
  * them to the output. Filling the window twice with different bytes makes it
  * visible: a stream that reaches back too far decodes to two different things,
  * and a well-formed one cannot tell the two fills apart.
@@ -94,7 +94,7 @@ import org.jx1.Decompressor;
  * <p><b>Does it stay inside its ring?</b> The comparison described above.
  *
  * <p>The first two questions share one rejection rather than getting one each,
- * and so does the stream that simply stops mid-operation. That is a limit, not
+ * and so does the stream that stops mid-operation. That is a limit, not
  * an economy. Under {@code -ea} the decoder stops at the first thing it does
  * not like and nothing after that point can be observed, so all three faults
  * look identical from out here - a run that did not finish - and telling them
@@ -124,18 +124,18 @@ public final class Zx1 {
 
     /**
      * The largest distance ZX1's two-byte offset form can name. A ring at least
-     * this big can never be lapped by a back-reference, which is what makes the
+     * this big can never be lapped by a back-reference, which makes the
      * ring comparison below skippable rather than merely usually equal.
      */
     private static final int MAX_OFFSET = 32512;
 
     /**
-     * The window the reference decode runs through: the one the C original uses,
-     * which is past {@link #MAX_OFFSET} and so cannot be outrun. That is what
-     * makes a decode through it worth calling the decode the packer meant, and
-     * it also leaves the input the only array a malformed stream can still index
-     * out of range - so a throw from that decode means the stream ran out, no
-     * matter which build is running.
+     * The window the reference decode runs through: the one the C original
+     * uses, which is past {@link #MAX_OFFSET} and so cannot be outrun. That
+     * makes a decode through it worth calling the decode the packer meant,
+     * and it also leaves the input the only array a malformed stream can
+     * still index out of range - so a throw from that decode means the stream
+     * ran out, no matter which build is running.
      */
     private static final int REFERENCE_WINDOW = Decompressor.DEFAULT_BUFFER_SIZE;
 
@@ -206,7 +206,7 @@ public final class Zx1 {
      * is worth. With {@code -ea} it arrives as an {@link AssertionError} naming
      * a condition in a decoder that cannot name the stream it was given, and
      * without {@code -ea} the same stream arrives as the array index that
-     * assertion was guarding, or does not arrive at all; the caller above has
+     * assertion was guarding, or does not arrive; the caller above has
      * the context, and calls in a way that does not need the difference.
      *
      * @param window how many bytes of ring to decode through

@@ -9,7 +9,7 @@ package org.ymx;
  * and R15 as effect data. YMX plays no effects, so those bits are
  * masked away here - once, at packing time. That is both correct (they are not
  * chip state) and cheaper: constant high bits compress better, and the player
- * needs no masking code at all.
+ * needs no masking code.
  *
  * <p>The one register that is not a plain mask is R13, the envelope shape.
  * A YM frame stores {@code $FF} there to mean "leave the shape alone"; writing

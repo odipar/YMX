@@ -88,7 +88,7 @@ final class St4RoundTripTest {
 
     @Test
     void limitedOffsetsStayInsideTheirWindow() {
-        // -mN is what makes a stream safe for an N-unit ring; decoding through
+        // -mN makes a stream safe for an N-unit ring; decoding through
         // exactly that much history has to reproduce the input.
         byte[] input = new byte[8000];
         var random = new Random(11);

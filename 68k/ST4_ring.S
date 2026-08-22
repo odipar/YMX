@@ -118,7 +118,7 @@ wrap_a1:
         .endif
 ; Leave room one unit short of the ring. A call that wraps and then fills the
 ; whole ring would return a1 exactly where it started, and the caller reads its
-; output as [old a1 .. new a1) - so a full ring would look like nothing at all.
+; output as [old a1 .. new a1) - so a full ring would look like nothing.
 ; A one-unit ring cannot spare the unit; there the span stays ambiguous unless
 ; the caller wraps a1 itself.
         subq.w  #1,d5
@@ -145,7 +145,7 @@ ST4_resume:
         swap    d5                      ; room = end.low - destination.low, bytes
         sub.w   a1,d5                   ; exact because the room is <= 65535
 ; Budgets and segments count units, so the room joins them. The ring size and
-; every position are whole units, which is what makes the shift exact.
+; every position are whole units, which makes the shift exact.
         .if ST4_UNIT=2
         lsr.w   #1,d5
         .endif

@@ -231,7 +231,7 @@ final class St4ChainRebuilder {
      * one. So the answer is the last match, provided some adjacent-pair match
      * sits at or below it. Offset one is the exception: the fake block the
      * whole parse hangs from is state before the first unit, so its every
-     * match counts - and with no match at all, the fake itself is the state.
+     * match counts - and with no match, the fake itself is the state.
      */
     private int previousStateEnd(int offset, int from) {
         int lastMatch = NONE;

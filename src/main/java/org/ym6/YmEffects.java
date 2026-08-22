@@ -98,7 +98,7 @@ public final class YmEffects {
      *  and each is named after the thing that was not started - a Sinus-SID,
      *  a drum with no sample - so they mean nothing to an engine that has
      *  never heard of either. A packer's report is where they belong, and a
-     *  front end for a format with no dialects to normalize simply has no
+     *  front end for a format with no dialects to normalize has no
      *  such report to make. */
     public record Extraction(byte[][] codes, byte[][] counts,
                              byte[][] samples, int inert, int tooFast, int sinus,

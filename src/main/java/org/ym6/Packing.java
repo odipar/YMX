@@ -19,7 +19,7 @@ import org.ymx.Tools;
  *
  * <p>A lone tune goes through the single-file form, where the trim options
  * still mean something. A set goes through the packer's trailing-directory
- * form, which is what pins them all to one unit size and one workspace - the
+ * form, which pins them all to one unit size and one workspace - the
  * shape a single player build can hold as subtunes.
  */
 public final class Packing {

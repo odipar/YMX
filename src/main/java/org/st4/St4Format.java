@@ -37,7 +37,7 @@ package org.st4;
  * One extra bit would make it odd again and cost a check on every data bit, far
  * more than the offsets save. So a new-offset match spends two: the first says
  * byte or word, and the second picks which 256-unit bank a byte offset names,
- * which is what keeps the split from costing ratio.
+ * which keeps the split from costing ratio.
  *
  * <pre>
  *   1 0   byte offset from stream C, 1..256 units
@@ -160,7 +160,7 @@ public final class St4Format {
     /**
      * Reads a container, checking everything a decoder would otherwise accept.
      * The streams it returns may carry up to three bytes of alignment padding,
-     * since no length is stored and each stream simply runs to the next.
+     * since no length is stored and each stream runs to the next.
      *
      * @throws IllegalArgumentException with a printable reason if it is not an
      *     ST4 file this build understands, or if the offsets do not describe

@@ -45,14 +45,14 @@ import org.jspecify.annotations.Nullable;
  * to fill, and the two fill it from different places: a YM6 file keeps a
  * buzzer's shape in the low nibble of the voice its code names, while RhYMe
  * keeps it where the chip does, in R13. Resolving that here rather than in
- * the compiler is what keeps the compiler and the player free of a mode -
- * the value is simply carried, the way every other operand is.
+ * the compiler keeps the compiler and the player free of a mode -
+ * the value is carried, the way every other operand is.
  *
  * <p>{@code samples} are the PCM streams' sources, PSG-ready volume values
  * 0..15 one per byte, and {@code sampleLoops} says for each of them where a
  * PCM stream goes back to when it runs out - an offset into that sample, or
  * {@link YmxFormat#SAMPLE_ONE_SHOT} for one that stops. The two are one
- * thing in two arrays, which the compact constructor is what keeps true.
+ * thing in two arrays, which the compact constructor keeps true.
  * {@code semantics} is what the source dialect implies about triggering and
  * stopping and cannot be read out of the codes - see
  * {@link EffectScript.Semantics}. {@code loopFrame} is the SOURCE's loop
@@ -191,7 +191,7 @@ public record Tune(int frames, int frameRate, long masterClock, int loopFrame,
      * <p>Returns the tune itself when the shape already fits, a padded tune
      * otherwise, or {@code null} when no safe frame exists within
      * {@value #PAD_SEARCH} frames of a boundary that needs one - which leaves
-     * the caller to drop to a unit size that needs no padding at all.
+     * the caller to drop to a unit size that needs no padding.
      */
     public static @Nullable Tune padToUnit(Tune tune, int loopFrame, int unit,
                                            IntPredicate safeToDuplicate) {
