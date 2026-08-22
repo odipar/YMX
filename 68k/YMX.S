@@ -97,9 +97,9 @@
 ; and one ring per stream, so its size depends on the ring size in the file.
 ; It is always sized for all twenty-five, whatever the tune uses:
 ;
-;   YMX_SIZE = YMX_FIXED + 25 * N       ; 1656 + 25 * N bytes
+;   YMX_SIZE = YMX_FIXED + 25 * N       ; 1654 + 25 * N bytes
 ;
-; For the default 960-byte rings that is 25656 bytes. A program with N at
+; For the default 960-byte rings that is 25654 bytes. A program with N at
 ; build time can reserve it with
 ;
 ;       ds.b    YMX_FIXED+(YMX_STREAMS*960)
@@ -1443,7 +1443,7 @@ ymx_shape:
         lsr.b   #4,d1
         rts
 
-; in: d0 = the action byte; out: a1 = the byte, d5 = voice*4.
+; in: d0 = the action byte; out: a1 = the byte, d5 = voice*4. Clobbers d1.
 ymx_voice:
         move.w  d0,d5
         lsr.w   #1,d5
@@ -1626,6 +1626,7 @@ ymx_pcm:
 ; would fire into a half-programmed timer. A retune passes no vector.
 ; in: d0 = the action byte (prescaler in bits 2-0), d4 = the vector or 0,
 ;     a4 = the action ring byte (the count is one ring above).
+; clobbers d0-d2 and a1-a2; d3-d5 and a3-a5 stand.
 ymx_program:
         movea.l a4,a1
         adda.l  d3,a1
