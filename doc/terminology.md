@@ -443,8 +443,9 @@ series of writes.
 
 A front end for another source format maps its own names onto these same
 things, and keeps them on its own side of the `Tune`. What each conversion
-costs is in its own account - [../ym/CONVERSION.md](../ym/CONVERSION.md)
-for a YM file - and is not repeated here.
+costs is in its own account - [../ym/CONVERSION.md](../ym/CONVERSION.md) for
+a YM file, [../ymr/CONVERSION.md](../ymr/CONVERSION.md) for the second front
+end in the tree, which carries its own mapping - and is not repeated here.
 
 ## The names in the code
 
