@@ -118,8 +118,11 @@ bugs in this player were found.
 YMX is the `.yx6` container from the
 [ST4](https://github.com/odipar/ST4) repository, adopted whole and renumbered
 to version 1. ST4 is the compression format underneath, and stays there; this
-repository vendors the parts it needs and has its own life-cycle. The design
-notes and the measurements that produced the format are in ST4's history.
+repository vendors the parts it needs and has its own life-cycle. The
+measurements that shaped the player came across too, in
+[doc/experiments](doc/experiments/README.md); what stayed behind is the
+version-by-version argument for a container that now simply is what
+[SPEC.md](SPEC.md) says, and it is in ST4's history if anyone wants it.
 
 ## License and attribution
 
