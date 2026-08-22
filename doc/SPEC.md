@@ -4,9 +4,11 @@ Version 1. Big-endian throughout.
 
 YMX is a streaming register-dump format for the YM2149 sound chip as fitted
 to the Atari ST, designed so a plain 68000 can play a tune it never holds in
-memory. A file carries twenty-five independently compressed streams: fourteen
-carrying the chip's sound registers, one value per frame, and eleven carrying
-a **compiled effect script** that drives the MFP's timers. Each stream is
+memory. A file carries twenty-five independently compressed streams — fourteen
+for the chip's sound registers, one value per frame, and eleven for a
+**compiled effect script** that drives the MFP's timers. Twenty-five is the
+count every file stores; how many a given tune fills, and how many a player
+reads, are smaller and are §1.4. Each stream is
 decoded through its own small ring, refilled one stream per frame, so the
 memory a tune needs is a property of the player's configuration rather than
 of the tune's length.
@@ -56,7 +58,7 @@ throughout. The four words it leans on hardest:
 | 6 | 2 | flags (§1.2) |
 | 8 | 4 | `O`, the frame count |
 | 12 | 2 | frame rate in Hz: how often the player is called |
-| 14 | 2 | `S`, the stream count — always **25** |
+| 14 | 2 | `S`, the stream count — always **25**, see §1.4 |
 | 16 | 2 | `N`, the ring size in bytes |
 | 18 | 2 | `C`, values decoded per call |
 | 20 | 4 | `L`, the loop frame; equal to `O` when the tune plays once |
@@ -108,12 +110,35 @@ displacement.
 
 960/24 is the usual pair and covers every tune that leaves channel 3 idle.
 
+### 1.4 Twenty-five is the table, not the traffic
+
+`S` is fixed. It is always 25, a reader must reject a file that says
+otherwise, and the two section tables are therefore always 100 bytes each,
+which is what puts the payload at a constant offset. Three different counts
+get called "streams", and only the first is `S`:
+
+| | |
+|---|---|
+| **stored** — always 25 | the size of the section tables. Absent sections have offset 0 |
+| **decoded** — 17, 19, 21, 23 or 25 | what a player reads per cycle: 17 for a tune naming no timer channel, then two more per channel, up to and including the **highest** channel it names |
+| **carrying** — fewer still | an idle channel's pair is stored, and packs to almost nothing |
+
+The middle one is what `C` has to cover, and it steps by the highest channel
+named rather than by the count of channels used, because a player stops at
+the last channel rather than counting them. A tune using only channel 3 still
+decodes 25.
+
+So a `.ymx` always has twenty-five slots and rarely twenty-five streams worth
+reading. The channel pairs come last precisely so the difference costs
+nothing: what a tune does not name is a tail no player ever touches.
+
 ---
 
 ## 2. The streams
 
-Twenty-five, in this order. Streams 0–13 are frame streams; 14–24 are script
-data whose bytes never reach a chip register.
+Twenty-five slots, in this order — every file has all of them, and most files
+have nothing in several (§1.4). Streams 0–13 are frame streams; 14–24 are
+script data whose bytes never reach a chip register.
 
 | # | name | carries |
 |---:|---|---|
@@ -418,7 +443,7 @@ A reader must check:
 
 - the magic is `'YMX!'`;
 - the version is 1;
-- the stream count is 25;
+- the stream count is 25 — it is fixed, not a size to adapt to;
 - every section's own ST4 signature matches the unit size the reader was
   built for — a tune packed for a different one is rejected, not garbled.
 

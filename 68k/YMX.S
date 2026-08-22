@@ -111,7 +111,7 @@
 ; CALLS AND REGISTERS
 ;
 ;   YMX_init   in   a0 = .ymx file, at an even address, a1 = workspace
-;              out  d0 = 0 accepted, -1 not a v7 YMX file with 25 streams
+;              out  d0 = 0 accepted, -1 not a v1 YMX file with 25 streams
 ;                        packed at this build's unit size
 ;              Claims a timer for each timer channel the header names:
 ;              stops it, parks its vector, drops stale pendings, enables
@@ -1551,7 +1551,7 @@ ymx_retune:                         ; the vector is NEVER touched: the
         moveq   #0,d4
         bra     ymx_program
 
-; v10: the prescaler moves under a RUNNING timer. Nothing is stopped, so the
+; The prescaler moves under a RUNNING timer. Nothing is stopped, so the
 ; period already in flight runs to its own end and the reload lands at the
 ; next underflow: a square keeps its phase AND its place inside the half it
 ; is in, which is what a source that reprograms live sounds like. Addressed
@@ -1608,7 +1608,7 @@ ymx_pcm:
         bsr     ymx_voice
         moveq   #0,d1
         move.b  (a1),d1                 ; the sample number, 0..31
-        lsl.w   #3,d1                   ; a PAIR each since v10: the sample's
+        lsl.w   #3,d1                   ; a PAIR each: the sample's
         movea.l CH_ISR(a5),a2           ; address, then where it loops back to
         lea     ymx_samples(pc),a1
         move.l  0(a1,d1.w),d2           ; both resolved at init, so a trigger
