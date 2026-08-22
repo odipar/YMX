@@ -25,7 +25,7 @@ whole and renumbered to 1. There is no older YMX version to stay compatible
 with.
 
 **Vocabulary.** This document uses [terminology.md](terminology.md)
-throughout. The four words it leans on hardest:
+throughout. The five words it leans on hardest:
 
 | word | meaning |
 |---|---|
@@ -485,7 +485,7 @@ frames twice, compiled differently. Nothing at play time distinguishes them.
 
 ## 9. Conformance
 
-A reader must check:
+### 9.1 What a reader checks
 
 - the magic is `'YMX!'`;
 - the version is 1;
@@ -493,11 +493,31 @@ A reader must check:
 - every section's own ST4 signature matches the unit size the reader was
   built for — a tune packed for a different one is rejected, not garbled.
 
-A player must also, on every frame: leave a skipped voice's volume register
-out of the frame write (§2.1), leave R13 alone on a frame carrying `$FF`, and
-supply its own bits 7-6 for R7 (§2). Those three are the whole of what a
-frame write does beyond copying bytes.
-
 Beyond that a player checks nothing, and a malformed file is undefined
 behaviour. This is deliberate: the format is a compilation target, and every
 decision that could be made at pack time already was.
+
+### 9.2 Interpreted data
+
+Fourteen streams are copied: each value reaches its register unchanged. The
+rest is interpreted — a byte whose meaning is an operation rather than a
+value. Those operations, in full:
+
+| interpreted | the operation |
+|---|---|
+| M bit 4 with bits 7-5 | the three skip bits take the value in 7-5. On a frame with bit 4 clear they keep the value they had; nothing else changes them |
+| skip bit set for voice v | R8+v is not written by the frame write: no stale value, no zero, no bus cycle |
+| R7 bits 7-6 | the value written there comes from the host. Bits 5-0 come from the stream |
+| R13 = `$FF` | R13 is not written this frame |
+| X bits 7-4 | the value written to R13 when a retrigger stream starts, and when a `HOLD` with flag 4 runs |
+| X bits 3-0 with `START_PCM_PREEMPT` | each named channel's timer is stopped before this channel's timer is programmed |
+| `RELEASE` bit 0 clear | the timer is stopped. Set: the timer's interrupt is masked and the timer keeps counting |
+| `RETUNE` addressed to voice 3 | the timer is reprogrammed without being stopped, so the count in flight runs to its end |
+| a toggle stream's volume, a PCM stream's sample number | read from the voice's own register ring on the frame the stream starts |
+| `START_TOGGLE` | R8+v is written 0 among that frame's actions, and the first tick, one timer period later, writes the level |
+| programming a timer | four writes in the order stop, vector, count, run, with no tick of that timer between the first and the last, ending with that interrupt enabled and unmasked |
+| a sample byte with bit 7 set | it is written to the volume register as a level, and the sample ends there |
+| loop point `$FFFF` | the timer is stopped at that point. Any other value: the read position becomes that offset into the sample and the ticks continue |
+| the frame's order | skip bits, then the fourteen register writes, then the frame's actions, then one refill |
+| refill turn | on frame `f`, stream `f` modulo `C` is decoded `C` values further |
+| a section running out mid-refill | decoding continues from the start of that stream's loop section, into the same ring |
