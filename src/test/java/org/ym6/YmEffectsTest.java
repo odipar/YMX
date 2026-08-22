@@ -54,10 +54,10 @@ final class YmEffectsTest {
     @Test
     void ym5IsNormalizedIntoTheSameShape() {
         byte[][] r = blank();
-        r[1][1] = (byte) 0x20;          // YM5: SID voice B (bits 4-5 of R1)
+        r[1][1] = (byte) 0x20;          // YM5: SID voice B (bits 5-4 of R1)
         r[6][1] = (byte) (2 << 5);
         r[14][1] = 50;
-        r[3][4] = (byte) 0x30;          // YM5: digidrum voice C (bits 4-5 of R3)
+        r[3][4] = (byte) 0x30;          // YM5: digidrum voice C (bits 5-4 of R3)
         r[8][4] = (byte) (1 << 5);      // the YM5 drum prescaler is ALWAYS R8
         r[10][4] = 1;                   // sample number in the voice's volume register
         r[15][4] = 122;
