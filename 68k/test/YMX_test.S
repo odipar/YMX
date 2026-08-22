@@ -4,9 +4,10 @@
 ; Plays an embedded looping tune on the actual sound chip and reads every
 ; register back after every frame, folding the chip's contents into a checksum
 ; that the host computed from the YM data alone. It plays past the end of the
-; tune, so the loop point is crossed and the wrap count is checked too. That covers what emulation cannot: the
-; player is writing to a real YM2149 through real bus cycles, and a wrong
-; register number or a missed write changes the checksum.
+; tune, so the loop point is crossed and the wrap count is checked too. That
+; covers what emulation cannot: the player is writing to a real YM2149 through
+; real bus cycles, and a wrong register number or a missed write changes the
+; checksum.
 ;
 ; Then it plays the tune again, untimed by read-back, and reports the ticks it
 ; took - the number the README asks you to measure with your own tune.

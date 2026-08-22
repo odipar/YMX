@@ -18,7 +18,7 @@
 ;
 ; Unlike ST4_wrap this decoder minds the destination itself: it stops each call
 ; at the ring end and wraps the write pointer on the next entry, so the caller
-; may ask for any budget and needs no call counting. d1.w = 0 means done.
+; may request any budget and needs no call counting. d1.w = 0 means done.
 ;
 ; The copy engine runs two ladders: match segments of at most sixteen units
 ; take a counter-free ladder that falls straight into the match epilogue, and

@@ -1,14 +1,13 @@
 ; -----------------------------------------------------------------------------
 ; YMX.S - streaming YM chiptune player for the plain 68000 (Atari ST)
 ;
-; By Robbert van Dalen. Plays a .ymx file: twenty-five streams - fourteen
-; frame streams, one per sound register, and eleven carrying the compiled
-; effect script - every one packed as its own embedded ST4 container and decoded
+; By Robbert van Dalen. Plays a .ymx file: twenty-five streams - fourteen frame
+; streams, one per sound register, and eleven carrying the compiled effect
+; script - every one packed as its own embedded ST4 container and decoded
 ; through its own small ring by ST4_wrap.S. Written by Claude (Anthropic's
-; Claude Code) under Robbert's direction, based on ZX1 v1.5 by Einar Saukas
-; and inspired by Steve Clarets' MinYMiser. Use it freely, including
-; commercially, as long as your documentation says you used ZX1 through
-; ST4 (see LICENSE).
+; Claude Code) under Robbert's direction, based on ZX1 v1.5 by Einar Saukas and
+; inspired by Steve Clarets' MinYMiser. Use it freely, including commercially,
+; as long as your documentation says you used ZX1 through ST4 (see LICENSE).
 ;
 ; It plays the fourteen standard sound registers, loops, and plays what the
 ; YM format calls its special effects - digidrums, SID voices, the
@@ -38,24 +37,23 @@
 ; -----------------------------------------------------------------------------
 ; THE DESIGN, in one paragraph. A tune is O frames long. Each of the
 ; twenty-five streams gets its own ring of N bytes and its own saved decoder
-; state, and is decoded C values at a time (C = 24 by default). On every VBL the player
-; uses one value from each of the rings and refills exactly one
-; stream - stream k on the VBL where the frame number modulo C is k. With
-; C at least the number of streams a tune DECODES - seventeen when it names
-; no channel, twenty-one for a YM tune - every one is refilled once per C
-; frames, one refill per VBL, so
-; the work per frame is flat, and ordered for the chip's benefit: the burst
-; gates, then the fourteen register writes - the FRAME WRITE, leaving the
-; VBL at a FIXED offset whatever the frame's timer streams cost - then the
-; script's actions, then one ST4_resume of C bytes. Since C divides N and a
-; call never reaches the ring end, ST4_wrap.S is the decoder that fits: the
-; player counts the calls itself and wraps the write pointer when it lands
+; state, and is decoded C values at a time (C = 24 by default). On every VBL
+; the player uses one value from each of the rings and refills exactly one
+; stream - stream k on the VBL where the frame number modulo C is k. With C at
+; least the number of streams a tune DECODES - seventeen when it names no
+; channel, twenty-one for a YM tune - every one is refilled once per C frames,
+; one refill per VBL, so the work per frame is flat, and ordered for the chip's
+; benefit: the gates, then the fourteen register writes - the FRAME WRITE,
+; leaving the VBL at a FIXED offset whatever the frame's timer streams cost -
+; then the script's actions, then one ST4_resume of C bytes. Since C divides N
+; and a call never reaches the ring end, ST4_wrap.S is the decoder that fits:
+; the player counts the calls itself and wraps the write pointer when it lands
 ; on the ring end.
 ;
 ; THE SCRIPT. The last eleven rings are not frame streams: their bytes never
 ; reach a register. They carry the COMPILED EFFECT SCRIPT, in which the
 ; packer replayed the reference player's whole decision logic over the
-; timeline - held or new, retune or restart, who stops whose timer, when a
+; timeline - held or new, retune or restart, which stops which timer, when a
 ; sample's gate reopens - and wrote the outcomes down as prepared actions.
 ; Ring M says what acts this frame (almost always: nothing, one test); each
 ; channel's A/P pair carries its action byte and timer count, and ring X
@@ -66,20 +64,19 @@
 ; R7 stream, so its sample is heard alone, and no ring byte is ever edited:
 ; what v1 discovered per frame, the file simply says.
 ;
-; LOOPING. A packed stream can only be restarted from its beginning, so the packer
-; splits every register at the loop frame L: an intro stream for frames [0, L)
-; and a loop stream for [L, O). When a register's section runs out mid-refill
-; the player starts its loop stream over - a fresh decoder writing on into the
-; same ring - so the rings always hold one continuous sequence of values and
-; nothing on the read side changes when it happens. Nothing requires L to fall
-; on a group boundary: a refill that straddles the split simply decodes two
-; pieces. A tune that loops from frame 0 has no intro streams at all.
-; The script adds one twist: when the effect state arriving from the intro
-; differs from the state arriving from the wrap, the packer ROTATES the
-; split forward to a frame where the two agree - the file then carries a
-; few frames twice, compiled differently, and O and L in the header count
-; this played timeline. Nothing at play time can distinguish it; the rotation
-; is inaudible.
+; LOOPING. A packed stream can only be restarted from its beginning, so the
+; packer splits every register at the loop frame L: an intro stream for frames
+; [0, L) and a loop stream for [L, O). When a register's section runs out
+; mid-refill the player starts its loop stream over - a fresh decoder writing
+; on into the same ring - so the rings always hold one continuous sequence of
+; values and nothing on the read side changes when it happens. Nothing requires
+; L to fall on a group boundary: a refill that straddles the split simply
+; decodes two pieces. A tune that loops from frame 0 has no intro streams at
+; all. The script adds one twist: when the effect state arriving from the intro
+; differs from the state arriving from the wrap, the packer ROTATES the split
+; forward to a frame where the two agree - the file then carries a few frames
+; twice, compiled differently, and O and L in the header count this played
+; timeline. Nothing at play time can distinguish it; the rotation is inaudible.
 ;
 ; -----------------------------------------------------------------------------
 ; USING IT
@@ -102,8 +99,8 @@
 ;
 ;   YMX_SIZE = YMX_FIXED + 25 * N       ; 1656 + 25 * N bytes
 ;
-; For the default 960-byte rings that is 25656 bytes. A program that knows N
-; at build time can reserve it with
+; For the default 960-byte rings that is 25656 bytes. A program with N at
+; build time can reserve it with
 ;
 ;       ds.b    YMX_FIXED+(YMX_STREAMS*960)
 ;
@@ -178,20 +175,20 @@
 ;      and IMRA, bit 4 of IERB and IMRB - and, built with YMX_SUPER_HOST,
 ;      the USP, which the PCM tick parks a0 in. A demo that has already
 ;      taken the machine over saves nothing at all. YMX_player.S is the
-;      worked example of the polite version
+;      worked example of doing that
 ; -----------------------------------------------------------------------------
 
-; A host that never runs user-mode code while the player is live - a demo
-; under its own takeover, say - may define YMX_SUPER_HOST equ 1 before
-; including this file: the PCM tick of the channel on Timer D then parks a0
-; in the then-unused USP (4 cycles each way instead of 12 through the
-; stack). Every other channel's always uses the stack, because Timer A and
-; Timer B both nest into Timer D's parked windows and must never overwrite
-; one - Timer D is last in MFP priority, so nothing nests into it. The park restores a0
-; but not the USP: a host that ever returns to user mode must save its USP
-; before YMX_init and restore it after YMX_stop, with the rest of the
-; machine state assumption 5 lists. Default off, because a program that
-; hooks the VBL from user mode has a live USP at every tick.
+; A host that never runs user-mode code while the player is live - a demo under
+; its own takeover, say - may define YMX_SUPER_HOST equ 1 before including this
+; file: the PCM tick of the channel on Timer D then parks a0 in the then-unused
+; USP (4 cycles each way instead of 12 through the stack). Every other
+; channel's always uses the stack, because Timer A and Timer B both nest into
+; Timer D's parked windows and must never overwrite one - Timer D is last in
+; MFP priority, so nothing nests into it. The park restores a0 but not the USP:
+; a host that ever returns to user mode must save its USP before YMX_init and
+; restore it after YMX_stop, with the rest of the machine state assumption 5
+; lists. Default off, because a program that hooks the VBL from user mode has a
+; live USP at every tick.
         .if ^^defined YMX_SUPER_HOST
         .else
 YMX_SUPER_HOST  equ     0
@@ -237,7 +234,7 @@ PERF_SYNC       equ     8000            ; the sync loop's ceiling: a whole
 
 YMX_CHANNELS    equ     4               ; timer channels, numbered 0..3. Which
                                         ; of the MFP's timers runs each one
-                                        ; is the file's business now: stream
+                                        ; is the file's choice now: stream
                                         ; T carries the map, two bits each
 YMX_TIMERS      equ     4               ; and this is what it may name
 YMX_STREAMS     equ     25              ; R0..R13, then the compiled effect
@@ -248,8 +245,8 @@ YMX_CHAN0       equ     17              ; stream index of channel 0's action
                                         ; byte: R0..R13, then M, X and T
 YMX_WRITE_READ  equ     6               ; inside a YMX_WRITE: the ring read's
                                         ; displacement, patched at init
-YMX_WRITE_MOVEP equ     8               ; and the movep, which the burst gate
-                                        ; swaps for two nops
+YMX_WRITE_MOVEP equ     8               ; and the movep, which a gate swaps
+                                        ; for two nops
 YMX_WRITE_SIZE  equ     12              ; the whole write
 YMX_STATE_SIZE  equ     64              ; per stream, so the index is a shift
                                         ; both ways: *64 in, /16 back to *4
@@ -284,11 +281,11 @@ YMX_STATE       equ     54              ; the decoder states, from an even base
 ; is this file's. One
 ; descriptor per channel says which timer implements it, and every channel
 ; carries the same fields, so the code that claims, programs and hands
-; timers back is one loop over the table. No remembered state beyond the
+; timers back is one loop over the table. No retained state beyond the
 ; claim - the script compiled every comparison at pack time. The hardware
 ; addresses are words: movea.w sign-extends $FAxx to $FFFFFAxx.
 ;
-; The MFP's four interrupt registers march in step - enable, pending,
+; The MFP's four interrupt registers sit at a fixed stride - enable, pending,
 ; in-service, mask, four bytes apart in both banks - so one address covers
 ; all four: IER+4 is pending, +8 in-service, +12 mask.
 CH_CTRL         equ     0               ; word  timer control register
@@ -602,13 +599,13 @@ YMX_init:
         adda.l  d1,a0                   ; ring T
         moveq   #0,d0
         move.b  (a0),d0
-        move.w  d0,YMX_TMAP(a3)         ; remembered, so a change shows up
+        move.w  d0,YMX_TMAP(a3)         ; kept, so a change shows up
         bsr     ymx_assign
 
 ; Claim a timer for each timer channel the header names: park our handler
 ; on its vector and leave the timer stopped but enabled and unmasked. A
 ; channel the tune does not use is left entirely alone, timer and all, so
-; a tune that names two hands the other timers to the host untouched.
+; a tune that names two leaves the other timers to the host untouched.
 ; Nothing is saved - the machine state is the host's, see assumption 5 in
 ; the header. bset/bclr only: Timer C's bits, Timer D's and the ACIA's all
 ; live in registers they share with something else.
@@ -834,15 +831,15 @@ YMX_play:
 ; The gates first, then the burst, then everything else: the fourteen chip
 ; writes leave the VBL at a FIXED offset, whatever the frame's effects cost.
 ; Only the gate state must precede the burst (a trigger frame's voice must
-; be muted before the burst would write its sample number); the actions -
+; be gated before the burst would write its sample number); the actions -
 ; timer programs, handler patches - happen after, where their varying cost
 ; cannot jitter the writes. Gate changes are rare, so the burst's offset
 ; moves only on those frames, and by a fixed amount.
         movea.l YMX_CURSOR(a3),a0
         adda.l  YMX_EFXOFF(a3),a0       ; ring M, at this frame's offset
         move.b  (a0),d0                 ; a0 survives everything below
-        btst    #4,d0                   ; the gate mask changed?
-        beq.s   .burst                  ; bits 7-5 carried the new state
+        btst    #4,d0                   ; a new gate state this frame?
+        beq.s   .burst                  ; bits 7-5 hold it
         lsr.b   #5,d0
         bsr     ymx_gates
 .burst:
@@ -1013,9 +1010,9 @@ ymx_w13:
 ; -----------------------------------------------------------------------------
 ; YMX_stop: a0 = workspace. Quiesces what YMX_init claimed - every claimed
 ; channel's timer stopped, its interrupt disabled and masked, its pending
-; dropped - then silences the three voices. A timer the tune never asked
-; for is not touched here either. It restores NOTHING: the host that saved the
-; machine state hands it back itself, after this returns. Tone and envelope
+; dropped - then silences the three voices. A timer the tune never named is
+; not touched here either. It restores NOTHING: the host that saved the
+; machine state restores it itself, after this returns. Tone and envelope
 ; settings stay, and a fresh YMX_init starts the tune over.
 ; -----------------------------------------------------------------------------
 YMX_stop:
@@ -1028,11 +1025,11 @@ YMX_stop:
         bsr.s   ymx_handback
         lea     CH_SIZE(a5),a5
         dbra    d2,.channel
-        moveq   #0,d0                   ; every burst gate open again
+        moveq   #0,d0                   ; every gate open again
         bsr     ymx_gates
 ; The silence stays inside the mask: selecting a register and writing it are
-; two bus cycles, and a polite host's system interrupts - about to get their
-; state back - use the chip too.
+; two bus cycles, and a host's system interrupts - about to be restored - use
+; the chip too.
         lea     YMX_PSG,a0
         moveq   #8,d0                   ; R8, R9, R10 are the voice volumes
 .silence:
@@ -1139,10 +1136,11 @@ ymx_parmoff:
 ; anywhere - which also means it must run from RAM, where a demo lives.
 ;
 ; The channels' handlers are the same text three times, and MUST stay
-; byte-congruent: the action handlers reach every patched operand through
-; ISR_ offsets measured on channel 1's block, and ymx_link walks the blocks
-; at a fixed stride. The rig checks both from the symbol table. The park entries - where YMX_init aims the vectors
-; while no effect runs - are the handlers' own tails.
+; byte-congruent: the action handlers reach every patched operand through ISR_
+; offsets measured on channel 1's block, and ymx_link walks the blocks at a
+; fixed stride. The rig checks both from the symbol table. The park entries -
+; where YMX_init aims the vectors while no effect runs - are the handlers' own
+; tails.
 ;
 ; The timers STACK: each handler drops the IPL to 5 as soon as its PSG
 ; select/data pair is complete, so an MFP channel of higher priority can
@@ -1168,7 +1166,7 @@ ymx_parmoff:
 ; The channels differ only in which timer runs them, so the whole set of
 ; handlers is written once as a macro and invoked once per channel. \chan
 ; is the channel's label suffix - rmac renders a bare digit as hex, so the
-; number wears a leading underscore - and the timer arrives
+; number takes a leading underscore - and the timer arrives
 ; as arguments: \eoi and \eoir the end-of-interrupt value and register,
 ; \tctrl the timer's control register, \vec its vector. \colour is the
 ; monitor's band and \park is 1 on the channel allowed to park a0 in the
@@ -1229,9 +1227,9 @@ ymx_pcm\{chan}:
         movea.l (sp)+,a0
         move.b  #$D,$FFFF8802.w         ; middle volume: no click
         andi.b  #\keep,\tctrl.w         ; the sample ran out: stop the timer -
-        .if YMX_PERF                    ; the script already knew this frame
-        move.l  a0,-(sp)                ; was coming: gate and mixer follow
-        lea     ymx_perf_acc(pc),a0     ; at the next frame boundary
+        .if YMX_PERF                    ; the script compiled this frame in
+        move.l  a0,-(sp)                ; advance: gate and mixer follow at
+        lea     ymx_perf_acc(pc),a0     ; the next frame boundary
         add.w   #23,(a0)
         movea.l (sp)+,a0
         move.w  (sp)+,$FFFF8240.w
@@ -1341,11 +1339,11 @@ ISR_PARK             equ     ymx_park_a-ymx_pcm_a
 ISR_RETRIGGER_SHAPE  equ     ISR_RETRIGGER+PERF_PAD+4
 
 ; -----------------------------------------------------------------------------
-; ymx_link, from YMX_init: the run-time addresses only a loaded player knows.
-; Every burst gate opens (a previous session's mute must not leak), each
-; descriptor gets its ISR block, and the toggle halves get each other's whole
-; vector - it never changes, so it is patched once here rather than on
-; every toggle start. One pass over the channel table does all of it.
+; ymx_link, from YMX_init: the run-time addresses that exist only once the
+; player is loaded. Every gate opens (a previous session's gate must not
+; leak), each descriptor gets its ISR block, and the toggle halves get each
+; other's whole vector - it never changes, so it is patched once here rather
+; than on every toggle start. One pass over the channel table does all of it.
 ; -----------------------------------------------------------------------------
 ymx_link:
         moveq   #0,d0
@@ -1401,8 +1399,8 @@ ymx_assign:
 
 ; -----------------------------------------------------------------------------
 ; The action handlers: the script's verbs, one straight line each. The
-; packer decided everything - which channel acts, which voice, restart or
-; retune, who stops whose timer - so a handler only moves prepared bytes
+; packer resolved everything - which channel acts, which voice, restart or
+; retune, which stops which timer - so a handler only moves prepared bytes
 ; into prepared places and programs its timer in the contract's order.
 ;
 ; in: a4 = the channel's action ring byte (its count byte is one ring above),
@@ -1540,7 +1538,7 @@ ymx_toggle_start:                          ; a fresh square restarts at phase
         bra     ymx_program
 
 ymx_retune:                         ; the vector is NEVER touched: the
-        move.b  d0,d1                   ; square's phase lives through every
+        move.b  d0,d1                   ; square's phase persists through every
         and.b   #$18,d1                 ; retune, and through a resume after
         cmp.b   #$18,d1                 ; a PCM stream took the voice.
         beq     ymx_live                ; voice 3 is no voice: see below
@@ -1623,7 +1621,7 @@ ymx_pcm:
         move.l  a2,d4                   ; the tick handler is the block base
         ; falls through: a trigger and a retrigger program alike
 
-; The timer program, in the order the reference demands: stop, vector,
+; The timer program, in the order the reference sets: stop, vector,
 ; count, run - under the mask, since a tick between the stop and the run
 ; would fire into a half-programmed timer. A retune passes no vector.
 ; in: d0 = the action byte (prescaler in bits 2-0), d4 = the vector or 0,
@@ -1655,9 +1653,9 @@ ymx_program:
         rts
 
 ; -----------------------------------------------------------------------------
-; ymx_gates: apply an absolute burst-gate state. Bit v of d0 mutes voice v:
-; the write is overwritten with two nops, so the byte never reaches the chip
-; and no branch ever enters the burst. Opening it again copies the movep
+; ymx_gates: apply the gate state. Bit v of d0 gates voice v: its volume
+; write is overwritten with two nops, so the byte never reaches the chip and
+; no branch ever enters the burst. Opening it again copies the movep
 ; back from a template. The script computed every edge at pack time.
 ; in: d0 bits 2-0 = the state, voices A/B/C; clobbers d0-d2/a1.
 ; -----------------------------------------------------------------------------
@@ -1668,7 +1666,7 @@ ymx_gates:
         move.l  ymx_movep(pc),d2        ; open: the instruction itself, copied
         lsr.b   #1,d0                   ; from a template so no hand-encoded
         bcc.s   .set                    ; opcode can drift
-        move.l  #$4E714E71,d2           ; muted: two nops - the displacement
+        move.l  #$4E714E71,d2           ; gated: two nops - the displacement
 .set:                                   ; word is part of the instruction
         move.l  d2,(a1)
         lea     YMX_WRITE_SIZE(a1),a1
@@ -1676,6 +1674,6 @@ ymx_gates:
         rts
 
 ; The template, never executed: ymx_gates copies these two words back over
-; a muted write to open it again.
+; a gated write to open it again.
 ymx_movep:
         movep.w d1,0(a2)

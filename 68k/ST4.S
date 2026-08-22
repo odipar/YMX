@@ -33,10 +33,11 @@
 ;
 ; 68000 ALIGNMENT. Streams A and D are read a word at a time, so both must
 ; start on an even address; the packer pads A to an even length so the last
-; refill finds a whole word, and D holds whole words by construction. At ST4_UNIT 2 or 4 the destination, stream B and every offset are
-; whole units, so a wide move can never land on an odd address - provided the
-; caller starts the destination and stream B on a unit boundary. A real 68000
-; raises an address error if they do not.
+; refill finds a whole word, and D holds whole words by construction. At
+; ST4_UNIT 2 or 4 the destination, stream B and every offset are whole units,
+; so a wide move can never land on an odd address - provided the caller starts
+; the destination and stream B on a unit boundary. A real 68000 raises an
+; address error if they do not.
 ;
 ; -----------------------------------------------------------------------------
 ; THE CONTAINER. An .st4 file is twenty bytes of header and then the four
@@ -53,8 +54,8 @@
 ; the header ends. No length is kept: a stream runs to the next one, and this
 ; decoder reads no length anyway - it stops on the end marker. The signature
 ; packs magic, version and unit size into one long, so a build proves an asset
-; matches it with a single cmp.l, and the offsets are relative to the header, so
-; opening one is one adda.l per stream and no relocation:
+; matches it with a single cmp.l, and the offsets are relative to the header,
+; so opening one is one adda.l per stream and no relocation:
 ;
 ;       lea     asset(pc),a3
 ;       cmp.l   #ST4_SIGNATURE,(a3)     ; magic, version and k in one compare
@@ -90,7 +91,7 @@
 ;                a3.l
 ;   untouched    d6 d7 a6            and the stack beyond the return address
 ;
-; The budget and the remaining count are UNITS, not bytes: a call that asks for
+; The budget and the remaining count are UNITS, not bytes: a call requesting
 ; 16 with ST4_UNIT = 4 produces 64 bytes.
 ;
 ; -----------------------------------------------------------------------------
