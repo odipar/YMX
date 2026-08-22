@@ -40,7 +40,7 @@
 ; state, and is decoded C values at a time (C = 24 by default). On every VBL
 ; the player uses one value from each of the rings and refills exactly one
 ; stream - stream k on the VBL where the frame number modulo C is k. With C at
-; least the number of streams a tune DECODES - seventeen when it names no
+; least the number of streams a tune DECODES - seventeen when it uses no
 ; channel, twenty-one for a YM tune - every one is refilled once per C frames,
 ; one refill per VBL, so the work per frame is flat, and ordered for the chip's
 ; benefit: the skips, then the fourteen register writes - the FRAME WRITE,
@@ -111,15 +111,15 @@
 ;   YMX_init   in   a0 = .ymx file, at an even address, a1 = workspace
 ;              out  d0 = 0 accepted, -1 not a v1 YMX file with 25 streams
 ;                        packed at this build's unit size
-;              Claims a timer for each timer channel the header names:
+;              Claims a timer for each timer channel the header flags:
 ;              stops it, parks its vector, drops stale pendings, enables
 ;              and unmasks it. It saves NOTHING - the machine state is the
 ;              host's, see assumption 5. WHICH timer a channel gets comes
-;              from stream T, not from this file: a YM tune names channels
+;              from stream T, not from this file: a YM tune uses channels
 ;              0 and 1 and maps them to Timers A and D, leaving B for
-;              rasters and C for the system, but a tune may name any of
+;              rasters and C for the system, but a tune may use any of
 ;              the four. Pair init with a stop.
-;              A channel the tune does not name is left ALONE, which means
+;              A channel the tune does not use is left ALONE, which means
 ;              a timer the host had running keeps running: claiming used
 ;              to quiet the machine as a side effect and no longer does.
 ;              A host needing a quiet machine stops the timers itself
@@ -236,7 +236,7 @@ YMX_CHANNELS    equ     4               ; timer channels, numbered 0..3. Which
                                         ; of the MFP's timers runs each one
                                         ; is the file's choice now: stream
                                         ; T carries the map, two bits each
-YMX_TIMERS      equ     4               ; and this is what it may name
+YMX_TIMERS      equ     4               ; and this is what it may use
 YMX_STREAMS     equ     25              ; R0..R13, then the compiled effect
                                         ; script: M, X, T, then each channel's
                                         ; action and count bytes - decoded
@@ -273,7 +273,7 @@ YMX_TMAP        equ     50              ; word  the channel-to-timer map in
                                         ; costs a compare per frame
 YMX_LIVE        equ     52              ; word  streams still worth decoding:
                                         ; the channels sit last, so a tune
-                                        ; that names two leaves the others'
+                                        ; that uses two leaves the others'
                                         ; pair off the end
 YMX_STATE       equ     54              ; the decoder states, from an even base
 
@@ -308,7 +308,7 @@ CH_ROW          equ     18              ; the bytes above are the timer's, and
 CH_CLAIMED      equ     18              ; word  nonzero once YMX_init took
                                         ; this channel's timer, which it
                                         ; does only for a channel the
-                                        ; header names. The channel's own,
+                                        ; header flags. The channel's own,
                                         ; so it survives a re-assignment
 CH_SIZE         equ     20              ; the table is indexed, so descriptors
                                         ; are a fixed stride apart
@@ -401,7 +401,7 @@ YMX_ENVELOPE    equ     13
 ; YMX_init: a0 = .ymx file, a1 = workspace. Sets up every decoder, decodes
 ; each stream's first group so frame 0 can be played immediately, patches the
 ; blob's run-time addresses and the burst's ring displacements, and claims
-; a timer for each timer channel the header names - saving nothing, per
+; a timer for each timer channel the header flags - saving nothing, per
 ; assumption 5.
 ; -----------------------------------------------------------------------------
 YMX_init:
@@ -602,10 +602,10 @@ YMX_init:
         move.w  d0,YMX_TMAP(a3)         ; kept, so a change shows up
         bsr     ymx_assign
 
-; Claim a timer for each timer channel the header names: park our handler
+; Claim a timer for each timer channel the header flags: park our handler
 ; on its vector and leave the timer stopped but enabled and unmasked. A
 ; channel the tune does not use is left alone, timer and all, so
-; a tune that names two leaves the other timers to the host untouched.
+; a tune that uses two leaves the other timers to the host untouched.
 ; Nothing is saved - the machine state is the host's, see assumption 5 in
 ; the header. bset/bclr only: Timer C's bits, Timer D's and the ACIA's all
 ; live in registers they share with something else.
@@ -812,7 +812,7 @@ YMX_play:
 
 ; One channel's turn in the frame's action stage: \bit of the master byte
 ; says whether it acts, \rings is how far its action stream sits above M
-; (channel c's pair is 3+2c and 4+2c streams up), \here names the block
+; (channel c's pair is 3+2c and 4+2c streams up), \here is the block
 ; and \next the one after it, so the channels chain without a loop's
 ; bookkeeping in the common case of nothing acting.
         .macro YMX_ACT chan, bit, rings, here, next
@@ -1010,7 +1010,7 @@ ymx_w13:
 ; -----------------------------------------------------------------------------
 ; YMX_stop: a0 = workspace. Quiesces what YMX_init claimed - every claimed
 ; channel's timer stopped, its interrupt disabled and masked, its pending
-; dropped - then silences the three voices. A timer the tune never named is
+; dropped - then silences the three voices. A timer the tune never used is
 ; not touched here either. It restores NOTHING: the host that saved the
 ; machine state restores it itself, after this returns. Tone and envelope
 ; settings stay, and a fresh YMX_init starts the tune over.
@@ -1079,7 +1079,7 @@ ymx_handback:
 ;
 ; Timers C and D share TCDCR at $FA1D: C in the high nibble, D in the low.
 ; That is the whole reason for KEEP and SHIFT. Timer C is also the
-; operating system's 200 Hz clock, so a tune that names it stops the
+; operating system's 200 Hz clock, so a tune that uses it stops the
 ; system clock and cannot be hosted from a Timer C hook - the file's
 ; choice, made at pack time, and the host's problem to handle.
         even
@@ -1212,7 +1212,7 @@ ymx_pcm\{chan}:
         tst.l   ISR_PCM_LOOP-ISR_PCM_PTR(a0)        ; the loop pointer beside
         beq.s   .stop\~                              ; it: this player is
         move.l  ISR_PCM_LOOP-ISR_PCM_PTR(a0),(a0)   ; position independent,
-        .if YMX_PERF                    ; so neither may be named absolutely
+        .if YMX_PERF                    ; so neither may be addressed absolutely
         lea     ymx_perf_acc(pc),a0
         add.w   #23,(a0)
         .endif
@@ -1364,7 +1364,7 @@ ymx_link:
 
 ; -----------------------------------------------------------------------------
 ; ymx_assign: stream T's byte in d0, two bits per channel. Copies each
-; named timer's row into that channel's descriptor - registers, vector,
+; chosen timer's row into that channel's descriptor - registers, vector,
 ; enable bit, keep mask, shift and handler block, everything that tells
 ; one timer from another. The claim stays where it is, because it belongs
 ; to the channel and not to the timer under it.
@@ -1590,11 +1590,11 @@ ymx_pcm_preempt:                        ; arbitration, compiled: the stopped
         movea.l a0,a1                   ; timers go FIRST, then the sample
         adda.l  d3,a1                   ; arms its own - the reference order.
         move.b  (a1),d2                 ; A channel has no fixed voice, so
-                                        ; ring X - one stream above M - names
+                                        ; ring X - one stream above M - gives
                                         ; what to stop, a bit per channel
         lea     ymx_desc_0(pc),a1
         moveq   #YMX_CHANNELS-1,d1      ; the table bounds the walk: a bit
-.stop:                                  ; past the last channel names nothing
+.stop:                                  ; past the last channel marks nothing
         lsr.b   #1,d2
         bcc.s   .keep
         movea.w CH_CTRL(a1),a2

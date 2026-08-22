@@ -145,7 +145,7 @@ too. The difference is that the frame clock steps the whole player at
 once, and a timer steps one stream.
 
 A **timer channel** is one place a timer stream can run: a claimable
-clock, and the stream on it. A tune names the channels it uses and which
+clock, and the stream on it. A tune says which channels it uses and which
 timer each runs on.
 
 A stream's place in its own cycle is its **phase**. What becomes of that
@@ -219,11 +219,11 @@ into rows and rows into frames.
 The **MFP** (MC68901) has four timers, A to D. YMX has four timer
 channels, numbered 0 to 3, and **the file says which timer each runs on**
 - a stream carries the map, two bits per channel. A player claims a timer
-only for a channel the tune names.
+only for a channel the tune uses.
 
 All four timers are reachable. Timer C costs more than the others: it is
-the operating system's 200 Hz clock, so a tune naming it stops that clock
-and cannot be hosted from a Timer C hook. A YM file never names it, since
+the operating system's 200 Hz clock, so a tune that uses it stops that clock
+and cannot be hosted from a Timer C hook. A YM file never uses it, since
 a YM frame starts at most two effects.
 
 The MFP's own clock runs at 2,457,600 a second, unrelated to the
@@ -273,7 +273,7 @@ writing the same register:
 ## What the old names mean
 
 A YM file starts an effect with an **effect code** in a register: a few
-bits naming the kind and the voice. **An effect code is a trigger, not a
+bits giving the kind and the voice. **An effect code is a trigger, not a
 change** - the same code on two frames in a row starts the stream
 *twice*.
 
@@ -507,7 +507,7 @@ meets the end has one long to load and no arithmetic to do. That makes a
 sample an instrument's sustain.
 
 **A rate can move under a running timer.** The action byte's voice field
-holds three voices in two bits, so 3 names none of them, and a retune
+holds three voices in two bits, so 3 is none of them, and a retune
 addressed to it writes the control register and then the data register
 without ever stopping the timer: the period in flight runs to its own end
 and the reload lands at the next underflow. That is the **live retune**,
@@ -543,7 +543,7 @@ sense.
 | **mixing** | which generators reach a voice: tone, noise, both or neither |
 | **period** | how long a generator takes per cycle. Bigger period, lower pitch |
 | **DAC** | the output ladder: about 3 dB a step, 16 steps from a volume register, 32 from the envelope |
-| **timer** | MFP hardware counting down to an interrupt. Four exist; a tune may name any |
+| **timer** | MFP hardware counting down to an interrupt. Four exist; a tune may use any |
 | **prescaler, timer count** | the two divisors that set a tick rate |
 
 **The model**

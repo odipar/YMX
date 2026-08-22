@@ -40,11 +40,11 @@ What is checked, frame by frame:
     PWM's first: a fresh square restarts at phase zero, so the player writes
     that voice silent itself, after the burst and past the skipped write,
     and exactly that one write of zero is expected there.
-  * The MFP: the player must claim exactly the timers the .YMR names - A, B
+  * The MFP: the player must claim exactly the timers the .YMR uses - A, B
     and D, never C - and a channel the tune leaves idle must claim nothing.
 
 WHAT IS EXCLUDED, and why. This test checks one thing: the writes YMX_play
-makes. Everything below is outside that window, and is named here rather than
+makes. Everything below is outside that window, and is listed here rather than
 quietly skipped.
 
   * The tick handlers' own audio. A PWM's square, an RTE's R13 rewrites and a
@@ -112,8 +112,8 @@ FX_NONE, FX_PWM, FX_SAMPLE, FX_RTE = 0, 1, 2, 3
 KIND_TOGGLE, KIND_PCM, KIND_RETRIGGER = 0x00, 0x40, 0xC0
 TRIGGER = 0x08                      # code bit 3, flipped on every sample trigger
 
-MAX_SAMPLES = 32                    # what five bits of a volume register name
-MAX_SAMPLE_BYTES = 65535            # what a ymx sample table's word-sized length names
+MAX_SAMPLES = 32                    # what five bits of a volume register hold
+MAX_SAMPLE_BYTES = 65535            # what a ymx sample table's word-sized length holds
 
 # How far the walk goes into a long tune: the same 1200 frames sweep.py
 # plays. Raising it is the only way to reach the frames the split rotation
@@ -404,7 +404,7 @@ class Ymr:
 
         A frame that pops none of a timer's three streams changes nothing.
         Popping the effect stream with something in it CONFIGURES the timer -
-        which restarts a sample even when the index it names is the one
+        which restarts a sample even when the index it gives is the one
         already playing - popping it with 0 stops the timer, popping the
         sample stream restarts the sample on a timer already running, and a
         rate pop on its own reprograms the prescaler and counter without
@@ -415,7 +415,7 @@ class Ymr:
 
         A timer that never ticks owns nothing, and three configurations never
         tick: an effect type the format reserves, a prescaler index of 0 (the
-        MFP's stopped state) or a counter of 0, and a Sample naming a block
+        MFP's stopped state) or a counter of 0, and a Sample pointing at a block
         the file does not carry. A sample that has played out gives its
         register back as well, which is why the window is recomputed at every
         trigger and the code goes quiet when it closes.
@@ -430,7 +430,7 @@ class Ymr:
 
         self.codes = [bytearray(self.frames) for _ in range(3)]
         self.window = [[0] * self.frames for _ in range(3)]
-        self.named = 0                  # the channels that ever act
+        self.used = 0                  # the channels that ever act
         self.triggers = 0
         for channel in range(3):
             self._channel(channel)
@@ -472,7 +472,7 @@ class Ymr:
             last = code
             self.codes[channel][frame] = code
             if code:
-                self.named |= 1 << channel
+                self.used |= 1 << channel
 
     def _code(self, channel, running, want, trigger, started, frame, armed_to):
         """The code byte a frame hands the effect stage, or 0 for a channel
@@ -640,7 +640,7 @@ INTERRUPT = {'A': (0xFFFFFA07, 0xFFFFFA0B, 0xFFFFFA0F, 0xFFFFFA13),
              'D': (0xFFFFFA09, 0xFFFFFA0D, 0xFFFFFA11, 0xFFFFFA15)}
 
 
-def mfp_problem(writes, named):
+def mfp_problem(writes, used):
     """What the MFP writes say about who claimed which timer.
 
     Timer C is the one that must stay untouched whatever the tune does: it is
@@ -652,7 +652,7 @@ def mfp_problem(writes, named):
     """
     allowed = set()
     for channel, timer in enumerate(CHANNEL_TIMER[:3]):
-        if named & (1 << channel):
+        if used & (1 << channel):
             control, data = TIMERS[timer][:2]
             allowed.update((control, data), INTERRUPT[timer])
     seen = collections.defaultdict(int)         # address -> the bits ever set
@@ -663,14 +663,14 @@ def mfp_problem(writes, named):
         if address == TCDCR and value & 0xF0:
             return 'programmed Timer C in TCDCR (%#04x)' % value
         if address not in allowed:
-            return 'wrote %#010x, which no timer this tune names owns' % address
+            return 'wrote %#010x, which no timer this tune uses owns' % address
     for channel, timer in enumerate(CHANNEL_TIMER):
         _, data, enable, unmask, bit = TIMERS[timer]
-        claimed = bool(named & (1 << channel)) if channel < 3 else False
+        claimed = bool(used & (1 << channel)) if channel < 3 else False
         for register, what in ((enable, 'enabled'), (unmask, 'unmasked')):
             live = bool(seen[register] & (1 << bit))
             if claimed and not live:
-                return 'never %s Timer %s, which channel %d names' % (
+                return 'never %s Timer %s, which channel %d uses' % (
                     what, timer, channel)
             if not claimed and live:
                 return '%s Timer %s for channel %d, which the tune never uses' % (
@@ -730,14 +730,14 @@ def play(name, dump, packed, warns):
     # the end are the first frames of the loop, played a second time.
     rotation = played - dump.frames
     loop_frame = split - rotation
-    if (flags >> 1) & 15 != dump.named:
-        return ('ISSUE %s: the header names timer channels %#x, the dump names %#x'
-                % (name, (flags >> 1) & 15, dump.named))
+    if (flags >> 1) & 15 != dump.used:
+        return ('ISSUE %s: the header marks timer channels %#x, the dump uses %#x'
+                % (name, (flags >> 1) & 15, dump.used))
 
     player = T.Player(packed, T.YMX_FIXED + T.STREAMS * ring)
     if player.init() != 0:
         return 'INITFAIL %s' % name
-    problem = mfp_problem(player.mfp, dump.named)
+    problem = mfp_problem(player.mfp, dump.used)
     if problem:
         return 'ISSUE %s: YMX_init %s' % (name, problem)
     claim = list(player.mfp)
@@ -770,7 +770,7 @@ def play(name, dump, packed, warns):
         problem = compare(dump, frame, source, writes, skipped, started)
         if problem:
             return 'ISSUE %s: %s' % (name, problem)
-        problem = mfp_problem(claim + player.mfp, dump.named)
+        problem = mfp_problem(claim + player.mfp, dump.used)
         if problem:
             return 'ISSUE %s: frame %d %s' % (name, frame, problem)
         edges += bin(skipped ^ was_skipped).count('1')
@@ -782,7 +782,7 @@ def play(name, dump, packed, warns):
         if not loops and walked == played:
             break
 
-    timers = ''.join(CHANNEL_TIMER[c] for c in range(3) if dump.named & (1 << c))
+    timers = ''.join(CHANNEL_TIMER[c] for c in range(3) if dump.used & (1 << c))
     where = 'looped' if wrapped else 'partial' if walked < played else 'once'
     crossings = ('%d skip edge%s, %d PWM start%s, %d buzzer frame%s, %d shape pop%s'
                  % (edges, '' if edges == 1 else 's', starts, '' if starts == 1 else 's',

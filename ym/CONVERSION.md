@@ -22,7 +22,7 @@ parameter:      in the voice's own volume register - a SID's maximum
                 volume, a drum's sample number, a buzzer's envelope shape
 ```
 
-YM5 encodes less, in different places: R1 bits 5-4 name a SID voice, R3 bits
+YM5 encodes less, in different places: R1 bits 5-4 give a SID voice, R3 bits
 5-4 a digidrum voice, and a drum's prescaler is always in R8 whatever the
 voice. Both dialects come out of the front end as the same thing — a code
 byte and a count byte per frame per timer channel — so nothing downstream
@@ -113,7 +113,7 @@ faithful, not what makes it lossy.
   [../doc/experiments.md](../doc/experiments.md) has the survey.
 
 * **A sync-buzzer's shape comes out of the voice's nibble.** YM6 files the
-  envelope shape in the volume register of the voice the buzzer names,
+  envelope shape in the volume register of the voice the buzzer runs on,
   because the parameter field sits at one place for all three kinds and a
   buzzer's voice, following the envelope, leaves that nibble spare. The front
   end resolves it and writes the number into stream X, so the player never
