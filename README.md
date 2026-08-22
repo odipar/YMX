@@ -5,15 +5,14 @@ without ever holding the tune in memory. A `.ymx` file carries twenty-five
 independently compressed streams: fourteen for the YM2149's sound registers,
 one value per frame, and eleven carrying a **compiled effect script** that
 drives the MFP's timers. Each stream decodes through its own small ring,
-refilled one stream per frame, so what a tune costs in RAM is a property of
-the player's configuration rather than of the tune's length.
+refilled one stream per frame, so a tune's cost in RAM follows the player's
+configuration, not the tune's length.
 
-The one thing YMX changes about the YM lineage is where the work happens.
-What those formats call a "special effect" — a SID voice, a digidrum, a
-sync-buzzer — is carried in spare register bits, and the player has to
-re-derive on every frame what it means. YMX resolves all of that when the
-file is packed and writes down the outcome, so the player compares nothing
-and every frame costs the same.
+The one thing YMX changes about the YM lineage is where the work happens. What
+those formats call a "special effect" — a SID voice, a digidrum, a sync-buzzer
+— is carried in spare register bits, and the player has to re-derive on every
+frame what it means. YMX resolves that at pack time and writes down the
+outcome, so the player compares nothing and every frame costs the same.
 
 [**doc/SPEC.md**](doc/SPEC.md) is the format: the container, the streams, the
 verbs and the frame contract. Everything else worth reading is beside it.
@@ -54,9 +53,9 @@ ymx/mkprg.sh MY.PRG build/*.ymx          # a TOS program around those same bytes
 ym/ym_sndh.sh -t"My Set" my.sndh *.ym    # both steps in one
 ```
 
-SNDH is the Atari ST's standard music container, and it is where the player
-really lives: the `.PRG` is a thin shell around the same blob, so the two
-share every byte that matters.
+SNDH is the Atari ST's standard music container, and where the player lives:
+the `.PRG` is a thin shell around the same blob, so the two share every byte
+that matters.
 
 ## Using the player
 
@@ -127,7 +126,7 @@ repository vendors the parts it needs and has its own life-cycle.
 The results of the experiments that shaped the player came across too, in
 [doc/experiments.md](doc/experiments.md). What stayed behind is their full
 logs — the false trails and the instrument readings — and the
-version-by-version argument for a container that now simply is what
+version-by-version argument for a container that is now what
 [doc/SPEC.md](doc/SPEC.md) says. Both are in ST4's history if anyone wants
 them.
 
