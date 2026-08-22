@@ -248,8 +248,8 @@ Everything else the conversion has to change, it counts and names the same way:
 * an effect type in the 4-255 the spec reserves, dropped rather than guessed
   at, since RhYMe's own player falls through to PWM for anything it does not
   recognise and a wrong guess is a wrong sound;
-* a timer configured with a prescaler or counter of 0, the MFP's stopped
-  state, which arms nothing;
+* a timer configured with a prescaler of 0, the MFP's stopped state, or with
+  a counter of 0, which the MFP reads as 256;
 * a sample index with no block behind it;
 * and a sample trigger landing on the loop frame with the code the song's last
   frame already ends on, which the wrap swallows — coming round from the end

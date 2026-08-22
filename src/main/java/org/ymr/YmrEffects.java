@@ -222,7 +222,7 @@ public final class YmrEffects {
     // thousand of them and still only be doing one thing wrong.
     private final int[] reservedEffect = new int[CHANNELS];
     private final int[] reservedType = new int[CHANNELS];
-    private final int[] stoppedTimer = new int[CHANNELS];
+    private final int[] inertTimer = new int[CHANNELS];
     private final int[] missingSample = new int[CHANNELS];
     private final int[] cappedSample = new int[CHANNELS];
     private final boolean[] triggersAtLoop = new boolean[CHANNELS];
@@ -483,8 +483,9 @@ public final class YmrEffects {
      * reserved effect type is one this converter will not guess at: RhYMe's
      * own player falls through to PWM for anything it does not recognise, but
      * the spec reserves 4-255 and a wrong guess is a wrong sound. A prescaler
-     * index of 0 is the MFP's stopped state and a counter of 0 leaves nothing
-     * to count down, so a timer configured with either never ticks. And a
+     * index of 0 is the MFP's stopped state. A counter of 0 is not - the MFP
+     * reads it as 256 counts - but neither is played: a rate byte of zero is
+     * not a rate. And a
      * sample whose block is not in the file - or was dropped past the cap -
      * has nothing to play.
      */
@@ -505,7 +506,7 @@ public final class YmrEffects {
             return 0;
         }
         if (Tune.prescaler(prescaler & 7) == 0 || counter == 0) {
-            stoppedTimer[channel]++;
+            inertTimer[channel]++;
             return 0;
         }
         int head = kind | ((voice + 1) << 4) | (prescaler & 7);
@@ -589,10 +590,11 @@ public final class YmrEffects {
                         + frameCount(reservedEffect[channel]) + ", which version 1.3"
                         + " reserves: dropped rather than guessed at");
             }
-            if (stoppedTimer[channel] > 0) {
+            if (inertTimer[channel] > 0) {
                 note(timer + " is configured with a prescaler or counter of 0 on "
-                        + frameCount(stoppedTimer[channel]) + ", which is the MFP's"
-                        + " stopped state: nothing was armed there");
+                        + frameCount(inertTimer[channel]) + ": a prescaler of 0 is"
+                        + " the MFP's stopped state, a counter of 0 is 256, and"
+                        + " neither is armed here");
             }
             if (missingSample[channel] > 0) {
                 note(timer + " triggers a sample with no block behind it "
