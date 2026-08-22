@@ -11,7 +11,7 @@ import org.ymx.YmxEncoder;
 import org.ymx.YmxFormat;
 
 /**
- * Command-line YM to ymx packer: reads a YM5!/YM6! register dump and writes a
+ * Command-line YM to YMX packer: reads a YM5!/YM6! register dump and writes a
  * {@code .ymx} file that the 68000 {@code YMX.S} player streams through ST4.
  *
  * <p>The player covers the fourteen standard YM2149 registers and the YM
@@ -158,7 +158,7 @@ public final class Ymx {
             outputName = args[i + 1];
         } else {
             usage("""
-                    Usage: ymx [-f] [-o] [-nN] [-cC] [-kK] [-lF] input.ym [output.ymx]
+                    Usage: YMX [-f] [-o] [-nN] [-cC] [-kK] [-lF] input.ym [output.ymx]
                            ymx [options] one.ym two.ym more.ym output-dir/
                       -f      Force overwrite of output file
                       -o      Play once: pack no loop section

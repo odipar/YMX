@@ -1,6 +1,6 @@
 # Register clustering: correlated pairs in one stream
 
-**Question.** ymx packs each YM register as its own stream because each
+**Question.** YMX packs each YM register as its own stream because each
 register's own history is what repeats. But some registers move together -
 a channel's fine and coarse period, the envelope period pair. Would
 interleaving correlated pairs into one stream pack better, with the

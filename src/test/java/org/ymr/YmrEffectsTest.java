@@ -207,7 +207,7 @@ final class YmrEffectsTest {
         byte[] shape = convert(image).registers()[13];
 
         // Writing R13 restarts the envelope, so the marker has to survive the
-        // conversion untouched: the value the ymx pipeline reads as "leave the
+        // conversion untouched: the value the YMX pipeline reads as "leave the
         // envelope alone" is the same $FF the reader wrote.
         assertArrayEquals(new byte[] {0x0A, (byte) 0xFF, 0x0A, (byte) 0xFF}, shape);
     }
@@ -291,7 +291,7 @@ final class YmrEffectsTest {
 
     @Test
     void samplesPastTheFormatsCeilingAreDroppedAndTriggeringOneIsReported() {
-        // A ymx sample number is the five bits the script reads out of a volume
+        // A YMX sample number is the five bits the script reads out of a volume
         // register, so the table stops at 32 however many a .ymr carries.
         Ymr builder = new Ymr()
                 .frame(TIMER_A_EFFECT, TIMER_A_RATE, TIMER_A_SAMPLE)

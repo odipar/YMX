@@ -11,7 +11,7 @@ import org.ymx.YmxEncoder;
 import org.ymx.YmxFormat;
 
 /**
- * Command-line .YMR to ymx packer: reads a RhYMe register dump and writes a
+ * Command-line .YMR to YMX packer: reads a RhYMe register dump and writes a
  * {@code .ymx} file that the 68000 {@code YMX.S} player streams through ST4.
  *
  * <p>It is {@link org.ym6.Ymx} with a different reader in front of it, and

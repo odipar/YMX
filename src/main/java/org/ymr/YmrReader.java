@@ -79,7 +79,7 @@ public final class YmrReader {
      * all - not even the value it last carried, which would retrigger the
      * envelope on every frame of a held note. No shape value can mean "nothing",
      * so the timeline carries a marker instead, and the marker is $FF because
-     * that is already what the ymx pipeline downstream reads as exactly this
+     * that is already what the YMX pipeline downstream reads as exactly this
      * (see {@code org.ymx.Ym2149.NO_ENVELOPE_CHANGE}): a converter hands the
      * register vector straight on rather than translating a convention.
      */

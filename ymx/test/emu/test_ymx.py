@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Differential test for the YMX player: does the ST write the right YM frames?
 
-Packs a synthetic tune with the Java ymx tool, assembles YMX.S together with
+Packs a synthetic tune with the Java YMX tool, assembles YMX.S together with
 ST4_wrap.S, runs the real player under Unicorn as a plain 68000, and captures
 every write to the sound chip. The captured (register, value) pairs must match,
 frame by frame and in order, what a YM2149 should have received - which the

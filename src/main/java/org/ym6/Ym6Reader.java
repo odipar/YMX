@@ -18,7 +18,7 @@ import org.ymx.Tune;
  * three NUL-terminated strings, and then the frames: either 16 vectors of one
  * register each (the interleaved option) or one 16-byte record per frame. Both
  * are accepted here and both come out as 16 register vectors, because that is
- * the shape ymx packs.
+ * the shape YMX packs.
  *
  * <p>Distributed {@code .ym} files are usually LHA archives holding this data;
  * the reader unpacks them itself, through {@link Lha}.

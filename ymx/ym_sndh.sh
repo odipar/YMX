@@ -3,7 +3,7 @@
 #
 #   ymx/ym_sndh.sh [-perf] [-tTitle] [packer flags] output.sndh one.ym [two.ym ...]
 #
-# Runs the two steps this repo already has: the ymx packer over every input
+# Runs the two steps this repo already has: the YMX packer over every input
 # with one configuration, then the SNDH builder around the results - the
 # tunes become subtunes 1..N, named from their own YM headers. Every packer
 # flag passes through (-nN -cC -kK -lF -o -drumhzH; the trim flags too, for a

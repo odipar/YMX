@@ -97,7 +97,7 @@ import org.ymx.YmxFormat;
  * <h2>What a .YMR asks for and a .ymx cannot give</h2>
  *
  * <p>One thing is converted rather than carried, and it leaves a note. The
- * format allows 65535 samples and a ymx sample number is five bits, so
+ * format allows 65535 samples and a YMX sample number is five bits, so
  * everything past {@link YmxFormat#MAX_SAMPLES} is dropped and a trigger of a
  * dropped one is reported.
  *
@@ -108,7 +108,7 @@ import org.ymx.YmxFormat;
  * the timer without stopping it.
  * RhYMe reprograms a RUNNING timer: control register, then data register, the
  * timer never stopped, so the effect keeps its place and only its rate moves.
- * Half of that a ymx verb does do. A .YMR rate entry is a prescaler and a
+ * Half of that a YMX verb does do. A .YMR rate entry is a prescaler and a
  * counter, only the prescaler is in the code byte, and a pop that moves the
  * counter alone therefore leaves the code where it was: it compiles to a HOLD
  * carrying the reload flag, and {@code ymx_hold} writes the new count to a
@@ -185,7 +185,7 @@ public final class YmrEffects {
      * sample twice. See this class's javadoc for why the bit is free. */
     public static final int TRIGGER = 0x08;
 
-    /** A ymx sample table entry stores its length in a word, so no sample
+    /** A YMX sample table entry stores its length in a word, so no sample
      * may pass this. */
     private static final int MAX_SAMPLE_BYTES = 65535;
 
@@ -200,7 +200,7 @@ public final class YmrEffects {
     private static final int R_ENVELOPE_SHAPE = 13;
     private static final int R_VOLUME_A = 8;
 
-    /** The largest sample number a ymx PCM action can name, from the five bits
+    /** The largest sample number a YMX PCM action can name, from the five bits
      * the script reads it out of. */
     /** The shape an RTE restarts before the song has popped one. The .YMR
      * spec says to assume it and RhYMe's player primes its shadow with it. */
@@ -327,7 +327,7 @@ public final class YmrEffects {
         List<YmrReader.Sample> blocks = source.samples();
         int keep = Math.min(blocks.size(), SAMPLES);
         if (blocks.size() > keep) {
-            note("samples " + keep + ".." + (blocks.size() - 1) + " dropped: a ymx sample"
+            note("samples " + keep + ".." + (blocks.size() - 1) + " dropped: a YMX sample"
                     + " number is the five bits the script reads out of a volume"
                     + " register, so the format carries " + SAMPLES + " and this song has "
                     + blocks.size());
@@ -355,11 +355,11 @@ public final class YmrEffects {
     private Prepared prepare(int index, YmrReader.Sample block) {
         byte[] data = levels(index, block.data());
         if (data.length > MAX_SAMPLE_BYTES) {
-            // The format allows a sample of 65536 bytes and a ymx sample table
+            // The format allows a sample of 65536 bytes and a YMX sample table
             // entry holds its length in a word, so the very largest a .YMR may
             // carry is one byte too long to describe.
             note("sample " + index + " is " + data.length + " bytes, past the "
-                    + MAX_SAMPLE_BYTES + " a ymx sample table entry's word-sized length"
+                    + MAX_SAMPLE_BYTES + " a YMX sample table entry's word-sized length"
                     + " can name: cut to fit");
             data = Arrays.copyOf(data, MAX_SAMPLE_BYTES);
         }

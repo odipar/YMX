@@ -150,7 +150,7 @@ def chip_states(frames, source=None, loop_frame=None, count=None):
 
 def ym6_file(frames, source=None, interleaved=True, player_hz=50, loop_frame=0,
              drums=()):
-    """A complete, unpacked YM6! file - what the ymx packer takes as input.
+    """A complete, unpacked YM6! file - what the YMX packer takes as input.
 
     drums is a sequence of byte strings: 8-bit digidrum samples, stored the
     way a YM6 file stores them.

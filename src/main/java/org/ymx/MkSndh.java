@@ -86,7 +86,7 @@ public final class MkSndh {
                     || header.unit() != set.unit()) {
                 throw Tools.fail("mksndh: " + tune + " is packed " + header.shape()
                         + ", the set started " + set.shape() + " - one player build"
-                        + " needs one configuration (pack the set in one ymx call)");
+                        + " needs one configuration (pack the set in one YMX call)");
             }
             n++;
             frms.add(header.frms());

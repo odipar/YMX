@@ -45,7 +45,7 @@ effect for the same reason.
   the timer is programmed to, and both hand the register back to the song when
   the block runs out. RhYMe's exporter has already folded its samples down to
   the levels the PSG's volume register takes, which is exactly what a
-  ymx sample table holds, so the bytes cross unchanged: they need a table
+  YMX sample table holds, so the bytes cross unchanged: they need a table
   entry and an end marker and nothing else. A YM digidrum arrives 8-bit and
   has to be folded; this is the one thing a .YMR hands over that needs no work
   at all.
@@ -210,9 +210,9 @@ parameter moved on the same frame as the rate, which is the row.
   Three channels means the player decodes 23 streams, so `C` must be at least
   23: the default 24 clears it by one slot, and more buys headroom no `.ymr`
   can use.
-* **Thirty-two samples, where a .YMR may carry 65535.** A ymx sample number
+* **Thirty-two samples, where a .YMR may carry 65535.** A YMX sample number
   is the five bits the script reads out of a volume register, so everything
-  past the cap is dropped and a trigger of a dropped one is reported. A ymx
+  past the cap is dropped and a trigger of a dropped one is reported. A YMX
   sample table entry holds its length in a word, too, so anything past 65535
   bytes is cut to fit. The .YMR spec caps a sample at 65536, so a file that
   keeps to it loses exactly the one byte; nothing in the reader enforces that

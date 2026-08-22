@@ -24,7 +24,7 @@
 ; SPEC.md is the format and doc/terminology.md the vocabulary.
 ;
 ; REQUIRES ST4_wrap.S, built for the SAME unit size the tune was packed with
-; (ymx -kK; the packer's default is 2). Include both, in either order, with
+; (YMX -kK; the packer's default is 2). Include both, in either order, with
 ; the unit size defined first:
 ;
 ;       ST4_UNIT    equ     2
@@ -111,7 +111,7 @@
 ; CALLS AND REGISTERS
 ;
 ;   YMX_init   in   a0 = .ymx file, at an even address, a1 = workspace
-;              out  d0 = 0 accepted, -1 not a v7 ymx file with 25 streams
+;              out  d0 = 0 accepted, -1 not a v7 YMX file with 25 streams
 ;                        packed at this build's unit size
 ;              Claims a timer for each timer channel the header names:
 ;              stops it, parks its vector, drops stale pendings, enables
@@ -157,7 +157,7 @@
 ;
 ; ASSUMPTIONS (unchecked beyond the magic, version and stream count):
 ;
-;   1. the file comes from the ymx packer, which enforces C >= the streams
+;   1. the file comes from the YMX packer, which enforces C >= the streams
 ;      a tune decodes, N mod C = 0,
 ;      N >= 2C, N <= 2520 - the burst reads each register's ring through an
 ;      assembled-in 16-bit displacement of k*N - offsets that stay inside the
