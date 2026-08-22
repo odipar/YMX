@@ -225,8 +225,8 @@ HEADER_SIZE = 28 + STREAM_COUNT * 12
 # One frame of one timer: what it should be doing, and which of its three
 # streams said so this frame. The flags are the events and are not the same
 # information as the values - popping timer_*_sample restarts the sample even
-# when the index has not moved, and popping timer_*_effect with 0 is what
-# stops the timer even though an idle timer already held 0.
+# when the index has not moved, and popping timer_*_effect with 0 stops the
+# timer even though an idle timer already held 0.
 TimerFrame = collections.namedtuple(
     'TimerFrame', 'effect prescaler counter sample effect_pop rate_pop sample_pop')
 
@@ -477,7 +477,7 @@ class Ymr:
 
     def _code(self, channel, running, want, trigger, started, frame, armed_to):
         """The code byte a frame hands the effect stage, or 0 for a channel
-        with nothing to run. The trigger bit is what makes two pops of one
+        with nothing to run. The trigger bit makes two pops of one
         sample at one rate two different codes, which is how an explicit
         re-trigger reaches a stage that acts on a code that CHANGED."""
         kind = {FX_PWM: KIND_TOGGLE, FX_SAMPLE: KIND_PCM,
@@ -535,7 +535,7 @@ class Stage:
         so the player writes the voice silent itself, after the register
         burst and past the skipped write: one write, carrying zero. A PWM
         whose prescaler merely moved is retuned instead and writes nothing,
-        which is what keeps the square's place in the cycle.
+        which keeps the square's place in the cycle.
 
     A .YMR binds each timer to one voice - A to A, B to B, D to C, and the
     binding is normative - so no two channels ever contend for one voice and the
@@ -649,7 +649,7 @@ def mfp_problem(writes, named):
     fourth timer channel - the one a .YMR never fills - is the one it is
     mapped to. Its control bits share a byte with Timer D's, so the check is
     that every write to that byte leaves the high nibble alone, and that its
-    data register is never written at all.
+    data register is never written.
     """
     allowed = set()
     for channel, timer in enumerate(CHANNEL_TIMER[:3]):

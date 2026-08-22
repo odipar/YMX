@@ -138,7 +138,7 @@ final class YmrReaderTest {
         YmrReader.Song song = YmrReader.read(image);
 
         // The same shape twice is not a repeat but a second retrigger, and a frame
-        // that does not pop the stream must not write R13 at all.
+        // that does not pop the stream must not write R13.
         assertEquals(0x0A, song.register(13, 0));
         assertEquals(YmrReader.NO_ENVELOPE_SHAPE, song.register(13, 1));
         assertEquals(0x0A, song.register(13, 2));
@@ -176,7 +176,7 @@ final class YmrReaderTest {
         assertTrue(timerA.get(2).ratePopped());
         assertFalse(timerA.get(2).samplePopped());
 
-        // Frame 3 pops a 0 effect, which is what stops the timer.
+        // Frame 3 pops a 0 effect, which stops the timer.
         assertEquals(YmrReader.TimerFrame.NONE, timerA.get(3).effect());
         assertTrue(timerA.get(3).effectPopped());
         assertEquals(4, timerA.get(3).sample());
@@ -346,8 +346,8 @@ final class YmrReaderTest {
 
     /**
      * Builds a .YMR image, storing every stream uncompressed - a ring size of 0,
-     * which the format defines as "the bytes are the data". That is what lets a
-     * fixture be written here at all: nothing in this repository packs ZX1, and
+     * which the format defines as "the bytes are the data". That lets a
+     * fixture be written here: nothing in this repository packs ZX1, and
      * the reader has no way to tell an exporter's uncompressed stream from one
      * of these.
      *

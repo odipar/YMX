@@ -126,7 +126,7 @@ public final class St4Compressor {
             }
         }
 
-        // End marker: the one control code that names no stream at all.
+        // End marker: the one control code that names no stream.
         writeBit(true);
         writeBit(false);
         writeBit(true);
@@ -141,7 +141,7 @@ public final class St4Compressor {
     /**
      * The two class bits, then the offset itself into whichever stream it
      * belongs to. The class bits are also what keeps the operation an even
-     * number of bits long, which is what lets the decoder skip refill checks.
+     * number of bits long, which lets the decoder skip refill checks.
      */
     private void writeOffsetOf(int offset) {
         if (offset <= St4Format.BYTE_OFFSET_LIMIT) {

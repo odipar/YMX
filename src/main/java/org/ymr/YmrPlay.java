@@ -171,7 +171,7 @@ public final class YmrPlay {
      *
      * <p>A lone tune goes through the packer's single-file form, where the
      * trim options still mean something. A set goes through its trailing-
-     * directory form, which is what pins them all to one unit size and one
+     * directory form, which pins them all to one unit size and one
      * workspace - the shape a single player build can hold as subtunes - and
      * which is why the directory has to exist before the packer runs.
      *

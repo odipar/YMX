@@ -349,7 +349,7 @@ final class YmrEffectsTest {
     void aSampleThatDoesNotLoopIsHandedOverExactlyAsTheFileStoresIt() {
         // RhYMe's exporter has already reduced a sample to the 4-bit levels the
         // volume register takes, which is the one thing a .ymr hands over that
-        // needs no conversion at all.
+        // needs no conversion.
         byte[] levels = {0x08, 0x0F, 0x00, 0x08};
         byte[] image = new Ymr()
                 .frame(VOLUME_A)
@@ -443,7 +443,7 @@ final class YmrEffectsTest {
                 .sample(new byte[40], false, 0);
     }
 
-    /** Frames that pop nothing at all, which change nothing at all. */
+    /** Frames that pop nothing, which change nothing. */
     private static Ymr quiet(Ymr builder, int count) {
         for (int frame = 0; frame < count; frame++) {
             builder.frame();
@@ -570,8 +570,8 @@ final class YmrEffectsTest {
 
     /**
      * Builds a .YMR image, storing every stream uncompressed - a ring size of 0,
-     * which the format defines as "the bytes are the data". That is what lets a
-     * fixture be written here at all: nothing in this repository packs ZX1, and
+     * which the format defines as "the bytes are the data". That lets a
+     * fixture be written here: nothing in this repository packs ZX1, and
      * the reader has no way to tell an exporter's uncompressed stream from one
      * of these.
      *

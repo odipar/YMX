@@ -29,7 +29,7 @@ EXTRA = 200                 # frames played past the end, through the loop
 def chip_checksum(states) -> int:
     """Fold what a YM2149 would read back after each frame into one long.
 
-    Registers keep their value until written again, which is what makes R13
+    Registers keep their value until written again, which makes R13
     interesting: on a frame that says "leave the envelope alone" the chip still
     reads back the shape from an earlier frame.
     """

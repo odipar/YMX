@@ -380,7 +380,7 @@ def run_effects(super_host: bool = False, perf: bool = False) -> str:
     # The ring-integrity trap: an 11-byte R10 pattern spanning the drum frame,
     # repeated 30 frames later - the packer emits a match that copies those
     # ring positions. v2 never edits the ring at runtime, so the trap now
-    # simply proves the drum number travels in the ring unharmed. Frame 30's
+    # proves the drum number travels in the ring unharmed. Frame 30's
     # value doubles as the drum number: sample 1; frame 31's names sample 0.
     pattern = [3, 4, 5, 6, 7, 1, 0, 6, 5, 4, 3]
     for i, v in enumerate(pattern):
@@ -393,7 +393,7 @@ def run_effects(super_host: bool = False, perf: bool = False) -> str:
     # The arbitration scene: a SID runs on voice B from slot 2, and at frame
     # 48 a drum fires on the SAME voice from slot 1. The script compiled the
     # whole exchange: START_PCM_PREEMPT stops the SID's timer first, the suppressed
-    # SID costs nothing at all, and it resumes BY RETUNE - phase intact - at
+    # SID costs nothing, and it resumes BY RETUNE - phase intact - at
     # the frame after the drum's computed end.
     for frame in range(45, 53):
         values[3][frame] |= 0x20
@@ -967,7 +967,7 @@ def ymr_image(frames: int, pops: list, streams: dict, loop: int = 0,
     The .ymr front end is the only source that sets the shape-from-R13 flag,
     so pinning the flag-set path needs a .YMR, and a hand-built one keeps the
     scene small enough to reason about. A ring size of 0 is the format's own
-    "stored uncompressed", which is what lets this skip a ZX1 packer.
+    "stored uncompressed", which lets this skip a ZX1 packer.
 
     pops[frame] is the stream indices that frame pops, ascending, and streams
     maps a stream index to its entries laid end to end. samples is a list of
@@ -1042,7 +1042,7 @@ def run_shape_source() -> str:
     and no other rig looks at.
     """
     # The flag-clear path, which is every YM tune. A buzzer on voice B with
-    # R9's nibble at 11, and R13 never written at all: if the player were
+    # R9's nibble at 11, and R13 never written: if the player were
     # reading the shadow it would restart 8, the value a tune that has
     # written no shape is taken to mean.
     frames = 16
@@ -1096,7 +1096,7 @@ def run_shape_source() -> str:
         return (f'shape source: a shape moving under a running buzzer left the '
                 f'tick on {got}, want 4 - the hold path reads R13 too')
 
-    # And an RTE that arms before the tune has written any shape at all: the
+    # And an RTE that arms before the tune has written any shape: the
     # spec says to assume 8, which is what RhYMe's own player primes. Voice
     # C's level is 15 here, so the two sources cannot be confused.
     pops = [[] for _ in range(8)]

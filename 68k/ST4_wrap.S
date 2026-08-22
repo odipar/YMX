@@ -23,7 +23,7 @@
 ;
 ; The ring is N BYTES and must be a whole number of units; the caller resets a1
 ; to the ring start after every F = N/(C*UNIT) calls. Budgets and remaining
-; counts are units; offsets, positions and N are bytes - which is what keeps
+; counts are units; offsets, positions and N are bytes - which keeps
 ; the wrap arithmetic identical to ST1_wrap's.
 ;
 ; The copy engine runs two ladders. Match segments of at most sixteen units -
@@ -106,11 +106,11 @@ ST4_init:
         move.w  d3,d2                   ; N lives below it for now
         swap    d2                      ; N above, -INITIAL_OFFSET*UNIT below
 ; One virtual 0 flag, then the empty sentinel. The first resume call runs a
-; zero-unit match segment through the normal path - remaining is zero, so
-; n = 0 and the ladder is entered at its end - and lands in match_transition,
+; zero-unit match segment through the normal path - remaining is zero, so n =
+; 0 and the ladder is entered at its end - and lands in match_transition,
 ; which shifts $4000 into $8000: the flag reads as "begin literals" and the
-; queue is the empty sentinel the old first call started from. That is what
-; lets ST4_resume skip a first-call test on every call.
+; queue is the empty sentinel the old first call started from. That lets
+; ST4_resume skip a first-call test on every call.
         move.w  #$4000,d0
         rts
 

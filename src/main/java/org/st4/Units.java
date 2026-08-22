@@ -4,7 +4,7 @@ package org.st4;
  * The input as an array of k-byte units.
  *
  * <p>A unit is at most four bytes, so it fits an {@code int} and comparisons
- * are plain integer comparisons - which is what makes the optimal parser as
+ * are plain integer comparisons - which makes the optimal parser as
  * cheap at k = 4 as the byte parser is at k = 1, over a quarter as many
  * positions.
  *

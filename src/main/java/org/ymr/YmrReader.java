@@ -42,7 +42,7 @@ import java.util.List;
  * A stream entry two bytes wide is the two register values in REGISTER ORDER:
  * a tone is (R0, R1), fine byte first; an envelope period is (R11, R12); a
  * timer's rate is (prescaler, counter), which are the MFP's control and data
- * registers and not one number at all. The player settles it -
+ * registers and not one number. The player settles it -
  * {@code ymr_pop_register} in {@code lib_data.s} walks a row of (first
  * register, count) and writes the bytes to consecutive registers in the order
  * they arrive - and so does any real file. Take the 16463 tone entries of the
@@ -175,7 +175,7 @@ public final class YmrReader {
             };
         }
 
-        /** Whether the header names a loop frame at all. */
+        /** Whether the header names a loop frame. */
         public boolean loops() {
             return loopFrame >= 0;
         }
@@ -190,7 +190,7 @@ public final class YmrReader {
      * three flags are the events, and they are not the same information: popping
      * {@code timer_*_sample} restarts the sample even when the index has not
      * changed - that is how the same drum sounds twice on adjacent rows - and
-     * popping {@code timer_*_effect} carrying 0 is what stops the timer, though
+     * popping {@code timer_*_effect} carrying 0 stops the timer, though
      * the value it stops from is the same 0 an idle timer already held.
      *
      * <p>{@code _ymr_process_tmr} in {@code lib_ymr.s} reconciles the three once

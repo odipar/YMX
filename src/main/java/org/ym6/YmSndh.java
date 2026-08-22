@@ -12,8 +12,8 @@ import org.ymx.Tools;
  * input with one configuration, then {@link MkSndh} around the results.
  *
  * <p>A lone tune is packed through the single-file path so the trim options
- * mean something; a set goes through the packer's own set mode, which is what
- * forces the one shared configuration the player needs.
+ * mean something; a set goes through the packer's own set mode, which forces
+ * the one shared configuration the player needs.
  */
 public final class YmSndh {
 

@@ -12,7 +12,7 @@ package org.st4;
  * more work than one that finds nothing - so the percentage measures progress,
  * not remaining time. The estimate handles time: elapsed is fitted as {@code
  * a*x + b*x^2} in the percentage, through the warm-up point, the midpoint and
- * now. The square is what makes it work on real assets: a parse that finds
+ * now. The square makes it work on real assets: a parse that finds
  * more matches as it goes gets steadily slower, and a rate measured over any
  * window - however recent - keeps predicting the past.
  */

@@ -17,14 +17,14 @@ import org.st4.Units;
  *
  * <p>Nothing here depends on what file the tune was read out of, and nothing
  * can find out: a front end has already turned its own format into the
- * engine's model and stopped. That is what lets a second front end be a peer
+ * engine's model and stopped. That lets a second front end be a peer
  * of the first rather than a client of it.
  *
  * <p>Packing the registers separately is the whole point. A register's value
- * usually repeats from frame to frame, and a vector holds one register's values
- * back to back, so the matches are short-range and dense. It also gives the
- * player fourteen independent decoders it can advance one at a time, which is
- * what keeps the per-VBL cost flat.
+ * usually repeats from frame to frame, and a vector holds one register's
+ * values back to back, so the matches are short-range and dense. It also
+ * gives the player fourteen independent decoders it can advance one at a
+ * time, which keeps the per-VBL cost flat.
  *
  * <p>A looping tune is packed as two sets of sections, split at the loop
  * frame. Looping means restarting a decoder, and a stream can only be
@@ -245,7 +245,7 @@ public final class YmxEncoder {
 
     /**
      * Packs one section of one register as a complete ST4 container; an empty
-     * section produces no container at all.
+     * section produces no container.
      */
     private static byte[] pack(List<Stream> streams, int register, boolean loop,
                                boolean progress, byte[] values, int offsetLimit,

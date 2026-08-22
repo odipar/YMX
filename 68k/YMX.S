@@ -62,7 +62,7 @@
 ; tick handlers - digidrum, SID square, sync-buzzer - and compare NOTHING
 ; at run time. A sample's voice is DISCONNECTED by mixing baked into the
 ; R7 stream, so its sample is heard alone, and no ring byte is ever edited:
-; what v1 discovered per frame, the file simply says.
+; what v1 discovered per frame, the file says.
 ;
 ; LOOPING. A packed stream can only be restarted from its beginning, so the
 ; packer splits every register at the loop frame L: an intro stream for frames
@@ -165,7 +165,7 @@
 ;   2. the workspace is at an even address and large enough for the file's N
 ;   3. YMX_play is called once per frame and never after it returns -1.
 ;      Calling it again is harmless - it returns -1 and writes nothing - which
-;      is what keeps ST4_wrap's "never call the decoder again" rule intact
+;      keeps ST4_wrap's "never call the decoder again" rule intact
 ;   4. a looping tune plays for as long as you keep calling: d0 = 1 marks each
 ;      time round, and YMX_init is only needed to start again from frame 0
 ;   5. the HOST owns the machine state - the player saves and restores none
@@ -174,7 +174,7 @@
 ;      $110, TACR, TADR, TDDR, TCDCR's low (Timer D) nibble, bit 5 of IERA
 ;      and IMRA, bit 4 of IERB and IMRB - and, built with YMX_SUPER_HOST,
 ;      the USP, which the PCM tick parks a0 in. A demo that has already
-;      taken the machine over saves nothing at all. YMX_player.S is the
+;      taken the machine over saves nothing. YMX_player.S is the
 ;      worked example of doing that
 ; -----------------------------------------------------------------------------
 
@@ -590,7 +590,7 @@ YMX_init:
 
 ; Read the map before claiming anything: stream T's first byte says which
 ; timer each channel runs on, and the rings are primed by now, so it is
-; simply the byte under the cursor.
+; the byte under the cursor.
         movea.l YMX_CURSOR(a3),a0
         adda.l  YMX_EFXOFF(a3),a0       ; ring M
         moveq   #0,d1
@@ -604,7 +604,7 @@ YMX_init:
 
 ; Claim a timer for each timer channel the header names: park our handler
 ; on its vector and leave the timer stopped but enabled and unmasked. A
-; channel the tune does not use is left entirely alone, timer and all, so
+; channel the tune does not use is left alone, timer and all, so
 ; a tune that names two leaves the other timers to the host untouched.
 ; Nothing is saved - the machine state is the host's, see assumption 5 in
 ; the header. bset/bclr only: Timer C's bits, Timer D's and the ACIA's all
@@ -814,7 +814,7 @@ YMX_play:
 ; says whether it acts, \rings is how far its action stream sits above M
 ; (channel c's pair is 3+2c and 4+2c streams up), \here names the block
 ; and \next the one after it, so the channels chain without a loop's
-; bookkeeping in the common case of nothing acting at all.
+; bookkeeping in the common case of nothing acting.
         .macro YMX_ACT chan, bit, rings, here, next
 \here:
         move.b  (a0),d0                 ; a0 survives ymx_act
@@ -937,7 +937,7 @@ ymx_w13:
 .effects_done:
 
 ; Refill the stream whose turn it is. Slots past the live streams exist
-; when C is larger than that count; they simply have nothing to do - which
+; when C is larger than that count; they have nothing to do - which
 ; is also how an unused timer channel costs no time, its pair of streams
 ; sitting past the end.
         move.w  YMX_SLOT(a3),d0
@@ -976,7 +976,7 @@ ymx_w13:
         move.w  d0,YMX_SLOT(a3)
 
 ; The rings hold the tune as one continuous sequence, so reaching the end of
-; the last frame simply means the next values in them are the loop section's.
+; the last frame means the next values in them are the loop section's.
 ; The countdown follows: it reloads with the loop section's length.
         subq.l  #1,YMX_LEFTFR(a3)
         bne.s   .played
@@ -1433,7 +1433,7 @@ ymx_verbs:
 ; ring, because that is where they live - they belong to the voice the
 ; effect took over. A shape belongs to the one envelope generator instead,
 ; and different formats file it in different places, so it is not looked
-; for at all: the packer resolved it and X carries it, high nibble. The
+; for: the packer resolved it and X carries it, high nibble. The
 ; player is therefore independent of where a tune came from.
 ; in: a0 = ring M, d3.l = N; out: d1 = the shape, 0..15. Clobbers a1.
 ymx_shape:

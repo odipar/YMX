@@ -129,7 +129,7 @@ final class YmxEncoderTest {
 
     @Test
     void everyStreamSurvivesItsOwnRing() {
-        // -mN is what makes a stream safe for an N-byte ring: decoding it
+        // -mN makes a stream safe for an N-byte ring: decoding it
         // through exactly that ring must never need a byte that has left it.
         // A too-far offset does not fail loudly - it reads whatever the ring
         // has wrapped onto - so the output comparison is the check.
