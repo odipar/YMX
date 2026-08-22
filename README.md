@@ -10,7 +10,7 @@ the player's configuration rather than of the tune's length.
 
 The one thing YMX changes about the YM lineage is where the work happens.
 What those formats call a "special effect" — a SID voice, a digidrum, a
-sync-buzzer — is smuggled into spare register bits, and the player has to
+sync-buzzer — is carried in spare register bits, and the player has to
 re-derive on every frame what it means. YMX resolves all of that when the
 file is packed and writes down the outcome, so the player compares nothing
 and every frame costs the same.
@@ -23,7 +23,7 @@ verbs and the frame contract. Everything else worth reading is beside it.
 | [doc/SPEC.md](doc/SPEC.md) | the format specification |
 | [ym/CONVERSION.md](ym/CONVERSION.md) | what a YM file loses on the way in |
 | [ymr/CONVERSION.md](ymr/CONVERSION.md) | what a `.YMR` loses on the way in |
-| [doc/terminology.md](doc/terminology.md) | the vocabulary both use |
+| [doc/terminology.md](doc/terminology.md) | the vocabulary all of these use |
 | [doc/experiments.md](doc/experiments.md) | ideas measured against the real corpus, and what the measurements said |
 
 ## Test driving one
@@ -72,9 +72,9 @@ share every byte that matters.
         bsr     YMX_stop                ; chip quiet, timers stopped
 ```
 
-[68k/YMX.S](68k/YMX.S) is the player, 3,170 bytes plus the 292 of
-[68k/ST4_wrap.S](68k/ST4_wrap.S), which is the stream decoder it is built on.
-Include both, with the unit size defined first:
+[68k/YMX.S](68k/YMX.S) is the player, 3,180 bytes at the `ST4_UNIT` 2 below,
+plus the 288 of [68k/ST4_wrap.S](68k/ST4_wrap.S), the stream decoder it is
+built on. Include both, with the unit size defined first:
 
 ```
 ST4_UNIT    equ     2
@@ -88,7 +88,7 @@ ST4_UNIT    equ     2
 |---|---|
 | [`org.ym6.Ymx`](src/main/java/org/ym6/Ymx.java) | the packer: `YM5!`/`YM6!` in, `.ymx` out |
 | [`org.ymr.Ymr`](src/main/java/org/ymr/Ymr.java) | the other packer: `YMR!` in, the same `.ymx` out |
-| [`org.ymx.Tune`](src/main/java/org/ymx/Tune.java) | what a front end hands over and the engine works on — no format anywhere in it |
+| [`org.ymx.Tune`](src/main/java/org/ymx/Tune.java) | what a front end produces and the engine works on — no format anywhere in it |
 | [`org.ymx.EffectScript`](src/main/java/org/ymx/EffectScript.java) | the script compiler: a `Tune` in, prepared actions out |
 | [68k/YMX.S](68k/YMX.S) | the player |
 | [68k/YMX_sndh.S](68k/YMX_sndh.S), [68k/YMX_player.S](68k/YMX_player.S) | the SNDH and `.PRG` wrappers |
@@ -112,8 +112,8 @@ python3 ymx/test/ymr_sweep.py songs/*.ymr  # the same for .YMR
 The two sweeps are the ones that matter. Each replays a converted tune on the
 real player under emulation and compares every write it makes to the sound
 chip — and which MFP timers it claimed — against an independent model of the
-source file. They disagree loudly and specifically, which is how most of the
-bugs in this player were found.
+source file. A disagreement is reported exactly where it happened, which is
+how most of the bugs in this player were found.
 
 ## Where this came from
 
@@ -137,5 +137,5 @@ commercially, as long as your documentation says you used ZX1 through ST4.
 See [LICENSE](LICENSE).
 
 The player was inspired by Steve Clarets' MinYMiser. Sinus-SID is the one YM
-effect deliberately left unplayed, in the good company of every other player
-including the format author's.
+effect deliberately left unplayed, as it is in every other player, including
+the format author's.
