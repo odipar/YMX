@@ -144,11 +144,11 @@ single `movep.w`, which a 68000 cannot split, so tearing is impossible
 whatever the interrupt state. That made the mask **optional** rather than
 necessary: `YMX_MASK_BURST` is on by default and `-nomask` turns it off.
 
-| | masked (default) | `-nomask` |
-|---|---|---|
-| player | 2,828 bytes | 2,820 |
-| harness, 1700 frames | 94 ticks | 91 |
-| longest interrupt-free span | ~500 cycles | one instruction |
+| what the mask costs | |
+|---|---|
+| player | 8 bytes |
+| harness | 3 ticks in 1,700 frames |
+| longest interrupt-free span | ~500 cycles, against one instruction |
 
 Same chip traffic either way, byte for byte — 16,156 PSG writes over 900 VBLs
 of one tune, identical. The flag moves when ticks run, not what reaches the
