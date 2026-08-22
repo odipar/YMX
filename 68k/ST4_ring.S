@@ -198,7 +198,7 @@ fast_ladder:
         .rept   16
         ST4_MOVE
         .endr
-fast_end:                               ; no counter, no kind test: fall into
+fast_end:                               ; uncounted and untested: fall into
 match_copied:                           ; the match epilogue
         tst.w   d1
         beq.s   match_transition

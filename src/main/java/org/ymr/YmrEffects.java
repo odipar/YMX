@@ -238,9 +238,9 @@ public final class YmrEffects {
     /**
      * Converts a song.
      *
-     * @param name what to call the song. A .YMR carries no metadata at all -
-     *             no title, no author, no comment - so the caller's file stem
-     *             is the only name there is, and the other two come out empty.
+     * @param name what to call the song. A .YMR carries no metadata at all,
+     *             so the caller's file stem is the only name there is, and
+     *             the title and composer come out empty.
      */
     public static Tune convert(YmrReader.Song song, String name) {
         return new YmrEffects(song, name).run();

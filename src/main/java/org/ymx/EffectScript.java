@@ -590,9 +590,8 @@ public final class EffectScript {
     /**
      * A rate under a running effect, with nothing stopped. RETUNE addressed
      * to voice 3 - no such voice, and the one free corner of the action
-     * byte - is the player's live path: it never touches the vector, never
-     * touches the parameter, and writes the control and data registers
-     * around a running timer.
+     * byte - is the live path: the vector and the parameter are left alone,
+     * and the control and data registers are written around a running timer.
      */
     private void liveRetune(int p, int index, Channel channel, int code, int count) {
         channel.tlast = count;
