@@ -158,7 +158,7 @@ sndh_play:
         beq.s   .silent
         lea     sndh_work(pc),a0
         bsr     YMX_play                ; -1 past a play-once end: harmless,
-.silent:                                ; the FRMS tag told the host when
+.silent:                                ; the FRMS tag gave the host the count
         movem.l (sp)+,d0-a6
         rts
 

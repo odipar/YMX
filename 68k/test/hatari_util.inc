@@ -55,7 +55,7 @@ div10:
         move.w  d4,d0                           ; quotient = high:low
         rts
 
-; sync: wait for a fresh tick and remember it. elapsed: ticks since then.
+; sync: wait for a fresh tick and record it. elapsed: ticks since then.
 sync:
         move.l  hz200,d0
 .wait:

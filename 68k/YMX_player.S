@@ -55,7 +55,7 @@ start:
 
 ; From here to the handback the machine is ours alone: every TOS interrupt
 ; silenced, the VBL unshared, the keyboard read straight off the ACIA. The
-; SNDH blob does its own polite save/restore of the timers it claims - two,
+; SNDH blob does its own save/restore of the timers it claims - two,
 ; for a YM tune - which is redundant under this takeover and exactly right
 ; when the same bytes run under a jukebox.
         move.l  #play,-(sp)
@@ -99,10 +99,10 @@ play:
         clr.b   $FFFFFA09.w
         clr.b   $FFFFFA13.w
         clr.b   $FFFFFA15.w
-; And every timer STOPPED, not merely silenced. Killing the enable bits
+; And every timer STOPPED, not merely silenced. Clearing the enable bits
 ; leaves TOS's timers counting underneath - Timer D is its RS232 baud
 ; generator and keeps ticking at a few hundred kHz - which is machine state
-; the tune did not ask for. A host that takes the machine over should hand
+; the tune did not name. A host that takes the machine over should give
 ; the player a quiet MFP; the player itself claims only what its tune
 ; names. Data registers are saved too: a timer reloads from them.
         move.b  $FFFFFA19.w,old_tacr
@@ -193,7 +193,7 @@ sndh_exit_entry:
         rts
 
 ; The VBL: one play call per frame, and for a play-once tune the frame count
-; the builder measured tells us when the music has ended.
+; the builder measured marks when the music has ended.
 handler:
         movem.l d0-d7/a0-a6,-(sp)
         tst.w   finished
