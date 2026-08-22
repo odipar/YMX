@@ -13,10 +13,11 @@ HATARI=${HATARI:-hatari}
 TOS=${TOS:-$HOME/hatari-2.6.1_macos/tos-2.06.rom}
 
 python3 gendata.py
-# -i../../68k/test finds hatari_util.inc: the console and 200 Hz timing
-# helpers are shared with the ST1 harnesses rather than copied.
-rmac -m68000 -p +o3 -i. -i.. -i../../68k -i../../68k/test \
-     -o YMXTEST.PRG YMX_test.S
+# -i. finds the generated ymxdata.inc; -i../../68k the player and the ST4
+# decoders, and -i../../68k/test hatari_util.inc - the console and 200 Hz
+# timing helpers, shared with the ST1 harnesses rather than copied.
+rmac -m68000 -p +o3 -i. -i../../68k -i../../68k/test \
+     -o YMXTEST.PRG ../../68k/test/YMX_test.S
 
 # A TOS program cannot fail the shell, so its output is the verdict: it must
 # reach DONE, and no line may report BAD.

@@ -71,7 +71,7 @@ public final class MkPrg {
             throw Tools.fail("mkprg: cannot write the wrapper");
         }
         Tools.assemble(work, "wrapper.S", output,
-                List.of("-p", "-i" + Tools.ymxDir()));
+                List.of("-p", "-i" + Tools.asmDir()));
 
         System.out.println(options.output() + ": " + Tools.size(output) + " bytes, "
                 + Tools.plural(tunes, "subtune"));

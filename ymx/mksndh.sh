@@ -5,7 +5,7 @@
 #
 # -c fills the COMM (composer) tag; -N names the subtunes from a file, one
 # per line in tune order, instead of the file stems. -perf builds the raster
-# monitor in (YMX.S has the colors). Flags come first.
+# monitor in (68k/YMX.S has the colors). Flags come first.
 #
 # The tunes become subtunes 1..N (SNDH '##' tag) and must be packed with one
 # configuration - same ring, chunk and unit - which `ymx ... directory/` does

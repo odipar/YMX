@@ -1,5 +1,5 @@
 ; -----------------------------------------------------------------------------
-; YMX_test.S - real-hardware validation for ymx/YMX.S.
+; YMX_test.S - real-hardware validation for 68k/YMX.S.
 ;
 ; Plays an embedded looping tune on the actual sound chip and reads every
 ; register back after every frame, folding the chip's contents into a checksum

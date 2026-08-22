@@ -110,9 +110,9 @@ public final class MkSndh {
         }
         String tagsInc = tags(options, set, n, frms, names);
         Path build = work.resolve("sndh_build.S");
-        substitute(Tools.ymxDir().resolve("YMX_sndh.S"), build, tagsInc, tunesInc.toString());
+        substitute(Tools.asmDir().resolve("YMX_sndh.S"), build, tagsInc, tunesInc.toString());
         Tools.assemble(work, "sndh_build.S", output,
-                List.of("-fr", "-i" + Tools.ymxDir(), "-i" + Tools.repo().resolve("68k")));
+                List.of("-fr", "-i" + Tools.asmDir()));
 
         System.out.println(options.output() + ": " + Tools.size(output) + " bytes, "
                 + Tools.plural(n, "subtune") + ", " + set.shape());

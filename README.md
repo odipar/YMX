@@ -72,7 +72,7 @@ share every byte that matters.
         bsr     YMX_stop                ; chip quiet, timers stopped
 ```
 
-[ymx/YMX.S](ymx/YMX.S) is the player, 3,170 bytes plus the 292 of
+[68k/YMX.S](68k/YMX.S) is the player, 3,170 bytes plus the 292 of
 [68k/ST4_wrap.S](68k/ST4_wrap.S), which is the stream decoder it is built on.
 Include both, with the unit size defined first:
 
@@ -90,9 +90,10 @@ ST4_UNIT    equ     2
 | [`org.ymr.Ymr`](src/main/java/org/ymr/Ymr.java) | the other packer: `YMR!` in, the same `.ymx` out |
 | [`org.ymx.Tune`](src/main/java/org/ymx/Tune.java) | what a front end hands over and the engine works on — no format anywhere in it |
 | [`org.ymx.EffectScript`](src/main/java/org/ymx/EffectScript.java) | the script compiler: a `Tune` in, prepared actions out |
-| [ymx/YMX.S](ymx/YMX.S) | the player |
-| [ymx/YMX_sndh.S](ymx/YMX_sndh.S), [ymx/YMX_player.S](ymx/YMX_player.S) | the SNDH and `.PRG` wrappers |
-| [`org.st4`](src/main/java/org/st4), [68k/](68k) | the ST4 compressor and its 68000 decoders, vendored |
+| [68k/YMX.S](68k/YMX.S) | the player |
+| [68k/YMX_sndh.S](68k/YMX_sndh.S), [68k/YMX_player.S](68k/YMX_player.S) | the SNDH and `.PRG` wrappers |
+| [`org.st4`](src/main/java/org/st4) | the ST4 compressor, vendored |
+| [68k/](68k) | all the 68000 sources: the player, its wrappers, the ST4 decoders |
 | [`org.jx1`](src/main/java/org/jx1) | the ZX1 decoder a `.YMR`'s own streams need, vendored |
 
 The two front ends are peers. Neither is downstream of the other: both read

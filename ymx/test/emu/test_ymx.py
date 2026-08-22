@@ -97,7 +97,7 @@ def assemble(unit: int = 1, super_host: bool = False, perf: bool = False):
     binary = SCRATCH / f'link{tag}.bin'
     listing = SCRATCH / f'link{tag}.lst'
     command = ['rmac', '-m68000', '-fr', '+o3',
-               '-i' + str(YMX), '-i' + str(REPO / '68k'),
+               '-i' + str(REPO / '68k'),
                f'-l*{listing}', '-o', str(binary), str(source)]
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode:

@@ -32,9 +32,10 @@ public final class Tools {
         }
     }
 
-    /** Where YMX.S, YMX_player.S and YMX_sndh.S live. */
-    public static Path ymxDir() {
-        return repo().resolve("ymx");
+    /** Where the 68000 sources live - the player, its two wrappers and the
+     * ST4 decoders they include. One directory, so one -i. */
+    public static Path asmDir() {
+        return repo().resolve("68k");
     }
 
     /**
