@@ -48,10 +48,10 @@ a register holds its value until written again.
 | R4, R5 | 8 + 4 | voice C tone period |
 | R6 | 5 | **noise period** |
 | R7 | 8 | the mixer register: **mixing** - which generators reach which voice - plus the I/O port directions |
-| R8, R9, R10 | 5 | voice A, B, C **volume**: four bits of level, bit 4 meaning "follow the envelope" |
-| R11, R12 | 8 + 8 | **envelope period**, fine and coarse: one 16-bit number |
+| R8, R9, R10 | 5 each | voice A, B, C **volume**: bits 3-0 the level, bit 4 meaning "follow the envelope" |
+| R11, R12 | 8 + 8 | **envelope period**, fine and coarse: a 16-bit divider, coarse as a pitch |
 | R13 | 4 | **envelope shape** |
-| R14, R15 | 8 | the two I/O ports. Not sound |
+| R14, R15 | 8 each | the two I/O ports. Not sound |
 
 A **signal** is a series of values with a rate: a square wave, a run of
 noise, a sample. Five **generators** make them:
@@ -539,7 +539,7 @@ sense.
 | **noise generator** | a shift register making a random-sounding pattern. One, shared |
 | **envelope generator** | a counter walking one of sixteen shapes, four of which repeat |
 | **voice** | one of the three outputs, A, B and C |
-| **volume** | a voice's level: four bits, or bit 4 set for "follow the envelope" |
+| **volume** | a voice's level: bits 3-0, or bit 4 set for "follow the envelope" |
 | **mixing** | which generators reach a voice: tone, noise, both or neither |
 | **period** | how long a generator takes per cycle. Bigger period, lower pitch |
 | **DAC** | the output ladder: about 3 dB a step, 16 steps from a volume register, 32 from the envelope |
