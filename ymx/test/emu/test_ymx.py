@@ -1229,6 +1229,152 @@ def run_live_retune() -> str:
     return ''
 
 
+class Reworded(Exception):
+    """A sentence this rig reads numbers out of has been reworded."""
+
+def corpus_tune(name: str):
+    """Where a tune the documentation measures can be found, or None.
+
+    The tunes are not in the tree. YMX_CORPUS says which directory holds
+    them; without it, the home directory and the repository root are tried.
+    """
+    named = os.environ.get('YMX_CORPUS')
+    for where in ([named] if named else [Path.home(), REPO]):
+        if (Path(where) / name).exists():
+            return Path(where) / name
+    return None
+
+
+def packer_report(tune: Path, extra: tuple = ()) -> str:
+    """The packer's own report for one tune, as the documentation quotes it."""
+    out = SCRATCH / (tune.stem + '.ymx')
+    SCRATCH.mkdir(exist_ok=True)
+    run = subprocess.run(['java', '-ea', '-cp', str(CLASSES), 'org.ymr.Ymr', '-f',
+                          *extra, str(tune), str(out)],
+                         capture_output=True, text=True)
+    if run.returncode:
+        raise AssertionError(f'packing {tune.name}: {run.stdout}{run.stderr}')
+    return run.stdout
+
+
+def script_verbs(tune: Path) -> dict:
+    """Verb counts from one tune's compiled script.
+
+    A RETUNE addressed to voice 3 is the live retune, one to a real voice
+    stops the timer to reprogram it, and a HOLD with bit 0 reloads the count
+    under a running one - the three the conversion account counts.
+    """
+    run = subprocess.run(['java', '-ea', '-cp', str(CLASSES), 'org.ymr.Ymr',
+                          '-script', str(tune)], capture_output=True, text=True)
+    if run.returncode:
+        raise AssertionError(f'compiling {tune.name}: {run.stdout}{run.stderr}')
+    counts = {'live retune': 0, 'stopping retune': 0, 'live reload': 0}
+    for action in re.findall(r'A[0-3]=([0-9A-F]{2})', run.stdout):
+        byte = int(action, 16)
+        verb, voice, flags = byte >> 5, (byte >> 3) & 3, byte & 7
+        if verb == 4:
+            counts['live retune' if voice == 3 else 'stopping retune'] += 1
+        elif verb == 1 and flags & 1:
+            counts['live reload'] += 1
+    return counts
+
+
+def run_conversion_numbers() -> str:
+    """The figures ymr/CONVERSION.md quotes, against the tunes it names.
+
+    Every one of them is a measurement, and a measurement in prose goes stale
+    the first time the packer changes. They are re-measured the way the
+    document says they were taken: the packer's own report for the byte
+    counts, and the compiled script for the verb counts.
+    """
+    flat = ' '.join((REPO / 'ymr' / 'CONVERSION.md').read_text().split())
+
+    def said(pattern, what):
+        found = re.search(pattern, flat)
+        if not found:
+            raise Reworded(f'conversion numbers: the sentence giving {what} no '
+                           f'longer matches {pattern!r} - this check reads them '
+                           f'out of it')
+        return [int(g.replace(',', '')) if g.replace(',', '').isdigit() else g
+                for g in found.groups()]
+
+    try:
+        tune, frames, rate = said(r'`([\w.-]+\.ymr)` is ([\d,]+) frames at (\d+) Hz',
+                                  'the tune and its length')
+        total, packed, _, size = said(
+            r'reports ([\d,]+) bytes of register and script data packed into '
+            r'([\d,]+) \(([\d,.]+)%\) in a ([\d,]+)-byte file',
+            'the packed sizes')
+        rings, ring, decoded, streams = said(
+            r'([\d,]+) rings of ([\d,]+) bytes, decoding (\d+) of the (\d+) streams',
+            'the ring shape')
+        rotation, = said(r'rotated the split forward ([\d,]+) frames', 'the rotation')
+        script, of, image = said(
+            r'([\d,]+) of those ([\d,]+) packed bytes are the eleven script '
+            r'streams, which the `\.YMR` — ([\d,]+) bytes', 'the script streams')
+        reloads, retunes = said(
+            r'on `' + re.escape(tune) + r'` the compiled script carries ([\d,]+) '
+            r'live reloads and ([\d,]+) live retunes against no verb that stops',
+            'the verb counts')
+        other, otherRetunes, otherStops = said(
+            r'`([\w.-]+\.ymr)` has ([\d,]+) live retunes and (\d+) that stop',
+            "the second tune's verb counts")
+    except Reworded as reworded:
+        return str(reworded)
+
+    paths = {name: corpus_tune(name) for name in (tune, other)}
+    missing = [name for name, path in paths.items() if path is None]
+    if missing:
+        return ('SKIP ' + ', '.join(missing) + ' not found - set YMX_CORPUS to the '
+                'directory holding the tunes ymr/CONVERSION.md measures')
+
+    report = packer_report(paths[tune])
+    measured = {}
+    got = re.search(r'Packed (\d+) register bytes into (\d+) \([\d,.]+%\), '
+                    r'file (\d+) bytes', report)
+    if not got:
+        return 'conversion numbers: the packer no longer reports its packed sizes'
+    measured['register bytes'] = (int(got.group(1)), total)
+    measured['packed bytes'] = (int(got.group(2)), packed)
+    measured['file bytes'] = (int(got.group(3)), size)
+
+    shape = re.search(r'Player needs (\d+) bytes of ring .*? decodes (\d+) of the '
+                      r'(\d+) streams', report)
+    if not shape:
+        return 'conversion numbers: the packer no longer reports its ring shape'
+    measured['ring bytes'] = (int(shape.group(1)), rings * ring)
+    measured['streams decoded'] = (int(shape.group(2)), decoded)
+    measured['streams stored'] = (int(shape.group(3)), streams)
+
+    rotated = re.search(r'loop split rotated by (\d+) frames', report)
+    measured['rotation'] = (int(rotated.group(1)) if rotated else 0, rotation)
+
+    # the eleven script streams, summed out of the packer's per-stream listing
+    measured['script bytes'] = (sum(
+        int(size_) for name_, size_ in
+        re.findall(r'^\s+(M|X|T|A[0-3]|P[0-3])\s+\w+\s+\d+\s+->\s+(\d+) bytes',
+                   report, re.M)), script)
+    measured['packed bytes, again'] = (int(got.group(2)), of)
+    measured['.YMR bytes'] = (paths[tune].stat().st_size, image)
+    measured['source frames'] = (
+        max(int(n) for n in re.findall(r'^\s+\w+\s+loop\s+(\d+)', report, re.M)),
+        frames)
+
+    verbs = script_verbs(paths[tune])
+    measured['live reloads'] = (verbs['live reload'], reloads)
+    measured['live retunes'] = (verbs['live retune'], retunes)
+    measured['stopping retunes'] = (verbs['stopping retune'], 0)
+    second = script_verbs(paths[other])
+    measured[f'{other} live retunes'] = (second['live retune'], otherRetunes)
+    measured[f'{other} stopping retunes'] = (second['stopping retune'], otherStops)
+
+    wrong = [f'{what} {is_:,} not {said_:,}'
+             for what, (is_, said_) in measured.items() if is_ != said_]
+    if wrong:
+        return 'conversion numbers: ' + '; '.join(wrong)
+    return ''
+
+
 def run_readme_sizes() -> str:
     """The README's two byte counts, against what the assembler just produced.
 
@@ -1339,6 +1485,15 @@ def main() -> int:
         failures += 1
     else:
         print('OK   the README sizes         (the two byte counts, measured)')
+
+    problem = run_conversion_numbers()
+    if problem.startswith('SKIP'):
+        print(problem)
+    elif problem:
+        print(f'FAIL {problem}')
+        failures += 1
+    else:
+        print('OK   the conversion numbers   (ymr/CONVERSION.md, re-measured)')
 
     for super_host, perf in ((False, False), (True, False), (False, True)):
         problem = run_effects(super_host, perf)

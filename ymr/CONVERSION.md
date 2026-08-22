@@ -104,6 +104,8 @@ where a code byte CHANGES, so bit 3 of the code is flipped on every sample
 trigger, and two pops of one sample at one rate become two different codes
 and two starts.
 
+<!-- The figures in this section are re-measured by ymx/test/emu/test_ymx.py,
+     which reads them back out of these sentences: keep the shape of them. -->
 `signals-grouped.ymr` is 9,984 frames at 50 Hz with a PWM on voice A, a
 sync-buzzer on voice B and a PWM on voice C — three effects at once, which two
 fixed channels could not have carried, and which is the case the four-channel
