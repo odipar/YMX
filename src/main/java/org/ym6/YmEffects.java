@@ -31,8 +31,8 @@ import org.ymx.YmxFormat;
  * <p>A YM6 frame carries up to two effect slots, each three fields smeared
  * across spare register bits: a code nibble (type in bits 7-6, voice+1 in
  * bits 5-4, zero voice bits meaning idle) in R1 or R3, an MFP timer prescaler
- * in R6 or R8 bits 5-7, and a timer count in R14 or R15. YM5 encodes less in
- * different places: R1 bits 4-5 name a SID voice, R3 bits 4-5 a digidrum
+ * in R6 or R8 bits 7-5, and a timer count in R14 or R15. YM5 encodes less in
+ * different places: R1 bits 5-4 name a SID voice, R3 bits 5-4 a digidrum
  * voice, with the drum's prescaler always in R8 regardless of voice. Both
  * come out of here as the same two byte pairs per frame:
  *
@@ -260,7 +260,7 @@ public final class YmEffects {
                 slot2 = effects.validate(effects.register(3, frame) & 0xF0,
                         effects.register(8, frame) >> 5, effects.register(15, frame), frame);
             } else {
-                // YM5: R1 bits 4-5 are a SID voice, R3 bits 4-5 a drum voice
+                // YM5: R1 bits 5-4 are a SID voice, R3 bits 5-4 a drum voice
                 // (the version byte is load-bearing: the same bits mean other
                 // things in YM6), and a YM5 drum's prescaler always sits in R8.
                 slot1 = effects.validate(KIND_TOGGLE | ((effects.register(1, frame) & 0x30)),

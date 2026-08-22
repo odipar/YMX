@@ -13,17 +13,17 @@ differs is where the *effects* live. A YM6 frame carries up to two effect
 slots, each three fields smeared across spare register bits:
 
 ```
-slot 1:  code = R1 bits 4-7    prescaler = R6 bits 5-7    count = R14
-slot 2:  code = R3 bits 4-7    prescaler = R8 bits 5-7    count = R15
+slot 1:  code = R1 bits 7-4    prescaler = R6 bits 7-5    count = R14
+slot 2:  code = R3 bits 7-4    prescaler = R8 bits 7-5    count = R15
 
-code bits 4-5:  voice + 1 (00 = the slot is idle this frame)
-code bits 6-7:  00 SID   01 DigiDrum   10 Sinus-SID   11 Sync-Buzzer
+code bits 5-4:  voice + 1 (00 = the slot is idle this frame)
+code bits 7-6:  00 SID   01 DigiDrum   10 Sinus-SID   11 Sync-Buzzer
 parameter:      in the voice's own volume register - a SID's maximum
                 volume, a drum's sample number, a buzzer's envelope shape
 ```
 
-YM5 encodes less, in different places: R1 bits 4-5 name a SID voice, R3 bits
-4-5 a digidrum voice, and a drum's prescaler is always in R8 whatever the
+YM5 encodes less, in different places: R1 bits 5-4 name a SID voice, R3 bits
+5-4 a digidrum voice, and a drum's prescaler is always in R8 whatever the
 voice. Both dialects come out of the front end as the same thing — a code
 byte and a count byte per frame per timer channel — so nothing downstream
 can tell which dialect a tune was read out of.
