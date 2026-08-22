@@ -8,7 +8,7 @@ import org.ymx.YmxFormat;
 /**
  * The YM front end's far side: a {@link Ym6Reader.Song} in, a {@link Tune}
  * out, with every dialect and every unplayable code normalized away on the
- * journey - the player never sees an effect it cannot run.
+ * journey - the player never receives an effect it cannot run.
  *
  * <p>This is where the vocabulary changes, and the change is the whole
  * reason the class exists. On the way in the names are the YM format's,
@@ -53,7 +53,7 @@ import org.ymx.YmxFormat;
  * ceiling - through the chip's volume curve, with a windowed-sinc filter,
  * so no alias fold-back brightens the sound - and every trigger of that
  * drum has its timer divisor scaled by the same exact ratio, so pitch and
- * duration stay what the dump asked for and only the bandwidth falls, by
+ * duration stay what the dump specified and only the bandwidth falls, by
  * as little as the ceiling allows. A 29 kHz conversion-family drum lands
  * at 25.6 kHz, not at the old half-rate 14.6. When a drum's triggers
  * cannot all take the exact ratio, the old power-of-two factor is the
@@ -91,7 +91,7 @@ public final class YmEffects {
      *  simultaneous streams has somewhere to put them. A YM tune fills the
      *  first two and leaves the rest idle. {@link #e1()} and its three
      *  companions stay behind under the slot names, for the packer and the
-     *  reports that still think in them.
+     *  reports that still use them.
      *
      *  <p>The four drop counters never leave this package. They
      *  count frames whose effect the reference player would not have started,

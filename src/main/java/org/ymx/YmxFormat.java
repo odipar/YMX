@@ -48,7 +48,8 @@ package org.ymx;
  * PSG-ready volume bytes 0..15 followed by one end marker with bit 7 set.
  * A PCM stream plays one of these out, and its tick handler stops on the
  * marker rather than counting - or, where the loop point is not
- * {@link #SAMPLE_ONE_SHOT}, goes back to it and plays on. YM calls them digidrums, and their numbering is the YM file's.
+ * {@link #SAMPLE_ONE_SHOT}, goes back to it and plays on. YM calls them
+ * digidrums, and their numbering is the YM file's.
  *
  * <p>Each section is a complete, standard ST4 container - twenty-byte header,
  * then its four streams - packed at unit size 1, placed on a long boundary so
@@ -96,8 +97,8 @@ public final class YmxFormat {
     public static final int REGISTER_STREAMS = 14;
 
     /** Stream indices of the script data: the master byte, then
-     * each timer channel's action and timer-count bytes. The byte semantics - the
-     * verb vocabulary, the master bits, the gate mask - are
+     * each timer channel's action and timer-count bytes. The byte semantics -
+     * the verb vocabulary, the master bits, the gate bits - are
      * {@link EffectScript}'s ABI, which packer, player and rigs all cite. */
     public static final int STREAM_M = 14;
     public static final int STREAM_X = 15;
@@ -138,7 +139,7 @@ public final class YmxFormat {
 
     /** The map a YM tune is packed with. Channels 0 and 1 land on Timers A
      * and D, which is where v6 put its first two, so a YM tune sounds
-     * exactly as it did; the rest fill in the timers nobody asked for. */
+     * exactly as it did; the rest fill in the unused timers. */
     public static final int DEFAULT_TIMERS =
             TIMER_A | (TIMER_D << 2) | (TIMER_B << 4) | (TIMER_C << 6);
 
@@ -179,7 +180,7 @@ public final class YmxFormat {
     public static final int SAMPLE_ONE_SHOT = 0xFFFF;
 
     /** The byte after a sample's last value has this bit set; the PCM tick
-     * interrupt routine's own move.b sees it as negative and stops. */
+     * interrupt routine's own move.b reads it as negative and stops. */
     public static final int SAMPLE_END_MARK = 0x80;
 
     /** The format's ceiling: a sample number is five bits in the YM file. */

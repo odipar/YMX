@@ -189,7 +189,7 @@ public final class Ymr {
                                 boolean forcedMode, int startMin, int startSec,
                                 int startFrame, int endFrame, int frameCount) {
         // The floor only: how many streams a tune decodes depends on the
-        // channels it names, which the encoder learns when it compiles the
+        // channels it names, which the encoder derives when it compiles the
         // script and checks again there.
         String problem = YmxFormat.checkShape(ringSize, chunk, Math.max(unit, 1),
                 YmxFormat.STREAM_A0);
@@ -284,7 +284,7 @@ public final class Ymr {
         } catch (IllegalArgumentException e) {
             // The encoder always says what it rejected, but getMessage() is
             // @Nullable, so give it something to fall back on - and where the
-            // chunk is what it rejected, say why a .ymr asks for a big one.
+            // chunk is what it rejected, say why a .ymr needs a big one.
             String reason = e.getMessage();
             if (reason == null) {
                 reason = "cannot pack this tune with these options";

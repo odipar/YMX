@@ -413,7 +413,7 @@ public final class YmrReader {
      * frame. One byte per command: $00 ends the frame, $01-$BF pops the stream
      * with that index, and $C0 upwards is reserved. A future command would
      * define for itself how many bytes follow it, so a reader that meets one it
-     * does not know cannot skip it and must stop - which is why the reserved
+     * does not recognise cannot skip it and must stop - which is why the reserved
      * range is a rejection here rather than something to step over.
      */
     private Song replay(byte[][] entries, boolean[] present, int frameCount, int loopFrame,
@@ -431,7 +431,7 @@ public final class YmrReader {
             if (command == END_OF_FRAME) {
                 if (frame == frameCount) {
                     throw new FormatException("the command stream holds more than the "
-                            + frameCount + " end-of-frame bytes the header asks for");
+                            + frameCount + " end-of-frame bytes the header declares");
                 }
                 settle(registers, timers, frame);
                 frame++;
@@ -440,7 +440,7 @@ public final class YmrReader {
             if (command >= FIRST_RESERVED_COMMAND) {
                 throw new FormatException("frame " + frame + " carries command $"
                         + Integer.toHexString(command).toUpperCase()
-                        + ", which version 1.3 reserves; a reader cannot know how long it is");
+                        + ", which version 1.3 reserves; a reader has no way to tell its length");
             }
             if (command >= STREAM_COUNT) {
                 throw new FormatException("frame " + frame + " pops stream " + command
@@ -451,7 +451,7 @@ public final class YmrReader {
 
         if (frame != frameCount) {
             throw new FormatException("the command stream holds " + frame
-                    + " end-of-frame bytes, not the " + frameCount + " the header asks for");
+                    + " end-of-frame bytes, not the " + frameCount + " the header declares");
         }
         if (commands.length != 0 && commands[commands.length - 1] != END_OF_FRAME) {
             throw new FormatException("the command stream ends in the middle of a frame: there "

@@ -25,7 +25,7 @@ import org.ymx.Tune;
  */
 public final class Ym6Reader {
 
-    /** One parsed tune, in the file's own terms and nobody else's: what the
+    /** One parsed tune, in the file's own terms and nothing else's: what the
      *  header said, the frames as read, and the samples as stored.
      *
      *  <p>{@code registers[r][frame]} is R{@code r}'s raw value, all sixteen

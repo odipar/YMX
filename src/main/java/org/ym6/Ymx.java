@@ -257,7 +257,7 @@ public final class Ymx {
                                 int timerMap, int startMin, int startSec, int startFrame,
                                 int endFrame, int frameCount) {
         // The floor only: how many streams a tune decodes depends on the
-        // channels it names, which the encoder learns when it compiles the
+        // channels it names, which the encoder derives when it compiles the
         // script and checks again there.
         String problem = YmxFormat.checkShape(ringSize, chunk, Math.max(unit, 1),
                 YmxFormat.STREAM_A0);

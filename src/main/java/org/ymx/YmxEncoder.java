@@ -11,11 +11,11 @@ import org.st4.Units;
 
 /**
  * Turns a {@link Tune} into a {@code .ymx} file: fourteen register vectors,
- * masked down to what a plain YM2149 sees, plus the compiled effect script
+ * masked down to what a plain YM2149 receives, plus the compiled effect script
  * streams and the sample table, each vector packed as its own embedded
  * ST4 container.
  *
- * <p>Nothing here knows what file the tune was read out of, and nothing here
+ * <p>Nothing here depends on what file the tune was read out of, and nothing
  * can find out: a front end has already turned its own format into the
  * engine's model and stopped. That is what lets a second front end be a peer
  * of the first rather than a client of it.
@@ -120,7 +120,7 @@ public final class YmxEncoder {
     /**
      * The whole encoder, with the channel-to-timer map the T stream carries.
      *
-     * <p>From this line down nothing knows which format the tune was read out
+     * <p>From this line down nothing depends on which format the tune was read
      * of. The frame streams are the chip state whatever wrote it, the timer
      * streams are already normalized, and how the source triggers and stops
      * arrives with the tune as its {@link EffectScript.Semantics}.

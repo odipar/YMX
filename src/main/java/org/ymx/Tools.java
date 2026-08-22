@@ -9,8 +9,8 @@ import java.util.List;
  * What the build tools need from the world outside the JVM: where the repo
  * is, and how to run rmac.
  *
- * <p>The shell wrappers pass the repository root in, since a class file knows
- * only where its own jar or directory sits; the fallback covers running the
+ * <p>The shell wrappers pass the repository root in, since a class file can
+ * locate only its own jar or directory; the fallback covers running the
  * tools straight from {@code target/classes} without a wrapper.
  */
 public final class Tools {
@@ -43,7 +43,7 @@ public final class Tools {
      *
      * <p>rmac is run from inside the work directory on short relative names:
      * it crashes - SIGTRAP, not an error message - on long include paths, and
-     * that is not something a caller can be trusted to remember.
+     * that is not something to leave to every caller.
      */
     public static void run(Path directory, List<String> command) {
         try {

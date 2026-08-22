@@ -32,7 +32,7 @@ public final class MkSndh {
 
     private MkSndh() {}
 
-    /** What the caller asked for; every field but the tunes has a default. */
+    /** What the caller requested; every field but the tunes has a default. */
     public record Options(Path output, List<Path> tunes, String title,
                           @Nullable String composer, @Nullable List<String> names,
                           boolean perf, boolean maskBurst) {
@@ -130,7 +130,7 @@ public final class MkSndh {
 
     /**
      * The tag block: the player's build-time equates, then the SNDH tags in
-     * the order the spec asks for them - the '##' subtune count before any
+     * the order the spec requires - the '##' subtune count before any
      * per-subtune table, and the names last.
      */
     private static String tags(Options options, YmxHeader set, int n,
