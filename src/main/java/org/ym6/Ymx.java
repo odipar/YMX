@@ -1,0 +1,575 @@
+package org.ym6;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.function.IntPredicate;
+import org.jspecify.annotations.Nullable;
+import org.ymx.EffectScript;
+import org.ymx.Tune;
+import org.ymx.YmxEncoder;
+import org.ymx.YmxFormat;
+
+/**
+ * Command-line YM to ymx packer: reads a YM5!/YM6! register dump and writes a
+ * {@code .ymx} file that the 68000 {@code YMX.S} player streams through ST4.
+ *
+ * <p>The player covers the fourteen standard YM2149 registers and the YM
+ * special effects - digidrums, SID voices, the sync-buzzer - extracted into
+ * their own streams; only the never-implemented sinus-SID is dropped.
+ *
+ * <p>The class is named after the format it writes rather than the one it
+ * reads, which reads oddly beside {@code org.ymr.Ymr} in the package next
+ * door. It stays that way because the name is published: the pom's
+ * {@code exec:exec@ymx} profile, {@code ymx/README.md} and the Python test
+ * rigs all spell it out on a command line, and a rename would break every
+ * one of them to settle a matter of taste.
+ */
+public final class Ymx {
+
+    private Ymx() {}
+
+    public static void main(String[] args) {
+        // -meta: the YM header's strings and rate, one per line, for the
+        // build scripts to carry into SNDH tags - no banner, no packing.
+        if (args.length == 2 && args[0].equals("-meta")) {
+            Ym6Reader.Song song;
+            try {
+                song = Ym6Reader.read(Files.readAllBytes(Path.of(args[1])));
+            } catch (IOException | Ym6Reader.FormatException e) {
+                throw error(args[1] + ": " + e.getMessage());
+            }
+            System.out.println(song.name().strip());
+            System.out.println(song.author().strip());
+            System.out.println(song.playerHz());
+            return;
+        }
+        // -script: the compiled effect script, one line per acting frame -
+        // the debugging window into what the v2 streams will carry.
+        if (args.length == 2 && args[0].equals("-script")) {
+            Ym6Reader.Song song;
+            try {
+                song = Ym6Reader.read(Files.readAllBytes(Path.of(args[1])));
+            } catch (IOException | Ym6Reader.FormatException e) {
+                throw error(args[1] + ": " + e.getMessage());
+            }
+            int loop = (int) Math.min(song.loopFrame(), Integer.MAX_VALUE);
+            EffectScript.Result script = EffectScript.compile(YmEffects.tune(song),
+                    loop < song.frames() ? loop : 0, 1);
+            System.out.printf("%d frames, split %d%n", script.frames(), script.split());
+            for (int f = 0; f < script.frames(); f++) {
+                if (script.m()[f] == 0 && script.r7force()[f] == 0) {
+                    continue;
+                }
+                StringBuilder line = new StringBuilder(String.format(
+                        "%6d  M=%02X X=%02X T=%02X", f, script.m()[f] & 0xFF,
+                        script.x()[f] & 0xFF, script.timers()[f] & 0xFF));
+                for (int c = 0; c < script.actions().length; c++) {
+                    line.append(String.format(" A%d=%02X P%d=%3d", c,
+                            script.actions()[c][f] & 0xFF, c,
+                            script.counts()[c][f] & 0xFF));
+                }
+                System.out.printf("%s R7|=%02X%n", line,
+                        script.r7force()[f] & 0xFF);
+            }
+            script.notes().forEach(n -> System.out.println("note: " + n));
+            return;
+        }
+        System.out.println("YMX: YM chiptune packer v1.0 by Robbert van Dalen, "
+                + "streaming ST4");
+
+        int ringSize = YmxFormat.DEFAULT_RING_SIZE;
+        int chunk = YmxFormat.DEFAULT_CHUNK;
+        int unit = 0;                           // 0 until chosen: -kK, or the
+        int loopFrame = -1;                     // tune's shape; -1 likewise
+        boolean playOnce = false;
+        boolean forcedMode = false;
+        boolean sidResume = false;
+        int startMin = 0;                       // the trim window, for zooming
+        int startSec = 0;                       // in on a moment of a tune
+        int startFrame = -1;
+        int endFrame = -1;
+        int frameCount = -1;
+        int drumHz = YmEffects.MAX_TIMER_HZ;
+        int timerMap = YmxFormat.DEFAULT_TIMERS;
+        int i = 0;
+        for (; i < args.length && args[i].startsWith("-"); i++) {
+            switch (args[i]) {
+                case "-f" -> forcedMode = true;
+                case "-o" -> playOnce = true;
+                case "-sidresume" -> sidResume = true;
+                default -> {
+                    if (args[i].startsWith("-timers")) {
+                        timerMap = parseTimers(args[i].substring(7));
+                    } else if (args[i].startsWith("-drumhz")) {
+                        drumHz = parseNumber(args[i].substring(7));
+                    } else if (args[i].startsWith("-startframe")) {
+                        startFrame = parseNumber(args[i].substring(11), true);
+                    } else if (args[i].startsWith("-endframe")) {
+                        endFrame = parseNumber(args[i].substring(9), true);
+                    } else if (args[i].startsWith("-frames")) {
+                        frameCount = parseNumber(args[i].substring(7), true);
+                    } else if (args[i].startsWith("-min")) {
+                        startMin = parseNumber(args[i].substring(4), true);
+                    } else if (args[i].startsWith("-sec")) {
+                        startSec = parseNumber(args[i].substring(4), true);
+                    } else if (args[i].startsWith("-n")) {
+                        ringSize = parseNumber(args[i].substring(2));
+                    } else if (args[i].startsWith("-c")) {
+                        chunk = parseNumber(args[i].substring(2));
+                    } else if (args[i].startsWith("-k")) {
+                        unit = parseNumber(args[i].substring(2));
+                    } else if (args[i].startsWith("-l")) {
+                        loopFrame = parseNumber(args[i].substring(2), true);
+                    } else {
+                        throw error("Invalid parameter " + args[i]);
+                    }
+                }
+            }
+        }
+
+        // A trailing DIRECTORY collects a whole set: every argument before it
+        // is an input, each packed with the identical configuration into
+        // <dir>/<stem>.ymx - the shape a multi-tune player needs, since one
+        // player build serves one unit size and one workspace.
+        if (args.length - i >= 2 && Files.isDirectory(Path.of(args[args.length - 1]))) {
+            if (startMin != 0 || startSec != 0 || startFrame >= 0
+                    || endFrame >= 0 || frameCount >= 0) {
+                throw error("the trim options take one tune, not a set");
+            }
+            if (unit == 0) {
+                unit = 2;               // uniform by construction: padding
+            }                           // makes any shape fit, or fails loudly
+            Path dir = Path.of(args[args.length - 1]);
+            for (int input = i; input < args.length - 1; input++) {
+                String stem = Path.of(args[input]).getFileName().toString()
+                        .replaceAll("(?i)\\.ym$", "");
+                packOne(args[input], dir.resolve(stem + ".ymx").toString(),
+                        ringSize, chunk, unit, loopFrame, playOnce, forcedMode,
+                        drumHz, sidResume, timerMap, 0, 0, -1, -1, -1);
+            }
+            return;
+        }
+
+        String outputName;
+        if (args.length == i + 1) {
+            outputName = args[i] + ".ymx";
+        } else if (args.length == i + 2) {
+            outputName = args[i + 1];
+        } else {
+            usage("""
+                    Usage: ymx [-f] [-o] [-nN] [-cC] [-kK] [-lF] input.ym [output.ymx]
+                           ymx [options] one.ym two.ym more.ym output-dir/
+                      -f      Force overwrite of output file
+                      -o      Play once: pack no loop section
+                      -nN     Ring size per stream, in bytes (default 960)
+                      -cC     Values decoded per call, and the round-robin group
+                              size (default 24; N mod C = 0, and C at
+                              least the streams the tune decodes: 17 with
+                              no timer channel, 21 for a YM tune, 25 for
+                              one that uses all four)
+                      -kK     ST4 unit size: 1, 2 or 4 (default 2). An odd
+                              tune length or loop frame is padded with safe
+                              duplicate frames - inaudible - to fit the unit.
+                              The player must be built with the same ST4_UNIT
+                      -lF     Loop from frame F, overriding the YM header
+                      -minM -secS   Trim: drop everything before M:S, so a
+                              moment deep in a long tune plays immediately
+                      -drumhzH   The drum rate ceiling (default 25600): a drum
+                              asking for a faster timer is downsampled to fit,
+                              with a warning
+                      -timersT   Which MFP timer each channel runs on, one
+                              letter per channel from 0 up: -timersBC puts
+                              channel 0 on Timer B and channel 1 on Timer C.
+                              The default is AD, where a YM tune has always
+                              played. Timer C is the system's 200 Hz clock,
+                              so a tune that takes it stops that clock and
+                              cannot be hosted from a Timer C interrupt
+                      -sidresume   The maxYMiser SID gap model: a released
+                              SID's timer keeps counting and a re-arrival
+                              resumes its phase. Default: the ym2149-rs
+                              model, phase-zero restarts
+                      -startframeF -endframeF -framesN   The same window in
+                              frames: start, end, or a length cap
+
+                    The input is a YM5!/YM6! dump, LHA-archived or already
+                    unpacked - the reader tells them apart by itself. With a
+                    trailing DIRECTORY, every argument before it is an input,
+                    packed with the same configuration - the set one player
+                    build can hold as subtunes.""");
+            return;
+        }
+        packOne(args[i], outputName, ringSize, chunk, unit, loopFrame, playOnce,
+                forcedMode, drumHz, sidResume, timerMap, startMin, startSec, startFrame,
+                endFrame, frameCount);
+    }
+
+    /** The whole pipeline for one tune: read, trim, pad, pack, write, report. */
+    /**
+     * {@code -timersABCD}: which MFP timer each channel runs on, one letter
+     * per channel from channel 0 up. Letters left off keep the default, so
+     * {@code -timersBC} moves the two channels a YM tune uses onto Timers B
+     * and C and leaves the rest alone. Two channels may not name the same
+     * timer.
+     */
+    private static int parseTimers(String spec) {
+        int map = YmxFormat.DEFAULT_TIMERS;
+        if (spec.isEmpty() || spec.length() > YmxFormat.CHANNELS) {
+            throw error("-timers takes one letter per channel, up to "
+                    + YmxFormat.CHANNELS + ": -timersBC, say");
+        }
+        boolean[] taken = new boolean[4];
+        int[] timers = new int[YmxFormat.CHANNELS];
+        java.util.Arrays.fill(timers, -1);
+        for (int channel = 0; channel < spec.length(); channel++) {
+            int timer = "ABCD".indexOf(Character.toUpperCase(spec.charAt(channel)));
+            if (timer < 0) {
+                throw error("-timers: '" + spec.charAt(channel)
+                        + "' is not one of the MFP's timers A, B, C or D");
+            }
+            if (taken[timer]) {
+                throw error("-timers: two channels cannot both run on Timer "
+                        + "ABCD".charAt(timer));
+            }
+            taken[timer] = true;
+            timers[channel] = timer;
+        }
+        // The channels the spec left out take the timers it did not, in
+        // order, so the map stays a permutation however short the spec is.
+        int spare = 0;
+        map = 0;
+        for (int channel = 0; channel < YmxFormat.CHANNELS; channel++) {
+            if (timers[channel] < 0) {
+                while (taken[spare]) {
+                    spare++;
+                }
+                taken[spare] = true;
+                timers[channel] = spare;
+            }
+            map |= timers[channel] << (2 * channel);
+        }
+        return map;
+    }
+
+    private static void packOne(String inputName, String outputName, int ringSize,
+                                int chunk, int unit, int loopFrame, boolean playOnce,
+                                boolean forcedMode, int drumHz, boolean sidResume,
+                                int timerMap, int startMin, int startSec, int startFrame,
+                                int endFrame, int frameCount) {
+        // The floor only: how many streams a tune decodes depends on the
+        // channels it names, which the encoder learns when it compiles the
+        // script and checks again there.
+        String problem = YmxFormat.checkShape(ringSize, chunk, Math.max(unit, 1),
+                YmxFormat.STREAM_A0);
+        if (!problem.isEmpty()) {
+            throw error(problem);
+        }
+
+        byte[] input;
+        try {
+            input = Files.readAllBytes(Path.of(inputName));
+        } catch (IOException e) {
+            throw error("Cannot access input file " + inputName);
+        }
+
+        Path outputPath = Path.of(outputName);
+        if (!forcedMode && Files.exists(outputPath)) {
+            throw error("Already existing output file " + outputName);
+        }
+
+        Ym6Reader.Song song;
+        try {
+            song = Ym6Reader.read(input);
+        } catch (Ym6Reader.FormatException e) {
+            throw error(inputName + ": " + e.getMessage());
+        }
+
+        // The trim window: -minM -secS (or -startframeF) picks where to start,
+        // -framesN (or -endframeF) how much to keep - everything before and
+        // after is dropped, so a moment deep in a long tune plays immediately.
+        // A loop frame inside the kept window is kept, adjusted; one outside
+        // it makes the excerpt loop from its own start.
+        int start = startFrame >= 0 ? startFrame
+                : (startMin * 60 + startSec) * song.playerHz();
+        int end = song.frames();
+        if (endFrame >= 0) {
+            end = Math.min(end, endFrame);
+        }
+        if (frameCount >= 0) {
+            end = Math.min(end, start + frameCount);
+        }
+        if (start > 0 || end < song.frames()) {
+            if (start < 0 || start >= end) {
+                throw error("Empty trim window: frames " + start + ".." + end
+                        + " of " + song.frames());
+            }
+            byte[][] cut = new byte[song.registers().length][];
+            for (int r = 0; r < cut.length; r++) {
+                cut[r] = java.util.Arrays.copyOfRange(song.registers()[r], start, end);
+            }
+            long loop = song.loopFrame() >= start && song.loopFrame() < end
+                    ? song.loopFrame() - start : 0;
+            song = new Ym6Reader.Song(song.format(), end - start, song.playerHz(),
+                    song.masterClock(), loop, song.interleaved(), song.attributes(),
+                    song.drums(), song.name(), song.author(), song.comment(), cut);
+            System.out.printf("Trimmed to frames %d-%d: %d frames%n",
+                    start, end - 1, end - start);
+        }
+
+        // The YM header's loop frame is the default; -lF overrides it and -o
+        // drops the loop altogether.
+        if (loopFrame < 0 && !playOnce) {
+            loopFrame = (int) Math.min(song.loopFrame(), Integer.MAX_VALUE);
+        }
+        if (playOnce) {
+            loopFrame = -1;
+        }
+        // Wild headers name a loop frame past the end of their own tune, and
+        // so may a hand-typed -lF; the check has to cover both, because the
+        // padding probes the frame BEFORE the split and an out-of-range one
+        // walks off the register array rather than reaching the encoder's own
+        // complaint. It used to sit inside the branch above and catch only
+        // the header's.
+        if (loopFrame >= song.frames()) {
+            System.out.printf("Warning: the loop frame is %d in a %d-frame tune;"
+                    + " looping from the start instead%n", loopFrame, song.frames());
+            loopFrame = 0;
+        }
+
+        // The boundary: from here on the tune is the engine's, and the dump is
+        // kept only for what the report and the padding rule have to say about
+        // the FILE - its dialect, its strings, where its effect codes sit. The
+        // extraction happens here rather than inside the encoder because its
+        // drop counters are a statement about the file, and padding, which
+        // comes next, invents frames the file never had.
+        YmEffects.Extraction effects = YmEffects.extract(song, drumHz);
+        Tune tune = YmEffects.tune(song, effects);
+        // -sidresume is the one source semantic a listener picks rather than a
+        // format: no YM file records which gap model its own player used, so
+        // the front end's answer is a default and this overrides it, the way
+        // -lF overrides the loop frame the header carries.
+        if (sidResume) {
+            tune = tune.under(tune.semantics().resuming());
+        }
+
+        // The default unit is 2, measured a few percent cheaper per frame for
+        // little ratio. A tune whose length or loop frame is odd is PADDED to
+        // the shape: a duplicated frame holds the chip state one tick longer,
+        // which is inaudible as long as the duplicate neither writes R13 (an
+        // envelope restart) nor triggers a drum - the packer scans for a safe
+        // frame and says what it did. An explicit -kK pads the same way and
+        // fails loudly only when no safe frame exists.
+        if (unit == 0 && chunk % 2 == 0) {
+            Tune padded = padToUnit(song, tune, loopFrame, 2);
+            if (padded != null) {
+                if (padded != tune) {
+                    tune = padded;
+                    loopFrame = loopFrame > 0 ? tune.loopFrame() : loopFrame;
+                }
+                unit = 2;
+            } else {
+                unit = 1;
+                System.out.println("Packing at -k1: this tune's shape is not "
+                        + "a whole number of 2-byte units, and no frame near "
+                        + "the boundary is safe to duplicate");
+            }
+        } else if (unit == 0) {
+            unit = 1;
+        } else if (unit > 1) {
+            Tune padded = padToUnit(song, tune, loopFrame, unit);
+            if (padded != null && padded != tune) {
+                tune = padded;
+                loopFrame = loopFrame > 0 ? tune.loopFrame() : loopFrame;
+            }
+        }
+
+        YmxEncoder.Result result;
+        try {
+            result = YmxEncoder.encode(tune, ringSize, chunk, loopFrame, true, unit,
+                    timerMap);
+        } catch (IllegalArgumentException e) {
+            // The encoder always says what it rejected, but getMessage() is
+            // @Nullable, so give it something to fall back on.
+            String reason = e.getMessage();
+            throw error(reason != null ? reason : "cannot pack this tune with these options");
+        }
+        try {
+            Files.write(outputPath, result.file());
+        } catch (IOException e) {
+            throw error("Cannot write output file " + outputName);
+        }
+
+        report(song, effects, result);
+    }
+
+    /**
+     * Pads the tune to whole {@code unit}s, with the YM dump's own idea of
+     * which frame may be duplicated: {@link Tune#padToUnit} does the work and
+     * this says what is safe. The mechanism is the engine's because a frame is
+     * a column across every stream and stretching one and not the others would
+     * put the effects a frame out; the rule is the dump's because only a YM
+     * reader can see a drum trigger in R1 or R3.
+     *
+     * <p>Returns the tune itself when the shape already fits, the padded tune
+     * otherwise - or null when no safe frame exists near a boundary that needs
+     * one, which is the caller's cue to drop to {@code -k1}.
+     */
+    static @Nullable Tune padToUnit(Ym6Reader.Song song, Tune tune, int loopFrame,
+                                    int unit) {
+        Tune padded = Tune.padToUnit(tune, loopFrame, unit, safeToDuplicate(song));
+        if (padded != null && padded != tune) {
+            int added = padded.frames() - tune.frames();
+            System.out.printf("Padded %d frame%s (duplicates of safe frames) so the "
+                    + "shape is whole %d-byte units%n", added, added == 1 ? "" : "s",
+                    unit);
+        }
+        return padded;
+    }
+
+    /**
+     * Which frames of this dump may be duplicated without being heard: R13
+     * quiet, and no drum code in either slot's effect field - a duplicated
+     * drum code would trigger the drum again. The test is on the RAW dump
+     * rather than on the extracted codes, because a code the extraction
+     * dropped is still a code the frame's registers carry, and the tune plays
+     * the same either way while the frames near the boundary are cheap.
+     */
+    private static IntPredicate safeToDuplicate(Ym6Reader.Song song) {
+        byte[][] r = song.registers();
+        boolean ym6 = song.format().startsWith("YM6");
+        return f -> {
+            if ((r[13][f] & 0xFF) != 0xFF) {
+                return false;                   // this frame restarts the
+            }                                   // envelope: not twice
+            int c1 = r[1][f] & 0xF0;
+            int c3 = r[3][f] & 0xF0;
+            boolean drum = ym6 ? (c1 & 0xC0) == 0x40 && (c1 & 0x30) != 0
+                    || (c3 & 0xC0) == 0x40 && (c3 & 0x30) != 0
+                    : (c3 & 0x30) != 0;
+            return !drum;
+        };
+    }
+
+    private static void report(Ym6Reader.Song song, YmEffects.Extraction effects,
+                               YmxEncoder.Result result) {
+        Tune tune = result.tune();
+        System.out.printf("%s: %s%s%s%n", song.format(),
+                song.name().isBlank() ? "(untitled)" : song.name(),
+                song.author().isBlank() ? "" : " by " + song.author(),
+                song.interleaved() ? "" : " (de-interleaved)");
+        if (effects.samples().length > 0) {
+            int bytes = 0;
+            for (byte[] sample : effects.samples()) {
+                bytes += sample.length + 1;
+            }
+            System.out.printf("%d digidrum%s, %d bytes%n", effects.samples().length,
+                    effects.samples().length == 1 ? "" : "s", bytes);
+        }
+        if (effects.sinus() > 0) {
+            System.out.printf("Warning: %d Sinus-SID frame%s dropped (unimplemented "
+                    + "everywhere, the reference player included)%n",
+                    effects.sinus(), effects.sinus() == 1 ? "" : "s");
+        }
+        if (effects.tooFast() > 0) {
+            System.out.printf("Warning: %d effect frame%s dropped: timer above %d Hz%n",
+                    effects.tooFast(), effects.tooFast() == 1 ? "" : "s",
+                    YmEffects.MAX_TIMER_HZ);
+        }
+        if (effects.missingDrum() > 0) {
+            System.out.printf("Warning: %d drum trigger%s dropped: no such sample%n",
+                    effects.missingDrum(), effects.missingDrum() == 1 ? "" : "s");
+        }
+        for (String note : effects.notes()) {
+            System.out.println("Warning: " + note);
+        }
+
+        // The PLAYED length, not the tune's: a rotated split hands the file
+        // some frames twice, and those bytes are in it and were packed. The
+        // line above still counts the tune, because that is the length a
+        // musician has - but a ratio has to be against what was packed.
+        int raw = result.script().frames() * YmxFormat.STREAMS;
+        System.out.printf("%d frames at %d Hz (%d:%02d), %d rings of %d bytes, %d per call%n",
+                tune.frames(), tune.frameRate(),
+                tune.frames() / tune.frameRate() / 60,
+                tune.frames() / tune.frameRate() % 60,
+                YmxFormat.STREAMS, result.ringSize(), result.chunk());
+        System.out.println(result.loops()
+                ? result.loopFrame() == 0
+                        ? "Loops from the start"
+                        : "Plays frames 0-" + (result.loopFrame() - 1)
+                                + ", then loops from frame " + result.loopFrame()
+                : "Plays once, then stops");
+        String[] effectNames = {"M ", "X ", "T ", "A0", "P0", "A1", "P1",
+                                "A2", "P2", "A3", "P3"};
+        for (YmxEncoder.Stream stream : result.streams()) {
+            String name = stream.register() < YmxFormat.REGISTER_STREAMS
+                    ? String.format("R%-2d", stream.register())
+                    : effectNames[stream.register() - YmxFormat.REGISTER_STREAMS] + " ";
+            System.out.printf("  %s %-5s %6d -> %6d bytes (%5.1f%%)%n", name,
+                    stream.loop() ? "loop" : "intro", stream.frames(), stream.packedSize(),
+                    100.0 * stream.packedSize() / stream.frames());
+        }
+        System.out.printf("Packed %d register bytes into %d (%.1f%%), file %d bytes%n",
+                raw, result.packedSize(), 100.0 * result.packedSize() / raw, result.file().length);
+        int flags = ((result.file()[YmxFormat.OFFSET_FLAGS] & 0xFF) << 8)
+                | (result.file()[YmxFormat.OFFSET_FLAGS + 1] & 0xFF);
+        // The chunk is a slot count: one stream refilled per call, so it has
+        // to cover the streams this tune DECODES, not all the format defines.
+        int live = YmxFormat.liveStreams(flags);
+        System.out.printf("Player needs %d bytes of ring plus its state, and"
+                        + " decodes %d of the %d streams - one refill a call,"
+                        + " so C=%d covers them with %d slots idle%n",
+                YmxFormat.STREAMS * result.ringSize(), live, YmxFormat.STREAMS,
+                result.chunk(), result.chunk() - live);
+        for (String note : result.script().notes()) {
+            System.out.println(note);
+        }
+
+        if (result.longestOp() > 65535) {
+            // A literal run, the one operation ZX1 cannot split. Only a tune
+            // longer than 65535 frames with a register that never repeats can
+            // reach this, and the 68000 decoder would mis-decode it.
+            System.out.printf("Warning: longest operation is %d bytes, over the 65535 the "
+                    + "68000 decoder can represent: do not play this file%n",
+                    result.longestOp());
+        }
+    }
+
+    private static RuntimeException error(String message) {
+        System.err.println("Error: " + message);
+        System.exit(1);
+        throw new AssertionError("unreachable");
+    }
+
+    private static void usage(String text) {
+        System.err.println(text);
+        System.exit(1);
+    }
+
+    private static int parseNumber(String argument) {
+        return parseNumber(argument, false);
+    }
+
+    /**
+     * Parses a numeric argument, refusing a negative one and, unless
+     * {@code zeroAllowed}, a zero.
+     *
+     * <p>Zero is a real answer for a loop frame and for every part of the trim
+     * window - {@code -min0 -sec13} is how a caller says thirteen seconds in,
+     * and {@code -startframe0} says the same thing again. It is nonsense for a
+     * ring, a chunk, a unit or a rate ceiling, which is why the default stands
+     * for those. A window that comes out empty is caught where the window is
+     * worked out, and says so in those words rather than as a bad parameter.
+     */
+    private static int parseNumber(String argument, boolean zeroAllowed) {
+        try {
+            int value = Integer.parseInt(argument);
+            if (value < 0 || (value == 0 && !zeroAllowed)) {
+                throw error("Invalid parameter value " + argument);
+            }
+            return value;
+        } catch (NumberFormatException e) {
+            throw error("Invalid parameter value " + argument);
+        }
+    }
+}

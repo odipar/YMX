@@ -1,0 +1,57 @@
+.idea
+target/
+*.class
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+.kotlin
+
+### IntelliJ IDEA ###
+.idea/modules.xml
+.idea/jarRepositories.xml
+.idea/compiler.xml
+.idea/libraries/
+*.iws
+*.iml
+*.ipr
+
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### Mac OS ###
+.DS_Store
+.claude/worktrees/
+
+# the differential rigs cache packed corpora here
+68k/test/emu/.st4/
+__pycache__/
+
+# the SNDH/PRG build scripts leave their scratch next to the output
+.sndh_work/
+.ym_work/
+.prg_work/
+
+# the YM player rig caches packed corpora and its SNDH build here
+ymx/test/emu/.work/
+
+# rig scratch: assembled probes and packed tunes
+ymx/test/emu/.work*/
