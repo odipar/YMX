@@ -60,3 +60,6 @@ ymx/test/emu/.work*/
 ymx/test/tune.ymx
 ymx/test/ymxdata.inc
 ymx/test/YMXTEST.PRG
+
+# The play scripts build <stem>-n<ring>-c<chunk>[-k<unit>]/ beside the tune
+*-n[0-9]*-c[0-9]*/
