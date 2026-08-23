@@ -349,11 +349,12 @@ YH_SECTIONS     equ     30              ; one offset per stream: its section,
                                         ; covering every frame of the tune
 
 YMX_MAGIC       equ     $594D5821       ; 'YMX!'
-YMX_VERSION     equ     1               ; YMX starts at 1: the layout is the
-                                        ; one .yx6 reached over ten revisions
-                                        ; inside ST4, adopted whole and
-                                        ; renumbered, so there is no older
-                                        ; version to stay compatible with
+YMX_VERSION     equ     1               ; YMX starts at 1: it began as ST4's
+                                        ; .yx6 container, adopted and
+                                        ; renumbered, and the layout has moved
+                                        ; since - doc/SPEC.md is where it is
+                                        ; now. There is no older version to
+                                        ; stay compatible with
 YMX_FLAG_LOOPS  equ     1               ; header flag: the tune starts over
 YMX_FLAG_CHAN   equ     2               ; and one per timer channel, from bit
                                         ; 1 up: set when the tune uses it,
@@ -503,7 +504,7 @@ YMX_init:
 
 ; The cursor reaches the script rings by fixed hops: 14*N to M, computed
 ; once, and the three parameter offsets (8+voice)*N the handlers read the
-; the toggle volume, retrigger shape and sample number through.
+; toggle volume and the sample number through - the shape is stream X's.
         move.w  YMX_N(a3),d0
         mulu.w  #14,d0
         move.l  d0,YMX_EFXOFF(a3)
@@ -785,7 +786,7 @@ ymx_reopen:
 ; header-relative offsets, exactly as ST4.S documents - and tail-calls
 ; ST4_init: its rts returns to ymx_open's caller with the decoder registers
 ; as ST4_init leaves them. ST4_init clobbers a3; callers restore it
-; themselves, init from the stack and the loop restart from a6.
+; themselves, init from the stack and ymx_reopen from a6.
 ; -----------------------------------------------------------------------------
 ymx_open:
         movea.l a0,a2
@@ -1155,9 +1156,9 @@ ymx_parmoff:
 ; patched operand is addressed pc-relatively so the player stays loadable
 ; anywhere - which also means it must run from RAM, where a demo lives.
 ;
-; The channels' handlers are the same text three times, and MUST stay
+; The timers' handlers are the same text four times, and MUST stay
 ; byte-congruent: the action handlers reach every patched operand through ISR_
-; offsets measured on channel 1's block, and ymx_link walks the blocks at a
+; offsets measured on Timer A's block, and ymx_link walks the blocks at a
 ; fixed stride. The rig checks both from the symbol table. The park entries -
 ; where YMX_init aims the vectors while no effect runs - are the handlers' own
 ; tails.
@@ -1341,7 +1342,7 @@ ymx_perf_acc:
         dc.w    0                       ; the ticks' estimated cost since the
         .endif                          ; last frame, in 10-cycle quanta
 
-; Where the patched operands sit, measured on channel 1's block; the other
+; Where the patched operands sit, measured on Timer A's block; the other
 ; blocks are byte-congruent, so the same offsets serve all of them through
 ; CH_ISR.
 ISR_PCM_SEL    equ     PERF_PAD+3
@@ -1391,7 +1392,7 @@ ymx_link:
 ;
 ; A channel whose timer changes while it runs is not stopped here: the
 ; packer only moves a channel between streams, and the design note says
-; why. Clobbers d0-d2, a0-a2.
+; why. Clobbers d0-d2, a1-a2; a0 survives, and the frame's caller uses that.
 ; -----------------------------------------------------------------------------
 ymx_assign:
         lea     ymx_desc_0(pc),a1
@@ -1444,9 +1445,8 @@ ymx_verbs:
         dc.w    ymx_pcm-ymx_verbs
         dc.w    ymx_pcm_preempt-ymx_verbs
 
-; The voice's parameter ring byte - the toggle volume, the retrigger shape
-; or the sample number ride the voice's own register stream, marked by the
-; script.
+; The two operands the verbs read out of the rings: a voice's parameter
+; byte off its own register stream, and the shape off stream X.
 ;
 ; ymx_shape: the envelope shape a retrigger stream must restart. A toggle
 ; stream's volume and a PCM stream's number are read off the voice's own
