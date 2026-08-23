@@ -36,50 +36,52 @@ final class YmxTest {
     }
 
     @Test
-    void padsOddShapesWithSafeDuplicateFrames() {
-        Ym6Reader.Song dump = song();               // an even-shaped tune:
+    void padsOddLengthsWithSafeDuplicateFrames() {
+        Ym6Reader.Song dump = song();               // an even-length tune:
         Tune source = YmEffects.tune(dump);
-        assertSame(source, Ymx.padToUnit(dump, source, 200, 2));  // nothing to do
+        assertSame(source, Ymx.padToUnit(dump, source, 2));  // nothing to do
 
-        // An odd loop split: one duplicated frame evens it, and the whole
-        // tune grows by one more to keep the length even too.
-        Tune padded = Ymx.padToUnit(dump, source, 201, 2);
+        // An odd length: one duplicated frame evens it.
+        byte[][] registers = Ym6TestData.registers(FRAMES - 1);
+        Ym6Reader.Song odd = Ym6Reader.read(
+                Ym6TestData.file(registers, FRAMES - 1, true));
+        Tune oddTune = YmEffects.tune(odd);
+        Tune padded = Ymx.padToUnit(odd, oddTune, 2);
         assertNotNull(padded);
-        assertEquals(source.frames() + 2, padded.frames());
-        assertEquals(202, padded.loopFrame());
-        // Every stream grew by the same two frames, because a frame is a
-        // column across all of them and the effects would otherwise play
-        // against the wrong registers from the duplicate on.
+        assertEquals(oddTune.frames() + 1, padded.frames());
+        // Every stream grew by the same frame, because a frame is a column
+        // across all of them and the effects would otherwise play against the
+        // wrong registers from the duplicate on.
         for (byte[] codes : padded.codes()) {
             assertEquals(padded.frames(), codes.length);
         }
-        // The intro gained a duplicate near the split: frame content around
-        // it is a copy, and everything before is untouched.
+        // The duplicate sits near the end: everything before is untouched.
         for (int r = 0; r < YmxFormat.REGISTER_STREAMS; r++) {
-            assertEquals(source.registers()[r][0], padded.registers()[r][0]);
+            assertEquals(oddTune.registers()[r][0], padded.registers()[r][0]);
         }
     }
 
     @Test
-    void givesUpOnAShapeWithNoSafeFrameNearTheBoundary() {
+    void givesUpOnALengthWithNoSafeFrameNearTheEnd() {
         // Every frame writes R13, so no frame may be duplicated: an envelope
         // restarted twice is audible, the whole of the predicate.
-        byte[][] registers = Ym6TestData.registers(FRAMES);
-        for (int frame = 0; frame < FRAMES; frame++) {
+        byte[][] registers = Ym6TestData.registers(FRAMES - 1);
+        for (int frame = 0; frame < FRAMES - 1; frame++) {
             registers[13][frame] = 0x0A;
         }
-        Ym6Reader.Song dump = Ym6Reader.read(Ym6TestData.file(registers, FRAMES, true));
+        Ym6Reader.Song dump = Ym6Reader.read(
+                Ym6TestData.file(registers, FRAMES - 1, true));
 
-        assertNull(Ymx.padToUnit(dump, YmEffects.tune(dump), 201, 2),
-                "no safe frame near the split, so the caller has to fall back to -k1");
+        assertNull(Ymx.padToUnit(dump, YmEffects.tune(dump), 2),
+                "no safe frame near the end, so the caller has to fall back to -k1");
     }
 
     // ------------------------------------------------------- the command line
 
     /**
-     * The CLI's own arithmetic, which nothing exercised before: trimming,
-     * the loop-frame override, and what each does to a tune whose numbers do
-     * not fit. These run {@link Ymx#main} rather than reaching past it,
+     * The CLI's own arithmetic, which nothing exercised before: trimming, and
+     * what it does to a tune whose numbers do not fit. These run
+     * {@link Ymx#main} rather than reaching past it,
      * because the bugs they are here for lived in the order its steps run in
      * rather than in any one of them.
      */
@@ -108,20 +110,14 @@ final class YmxTest {
     }
 
     @Test
-    void aLoopFrameOffTheEndOfTheTuneIsRefusedRatherThanReachedFor(@TempDir Path dir)
+    void playOnceClearsTheFlagTheHeaderOtherwiseSets(@TempDir Path dir)
             throws Exception {
-        // The padding probes the frame BEFORE the split, so a -lF past the end
-        // used to walk off the register array with an index out of bounds. An
-        // ODD one is the case that did it: an even one leaves no split padding
-        // to do and reaches the encoder's own complaint instead.
-        String report = pack(dir, "far.ymx", "-l" + (FRAMES + 501));
-
-        assertTrue(report.contains("looping from the start instead"), report);
-        assertTrue(Files.exists(dir.resolve("far.ymx")), "it should still pack");
+        assertTrue(pack(dir, "over.ymx").contains("Plays through, then starts over"));
+        assertTrue(pack(dir, "once.ymx", "-o").contains("Plays once, then stops"));
     }
 
     @Test
-    void aTrimWindowMovesTheLoopFrameWithIt(@TempDir Path dir) throws Exception {
+    void aTrimWindowCutsEveryTimelineWithIt(@TempDir Path dir) throws Exception {
         String report = pack(dir, "cut.ymx", "-startframe300", "-frames500");
 
         assertTrue(report.contains("Trimmed to frames 300-799: 500 frames"), report);
@@ -158,10 +154,10 @@ final class YmxTest {
     @Test
     void theReportCountsTheBytesTheFileActuallyCarries(@TempDir Path dir)
             throws Exception {
-        // A rotated split hands the file some frames twice. The tune's length
-        // is what a musician has and stays in the first line; the ratio has to
-        // be against what was packed, or it flatters itself by the rotation.
-        String report = pack(dir, "rot.ymx", "-l401");
+        // Padding to whole units hands the file a frame the source never had.
+        // The tune's length is what a musician has and stays in the first
+        // line; the ratio has to be against what was packed.
+        String report = pack(dir, "rot.ymx");
 
         int played = Integer.parseInt(report.replaceAll("(?s).*Packed (\\d+) register.*",
                 "$1")) / YmxFormat.STREAMS;

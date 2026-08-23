@@ -26,13 +26,11 @@ import org.st4.Units;
  * gives the player fourteen independent decoders it can advance one at a
  * time, which keeps the per-VBL cost flat.
  *
- * <p>A looping tune is packed as two sets of sections, split at the loop
- * frame. Looping means restarting a decoder, and a stream can only be
- * restarted from its beginning - so the frames from the loop point on become
- * sections of their own, which the player re-inits every time round. The split
- * costs a little ratio, since the loop half cannot reference the intro half,
- * and costs nothing for the common case of a tune that loops from
- * frame 0.
+ * <p>A tune is one set of sections, whatever it does at the end. A stream can
+ * only be restarted from its beginning, so a tune that repeats plays its
+ * frames again from frame 0: the player re-inits every stream and silences
+ * every effect at the boundary. Nothing is packed twice and nothing is packed
+ * against frames the second pass cannot reach.
  *
  * <p>Each section is packed the way {@code st4} would with
  * {@code -k1 -mN -l65535}: offsets never reach further back than the ring the
@@ -45,13 +43,13 @@ public final class YmxEncoder {
 
     /** What packing one stream's vector produced; the first fourteen stream
      * indices are registers, then M, A1, P1, A2, P2. */
-    public record Stream(int register, boolean loop, int frames, int packedSize, int longestOp) {}
+    public record Stream(int register, int frames, int packedSize, int longestOp) {}
 
     /** The finished file plus the per-stream numbers the CLI reports; the
      * tune is the one that was actually packed, the padded one
      * where the shape needed padding. */
     public record Result(byte[] file, List<Stream> streams, int ringSize, int chunk,
-                         int loopFrame, boolean loops, int unit, Tune tune,
+                         boolean loops, int unit, Tune tune,
                          EffectScript.Result script) {
 
         public int packedSize() {
@@ -68,23 +66,16 @@ public final class YmxEncoder {
 
     /** Packs a tune that plays once and stops. */
     public static Result encode(Tune tune, int ringSize, int chunk) {
-        return encode(tune, ringSize, chunk, -1, true);
+        return encode(tune, ringSize, chunk, false, true);
     }
 
     /**
-     * Packs a tune, looping at {@code loopFrame} - or playing once and stopping
-     * when {@code loopFrame} is negative. A loop frame of 0 means the whole
-     * tune is the loop.
+     * Packs a tune that plays its frames once and then, when {@code loops},
+     * plays them again from the top.
      */
     public static Result encode(Tune tune, int ringSize, int chunk,
-                                int loopFrame) {
-        return encode(tune, ringSize, chunk, loopFrame, true);
-    }
-
-    /** A tune that plays once and stops, with the progress report turned off. */
-    public static Result encode(Tune tune, int ringSize, int chunk,
-                                boolean progress) {
-        return encode(tune, ringSize, chunk, -1, progress);
+                                boolean loops) {
+        return encode(tune, ringSize, chunk, loops, true);
     }
 
     /**
@@ -94,26 +85,26 @@ public final class YmxEncoder {
      * at a terminal, noise anywhere else.
      */
     public static Result encode(Tune tune, int ringSize, int chunk,
-                                int loopFrame, boolean progress) {
-        return encode(tune, ringSize, chunk, loopFrame, progress, 1);
+                                boolean loops, boolean progress) {
+        return encode(tune, ringSize, chunk, loops, progress, 1);
     }
 
     /**
      * As above, packing the sections at {@code unit} bytes per ST4 unit - the
      * player must then be built with the same {@code ST4_UNIT}, which it
      * verifies against each container's signature. Lengths and offsets are
-     * whole units, so the tune length and the loop frame must be multiples of
-     * {@code unit}: a padded section would decode one extra value into the
-     * ring, and it would be played.
+     * whole units, so the tune length must be a multiple of {@code unit}: a
+     * padded section would decode one extra value into the ring, and it would
+     * be played.
      */
     public static Result encode(Tune tune, int ringSize, int chunk,
-                                int loopFrame, boolean progress, int unit) {
+                                boolean loops, boolean progress, int unit) {
         // The default map is a YM tune's, and only a YM tune's: it puts
         // channel 2 on Timer B, where a .ymr needs Timer D. A front end whose
         // format binds its timers passes its own map to the overload below,
         // and both CLIs do; this shorthand is for callers with no such map -
         // which in practice means tests.
-        return encode(tune, ringSize, chunk, loopFrame, progress, unit,
+        return encode(tune, ringSize, chunk, loops, progress, unit,
                 YmxFormat.DEFAULT_TIMERS);
     }
 
@@ -125,7 +116,7 @@ public final class YmxEncoder {
      * streams are already normalized, and how the source triggers and stops
      * arrives with the tune as its {@link EffectScript.Semantics}.
      */
-    public static Result encode(Tune tune, int ringSize, int chunk, int loopFrame,
+    public static Result encode(Tune tune, int ringSize, int chunk, boolean loops,
                                 boolean progress, int unit, int timerMap) {
         // The floor first, on what every tune decodes; the exact check waits
         // for the script, since a tune that leaves channels idle decodes
@@ -135,18 +126,10 @@ public final class YmxEncoder {
         if (!problem.isEmpty()) {
             throw new IllegalArgumentException(problem);
         }
-        boolean loops = loopFrame >= 0;
-        if (loops && loopFrame >= tune.frames()) {
-            throw new IllegalArgumentException("loop frame " + loopFrame
-                    + " is not inside a tune of " + tune.frames() + " frames");
-        }
-        // Without a loop the intro covers everything, the same thing
-        // as looping at the end - so the player needs only one rule.
-        if (tune.frames() % unit != 0 || (loops ? loopFrame : 0) % unit != 0) {
+        if (tune.frames() % unit != 0) {
             throw new IllegalArgumentException("a tune of " + tune.frames()
-                    + " frames splitting at " + (loops ? loopFrame : tune.frames())
-                    + " cannot be packed in " + unit + "-byte units: both must be"
-                    + " multiples of " + unit);
+                    + " frames cannot be packed in " + unit + "-byte units:"
+                    + " its length must be a multiple of " + unit);
         }
 
         // A back-reference may never reach out of the ring the player decodes
@@ -154,14 +137,11 @@ public final class YmxEncoder {
         // still applies above that.
         int offsetLimit = Math.min(ringSize / unit, St4Format.maxOffsetUnits(unit));
 
-        // Every stream's vector, on the PLAYED timeline the script compiled:
-        // registers source-mapped through the split rotation with R7 carrying
-        // the baked mixer force, then the script's own five streams. Bytes a
-        // stream does not consume repeat their predecessor - the event
-        // optimizer packs a repeat to nothing, and the player never reads
-        // them.
-        EffectScript.Result script = EffectScript.compile(tune,
-                loops ? loopFrame : -1, unit, timerMap);
+        // Every stream's vector: the registers with R7 carrying the baked
+        // mixer force, then the script's own five streams. Bytes a stream does
+        // not consume repeat their predecessor - the event optimizer packs a
+        // repeat to nothing, and the player never reads them.
+        EffectScript.Result script = EffectScript.compile(tune, timerMap);
         int channels = channelsUsed(script);
         problem = YmxFormat.checkShape(ringSize, chunk, unit,
                 YmxFormat.liveStreams(channels));
@@ -169,20 +149,16 @@ public final class YmxEncoder {
             throw new IllegalArgumentException(problem);
         }
         int frames = script.frames();
-        int split = script.split();
         byte[][] vectors = new byte[YmxFormat.STREAMS][];
         for (int register = 0; register < YmxFormat.REGISTER_STREAMS; register++) {
-            byte[] source = Ym2149.mask(register, tune.registers()[register]);
-            byte[] played = new byte[frames];
-            for (int p = 0; p < frames; p++) {
-                played[p] = source[script.source()[p]];
-            }
+            byte[] values = Ym2149.mask(register, tune.registers()[register]);
             if (register == 7) {
+                values = values.clone();
                 for (int p = 0; p < frames; p++) {
-                    played[p] |= script.r7force()[p];
+                    values[p] |= script.r7force()[p];
                 }
             }
-            vectors[register] = played;
+            vectors[register] = values;
         }
         vectors[YmxFormat.STREAM_M] = script.m();
         vectors[YmxFormat.STREAM_X] = script.x();
@@ -196,21 +172,16 @@ public final class YmxEncoder {
                     carry(script.counts()[c], script.m(), acts, action);
         }
 
-        var streams = new ArrayList<Stream>(2 * YmxFormat.STREAMS);
-        var intro = new Section[YmxFormat.STREAMS];
-        var loop = new Section[YmxFormat.STREAMS];
+        var streams = new ArrayList<Stream>(YmxFormat.STREAMS);
+        var sections = new Section[YmxFormat.STREAMS];
         for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
-            byte[] values = vectors[stream];
-            intro[stream] = pack(streams, stream, false, progress,
-                    Arrays.copyOfRange(values, 0, split), offsetLimit, unit);
-            loop[stream] = pack(streams, stream, true, progress,
-                    loops ? Arrays.copyOfRange(values, split, values.length) : new byte[0],
-                    offsetLimit, unit);
+            sections[stream] = pack(streams, stream, progress,
+                    vectors[stream], offsetLimit, unit);
         }
 
-        byte[] file = build(tune, ringSize, chunk, frames, split, loops, intro,
-                loop, tune.samples(), channels);
-        return new Result(file, List.copyOf(streams), ringSize, chunk, split, loops, unit,
+        byte[] file = build(tune, ringSize, chunk, frames, loops, sections,
+                tune.samples(), channels);
+        return new Result(file, List.copyOf(streams), ringSize, chunk, loops, unit,
                 tune, script);
     }
 
@@ -254,10 +225,10 @@ public final class YmxEncoder {
      *
      * <p>A short section costs more as a container than as itself: twenty of
      * the bytes are header before a value is written down, and a one-frame
-     * intro carries one value. Where the values are the smaller of the two,
+     * tune carries one value. Where the values are the smaller of the two,
      * they are what the file gets, and the section's offset says so.
      */
-    private static Section pack(List<Stream> streams, int register, boolean loop,
+    private static Section pack(List<Stream> streams, int register,
                                 boolean progress, byte[] values, int offsetLimit,
                                 int unit) {
         if (values.length == 0) {
@@ -270,13 +241,13 @@ public final class YmxEncoder {
         byte[] container = St4.container(result);
         boolean stored = values.length < container.length;
         byte[] bytes = stored ? values : container;
-        streams.add(new Stream(register, loop, values.length, bytes.length,
+        streams.add(new Stream(register, values.length, bytes.length,
                 result.longestOp()));
         return new Section(bytes, stored);
     }
 
     private static byte[] build(Tune tune, int ringSize, int chunk, int frames,
-                                int split, boolean loops, Section[] intro, Section[] loop,
+                                boolean loops, Section[] sections,
                                 byte[][] samples, int channels) {
         // Containers carry alignment guarantees of their own - stream A and D
         // are read a word at a time - so each is placed on a long boundary. A
@@ -284,10 +255,7 @@ public final class YmxEncoder {
         // the same boundary: one placement rule, and the four bytes it can
         // cost are what a section of its size is trying to save.
         int total = YmxFormat.HEADER_SIZE;
-        for (Section section : intro) {
-            total = align(total) + section.bytes().length;
-        }
-        for (Section section : loop) {
+        for (Section section : sections) {
             total = align(total) + section.bytes().length;
         }
         int sampleTable = samples.length == 0 ? 0 : align(total);
@@ -311,14 +279,11 @@ public final class YmxEncoder {
         putWord(file, YmxFormat.OFFSET_STREAM_COUNT, YmxFormat.STREAMS);
         putWord(file, YmxFormat.OFFSET_RING_SIZE, ringSize);
         putWord(file, YmxFormat.OFFSET_CHUNK, chunk);
-        putLong(file, YmxFormat.OFFSET_LOOP_FRAME, split);
         putLong(file, YmxFormat.OFFSET_MASTER_CLOCK, tune.masterClock());
         putLong(file, YmxFormat.OFFSET_SAMPLE_TABLE, sampleTable);
         putWord(file, YmxFormat.OFFSET_SAMPLE_COUNT, samples.length);
 
-        int at = YmxFormat.HEADER_SIZE;
-        at = place(file, YmxFormat.OFFSET_INTRO_TABLE, intro, at);
-        at = place(file, YmxFormat.OFFSET_LOOP_TABLE, loop, at);
+        place(file, YmxFormat.OFFSET_SECTION_TABLE, sections, YmxFormat.HEADER_SIZE);
 
         // The sample table: entries first, then the samples, each closed by the
         // end marker the PCM tick handler stops on.

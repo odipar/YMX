@@ -6,7 +6,7 @@
 # Runs the two steps this repo already has: the YMX packer over every input
 # with one configuration, then the SNDH builder around the results - the
 # tunes become subtunes 1..N, named from their own YM headers. Every packer
-# flag passes through (-nN -cC -kK -lF -o -drumhzH; the trim flags too, for a
+# flag passes through (-nN -cC -kK -o -drumhzH; the trim flags too, for a
 # single tune). -tTitle names the SNDH; the default is the songs, joined.
 #
 #   ym/ym_sndh.sh -t"Mad Max" maxset.sndh stormlord3.ym lastv8.ym

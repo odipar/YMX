@@ -32,9 +32,8 @@ public final class Play {
               ym/play.sh song.ym                  # 960-byte rings, 24 values per call
               ym/play.sh -n256 song.ym            # smaller rings: less RAM, worse ratio
               ym/play.sh -n2048 -c32 song.ym      # longer calls: cheaper on average
-              ym/play.sh -l0 song.ym              # loop from the start, whatever the
-                                                   # YM header says
-              ym/play.sh -o song.ym               # play once and stop
+              ym/play.sh -o song.ym               # play once and stop, instead of
+                                                   # starting over at the end
               ym/play.sh -min13 -sec52 song.ym    # trim: start deep in a long tune
               ym/play.sh -startframe41403 -frames1729 song.ym
               ym/play.sh one.ym two.ym            # a set: subtunes, number keys pick
@@ -57,7 +56,7 @@ public final class Play {
         int ring = YmxFormat.DEFAULT_RING_SIZE;
         int chunk = YmxFormat.DEFAULT_CHUNK;
         String unit = "";
-        String loop = "";
+        String once = "";
         boolean perf = false;
         boolean maskBurst = true;
         List<String> extra = new ArrayList<>();
@@ -69,7 +68,7 @@ public final class Play {
             } else if (a.equals("-nomask")) {
                 maskBurst = false;
             } else if (a.equals("-o")) {
-                loop = "-o";
+                once = "-o";
             } else if (a.equals("-h") || a.equals("--help")) {
                 System.out.println(USAGE);
                 return;
@@ -79,8 +78,6 @@ public final class Play {
                 chunk = number(a.substring(2));
             } else if (a.startsWith("-k")) {
                 unit = "-k" + a.substring(2);
-            } else if (a.startsWith("-l")) {
-                loop = "-l" + a.substring(2);
             } else {
                 extra.add(a);           // the packer's: trim, -drumhz, whatever
             }                           // it reads next
@@ -91,7 +88,7 @@ public final class Play {
         }
         if (yms.isEmpty()) {
             throw Tools.fail("usage: play.sh [-perf] [-nomask] [-nRING] [-cCHUNK]"
-                    + " [-kUNIT] [-lFRAME|-o] song.ym...");
+                    + " [-kUNIT] [-o] song.ym...");
         }
         for (Path ym : yms) {
             if (!Files.isRegularFile(ym)) {
@@ -119,8 +116,8 @@ public final class Play {
         if (!unit.isEmpty()) {
             flags.add(unit);
         }
-        if (!loop.isEmpty()) {
-            flags.add(loop);
+        if (!once.isEmpty()) {
+            flags.add(once);
         }
         flags.addAll(extra);
 

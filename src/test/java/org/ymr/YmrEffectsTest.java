@@ -144,7 +144,7 @@ final class YmrEffectsTest {
 
     @Test
     void anRteLeavesTheVoicesVolumeRegisterExactlyAsTheDumpHadIt() {
-        // Format v8 lets a file say its retrigger streams take their shape
+        // A file may say its retrigger streams take their shape
         // from R13, and a .YMR says so, because that is where RhYMe keeps it.
         // So there is nothing to smuggle: the volume register carries the
         // dump's own levels on every frame the buzzer runs, bit 4 set or not.
@@ -320,11 +320,11 @@ final class YmrEffectsTest {
 
         Tune tune = YmrEffects.convert(YmrReader.read(image), "test");
 
-        // Since v10 the file says where a sample comes back to and the player
+        // The file says where a sample comes back to and the player
         // does the coming back, so the sample is the six bytes the .ymr
-        // stores and the loop point rides beside it. Before that a loop had
-        // to be written out again and again until some ceiling stopped it,
-        // which made every long loop both wrong and enormous.
+        // stores and the loop point rides beside it. The alternative -
+        // writing the loop out again and again until some ceiling stopped it
+        // - makes every long loop both wrong and enormous.
         assertArrayEquals(new byte[] {1, 2, 3, 4, 5, 6}, tune.samples()[0]);
         assertEquals(2, tune.sampleLoops()[0]);
     }
@@ -562,7 +562,7 @@ final class YmrEffectsTest {
     }
 
     private static EffectScript.Result compile(Tune tune) {
-        return EffectScript.compile(tune, -1, 1, YmrEffects.TIMERS);
+        return EffectScript.compile(tune, YmrEffects.TIMERS);
     }
 
     private static boolean note(Tune tune, String fragment) {

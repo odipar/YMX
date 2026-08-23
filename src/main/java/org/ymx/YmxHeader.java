@@ -10,17 +10,17 @@ import java.nio.file.Path;
  *
  * <p>The unit size is not in the YMX header - it lives in the low byte
  * of the first embedded ST4 container's signature, which is why this reads a
- * section offset first. A tune that loops from the start has no intro
- * sections, so the loop table answers when the intro table is empty.
+ * section offset first.
  */
 public record YmxHeader(int ring, int chunk, int unit, int hz, int flags, int frames) {
 
-    /** Bit 0 of the flags: the tune loops instead of ending. */
+    /** Bit 0 of the flags: the tune starts over instead of ending. */
     public boolean loops() {
         return (flags & YmxFormat.FLAG_LOOPS) != 0;
     }
 
-    /** What SNDH's FRMS tag requires: a looping tune is endless, so zero. */
+    /** What SNDH's FRMS tag requires: a tune that starts over is endless,
+     * so zero. */
     public int frms() {
         return loops() ? 0 : frames;
     }
@@ -49,13 +49,9 @@ public record YmxHeader(int ring, int chunk, int unit, int hz, int flags, int fr
         // tune's worth of values never packs larger than itself.
         int section = 0;
         for (int stream = 0; stream < YmxFormat.STREAMS && section == 0; stream++) {
-            for (int table : new int[] {YmxFormat.OFFSET_INTRO_TABLE,
-                                        YmxFormat.OFFSET_LOOP_TABLE}) {
-                long entry = longAt(file, table + 4 * stream);
-                if (entry != 0 && !YmxFormat.isStored(entry)) {
-                    section = (int) YmxFormat.sectionOffset(entry);
-                    break;
-                }
+            long entry = longAt(file, YmxFormat.OFFSET_SECTION_TABLE + 4 * stream);
+            if (entry != 0 && !YmxFormat.isStored(entry)) {
+                section = (int) YmxFormat.sectionOffset(entry);
             }
         }
         if (section == 0 || section + 3 >= file.length) {

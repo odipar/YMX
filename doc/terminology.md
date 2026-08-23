@@ -84,7 +84,7 @@ which suits a decay and is useless as an oscillator.
 
 **The envelope's pitch resolution is coarse, and worsens as pitch
 rises.** The divisor is 256, so neighbouring periods are far apart:
-period 18 is 434 Hz, period 17 is 460 Hz - nearly a semitone between
+period 18 is 434 Hz, period 17 is 460 Hz - just over a semitone between
 adjacent settings. That is the limit on a buzzer part. A sync buzzer
 escapes it by taking its pitch from a timer instead, which at 440 Hz
 lands within a few cents.
@@ -207,7 +207,8 @@ A property of the tune, fixed for the whole of it:
 - **200 a second** for four times the detail in arpeggios, volume shapes
   and pitch slides. Not the screen but a timer in the **MFP**, the ST's
   support chip - usually its Timer C.
-- **Anything else** a composer set: 25, 100 and 150 all exist.
+- **Anything else** a composer set: 25, 100 and 150 are all rates the
+  header can name, though no file in the corpus uses one.
 
 The rate belongs to the tune, not to the file carrying it: stepping the
 music at another speed plays it wrong. Faster frames cost processor time.
@@ -230,7 +231,8 @@ a YM frame starts at most two effects.
 
 The MFP's own clock runs at 2,457,600 a second, unrelated to the
 YM2149's. A timer divides it twice: by a **prescaler**, one of 4, 10, 16,
-50, 64, 100 or 200, then by a **timer count**, 1 to 255.
+50, 64, 100 or 200, then by a **timer count**, 1 to 255 - and 0, which the
+MFP reads as 256.
 
     rate = 2,457,600 / (prescaler x timer count)
 
@@ -333,8 +335,8 @@ That is a default, not a rule. YM6 stores one rate per trigger, so a
 digidrum in a YM file plays at a fixed rate; nothing in this model
 forbids a source that moves a sample's rate under a melody. The split
 does say when a rate may change in a given format: independent means
-**set once** - and, since v10, movable under a running stream where the
-source says so - derived means **per-frame**, renewed on every frame.
+**set once** - and movable under a running stream where the source says so -
+derived means **per-frame**, renewed on every frame.
 (Not "control-rate": the frame clock already answers to **control
 rate**, and a policy and a clock should not share a word.)
 
@@ -459,7 +461,7 @@ end in the tree, which carries its own mapping - and is not repeated here.
 | the timers and the map onto them | `ymx_timer_a` to `ymx_timer_d`, `ymx_desc_0` to `ymx_desc_3`, `ymx_assign` |
 | the actions the script runs | `ymx_pcm`, `ymx_pcm_preempt`, `ymx_toggle_start`, `ymx_retrigger_start`, `ymx_retune`, `ymx_live` - the live retune it branches to - `ymx_resume`, `ymx_hold`, `ymx_release` |
 | where a retrigger stream's shape comes from | `ymx_shape`, reading stream X's high nibble, because a shape belongs to the one envelope generator and not to a voice |
-| a sample's loop point | `YMX_ONE_SHOT` for one that has none, `ymx_pcmloop` for the address the tick jumps back to |
+| a sample's loop point | `YMX_ONE_SHOT` for one that has none, `ymx_pcmloop_a` and the same per timer for the address the tick jumps back to |
 | the frame write, the skips, the mixer | `ymx_wA`, `ymx_w7`, `ymx_wB`, `ymx_skips`, `YMX_MIXER` |
 | a tune as the engine has one | `Tune` - the frame streams, the timer streams, the samples and the rate, and nothing a format would recognise |
 
@@ -496,9 +498,8 @@ be self-consistent.
 
 ## Where this went
 
-The model is wider than YM5 and YM6 in two places. Format v10 spent both,
-and the room was there because a stream is a source and a rate policy and
-nothing else.
+The model is wider than YM5 and YM6 in two places, and the room was there
+because a stream is a source and a rate policy and nothing else.
 
 **A PCM stream can loop.** A sample table entry carries a loop word
 beside the offset and the length: `$FFFF` means one-shot, and anything
@@ -523,9 +524,9 @@ can express them.
 
 Still ahead is the other half of the rate idea: a PCM stream with a
 **derived** rate, a sample tracking the note the way a toggle stream
-does. v10 carries a rate the source moves; nothing yet derives one from a
-melody. With the loop point, that would be a wavetable in the ordinary
-sense.
+does. The format carries a rate the source moves; nothing yet derives one
+from a melody. With the loop point, that would be a wavetable in the
+ordinary sense.
 
 ## Quick reference
 

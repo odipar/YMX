@@ -56,7 +56,7 @@ VECTORS = 0x000000              # $110/$134: the two timer vectors
 STREAMS = 25                    # fourteen register, eleven script
 CHANNELS = 4                    # timer channels; stream T maps them
 Ymx_DEFAULT_MAP = 0x9C          # what the packer emits: 0->A 1->D 2->B 3->C
-YMX_FIXED = 54 + STREAMS * 64   # the workspace before the rings
+YMX_FIXED = 46 + STREAMS * 64   # the workspace before the rings
 
 QUICK = '--quick' in sys.argv
 
@@ -125,27 +125,28 @@ def symbol_table(listing: Path) -> dict:
     return symbols
 
 
-def pack(tune: bytes, ring: int, chunk: int, loop, unit: int = 1,
+def pack(tune: bytes, ring: int, chunk: int, loops: bool = True, unit: int = 1,
          extra: tuple = ()) -> bytes:
     """Runs the real packer, cached on the tune and the packing options.
 
-    loop is the frame to loop from, or None to pack a tune that plays once.
+    loops says the tune starts over at the end; False packs one that stops.
     NOTE: the cache keys on the tune bytes and options, NOT on the packer's
     code - after changing the packer or the simulator, rm -rf the scratch.
     """
     if not CLASSES.exists():
         raise SystemExit('target/classes is missing; run `mvn compile` first')
     SCRATCH.mkdir(exist_ok=True)
-    option = '-o' if loop is None else f'-l{loop}'
+    option = () if loops else ('-o',)
     key = hashlib.sha1(tune).hexdigest()[:12]
     tag = ''.join(extra)
-    cached = SCRATCH / f'{key}-n{ring}-c{chunk}-k{unit}{option}{tag}.ymx'
+    cached = SCRATCH / (f'{key}-n{ring}-c{chunk}-k{unit}'
+                        f'{"loops" if loops else "once"}{tag}.ymx')
     if not cached.exists():
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / 'tune.ym'
             source.write_bytes(tune)
             subprocess.run(['java', '-ea', '-cp', str(CLASSES), 'org.ym6.Ymx', '-f',
-                            f'-n{ring}', f'-c{chunk}', f'-k{unit}', option,
+                            f'-n{ring}', f'-c{chunk}', f'-k{unit}', *option,
                             *extra, str(source), str(cached)],
                            check=True, capture_output=True)
     return cached.read_bytes()
@@ -279,17 +280,16 @@ def apply_writes(state, writes):
 
 
 def run_shape(frames: int, ring: int, chunk: int, label: str,
-              loop=0, passes: int = 1, unit: int = 1) -> str:
-    """Plays a whole tune (and `passes` times round its loop) and checks it.
+              loops: bool = True, passes: int = 1, unit: int = 1) -> str:
+    """Plays a whole tune (and `passes` times more) and checks it.
 
-    loop is the frame the packed tune loops from, or None for one that plays
-    once and stops.
+    loops says the packed tune starts over at the end; False packs one that
+    plays once and stops.
     """
     source = gen_ym.registers(frames)
-    packed = pack(gen_ym.ym6_file(frames, source, loop_frame=loop or 0),
-                  ring, chunk, loop, unit)
-    played = frames if loop is None else frames + passes * (frames - loop)
-    expected = gen_ym.chip_states(frames, source, loop, played)
+    packed = pack(gen_ym.ym6_file(frames, source), ring, chunk, loops, unit)
+    played = frames * (1 + passes) if loops else frames
+    expected = gen_ym.chip_states(frames, source, loops, played)
 
     player = Player(packed, workspace_size(ring), unit)
     if player.init() != 0:
@@ -309,16 +309,16 @@ def run_shape(frames: int, ring: int, chunk: int, label: str,
             return (f'{label}: frame {index} {"wrote" if envelope else "skipped"}'
                     f' R13, expected the other')
         position += 1
-        # d0 = 1 means "that frame ended the tune, the next one is the loop
-        # frame". A tune that plays once never reports it: it reports -1 on the
+        # d0 = 1 means "that frame ended the tune, the next one is frame 0
+        # again". A tune that plays once never reports it: it reports -1 on the
         # call after its last frame instead.
-        wrapped = position >= frames and loop is not None
+        wrapped = position >= frames and loops
         if wrapped:
-            position = loop
+            position = 0
         if result != (1 if wrapped else 0):
             return f'{label}: frame {index} returned {result}, expected {1 if wrapped else 0}'
 
-    if loop is None:
+    if not loops:
         result, writes = player.frame()
         if result != -1 or writes:
             return f'{label}: past the end it wrote {writes} and returned {result}'
@@ -342,8 +342,9 @@ TCDCR, TDDR = 0xFFFFFA1D, 0xFFFFFA25
 def run_effects(super_host: bool = False, perf: bool = False) -> str:
     """The effect stage, frame by frame, against the compiled script: a SID
     held, reloaded and retuned on slot 1, drums triggered and retriggered on
-    slot 2, a buzzer, the same-voice arbitration - the same scene the v1
-    interpreter was tested on, asserted at v2's frame-aligned edges. The
+    slot 2, a buzzer, the same-voice arbitration - the same scene the
+    reference player's interpreter was tested on, asserted at this format's
+    frame-aligned edges. The
     tick handlers are then driven by direct invocation, after the walk, so
     the script and the hand-run ticks never disagree about state."""
     frames = 72
@@ -379,7 +380,7 @@ def run_effects(super_host: bool = False, perf: bool = False) -> str:
     values[15][31] = 122
     # The ring-integrity trap: an 11-byte R10 pattern spanning the drum frame,
     # repeated 30 frames later - the packer emits a match that copies those
-    # ring positions. v2 never edits the ring at runtime, so the trap now
+    # ring positions. Nothing edits the ring at runtime, so the trap now
     # proves the drum number travels in the ring unharmed. Frame 30's
     # value doubles as the drum number: sample 1; frame 31's is sample 0.
     pattern = [3, 4, 5, 6, 7, 1, 0, 6, 5, 4, 3]
@@ -405,7 +406,7 @@ def run_effects(super_host: bool = False, perf: bool = False) -> str:
     values[9][48] = 0                               # its number: sample 0
     drums = (bytes([0x80, 0x40]), bytes([0x10, 0xF0, 0x50]))
 
-    packed = pack(gen_ym.ym6_file(frames, values, drums=drums), 960, 24, 0, 1)
+    packed = pack(gen_ym.ym6_file(frames, values, drums=drums), 960, 24, True, 1)
     player = Player(packed, workspace_size(960), super_host=super_host,
                     perf=perf)
     if player.init() != 0:
@@ -595,6 +596,17 @@ def run_effects(super_host: bool = False, perf: bool = False) -> str:
                 return f'effects: frame 53 wrote {mfp}'
             if 9 not in registers:
                 return 'effects: frame 53 kept skipping the voice'
+        elif frame == 71:                           # the tune starts over: both
+            want = [(TACR, 0), (0xFFFFFA0B, 0), (0xFFFFFA07, 0x20),  # claimed
+                    (TCDCR, 0), (0xFFFFFA0D, 0), (0xFFFFFA09, 0x10)]  # timers
+            if mfp != want:                         # stop, nothing pending,
+                return f'effects: the wrap wrote {mfp}'   # enabled again
+            for channel, vector in ((0, 0x134), (1, 0x110)):
+                parked = int.from_bytes(player.uc.mem_read(vector, 4), 'big')
+                if parked not in (CODE + player.symbols['ymx_park_a'],
+                                  CODE + player.symbols['ymx_park_d']):
+                    return (f'effects: the wrap left channel {channel} pointing '
+                            f'at {parked:#x}, not a park entry')
         elif mfp:
             return f'effects: frame {frame} unexpectedly wrote {mfp}'
         if frame == 60 and registers.get(10) != 1:
@@ -660,13 +672,13 @@ def run_effects(super_host: bool = False, perf: bool = False) -> str:
     # init an effect-free one into the same blob and workspace.
     quiet = gen_ym.ym6_file(40, [bytearray(40) for _ in range(16)])
     reused = Player(pack(gen_ym.ym6_file(frames, values, drums=drums),
-                         960, 24, 0, 1),
+                         960, 24, True, 1),
                     workspace_size(960), super_host=super_host, perf=perf)
     if reused.init() != 0:
         return 'effects: init rejected the two-channel pack'
     for _ in range(32):                         # far enough in to be running
         reused.frame()
-    reused.uc.mem_write(reused.file, pack(quiet, 960, 24, 0, 1))
+    reused.uc.mem_write(reused.file, pack(quiet, 960, 24, True, 1))
     if reused.init() != 0:
         return 'effects: init rejected the effect-free pack'
     mfp2 = lambda a: reused.uc.mem_read(a, 1)[0]
@@ -684,7 +696,7 @@ def run_effects(super_host: bool = False, perf: bool = False) -> str:
     # the release and resume and must see the mask, the counting-on timer,
     # and the reload-only comeback - the player's resume verbs, live.
     resumed = Player(pack(gen_ym.ym6_file(frames, values, drums=drums),
-                          960, 24, 0, 1, extra=('-sidresume',)),
+                          960, 24, True, 1, extra=('-sidresume',)),
                      workspace_size(960), super_host=super_host, perf=perf)
     if resumed.init() != 0:
         return 'effects: init rejected the -sidresume pack'
@@ -709,7 +721,7 @@ def run_effects(super_host: bool = False, perf: bool = False) -> str:
                 return ('effects: resume-model frame 27 wrote '
                         f'{resumed.mfp}')
 
-    # The monitor's color protocol, unchanged from v1: every frame paints
+    # The monitor's color protocol: every frame paints
     # the yellow timer bar, then its own red, then puts the original back;
     # every tick paints its timer's color and restores.
     if perf:
@@ -816,7 +828,7 @@ def run_sndh() -> str:
         for f in range(frames):
             values[2][f] = signature(f)
             values[13][f] = gen_ym.NO_ENVELOPE_CHANGE
-        sets.append(pack(gen_ym.ym6_file(frames, values), 960, 24, 0, 2))
+        sets.append(pack(gen_ym.ym6_file(frames, values), 960, 24, True, 2))
     for i, packed in enumerate(sets):
         (SCRATCH / f'sndh_tune{i + 1}.ymx').write_bytes(packed)
     out = SCRATCH / 'sndh_test.sndh'
@@ -905,7 +917,7 @@ def run_sndh() -> str:
 
 def Ymx_DRUM_TABLE(player) -> int:
     """The sample table's offset, straight from the packed file's header."""
-    return int.from_bytes(player.uc.mem_read(player.file + 28, 4), 'big')
+    return int.from_bytes(player.uc.mem_read(player.file + 24, 4), 'big')
 
 
 def check_assignment(player) -> str:
@@ -1055,7 +1067,7 @@ def run_shape_source() -> str:
         values[1][frame] = 0xE0
         values[6][frame] |= 6 << 5
         values[14][frame] = 200
-    player = Player(pack(gen_ym.ym6_file(frames, values), 960, 24, 0, 1),
+    player = Player(pack(gen_ym.ym6_file(frames, values), 960, 24, True, 1),
                     workspace_size(960))
     if player.init() != 0:
         return 'shape source: YMX_init rejected the YM tune'
@@ -1232,19 +1244,6 @@ def run_live_retune() -> str:
 class Reworded(Exception):
     """A sentence this rig reads numbers out of has been reworded."""
 
-def corpus_tune(name: str):
-    """Where a tune the documentation measures can be found, or None.
-
-    The tunes are not in the tree. YMX_CORPUS says which directory holds
-    them; without it, the home directory and the repository root are tried.
-    """
-    named = os.environ.get('YMX_CORPUS')
-    for where in ([named] if named else [Path.home(), REPO]):
-        if (Path(where) / name).exists():
-            return Path(where) / name
-    return None
-
-
 def packer_report(tune: Path, extra: tuple = ()) -> str:
     """The packer's own report for one tune, as the documentation quotes it."""
     out = SCRATCH / (tune.stem + '.ymx')
@@ -1299,7 +1298,7 @@ def run_conversion_numbers() -> str:
                 for g in found.groups()]
 
     try:
-        tune, frames, rate = said(r'`([\w.-]+\.ymr)` is ([\d,]+) frames at (\d+) Hz',
+        tune, frames, rate = said(r'`([\w./-]+\.ymr)` is ([\d,]+) frames at (\d+) Hz',
                                   'the tune and its length')
         total, packed, _, size = said(
             r'reports ([\d,]+) bytes of register and script data packed into '
@@ -1308,7 +1307,6 @@ def run_conversion_numbers() -> str:
         rings, ring, decoded, streams = said(
             r'([\d,]+) rings of ([\d,]+) bytes, decoding (\d+) of the (\d+) streams',
             'the ring shape')
-        rotation, = said(r'rotated the split forward ([\d,]+) frames', 'the rotation')
         script, of, image = said(
             r'([\d,]+) of those ([\d,]+) packed bytes are the eleven script '
             r'streams, which the `\.YMR` — ([\d,]+) bytes', 'the script streams')
@@ -1317,16 +1315,15 @@ def run_conversion_numbers() -> str:
             r'live reloads and ([\d,]+) live retunes against no verb that stops',
             'the verb counts')
         other, otherRetunes, otherStops = said(
-            r'`([\w.-]+\.ymr)` has ([\d,]+) live retunes and (\d+) that stop',
+            r'`([\w./-]+\.ymr)` has ([\d,]+) live retunes and (\d+) that stop',
             "the second tune's verb counts")
     except Reworded as reworded:
         return str(reworded)
 
-    paths = {name: corpus_tune(name) for name in (tune, other)}
-    missing = [name for name, path in paths.items() if path is None]
+    paths = {name: REPO / name for name in (tune, other)}
+    missing = [name for name, path in paths.items() if not path.exists()]
     if missing:
-        return ('SKIP ' + ', '.join(missing) + ' not found - set YMX_CORPUS to the '
-                'directory holding the tunes ymr/CONVERSION.md measures')
+        return 'conversion numbers: ' + ', '.join(missing) + ' is not in the tree'
 
     report = packer_report(paths[tune])
     measured = {}
@@ -1346,18 +1343,15 @@ def run_conversion_numbers() -> str:
     measured['streams decoded'] = (int(shape.group(2)), decoded)
     measured['streams stored'] = (int(shape.group(3)), streams)
 
-    rotated = re.search(r'loop split rotated by (\d+) frames', report)
-    measured['rotation'] = (int(rotated.group(1)) if rotated else 0, rotation)
-
     # the eleven script streams, summed out of the packer's per-stream listing
     measured['script bytes'] = (sum(
         int(size_) for name_, size_ in
-        re.findall(r'^\s+(M|X|T|A[0-3]|P[0-3])\s+\w+\s+\d+\s+->\s+(\d+) bytes',
+        re.findall(r'^\s+(M|X|T|A[0-3]|P[0-3])\s+\d+\s+->\s+(\d+) bytes',
                    report, re.M)), script)
     measured['packed bytes, again'] = (int(got.group(2)), of)
     measured['.YMR bytes'] = (paths[tune].stat().st_size, image)
     measured['source frames'] = (
-        max(int(n) for n in re.findall(r'^\s+\w+\s+loop\s+(\d+)', report, re.M)),
+        max(int(n) for n in re.findall(r'^\s+\S+\s+(\d+)\s+->', report, re.M)),
         frames)
 
     verbs = script_verbs(paths[tune])
@@ -1406,44 +1400,44 @@ def run_readme_sizes() -> str:
 
 
 def main() -> int:
-    # frames, ring, chunk, label, loop frame (None = play once), passes, unit
+    # frames, ring, chunk, label, starts over, extra passes, unit
     shapes = [
-        (600, 960, 24, 'default 960/24', 0, 1),
-        (600, 960, 24, 'plays once', None, 0),
-        (600, 960, 24, 'loops from frame 397', 397, 2),
-        (600, 240, 24, 'small ring 240/24', 0, 1),
-        (600, 48, 24, 'two-group ring 48/24', 128, 1),
-        (600, 960, 64, 'long calls 960/64', 401, 1),
-        (608, 34, 17, 'tightest legal 34/17', 13, 1),
-        (37, 960, 24, 'shorter than a ring', 5, 3),
-        (40, 960, 24, 'loop shorter than a group', 35, 4),
-        (24, 960, 24, 'exactly one group', 0, 2),
-        (9, 960, 24, 'shorter than one group', 0, 3),
-        (1, 960, 24, 'a single frame', 0, 5),
-        (1, 960, 24, 'a single frame, once', None, 0),
+        (600, 960, 24, 'default 960/24', True, 1),
+        (600, 960, 24, 'plays once', False, 0),
+        (600, 960, 24, 'two passes more', True, 2),
+        (600, 240, 24, 'small ring 240/24', True, 1),
+        (600, 48, 24, 'two-group ring 48/24', True, 1),
+        (600, 960, 64, 'long calls 960/64', True, 1),
+        (608, 34, 17, 'tightest legal 34/17', True, 1),
+        (37, 960, 24, 'shorter than a ring', True, 3),
+        (40, 960, 24, 'shorter than two groups', True, 4),
+        (24, 960, 24, 'exactly one group', True, 2),
+        (9, 960, 24, 'shorter than one group', True, 3),
+        (1, 960, 24, 'a single frame', True, 5),
+        (1, 960, 24, 'a single frame, once', False, 0),
         # Wider units: cheaper refills, and the packer's whole-unit rules for
-        # the tune length, the loop frame and C must hold. The decoder is a
-        # different build for each.
-        (600, 960, 24, 'unit 2, loops at 398', 398, 2, 2),
-        (600, 960, 24, 'unit 2, plays once', None, 0, 2),
-        (600, 960, 24, 'unit 4, loops at 396', 396, 1, 4),
+        # the tune length and C must hold. The decoder is a different build
+        # for each.
+        (600, 960, 24, 'unit 2', True, 2, 2),
+        (600, 960, 24, 'unit 2, plays once', False, 0, 2),
+        (600, 960, 24, 'unit 4', True, 1, 4),
     ]
     if not QUICK:
-        shapes.append((4000, 960, 24, 'four thousand frames', 1234, 1))
-        shapes.append((4000, 2048, 32, 'four thousand, 2048/32', 0, 1))
-        shapes.append((4000, 960, 24, 'four thousand, unit 2', 1234, 1, 2))
-        shapes.append((4000, 2048, 32, 'four thousand, unit 4', 0, 1, 4))
+        shapes.append((4000, 960, 24, 'four thousand frames', True, 1))
+        shapes.append((4000, 2048, 32, 'four thousand, 2048/32', True, 1))
+        shapes.append((4000, 960, 24, 'four thousand, unit 2', True, 1, 2))
+        shapes.append((4000, 2048, 32, 'four thousand, unit 4', True, 1, 4))
 
     failures = 0
     for shape in shapes:
-        frames, ring, chunk, label, loop, passes = shape[:6]
+        frames, ring, chunk, label, loops, passes = shape[:6]
         unit = shape[6] if len(shape) > 6 else 1
-        problem = run_shape(frames, ring, chunk, label, loop, passes, unit)
+        problem = run_shape(frames, ring, chunk, label, loops, passes, unit)
         if problem:
             print(f'FAIL {problem}')
             failures += 1
         else:
-            where = 'plays once' if loop is None else f'loops at {loop}'
+            where = 'starts over' if loops else 'plays once'
             print(f'OK   {label:26s} ({frames} frames, {ring}-byte rings, {where})')
 
     problem = run_sndh()

@@ -19,10 +19,10 @@ re-derive every frame from bits smuggled into spare register fields. YMX
 resolves all of that at pack time and writes down the outcome, so the player
 compares nothing.
 
-The layout described here is the one the `.yx6` container reached over ten
-revisions inside the [ST4](https://github.com/odipar/ST4) repository, adopted
-whole and renumbered to 1. There is no older YMX version to stay compatible
-with.
+Version 1 began as the `.yx6` container the [ST4](https://github.com/odipar/ST4)
+repository reached over ten revisions, adopted whole and renumbered; the layout
+has moved since, and this document is where it is now. There is no older YMX
+version to stay compatible with.
 
 **Vocabulary.** This document uses [terminology.md](terminology.md)
 throughout. The five words it leans on hardest:
@@ -33,7 +33,7 @@ throughout. The five words it leans on hardest:
 | **stream** | a series of values arriving at one destination |
 | **frame stream** | a stream delivering one value per frame — the fourteen sound registers |
 | **timer stream** | a stream delivering values *between* frames, at a rate an MFP timer sets |
-| **section** | one ST4 container holding a stream's intro or its loop |
+| **section** | one stream's values for the whole tune, packed |
 
 ---
 
@@ -41,9 +41,8 @@ throughout. The five words it leans on hardest:
 
 ```
 +--------------------------------+
-| header, 34 bytes fixed         |
-| intro section table, 4 x S     |
-| loop  section table, 4 x S     |
+| header, 30 bytes fixed         |
+| section table, 4 x S           |
 | packed sections, in stream order
 | sample table + sample bytes    |
 +--------------------------------+
@@ -61,23 +60,21 @@ throughout. The five words it leans on hardest:
 | 14 | 2 | `S`, the stream count — always **25**, see §1.5 |
 | 16 | 2 | `N`, the ring size in bytes |
 | 18 | 2 | `C`, values decoded per call |
-| 20 | 4 | `L`, the loop frame; equal to `O` when the tune plays once |
-| 24 | 4 | the YM2149's master clock in Hz (informational) |
-| 28 | 4 | byte offset of the sample table; 0 when there are none |
-| 32 | 2 | sample count |
-| 34 | 4·S | byte offset of each **intro** section, covering frames `[0, L)` |
-| 134 | 4·S | byte offset of each **loop** section, covering frames `[L, O)` |
+| 20 | 4 | the YM2149's master clock in Hz (informational) |
+| 24 | 4 | byte offset of the sample table; 0 when there are none |
+| 28 | 2 | sample count |
+| 30 | 4·S | byte offset of each **section**, covering frames `[0, O)` |
 
-With `S` fixed at 25 the header is **234 bytes**, and everything after it is
+With `S` fixed at 25 the header is **130 bytes**, and everything after it is
 body: the sections (§1.4), then the sample table (§6). Nothing in the body is
-found by position — a section through its offset in one of the two tables
-above, the samples through the offset at byte 28.
+found by position — a section through its offset in the table above, the
+samples through the offset at byte 24.
 
 ### 1.2 Flags
 
 | bit | meaning |
 |---:|---|
-| 0 | the tune loops |
+| 0 | the tune starts over at frame 0 instead of ending |
 | 1 | the tune uses timer channel 0 |
 | 2 | timer channel 1 |
 | 3 | timer channel 2 |
@@ -105,9 +102,8 @@ displacement.
   rather than a general one; and
 - fit twice in a ring: `N` is at least `2C`.
 
-At a unit size above 1, `C`, the frame count `O` and the loop frame `L` are
-each a whole number of units, so every budget a player hands the decoder
-divides cleanly.
+At a unit size above 1, `C` and the frame count `O` are each a whole number
+of units, so every budget a player hands the decoder divides cleanly.
 
 960/24 is the usual pair and covers every tune that leaves channel 3 idle.
 
@@ -126,19 +122,17 @@ A section shorter than the container that would hold it is **stored**: the
 bytes at its offset are its values, one per frame, with no header and no
 signature. Bit 31 of a section's offset says which of the two it is, and the
 offset is the rest. A container spends twenty bytes on its header before a
-value is written down, so a one-frame intro is one stored byte a stream rather
+value is written down, so a one-frame tune is one stored byte a stream rather
 than twenty-five containers.
 
-Every stream is packed twice, because restarting it at the loop frame means
-starting a decoder over: the intro section covers `[0, L)`, the loop section
-covers `[L, O)`, and the player starts the loop section again every time round
-(§8). The packer writes all twenty-five intro sections in stream order and
-then all twenty-five loop sections, but nothing depends on that — a section is
-reached only through its offset.
+Each stream is packed once, into one section covering `[0, O)`. The packer
+writes the twenty-five sections in stream order, but nothing depends on that
+— a section is reached only through its offset. A tune that starts over
+reaches the end of a section and the reader opens it again from the top (§8),
+which is the only way to restart a decoder.
 
-A section offset of 0 means the section is not present. A tune that loops from
-frame 0 has no intro sections; a tune that does not loop has no loop sections.
-Both halves of the table are always written, and the absent half is zero.
+A section offset of 0 means the section is not present, which a tune of no
+frames is the only case of.
 
 Packed sizes are not stored. ST4 counts output units rather than input bytes,
 so a decoder never needs them.
@@ -419,8 +413,8 @@ Index 0 is not a divider but the MFP's **stopped** state, so a code that
 selects it starts nothing. A count of 0 is not: the MFP reads it as 256, the
 slowest tick a prescaler gives.
 
-The encodable range is 48 Hz — prescaler 200, count 255 — to 614,400 Hz,
-prescaler 4 and count 1. What a packer emits is narrower: a rate that costs
+The encodable range is 48 Hz — prescaler 200, count 0, which is 256 — to
+614,400 Hz, prescaler 4 and count 1. What a packer emits is narrower: a rate that costs
 more of the machine than a tune can spare is a packing-time decision, not a
 format limit.
 
@@ -469,7 +463,9 @@ A player's one call per frame does this, in this order:
 3. **The script's actions** — for each channel M marks, decode its A byte and
    run the verb.
 4. **One refill** — decode `C` values into one stream's ring: stream
-   `k` on the frame where the frame number modulo `C` is `k`.
+   `k` on the frame where the frame number modulo `C` is `k`. A `k` past
+   the streams the tune decodes (§1.5) has nothing to refill, and those
+   frames decode nothing.
 
 Actions come *after* the frame write so their varying cost cannot jitter the
 register writes. The skips come *before* it so that a voice released back
@@ -482,19 +478,20 @@ interrupts across the frame write optional rather than necessary.
 
 ---
 
-## 8. Looping
+## 8. Starting over
 
-A packed stream can only be restarted from its beginning, so every stream is
-split at the loop frame `L`: an intro section for `[0, L)` and a loop section
-for `[L, O)`. When a section runs out mid-refill the player starts that
-stream's loop section over — a fresh decoder writing on into the same ring —
-so the rings hold one continuous sequence and nothing on the read side
-changes when it happens. Nothing requires `L` to fall on a group boundary.
+A packed stream can only be restarted from its beginning, so a tune whose
+flag bit 0 is set plays its frames again from frame 0. When a section runs
+out mid-refill the reader opens that stream's section again — a fresh decoder
+writing on into the same ring — so the rings hold one continuous sequence and
+nothing on the read side changes when it happens. Nothing requires `O` to
+fall on a group boundary.
 
-`O` and `L` count **played** frames. When the stream state arriving from the
-intro differs from the state arriving from the wrap, a packer rotates the
-split forward to a frame where the two agree; the file then carries a few
-frames twice, compiled differently. Nothing at play time distinguishes them.
+On the frame that ends the tune, and after that frame's write, refill and
+actions: every timer a flag claims is stopped, its vector goes back to the
+entry that does nothing, its interrupt is enabled with no tick of it pending,
+and all three skip bits are cleared. That is the state a reader is in before
+frame 0 the first time, so the second pass runs exactly as the first.
 
 ---
 
@@ -536,5 +533,6 @@ value. Those operations, in full:
 | a sample byte with bit 7 set | it is written to the volume register as a level, and the sample ends there |
 | loop point `$FFFF` | the timer is stopped at that point. Any other value: the read position becomes that offset into the sample and the ticks continue |
 | the frame's order | skip bits, then the fourteen register writes, then the frame's actions, then one refill |
+| the frame after the last, flag bit 0 set | every claimed timer is stopped, its vector parked, its interrupt enabled with nothing pending, and every skip bit cleared, before frame 0 is played again |
 | refill turn | on frame `f`, stream `f` modulo `C` is decoded `C` values further |
-| a section running out mid-refill | decoding continues from the start of that stream's loop section, into the same ring |
+| a section running out mid-refill | decoding continues from the start of that same section, into the same ring |

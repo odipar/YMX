@@ -48,9 +48,8 @@ public final class YmrPlay {
 
               ymr/ymr.sh song.ymr                # 960-byte rings, 24 values per call
               ymr/ymr.sh -n2048 -c32 song.ymr    # longer calls: cheaper on average
-              ymr/ymr.sh -l0 song.ymr            # loop from the start, whatever the
-                                                   # .ymr header says
-              ymr/ymr.sh -o song.ymr             # play once and stop
+              ymr/ymr.sh -o song.ymr             # play once and stop, instead of
+                                                   # starting over at the end
               ymr/ymr.sh -min13 -sec52 song.ymr  # trim: start deep in a long tune
               ymr/ymr.sh -startframe41403 -frames1729 song.ymr
               ymr/ymr.sh one.ymr two.ymr         # a set: subtunes, number keys pick
@@ -77,7 +76,7 @@ public final class YmrPlay {
         int ring = YmxFormat.DEFAULT_RING_SIZE;
         int chunk = YmxFormat.DEFAULT_CHUNK;
         String unit = "";
-        String loop = "";
+        String once = "";
         boolean perf = false;
         boolean maskBurst = true;
         List<String> extra = new ArrayList<>();
@@ -89,7 +88,7 @@ public final class YmrPlay {
             } else if (a.equals("-nomask")) {
                 maskBurst = false;
             } else if (a.equals("-o")) {
-                loop = "-o";
+                once = "-o";
             } else if (a.equals("-h") || a.equals("--help")) {
                 System.out.println(USAGE);
                 return;
@@ -99,8 +98,6 @@ public final class YmrPlay {
                 chunk = number(a.substring(2));
             } else if (a.startsWith("-k")) {
                 unit = "-k" + a.substring(2);
-            } else if (a.startsWith("-l")) {
-                loop = "-l" + a.substring(2);
             } else {
                 extra.add(a);           // the packer's: the trim window, and
             }                           // whatever it reads next
@@ -111,7 +108,7 @@ public final class YmrPlay {
         }
         if (ymrs.isEmpty()) {
             throw Tools.fail("usage: ymr.sh [-perf] [-nomask] [-nRING] [-cCHUNK]"
-                    + " [-kUNIT] [-lFRAME|-o] song.ymr...");
+                    + " [-kUNIT] [-o] song.ymr...");
         }
         for (Path ymr : ymrs) {
             if (!Files.isRegularFile(ymr)) {
@@ -140,8 +137,8 @@ public final class YmrPlay {
         if (!unit.isEmpty()) {
             flags.add(unit);
         }
-        if (!loop.isEmpty()) {
-            flags.add(loop);
+        if (!once.isEmpty()) {
+            flags.add(once);
         }
         flags.addAll(extra);
 

@@ -89,9 +89,9 @@ import org.ymx.YmxFormat;
  *
  * <p>An RTE's shape is the third parameter and is not one of them, because it
  * is not a voice's: there is one envelope generator and any number of voices
- * may follow it. From format v9 it is carried in the script instead - see
- * {@link #shapes()} - so nothing is written over a volume register, and the
- * volume byte a .YMR popped reaches the chip exactly as the dump had it.
+ * may follow it. It is carried in the script instead - see {@link #shapes()}
+ * - so nothing is written over a volume register, and the volume byte a .YMR
+ * popped reaches the chip exactly as the dump had it.
  *
  *
  * <h2>What a .YMR can express and a .ymx cannot</h2>
@@ -225,7 +225,6 @@ public final class YmrEffects {
     private final int[] inertTimer = new int[CHANNELS];
     private final int[] missingSample = new int[CHANNELS];
     private final int[] cappedSample = new int[CHANNELS];
-    private final boolean[] triggersAtLoop = new boolean[CHANNELS];
 
     private YmrEffects(YmrReader.Song source, String name) {
         this.source = source;
@@ -254,12 +253,10 @@ public final class YmrEffects {
             walk(channel);
         }
         reportChannels();
-        reportLostLoopTriggers();
 
         // A .YMR carries no metadata, so the author and the comment
         // come out empty and the caller's file stem is the only name there is.
-        return new Tune(frames, source.frameRate(), source.ymClock(),
-                source.loops() ? source.loopFrame() : frames,
+        return new Tune(frames, source.frameRate(), source.ymClock(), source.loops(),
                 registers, codes, counts, shapes(), levelsOf(samples),
                 loopsOf(samples), SEMANTICS,
                 name, "", "", notes);
@@ -342,13 +339,12 @@ public final class YmrEffects {
     /**
      * One .YMR sample block, ready for the table, and where it loops back to.
      *
-     * <p>The loop point is the block's own, because from format v10 a PCM
-     * stream has one: the tick's end test already sets the condition codes
-     * off the byte it just played, so resuming instead of stopping costs
-     * nothing per tick and a few instructions on a path that runs once a
-     * sample. Before that it was unrolled - the loop region written out again
-     * and again towards a ceiling - which cost the file real bytes and still
-     * stopped in the end.
+     * <p>The loop point is the block's own, because a PCM stream has one:
+     * the tick's end test already sets the condition codes off the byte it
+     * just played, so resuming instead of stopping costs nothing per tick and
+     * a few instructions on a path that runs once a sample. The alternative -
+     * unrolling, the loop region written out again and again towards a
+     * ceiling - costs the file real bytes and still stops in the end.
      */
     private record Prepared(byte[] data, int loopStart) {}
 
@@ -427,7 +423,6 @@ public final class YmrEffects {
         int trigger = 0;                        // the code's bit 3, flipped per trigger
         int armedTo = 0;                        // frame the armed PCM code goes quiet on
         int last = 0;
-        int loop = loopFrame();
         List<YmrReader.TimerFrame> timer = source.timer(channel);
 
         for (int frame = 0; frame < frames; frame++) {
@@ -464,9 +459,6 @@ public final class YmrEffects {
                 // except where only the prescaler moved: bit 3 says whether a
                 // trigger happened, so a rate pop bends the sample rather than
                 // restarting it, and this is a window only when it is a start.
-                if (frame == loop) {
-                    triggersAtLoop[channel] = true;
-                }
                 armedTo = frame + armed(sample, prescaler, counter);
             }
             last = code;
@@ -570,10 +562,6 @@ public final class YmrEffects {
         return (int) ((scaled + Tune.MFP_CLOCK - 1) / Tune.MFP_CLOCK);
     }
 
-    private int loopFrame() {
-        return source.loops() ? source.loopFrame() : -1;
-    }
-
     // --------------------------------------------------------------- the notes
 
     private void note(String what) {
@@ -603,30 +591,6 @@ public final class YmrEffects {
             if (cappedSample[channel] > 0) {
                 note(timer + " triggers a sample past the " + SAMPLES + " this format"
                         + " carries " + times(cappedSample[channel]) + ": nothing plays");
-            }
-        }
-    }
-
-    /**
-     * A trigger on the loop frame that the last frame's code already carries
-     * is a trigger the wrap swallows: the script acts on a code that CHANGED,
-     * and coming round from the end of the song this one does not. Within the
-     * song bit 3 rules that out, because it flips on every trigger; across the
-     * wrap the two frames are only neighbours by accident and nothing can make
-     * them differ.
-     */
-    private void reportLostLoopTriggers() {
-        int loop = loopFrame();
-        if (loop < 0 || frames < 2) {
-            return;
-        }
-        for (int channel = 0; channel < CHANNELS; channel++) {
-            if (triggersAtLoop[channel]
-                    && codes[channel][loop] == codes[channel][frames - 1]) {
-                note("Timer " + "ABD".charAt(channel) + " triggers a sample on loop frame "
-                        + loop + " with the same code the song's last frame ends on, so"
-                        + " the trigger is heard on the first pass and not on the ones"
-                        + " after");
             }
         }
     }

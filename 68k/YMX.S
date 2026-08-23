@@ -9,9 +9,9 @@
 ; inspired by Steve Clarets' MinYMiser. Use it freely, including commercially,
 ; as long as your documentation says you used ZX1 through ST4 (see LICENSE).
 ;
-; It plays the fourteen standard sound registers, loops, and plays what the
-; YM format calls its special effects - digidrums, SID voices, the
-; sync-buzzer - on FOUR TIMER CHANNELS. A timer channel is the format's
+; It plays the fourteen standard sound registers, starts over at the end, and
+; plays what the YM format calls its special effects - digidrums, SID voices,
+; the sync-buzzer - on FOUR TIMER CHANNELS. A timer channel is the format's
 ; idea; WHICH of the MFP's timers serves it is the FILE's: stream T maps
 ; the four channels onto the MFP's four timers, two bits each, and
 ; ymx_timers holds one row per timer for the map to point at. A timer is
@@ -62,21 +62,18 @@
 ; tick handlers - digidrum, SID square, sync-buzzer - and compare NOTHING
 ; at run time. A sample's voice is DISCONNECTED by mixing baked into the
 ; R7 stream, so its sample is heard alone, and no ring byte is ever edited:
-; what v1 discovered per frame, the file says.
+; what the reference player discovered per frame, the file says.
 ;
-; LOOPING. A packed stream can only be restarted from its beginning, so the
-; packer splits every register at the loop frame L: an intro stream for frames
-; [0, L) and a loop stream for [L, O). When a register's section runs out
-; mid-refill the player starts its loop stream over - a fresh decoder writing
-; on into the same ring - so the rings always hold one continuous sequence of
-; values and nothing on the read side changes when it happens. Nothing requires
-; L to fall on a group boundary: a refill that straddles the split simply
-; decodes two pieces. A tune that loops from frame 0 has no intro streams at
-; all. The script adds one twist: when the effect state arriving from the intro
-; differs from the state arriving from the wrap, the packer ROTATES the split
-; forward to a frame where the two agree - the file then carries a few frames
-; twice, compiled differently, and O and L in the header count this played
-; timeline. Nothing at play time can distinguish it; the rotation is inaudible.
+; STARTING OVER. A packed stream can only be restarted from its beginning, so
+; a tune that repeats plays its frames again from frame 0: each stream is one
+; section covering [0, O), and when a stream's section runs out mid-refill the
+; player opens it again - a fresh decoder writing on into the same ring - so
+; the rings always hold one continuous sequence of values and nothing on the
+; read side changes when it happens. Nothing requires the boundary to fall on
+; a group boundary: a refill that straddles it decodes two pieces. On the
+; frame the tune ends, the player stops every claimed timer, parks its vector
+; and opens every skip, which is the state the script was compiled from - so
+; the second pass plays exactly as the first.
 ;
 ; -----------------------------------------------------------------------------
 ; USING IT
@@ -97,9 +94,9 @@
 ; and one ring per stream, so its size depends on the ring size in the file.
 ; It is always sized for all twenty-five, whatever the tune uses:
 ;
-;   YMX_SIZE = YMX_FIXED + 25 * N       ; 1654 + 25 * N bytes
+;   YMX_SIZE = YMX_FIXED + 25 * N       ; 1646 + 25 * N bytes
 ;
-; For the default 960-byte rings that is 25654 bytes. A program with N at
+; For the default 960-byte rings that is 25646 bytes. A program with N at
 ; build time can reserve it with
 ;
 ;       ds.b    YMX_FIXED+(YMX_STREAMS*960)
@@ -127,7 +124,7 @@
 ;   YMX_play   in   a0 = workspace
 ;              out  d0 = 0 played a frame
 ;                   d0 = 1 played a frame, and that frame ended the tune: the
-;                          next one is the loop frame L
+;                          next one is frame 0 again
 ;                   d0 = -1 the tune is over and nothing was written, which
 ;                          only a tune packed with -o can report
 ;   YMX_stop   in   a0 = workspace
@@ -159,15 +156,16 @@
 ;      a tune decodes, N mod C = 0,
 ;      N >= 2C, N <= 2520 - the burst reads each register's ring through an
 ;      assembled-in 16-bit displacement of k*N - offsets that stay inside the
-;      ring, and - at ST4_UNIT above 1 - a tune length, loop frame and C that
-;      are whole units, so every budget this player passes to the decoder
-;      divides cleanly
+;      ring, and - at ST4_UNIT above 1 - a tune length and C that are whole
+;      units, so every budget this player passes to the decoder divides
+;      cleanly
 ;   2. the workspace is at an even address and large enough for the file's N
 ;   3. YMX_play is called once per frame and never after it returns -1.
 ;      Calling it again is harmless - it returns -1 and writes nothing - which
 ;      keeps ST4_wrap's "never call the decoder again" rule intact
-;   4. a looping tune plays for as long as you keep calling: d0 = 1 marks each
-;      time round, and YMX_init is only needed to start again from frame 0
+;   4. a tune that starts over plays for as long as you keep calling: d0 = 1
+;      marks each time round, and YMX_init is only needed to start it again
+;      from a stop
 ;   5. the HOST owns the machine state - the player saves and restores none
 ;      of it. A host needing the machine back afterwards saves, around
 ;      init..stop, exactly what the player touches: the vectors $134 and
@@ -260,22 +258,20 @@ YMX_RINGEND     equ     12              ; long  one past ring 0, where it wraps
 YMX_RINGS       equ     16              ; long  base of the ring area
 YMX_FILE        equ     20              ; long  the .ymx file
 YMX_TOTAL       equ     24              ; long  O, the tune length in frames
-YMX_LOOPLEN     equ     28              ; long  O - L, zero when it does not loop
-YMX_LOOP        equ     32              ; long  L, read at init to split sections
-YMX_N           equ     36              ; word  ring size N
-YMX_C           equ     38              ; word  values per call C
-YMX_SLOT        equ     40              ; word  refill turn, 0..C-1
-YMX_INDEX       equ     42              ; word  stream index, during init only
-YMX_LOOPS       equ     44              ; word  nonzero when the tune loops
-YMX_EFXOFF      equ     46              ; long  14*N: the cursor's ring to M's
-YMX_TMAP        equ     50              ; word  the channel-to-timer map in
+YMX_N           equ     28              ; word  ring size N
+YMX_C           equ     30              ; word  values per call C
+YMX_SLOT        equ     32              ; word  refill turn, 0..C-1
+YMX_INDEX       equ     34              ; word  stream index, during init only
+YMX_LOOPS       equ     36              ; word  nonzero when the tune starts over
+YMX_EFXOFF      equ     38              ; long  14*N: the cursor's ring to M's
+YMX_TMAP        equ     42              ; word  the channel-to-timer map in
                                         ; force, so stream T's byte only
                                         ; costs a compare per frame
-YMX_LIVE        equ     52              ; word  streams still worth decoding:
+YMX_LIVE        equ     44              ; word  streams still worth decoding:
                                         ; the channels sit last, so a tune
                                         ; that uses two leaves the others'
                                         ; pair off the end
-YMX_STATE       equ     54              ; the decoder states, from an even base
+YMX_STATE       equ     46              ; the decoder states, from an even base
 
 ; A timer channel is the format's idea; which of the MFP's four serves it
 ; is this file's. One
@@ -346,13 +342,11 @@ YH_PLAYER_HZ    equ     12
 YH_STREAM_COUNT equ     14
 YH_RING         equ     16
 YH_CHUNK        equ     18
-YH_LOOP         equ     20
-YH_CLOCK        equ     24
-YH_SAMPLES        equ     28              ; long: the sample table, 0 when none
-YH_SAMPLECOUNT    equ     32              ; word
-YH_INTRO_TABLE  equ     34              ; one offset per stream: the frames
-                                        ; before the loop
-YH_LOOP_TABLE   equ     YH_INTRO_TABLE+(YMX_STREAMS*4)
+YH_CLOCK        equ     20
+YH_SAMPLES        equ     24              ; long: the sample table, 0 when none
+YH_SAMPLECOUNT    equ     28              ; word
+YH_SECTIONS     equ     30              ; one offset per stream: its section,
+                                        ; covering every frame of the tune
 
 YMX_MAGIC       equ     $594D5821       ; 'YMX!'
 YMX_VERSION     equ     1               ; YMX starts at 1: the layout is the
@@ -360,7 +354,7 @@ YMX_VERSION     equ     1               ; YMX starts at 1: the layout is the
                                         ; inside ST4, adopted whole and
                                         ; renumbered, so there is no older
                                         ; version to stay compatible with
-YMX_FLAG_LOOPS  equ     1               ; header flag: the tune loops
+YMX_FLAG_LOOPS  equ     1               ; header flag: the tune starts over
 YMX_FLAG_CHAN   equ     2               ; and one per timer channel, from bit
                                         ; 1 up: set when the tune uses it,
                                         ; which is when a timer is claimed
@@ -418,7 +412,6 @@ YMX_init:
         bne     .rejected
 
         move.l  YH_FRAMES(a0),YMX_TOTAL(a3)
-        move.l  YH_LOOP(a0),YMX_LOOP(a3)
         move.w  YH_RING(a0),YMX_N(a3)
         move.w  YH_CHUNK(a0),YMX_C(a3)
         move.w  YH_FLAGS(a0),d0
@@ -434,17 +427,9 @@ YMX_init:
         add.l   a1,d0
         move.l  d0,YMX_RINGEND(a3)      ; where the cursor goes back to the top
 
-        move.l  YMX_TOTAL(a3),d0        ; the loop section is O - L frames long,
-        sub.l   YMX_LOOP(a3),d0         ; and empty when the tune plays once
-        tst.w   YMX_LOOPS(a3)
-        bne.s   .loop_length
-        moveq   #0,d0
-.loop_length:
-        move.l  d0,YMX_LOOPLEN(a3)
-
         moveq   #0,d1                   ; the first group is C values, or the
         move.w  YMX_C(a3),d1            ; whole tune when that is shorter and
-        tst.w   YMX_LOOPS(a3)           ; there is no loop to carry on into
+        tst.w   YMX_LOOPS(a3)           ; there is no second pass to run into
         bne.s   .first_group
         move.l  YMX_TOTAL(a3),d0
         cmp.l   d1,d0
@@ -470,23 +455,12 @@ YMX_init:
         add.l   d3,d0
         move.l  d0,YS_END(a2)
 
-; A tune that loops from frame 0 has no intro streams, so its registers start
-; on the loop section - then the whole tune. The load of L comes
-; last because it is the branch condition: a move to a data register writes
-; the flags, a lesson the original version of this choice taught by always
-; picking the intro table and leaning on the section-exhausted path to
-; recover. The signature check below ended that arrangement.
-        move.w  #YH_INTRO_TABLE,d4
-        move.l  YMX_LOOP(a3),d0
-        bne.s   .section                ; L != 0: the intro covers [0, L)
-        move.w  #YH_LOOP_TABLE,d4
-        move.l  YMX_LOOPLEN(a3),d0
-.section:
-        move.l  d0,YS_LEFT(a2)          ; values before this stream runs out
+; One section per stream, covering every frame of the tune.
+        move.l  YMX_TOTAL(a3),YS_LEFT(a2)   ; values before this stream runs out
 
         move.w  YMX_INDEX(a3),d0
-        lsl.w   #2,d0                   ; the tables hold long offsets
-        add.w   d4,d0
+        lsl.w   #2,d0                   ; the table holds long offsets
+        add.w   #YH_SECTIONS,d0
         movea.l YMX_FILE(a3),a0
         move.l  0(a0,d0.w),d0
         clr.w   YS_STORED(a2)           ; clr writes the flags, so the test
@@ -673,9 +647,9 @@ YMX_init:
 
 ; -----------------------------------------------------------------------------
 ; YMX_fill: d0.w = stream index * YMX_STATE_SIZE, d3.w = values needed.
-; Produces exactly that many values for one register, crossing into the loop
-; section - and around it again - as often as it takes. Straddling matters even
-; for one group: nothing says the loop frame falls on a group boundary.
+; Produces exactly that many values for one register, opening its section
+; again - and again - as often as it takes. Straddling matters even for one
+; group: nothing says the end of the tune falls on a group boundary.
 ; -----------------------------------------------------------------------------
 YMX_fill:
         movem.l d6-d7/a6,-(sp)          ; three registers that survive a decoder
@@ -687,7 +661,7 @@ YMX_fill:
 .piece:
         move.l  YS_LEFT(a2),d0
         bne.s   .section
-        bsr     YMX_start_loop          ; this section ran out: go round again
+        bsr     ymx_reopen              ; this section ran out: go round again
         move.l  YS_LEFT(a2),d0
         beq.s   .done                   ; nothing to go round to; do not hang
 .section:
@@ -701,8 +675,8 @@ YMX_fill:
         tst.w   YS_STORED(a2)
         bne.s   .copy                   ; stored: the section is the values
 ; The decoder's budget counts units of ST4_UNIT bytes. The packer enforces
-; that every piece boundary - C, the loop frame, the tune length - is a whole
-; number of units, so this shift never drops a remainder.
+; that every piece boundary - C and the tune length - is a whole number of
+; units, so this shift never drops a remainder.
         .if ST4_UNIT=2
         lsr.w   #1,d3
         .endif
@@ -759,37 +733,36 @@ YMX_fill:
         bra     .done                   ; ways back are word displacements
 
 ; -----------------------------------------------------------------------------
-; YMX_start_loop: a2 = state block. Starts this register's loop stream over -
-; a fresh decoder, reading from the top of the loop section, still writing
-; where the last one stopped. ST4_init needs the ring start so that its packed
-; metadata comes out right; the write pointer is restored from the block, which
-; is why it is stored rather than held in a register.
+; ymx_reopen: a2 = state block. Starts this stream's section over - a fresh
+; decoder, reading from the top of the section, still writing where the last
+; one stopped. ST4_init needs the ring start so that its packed metadata comes
+; out right; the write pointer is restored from the block, which is why it is
+; stored rather than held in a register.
 ; -----------------------------------------------------------------------------
 ; It runs inside YMX_fill, which guarantees d6 = the state block and a6 = the
 ; workspace - the two anchors that survive the decoder call.
-YMX_start_loop:
+ymx_reopen:
+        tst.w   YMX_LOOPS(a3)
+        beq.s   .done                   ; a tune that plays once stops here
         move.l  a2,d0
         sub.l   a3,d0
         sub.w   #YMX_STATE,d0
         lsr.w   #4,d0                   ; k * 64 becomes k * 4, a table index
+        add.w   #YH_SECTIONS,d0         ; the table holds long offsets
         movea.l YMX_FILE(a3),a0
-        lea     YH_LOOP_TABLE(a0),a0    ; the loop table passed 127 bytes into
-        move.l  0(a0,d0.w),d0           ; the header at 25 streams, and an
-                                        ; indexed displacement is a SIGNED
-                                        ; BYTE - so the base moves instead
-        suba.w  #YH_LOOP_TABLE,a0       ; a0 is the file again below
-        beq.s   .no_loop                ; this tune has no loop section
+        move.l  0(a0,d0.w),d0
+        beq.s   .done                   ; this stream has no section
         tst.l   d0
         bpl.s   .container              ; the offset's top bit: stored values
         bclr    #31,d0
         adda.l  d0,a0
         move.l  a0,YS_INPUT(a2)         ; the values, read a byte at a time
         move.w  #1,YS_STORED(a2)
-        move.l  YMX_LOOPLEN(a6),YS_LEFT(a2)
+        move.l  YMX_TOTAL(a6),YS_LEFT(a2)
         rts
 .container:
         clr.w   YS_STORED(a2)
-        adda.l  d0,a0                   ; the loop section's ST4 container
+        adda.l  d0,a0                   ; the section's ST4 container
         movea.l YS_START(a2),a1         ; read before a2 becomes stream B
         bsr.s   ymx_open
         movea.l a6,a3                   ; the decoder clobbered the workspace
@@ -801,9 +774,9 @@ YMX_start_loop:
         move.w  d0,YS_QUEUE(a2)
         move.l  d1,YS_D1(a2)
         move.l  d2,YS_D2(a2)
-        move.l  YMX_LOOPLEN(a3),YS_LEFT(a2)
+        move.l  YMX_TOTAL(a3),YS_LEFT(a2)
         move.l  a2,d6                   ; the block pointer, as fill keeps it
-.no_loop:
+.done:
         rts
 
 ; -----------------------------------------------------------------------------
@@ -835,7 +808,7 @@ YMX_play:
         tst.l   YMX_LEFTFR(a3)
         bne.s   .frame
         moveq   #-1,d0                  ; past the last frame of a tune that
-        rts                             ; does not loop: write nothing
+        rts                             ; plays once: write nothing
 
 .frame:
         .if YMX_PERF
@@ -991,7 +964,7 @@ ymx_w13:
         moveq   #0,d3
         move.w  YMX_C(a3),d3            ; a whole group
         tst.w   YMX_LOOPS(a3)
-        bne.s   .refill                 ; a looping tune never runs out
+        bne.s   .refill                 ; a tune that starts over never runs out
         move.l  YMX_TOTAL(a3),d1
         sub.l   YMX_NEXT(a3),d1         ; values still packed
         ble.s   .advance                ; all decoded: never call ST4 again
@@ -1021,13 +994,15 @@ ymx_w13:
         move.w  d0,YMX_SLOT(a3)
 
 ; The rings hold the tune as one continuous sequence, so reaching the end of
-; the last frame means the next values in them are the loop section's.
-; The countdown follows: it reloads with the loop section's length.
+; the last frame means the next values in them are frame 0's again.
+; The countdown follows: it reloads with the tune length.
         subq.l  #1,YMX_LEFTFR(a3)
         bne.s   .played
         tst.w   YMX_LOOPS(a3)
-        beq.s   .played                 ; zero and no loop: the next call ends
-        move.l  YMX_LOOPLEN(a3),YMX_LEFTFR(a3)
+        beq.s   .played                 ; zero and it plays once: the next
+                                        ; call ends
+        bsr     ymx_restart             ; the tune starts over, from silence
+        move.l  YMX_TOTAL(a3),YMX_LEFTFR(a3)
         .if YMX_PERF
         move.w  #$770,$FFFF8240.w       ; then the timers' bar: what the
         lea     ymx_perf_acc(pc),a0     ; ticks cost since last frame,
@@ -1037,7 +1012,7 @@ ymx_w13:
         dbra    d0,.perf_bar_w
         move.w  (sp)+,$FFFF8240.w
         .endif
-        moveq   #1,d0                   ; played, and wrapped to the loop point
+        moveq   #1,d0                   ; played, and wrapped to frame 0
         rts
 .played:
         .if YMX_PERF
@@ -1697,6 +1672,40 @@ ymx_program:
         move.w  CH_IERBIT(a5),d1        ; left: every program ends live
         bset    d1,(a1)
         rts
+
+; -----------------------------------------------------------------------------
+; ymx_restart: the tune begins again, so nothing may still be running from its
+; end. Every claimed timer stops and its vector goes back to the park entry,
+; and every skip opens - the state the script's first frame is compiled for.
+; The rings are not touched: each stream re-opened its own section on its own
+; refill turn, one a frame, so the values for the new pass are already there.
+; in: a3 = workspace; clobbers d0-d2/a1-a2/a5.
+; -----------------------------------------------------------------------------
+ymx_restart:
+        lea     ymx_desc_0(pc),a5
+        moveq   #YMX_CHANNELS-1,d2
+        move.w  sr,-(sp)                ; a tick between the stop and the park
+        ori.w   #$0700,sr               ; would run the old handler
+.channel:
+        tst.w   CH_CLAIMED(a5)
+        beq.s   .next
+        movea.w CH_CTRL(a5),a1
+        move.w  CH_KEEP(a5),d1
+        and.b   d1,(a1)                 ; stopped; the other nibble kept
+        movea.l CH_ISR(a5),a2
+        lea     ISR_PARK(a2),a2         ; nothing to tick until an arm
+        movea.w CH_VEC(a5),a1
+        move.l  a2,(a1)
+        move.w  CH_IERBIT(a5),d1        ; a released toggle left this clear
+        movea.w CH_IER(a5),a1
+        bclr    d1,4(a1)                ; drop a stale pending
+        bset    d1,(a1)                 ; enabled, as init leaves it
+.next:
+        lea     CH_SIZE(a5),a5
+        dbra    d2,.channel
+        move.w  (sp)+,sr
+        moveq   #0,d0                   ; no voice skipped again
+        bra     ymx_skips
 
 ; -----------------------------------------------------------------------------
 ; ymx_skips: apply the skip bits. Bit v of d0 skips voice v: its volume write

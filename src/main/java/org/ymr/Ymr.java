@@ -51,9 +51,9 @@ public final class Ymr {
         if (args.length == 2 && args[0].equals("-script")) {
             YmrReader.Song dump = read(args[1]);
             Tune converted = YmrEffects.convert(dump, stem(args[1]));
-            EffectScript.Result script = EffectScript.compile(converted,
-                    dump.loops() ? dump.loopFrame() : -1, 1, YmrEffects.TIMERS);
-            System.out.printf("%d frames, split %d%n", script.frames(), script.split());
+            EffectScript.Result script =
+                    EffectScript.compile(converted, YmrEffects.TIMERS);
+            System.out.printf("%d frames%n", script.frames());
             for (int f = 0; f < script.frames(); f++) {
                 if (script.m()[f] == 0 && script.r7force()[f] == 0) {
                     continue;
@@ -78,7 +78,6 @@ public final class Ymr {
         int ringSize = YmxFormat.DEFAULT_RING_SIZE;
         int chunk = YmxFormat.DEFAULT_CHUNK;
         int unit = 0;                           // 0 until chosen: -kK, or the
-        int loopFrame = -1;                     // tune's shape; -1 likewise
         boolean playOnce = false;
         boolean forcedMode = false;
         int startMin = 0;                       // the trim window, for zooming
@@ -108,8 +107,6 @@ public final class Ymr {
                         chunk = parseNumber(args[i].substring(2));
                     } else if (args[i].startsWith("-k")) {
                         unit = parseNumber(args[i].substring(2));
-                    } else if (args[i].startsWith("-l")) {
-                        loopFrame = parseNumber(args[i].substring(2), true);
                     } else {
                         throw error("Invalid parameter " + args[i]);
                     }
@@ -132,7 +129,7 @@ public final class Ymr {
             Path dir = Path.of(args[args.length - 1]);
             for (int input = i; input < args.length - 1; input++) {
                 packOne(args[input], dir.resolve(stem(args[input]) + ".ymx").toString(),
-                        ringSize, chunk, unit, loopFrame, playOnce, forcedMode,
+                        ringSize, chunk, unit, playOnce, forcedMode,
                         0, 0, -1, -1, -1);
             }
             return;
@@ -145,20 +142,19 @@ public final class Ymr {
             outputName = args[i + 1];
         } else {
             usage("""
-                    Usage: ymr [-f] [-o] [-nN] [-cC] [-kK] [-lF] input.ymr [output.ymx]
+                    Usage: ymr [-f] [-o] [-nN] [-cC] [-kK] input.ymr [output.ymx]
                            ymr [options] one.ymr two.ymr more.ymr output-dir/
                       -f      Force overwrite of output file
-                      -o      Play once: pack no loop section
+                      -o      Play once: stop at the end instead of starting over
                       -nN     Ring size per stream, in bytes (default 960)
                       -cC     Values decoded per call, and the round-robin group
                               size (default 24; N mod C = 0, and C at least the
                               streams the tune decodes: a .ymr fills three timer
                               channels, so that is 23)
                       -kK     ST4 unit size: 1, 2 or 4 (default 2). An odd
-                              tune length or loop frame is padded with safe
-                              duplicate frames - inaudible - to fit the unit.
-                              The player must be built with the same ST4_UNIT
-                      -lF     Loop from frame F, overriding the .ymr header
+                              tune length is padded with safe duplicate frames
+                              - inaudible - to fit the unit. The player must be
+                              built with the same ST4_UNIT
                       -minM -secS   Trim: drop everything before M:S, so a
                               moment deep in a long tune plays immediately
                       -startframeF -endframeF -framesN   The same window in
@@ -178,14 +174,14 @@ public final class Ymr {
                     doc/CONVERSION.md.""");
             return;
         }
-        packOne(args[i], outputName, ringSize, chunk, unit, loopFrame, playOnce,
+        packOne(args[i], outputName, ringSize, chunk, unit, playOnce,
                 forcedMode, startMin, startSec, startFrame, endFrame, frameCount);
     }
 
     /** The whole pipeline for one tune: read, convert, trim, pad, pack, write,
      * report - the same order {@link org.ym6.Ymx} runs it in. */
     private static void packOne(String inputName, String outputName, int ringSize,
-                                int chunk, int unit, int loopFrame, boolean playOnce,
+                                int chunk, int unit, boolean playOnce,
                                 boolean forcedMode, int startMin, int startSec,
                                 int startFrame, int endFrame, int frameCount) {
         // The floor only: how many streams a tune decodes depends on the
@@ -219,67 +215,46 @@ public final class Ymr {
         if (frameCount >= 0) {
             end = Math.min(end, start + frameCount);
         }
-        boolean loops = dump.loops();
         if (start > 0 || end < dump.frameCount()) {
             if (start < 0 || start >= end) {
                 throw error("Empty trim window: frames " + start + ".." + end
                         + " of " + dump.frameCount());
             }
-            // A loop frame inside the kept window is kept, adjusted; one
-            // outside it makes the excerpt loop from its own start.
-            int kept = loops && dump.loopFrame() >= start && dump.loopFrame() < end
-                    ? dump.loopFrame() - start : 0;
-            tune = trim(tune, start, end, kept);
+            tune = trim(tune, start, end);
             System.out.printf("Trimmed to frames %d-%d: %d frames%n",
                     start, end - 1, end - start);
         }
 
-        // The .ymr header's loop frame is the default; -lF overrides it and -o
-        // drops the loop altogether. A song the header says plays once has no
-        // loop to inherit, so it stays a play-once file.
-        if (loopFrame < 0 && !playOnce && loops) {
-            loopFrame = tune.loopFrame();
-        }
-        if (playOnce) {
-            loopFrame = -1;
-        }
-        if (loopFrame >= tune.frames()) {
-            System.out.printf("Warning: the loop frame is %d in a %d-frame tune;"
-                    + " looping from the start instead%n", loopFrame, tune.frames());
-            loopFrame = 0;
-        }
+        // What the song says the end does is the default; -o overrides it.
+        boolean startsOver = tune.loops() && !playOnce;
 
         // The default unit is 2, measured a few percent cheaper per frame for
-        // little ratio. A tune whose length or loop frame is odd is PADDED to
-        // the shape with duplicated safe frames; an explicit -kK pads the same
-        // way and drops to -k1 only when no safe frame exists.
+        // little ratio. A tune of odd length is PADDED to the shape with
+        // duplicated safe frames; an explicit -kK pads the same way and drops
+        // to -k1 only when no safe frame exists.
         if (unit == 0 && chunk % 2 == 0) {
-            Tune padded = padToUnit(tune, loopFrame, 2);
+            Tune padded = padToUnit(tune, 2);
             if (padded != null) {
-                if (padded != tune) {
-                    tune = padded;
-                    loopFrame = loopFrame > 0 ? tune.loopFrame() : loopFrame;
-                }
+                tune = padded;
                 unit = 2;
             } else {
                 unit = 1;
-                System.out.println("Packing at -k1: this tune's shape is not "
+                System.out.println("Packing at -k1: this tune's length is not "
                         + "a whole number of 2-byte units, and no frame near "
-                        + "the boundary is safe to duplicate");
+                        + "the end is safe to duplicate");
             }
         } else if (unit == 0) {
             unit = 1;
         } else if (unit > 1) {
-            Tune padded = padToUnit(tune, loopFrame, unit);
-            if (padded != null && padded != tune) {
+            Tune padded = padToUnit(tune, unit);
+            if (padded != null) {
                 tune = padded;
-                loopFrame = loopFrame > 0 ? tune.loopFrame() : loopFrame;
             }
         }
 
         YmxEncoder.Result result;
         try {
-            result = YmxEncoder.encode(tune, ringSize, chunk, loopFrame, true, unit,
+            result = YmxEncoder.encode(tune, ringSize, chunk, startsOver, true, unit,
                     YmrEffects.TIMERS);
         } catch (IllegalArgumentException e) {
             // The encoder always says what it rejected, but getMessage() is
@@ -307,7 +282,7 @@ public final class Ymr {
     // ------------------------------------------------------- shaping the tune
 
     /**
-     * The kept window of every timeline at once, and the loop frame inside it.
+     * The kept window of every timeline at once.
      *
      * <p>The registers and the timer streams are cut together because they are
      * one timeline: a frame is a column across all of them, and cutting one and
@@ -316,8 +291,8 @@ public final class Ymr {
      * rate, its samples, the notes the conversion left - is untouched by
      * shortening it.
      */
-    private static Tune trim(Tune tune, int start, int end, int loopFrame) {
-        return new Tune(end - start, tune.frameRate(), tune.masterClock(), loopFrame,
+    private static Tune trim(Tune tune, int start, int end) {
+        return new Tune(end - start, tune.frameRate(), tune.masterClock(), tune.loops(),
                 slice(tune.registers(), start, end), slice(tune.codes(), start, end),
                 slice(tune.counts(), start, end),
                 java.util.Arrays.copyOfRange(tune.shapes(), start, end),
@@ -330,16 +305,16 @@ public final class Ymr {
      * frame may be duplicated: {@link Tune#padToUnit} does the work and this
      * says what is safe.
      *
-     * <p>Returns the tune itself when the shape already fits, the padded tune
-     * otherwise - or null when no safe frame exists near a boundary that needs
-     * one, the caller's cue to drop to {@code -k1}.
+     * <p>Returns the tune itself when the length already fits, the padded tune
+     * otherwise - or null when no safe frame exists near the end, the caller's
+     * cue to drop to {@code -k1}.
      */
-    private static @Nullable Tune padToUnit(Tune tune, int loopFrame, int unit) {
-        Tune padded = Tune.padToUnit(tune, loopFrame, unit, safeToDuplicate(tune));
+    private static @Nullable Tune padToUnit(Tune tune, int unit) {
+        Tune padded = Tune.padToUnit(tune, unit, safeToDuplicate(tune));
         if (padded != null && padded != tune) {
             int added = padded.frames() - tune.frames();
             System.out.printf("Padded %d frame%s (duplicates of safe frames) so the "
-                    + "shape is whole %d-byte units%n", added, added == 1 ? "" : "s",
+                    + "length is whole %d-byte units%n", added, added == 1 ? "" : "s",
                     unit);
         }
         return padded;
@@ -414,10 +389,7 @@ public final class Ymr {
                 tune.frames() / tune.frameRate() % 60,
                 YmxFormat.STREAMS, result.ringSize(), result.chunk());
         System.out.println(result.loops()
-                ? result.loopFrame() == 0
-                        ? "Loops from the start"
-                        : "Plays frames 0-" + (result.loopFrame() - 1)
-                                + ", then loops from frame " + result.loopFrame()
+                ? "Plays through, then starts over"
                 : "Plays once, then stops");
         String[] scriptNames = {"M ", "X ", "T ", "A0", "P0", "A1", "P1",
                                 "A2", "P2", "A3", "P3"};
@@ -425,8 +397,8 @@ public final class Ymr {
             String name = stream.register() < YmxFormat.REGISTER_STREAMS
                     ? String.format("R%-2d", stream.register())
                     : scriptNames[stream.register() - YmxFormat.REGISTER_STREAMS] + " ";
-            System.out.printf("  %s %-5s %6d -> %6d bytes (%5.1f%%)%n", name,
-                    stream.loop() ? "loop" : "intro", stream.frames(),
+            System.out.printf("  %s %6d -> %6d bytes (%5.1f%%)%n", name,
+                    stream.frames(),
                     stream.packedSize(), 100.0 * stream.packedSize() / stream.frames());
         }
         System.out.printf("Packed %d register bytes into %d (%.1f%%), file %d bytes%n",

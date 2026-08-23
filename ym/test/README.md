@@ -8,8 +8,9 @@ field. The test says how to repin after an intended change.
 They were taken by covering features rather than by sampling: both dialects,
 every effect class the collection holds - digidrums, SID voices, and tunes
 with no effect at all - each distinct drum rate, the tunes that put two and
-three voices on the envelope at once, looping and non-looping, and the
-extremes of length (4 to 58,716 frames) and size (162 bytes to 55 KB).
+three voices on the envelope at once, four whose header names a loop frame
+other than 0, and the extremes of length (4 to 58,716 frames) and size (162
+bytes to 55 KB).
 
 Each is packed by `org.ym6.Ymx` at the default options, the entry point the
 tools call, so what is pinned is what a user gets. Packing is deterministic:

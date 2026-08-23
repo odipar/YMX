@@ -180,12 +180,24 @@ public final class YmEffects {
      * frame streams itself on the way into the file.
      */
     public static Tune tune(Ym6Reader.Song song, Extraction fx) {
-        return new Tune(song.frames(), song.playerHz(), song.masterClock(),
-                (int) Math.min(song.loopFrame(), Integer.MAX_VALUE),
+        // A YM header always names a loop frame, and its players always went
+        // round; a listener who wants one pass says so at the command line.
+        // Where the header names a frame other than 0, the tune goes round to
+        // 0 instead and its opening is heard on every pass - the one thing
+        // about a YM tune's shape this conversion does not keep.
+        java.util.List<String> notes = fx.notes();
+        if (song.loopFrame() > 0 && song.loopFrame() < song.frames()) {
+            notes = new java.util.ArrayList<>(notes);
+            notes.add(String.format("The YM header loops from frame %d of %d;"
+                    + " the tune starts over from frame 0 instead, so its"
+                    + " first %d frames are heard on every pass",
+                    song.loopFrame(), song.frames(), song.loopFrame()));
+        }
+        return new Tune(song.frames(), song.playerHz(), song.masterClock(), true,
                 java.util.Arrays.copyOf(song.registers(), YmxFormat.REGISTER_STREAMS),
                 fx.codes(), fx.counts(), shapes(song, fx), fx.samples(),
                 oneShot(fx.samples().length), EffectScript.Semantics.YM,
-                song.name(), song.author(), song.comment(), fx.notes());
+                song.name(), song.author(), song.comment(), notes);
     }
 
     /**

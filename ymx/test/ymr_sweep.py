@@ -6,13 +6,11 @@ in the Unicorn rig.
 
 Each tune is packed at k=1 - no padding frames, so the .YMR's own frames are
 the exact expectation - then played through the real 68000 player under
-emulation, exactly as sweep.py plays a .ym. The v2 split rotation is replayed
-here too: a rotated tune's played timeline shows some source frames twice, and
-the walk follows the same map the packer compiled. This one takes that map
-from the PACKED FILE's header - O at offset 8, the split at 20, the loop flag
-at 6 - rather than recomputing it, because the header is the contract the
-player itself reads and a rotation the file and the player disagreed about
-would show up as a wrong frame here anyway.
+emulation, exactly as sweep.py plays a .ym. A tune that starts over plays its
+frames again from frame 0, so the walk is the dump's own frames over and over.
+Its length and whether it starts over come from the PACKED FILE's header - O
+at offset 8, the flags at 6 - rather than from the dump, because the header is
+the contract the player itself reads.
 
 The truth side is an INDEPENDENT model of the .YMR image, written in this
 file from the format spec: its own ZX1 decoder, its own stream map walk, its
@@ -67,11 +65,10 @@ quietly skipped.
     programmed to. Those are the effect test's; here the timers are checked
     only for who claimed them.
   * Everything past the frame cap - the first 1200 frames of a long tune, the
-    same budget sweep.py plays, which leaves the frames the split rotation
-    added and the wrap after them unwalked on a long tune. YMR_FRAME_CAP
-    raises it, and the cap is printed on the status line along with the
-    boundaries it crossed, so a tune whose only interesting frame is past it
-    says so rather than reading OK on nothing.
+    same budget sweep.py plays, which leaves the wrap unwalked on a long tune.
+    YMR_FRAME_CAP raises it, and the cap is printed on the status line along
+    with the boundaries it crossed, so a tune whose only interesting frame is
+    past it says so rather than reading OK on nothing.
 
 One status line per tune: OK, ISSUE, PACKFAIL or SKIP. A non-zero exit on any
 ISSUE. Needs mvn compile, rmac and unicorn, like the rigs.
@@ -82,7 +79,8 @@ import collections, os, struct, subprocess, sys, tempfile
 # run from its own directory and a relative argument would stop meaning what
 # the caller typed the moment it does.
 TUNES = [os.path.abspath(p) for p in sys.argv[1:]] \
-    or ['/Users/rapido/signals-grouped.ymr']
+    or [os.path.join(os.path.dirname(os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__)))), 'ymr', 'test', 'deeper.ymr')]
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 EMU = os.path.join(REPO, 'ymx', 'test', 'emu')
@@ -116,8 +114,7 @@ MAX_SAMPLES = 32                    # what five bits of a volume register hold
 MAX_SAMPLE_BYTES = 65535            # what a ymx sample table's word-sized length holds
 
 # How far the walk goes into a long tune: the same 1200 frames sweep.py
-# plays. Raising it is the only way to reach the frames the split rotation
-# added, which sit past the file's own length, and the wrap after them -
+# plays. Raising it is the only way to reach the wrap -
 #   YMR_FRAME_CAP=11000 python3 ymx/test/ymr_sweep.py song.ymr
 # is a whole pass of a four-minute tune and a couple of seconds of emulation.
 FRAME_CAP = int(os.environ.get('YMR_FRAME_CAP', 1200))
@@ -461,12 +458,10 @@ class Ymr:
             code = self._code(channel, running, want, trigger, started, frame, armed_to)
             if code and (code & 0xC0) == KIND_PCM:
                 # Every armed frame carries the window its rate would give a
-                # sample starting there, not only the frame the dump timeline
-                # happens to start one on: the effect stage arms on the frame
-                # a code CHANGES, and the played timeline can reach a change
-                # the dump timeline does not have - the first frame the split
-                # rotation added is a change coming out of the song's last
-                # frame rather than out of the frame before it.
+                # sample starting there, not only the frame a code changes on:
+                # the effect stage arms on the frame a code CHANGES, and the
+                # arming frame is the one whose rate the window is measured
+                # at.
                 self.window[channel][frame] = self._armed(want)
                 if code != last:
                     armed_to = frame + self.window[channel][frame]
@@ -508,15 +503,11 @@ class Ymr:
 
 
 class Stage:
-    """The effect stage, replayed frame by frame on the PLAYED timeline.
+    """The effect stage, replayed frame by frame.
 
-    The skip is state, not a property of a dump frame: what a code byte does
-    depends on the code before it, and the played timeline is where "before"
-    means anything. It matters at exactly one place - the frames the split
-    rotation added, which show dump frames the walk has already been past -
-    and getting it wrong there reads as the player starting a square it does
-    not start. So this steps once per played frame, given the dump frame that
-    frame shows, the way the compiler does.
+    The skip is state, not a property of a frame: what a code byte does
+    depends on the code before it. So this steps once per played frame, given
+    the dump frame that frame shows, the way the compiler does.
 
     What it reports is the whole of what a frame's volume writes depend on:
 
@@ -550,6 +541,15 @@ class Stage:
         self.last = [0] * 3             # the code each channel ran last frame
         self.owner = [-1] * 3           # the channel a voice's sample belongs to
         self.end = [-1] * 3             # the played frame its window closes on
+        self.skips = 0
+
+    def restart(self):
+        """The tune starts over, so nothing is running from its end: the state
+        the compiler began from, which the player puts the machine back into
+        on the frame that ends the tune."""
+        self.last = [0] * 3
+        self.owner = [-1] * 3
+        self.end = [-1] * 3
         self.skips = 0
 
     def step(self, frame):
@@ -708,7 +708,7 @@ def sweep(path):
             last = (out.stderr or out.stdout).strip().splitlines()[-1]
             return 'PACKFAIL %s: %s' % (name, last[:70])
         warns = [line for line in out.stdout.replace('\r', '\n').splitlines()
-                 if line.startswith('Warning') or 'rotated' in line]
+                 if line.startswith('Warning')]
         return play(name, dump, open(ymx, 'rb').read(), warns)
     except AssertionError as problem:
         return 'ISSUE %s: %s' % (name, problem)
@@ -721,16 +721,7 @@ def play(name, dump, packed, warns):
     flags, = struct.unpack('>H', packed[6:8])
     played, = struct.unpack('>I', packed[8:12])
     ring, = struct.unpack('>H', packed[16:18])
-    split, = struct.unpack('>I', packed[20:24])
     loops = flags & 1
-
-    # The split rotation, from the packed header. The packer cut the loop
-    # where the effect state coming from the intro and the state coming from
-    # the wrap agree, which pushes the cut past the musical loop frame and
-    # lengthens the played timeline by the surplus; the frames it added at
-    # the end are the first frames of the loop, played a second time.
-    rotation = played - dump.frames
-    loop_frame = split - rotation
     if (flags >> 1) & 15 != dump.used:
         return ('ISSUE %s: the header marks timer channels %#x, the dump uses %#x'
                 % (name, (flags >> 1) & 15, dump.used))
@@ -743,10 +734,9 @@ def play(name, dump, packed, warns):
         return 'ISSUE %s: YMX_init %s' % (name, problem)
     claim = list(player.mfp)
 
-    # The same budget sweep.py plays: a short tune goes right round its loop
-    # and out the other side, a long one plays its first FRAME_CAP frames.
+    # The same budget sweep.py plays: a short tune goes right round and out
+    # the other side, a long one plays its first FRAME_CAP frames.
     budget = played + 200 if played <= 3000 else FRAME_CAP
-    cycle = played - split
     stage = Stage(dump)
     wrapped = False
     walked = 0
@@ -755,13 +745,9 @@ def play(name, dump, packed, warns):
     edges = pops = buzzers = starts = 0
     was_skipped = 0
     for frame in range(budget):
-        # The played timeline: the packer's rotation replayed. Frames past
-        # the file's own length are the loop, and the source frame each shows
-        # is the one the packer compiled it from.
-        position = frame if frame < played else \
-            split + (frame - split) % cycle if cycle else played - 1
-        source = position if position < dump.frames \
-            else loop_frame + (position - dump.frames)
+        source = frame % played         # the same frames, over and over
+        if frame and source == 0:
+            stage.restart()             # the player silenced everything
         result, writes = player.frame()
         if result == -1:
             return 'ISSUE %s: ended early at frame %d/%d' % (name, frame, played)
@@ -784,14 +770,14 @@ def play(name, dump, packed, warns):
             break
 
     timers = ''.join(CHANNEL_TIMER[c] for c in range(3) if dump.used & (1 << c))
-    where = 'looped' if wrapped else 'partial' if walked < played else 'once'
+    where = 'started over' if wrapped else 'partial' if walked < played else 'once'
     crossings = ('%d skip edge%s, %d PWM start%s, %d buzzer frame%s, %d shape pop%s'
                  % (edges, '' if edges == 1 else 's', starts, '' if starts == 1 else 's',
                     buzzers, '' if buzzers == 1 else 's', pops, '' if pops == 1 else 's'))
     extra = (' [' + '; '.join(warns)[:90] + ']') if warns else ''
-    return ('OK %s (%df of %d played, split %d (+%d rotated), cap %d, %s;'
+    return ('OK %s (%df of %d played, cap %d, %s;'
             ' timers %s; %s; %d sample trigger%s in the whole dump)%s'
-            % (name, walked, played, split, rotation, FRAME_CAP, where,
+            % (name, walked, played, FRAME_CAP, where,
                timers or 'none', crossings, dump.triggers,
                '' if dump.triggers == 1 else 's', extra))
 
@@ -852,7 +838,7 @@ def compare(dump, frame, source, writes, skipped, started):
             return 'frame %d wrote R%d %d times' % (frame, register, counted[register])
         value = dump.registers[register][source] & MASK[register]
         # A buzzing voice is no longer a special case: an RTE drives R13 and
-        # never the volume register, and v8 stopped the shape being smuggled
+        # never the volume register, and the shape is no longer smuggled
         # through the nibble, so the byte is the dump's own and is compared
         # like any other.
         if got[register] != value:
