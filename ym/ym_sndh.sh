@@ -12,7 +12,8 @@
 #   ym/ym_sndh.sh -t"Mad Max" maxset.sndh stormlord3.ym lastv8.ym
 #
 # The work is org.ym6.YmSndh's; this only finds the repo and the classes.
-# Needs rmac on PATH.
+# rmac is needed only the first time, when ymx/mkcores.sh assembles the
+# prebuilt player binaries.
 set -e
 YMX_DIR=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$YMX_DIR/.." && pwd)

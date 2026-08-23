@@ -7,7 +7,7 @@ import java.util.List;
 
 /**
  * What the build tools need from the world outside the JVM: where the repo
- * is, and how to run rmac.
+ * is, and how to run a command.
  *
  * <p>The shell wrappers pass the repository root in, since a class file can
  * locate only its own jar or directory; the fallback covers running the
@@ -32,19 +32,7 @@ public final class Tools {
         }
     }
 
-    /** Where the 68000 sources live - the player, its two wrappers and the
-     * ST4 decoders they include. One directory, so one -i. */
-    public static Path asmDir() {
-        return repo().resolve("68k");
-    }
-
-    /**
-     * Runs a command with its output on ours, failing loudly.
-     *
-     * <p>rmac is run from inside the work directory on short relative names:
-     * it crashes - SIGTRAP, not an error message - on long include paths, and
-     * that is not something to leave to every caller.
-     */
+    /** Runs a command with its output on ours, failing loudly. */
     public static void run(Path directory, List<String> command) {
         try {
             Process process = new ProcessBuilder(command)
@@ -61,16 +49,6 @@ public final class Tools {
             Thread.currentThread().interrupt();
             throw fail("interrupted while running " + command.get(0));
         }
-    }
-
-    /** Assembles one source file, from inside its own directory. */
-    public static void assemble(Path directory, String source, Path output,
-                                List<String> extraFlags) {
-        List<String> command = new java.util.ArrayList<>(
-                List.of("rmac", "-m68000"));
-        command.addAll(extraFlags);
-        command.addAll(List.of("+o3", "-o", output.toAbsolutePath().toString(), source));
-        run(directory, command);
     }
 
     /**

@@ -14,6 +14,12 @@ import java.nio.file.Path;
  */
 public record YmxHeader(int ring, int chunk, int unit, int hz, int flags, int frames) {
 
+    /** Whether the tune reads the same at any unit size: every section is
+     * stored, so no ST4 signature names one. {@link #unit} is 0. */
+    public boolean anyUnit() {
+        return unit == 0;
+    }
+
     /** Bit 0 of the flags: the tune starts over instead of ending. */
     public boolean loops() {
         return (flags & YmxFormat.FLAG_LOOPS) != 0;
@@ -45,8 +51,9 @@ public record YmxHeader(int ring, int chunk, int unit, int hz, int flags, int fr
                     + " - repack the tune from its .ym source");
         }
         // A stored section carries no signature, so the unit size comes from
-        // the first section that is a container. Every tune has one: a whole
-        // tune's worth of values never packs larger than itself.
+        // the first section that is a container. A tune short enough to
+        // store every section reads the same at any unit size, and its
+        // unit here is 0.
         int section = 0;
         for (int stream = 0; stream < YmxFormat.STREAMS && section == 0; stream++) {
             long entry = longAt(file, YmxFormat.OFFSET_SECTION_TABLE + 4 * stream);
@@ -54,12 +61,12 @@ public record YmxHeader(int ring, int chunk, int unit, int hz, int flags, int fr
                 section = (int) YmxFormat.sectionOffset(entry);
             }
         }
-        if (section == 0 || section + 3 >= file.length) {
+        if (section + 3 >= file.length) {
             throw new IOException(path + " has no readable first section");
         }
         return new YmxHeader(word(file, YmxFormat.OFFSET_RING_SIZE),
                 word(file, YmxFormat.OFFSET_CHUNK),
-                file[section + 3] & 0xFF,       // the ST4 signature's low byte
+                section == 0 ? 0 : file[section + 3] & 0xFF,
                 word(file, YmxFormat.OFFSET_PLAYER_HZ),
                 word(file, YmxFormat.OFFSET_FLAGS),
                 (int) longAt(file, YmxFormat.OFFSET_FRAMES));
