@@ -24,11 +24,13 @@ defaults quoted below are the constants' own values.
 | `ymx/test/ymr_sweep.sh` | `org.ymx.rig.YmrSweep` | a `.ymr` corpus, differentially |
 | `ymx/test/run.sh` | `org.ymx.rig.GenData` + rmac + Hatari | the real-hardware harness |
 
-The two packers have no wrapper of their own: the play and combine scripts
-run them, and a direct run is `java -cp target/classes org.ym6.Ymx ...`,
-`mvn -q compile exec:exec@ymx -Dargs="..."`, or `dotnet dotnet/bin/Release/
-net10.0/ymx.dll ymx ...`. Every tool prints its own usage when called with
-no or wrong arguments; this document is the same information in one place.
+The two packers have no wrapper of their own: the play scripts and
+`ym_sndh.sh` run them, and a direct run is
+`java -cp target/classes org.ym6.Ymx ...`,
+`mvn -q compile exec:exec@ymx -Dargs="..."`, or
+`dotnet dotnet/bin/Release/net10.0/ymx.dll ymx ...`. A wrong call prints
+the tool's own usage - `mkcores.sh` and `mkrelease.sh` run with no
+arguments at all - and this document is the same information in one place.
 
 ## The packers
 
@@ -100,7 +102,7 @@ when missing or stale. `doc/BINARIES.md` is the byte contract.
 ### mkprg.sh
 
 A runnable TOS program around an SNDH file: the prebuilt stub, patched and
-concatenated. Takes packed tunes (combined through `mksndh.sh` first) or a
+concatenated. Takes packed tunes (combined into an SNDH file first) or a
 ready `.sndh`; both argument orders work, the `.prg` naming the output
 wherever it stands.
 
@@ -114,9 +116,11 @@ wherever it stands.
 
 ### mkcores.sh
 
-The one build step that runs rmac: the three SNDH cores for one flag
-combination and, in a plain run, the PRG stub, into `dist/` or the named
-directory.
+Runs rmac to assemble the three SNDH cores for one flag combination and,
+in a plain run, the PRG stub, into `dist/` or the named directory. The
+combiners run no assembler: `mksndh.sh` and `mkprg.sh` call this step in
+when a binary under `dist/` is missing or stale, and `mkrelease.sh` runs
+it for every variant.
 
     ymx/mkcores.sh [-perf] [-nomask] [outdir]
 
@@ -254,6 +258,6 @@ of `dotnet dotnet/bin/Release/net10.0/ymx.dll` names the tool:
 | `YMX_NOMASK` | rig.sh | assemble the player with the frame write unmasked |
 | `YMX_PACK_OPTIONS` | sweep.sh | extra packer options for the sweep |
 | `YMR_FRAME_CAP` | ymr_sweep.sh | the .ymr sweep's frame cap |
-| `ymx.repo` / `YMX_REPO` | every tool | the repository root, when not derivable (the Java property, the C# variable) |
+| `ymx.repo` / `YMX_REPO` | the combiners, the play tools and the rigs | the repository root, when not derivable (the Java property, the C# variable) |
 | `ymx.core` / `YMX_CORE` | mksndh.sh | a core file, overriding `dist/` |
 | `ymx.stub` / `YMX_STUB` | mkprg.sh | a stub file, overriding `dist/` |
