@@ -32,6 +32,44 @@ public final class Tools {
         }
     }
 
+    /** Runs a command, returning its trimmed stdout, failing loudly. */
+    public static String output(Path directory, List<String> command) {
+        try {
+            Process process = new ProcessBuilder(command)
+                    .directory(directory.toFile())
+                    .redirectErrorStream(true)
+                    .start();
+            String out = new String(process.getInputStream().readAllBytes(),
+                    java.nio.charset.StandardCharsets.UTF_8).trim();
+            if (process.waitFor() != 0) {
+                throw fail(command.get(0) + " failed: " + out);
+            }
+            return out;
+        } catch (IOException e) {
+            throw fail("cannot run " + command.get(0) + ": " + e.getMessage());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw fail("interrupted while running " + command.get(0));
+        }
+    }
+
+    /** Runs a command quietly, returning its exit status. */
+    public static int status(Path directory, List<String> command) {
+        try {
+            Process process = new ProcessBuilder(command)
+                    .directory(directory.toFile())
+                    .redirectErrorStream(true)
+                    .start();
+            process.getInputStream().readAllBytes();
+            return process.waitFor();
+        } catch (IOException e) {
+            return -1;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return -1;
+        }
+    }
+
     /** Runs a command with its output on ours, failing loudly. */
     public static void run(Path directory, List<String> command) {
         try {
