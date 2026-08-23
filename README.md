@@ -105,6 +105,7 @@ ST4_UNIT    equ     2
 | [`org.st4`](src/main/java/org/st4) | the ST4 compressor, vendored |
 | [68k/](68k) | all the 68000 sources: the player, its wrappers, the ST4 decoders |
 | [`org.jx1`](src/main/java/org/jx1) | the ZX1 decoder a `.YMR`'s own streams need, vendored |
+| [dotnet/](dotnet) | the C# tree: every tool and rig again, producing the same bytes |
 
 The two front ends are peers. Neither is downstream of the other: both read
 their own format and produce a `Tune`, and no field past that point records
@@ -122,6 +123,10 @@ ymx/test/ymr_sweep.sh songs/*.ymr     # the same for .YMR
 The three player tests run the 68000 player under emulation and need rmac
 and libunicorn (`brew install unicorn`, or `UNICORN_LIB` names the
 library).
+
+Every shell script also takes `-dotnet` as its first argument, which runs
+the C# tree in [dotnet/](dotnet) instead of the Java one - the same tools
+and rigs, producing the same bytes, built by the .NET SDK on first use.
 
 The two sweeps are the broadest of these. Each replays a converted tune on the
 real player under emulation and compares every write it makes to the sound

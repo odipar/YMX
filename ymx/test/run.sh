@@ -13,9 +13,17 @@ HATARI=${HATARI:-hatari}
 TOS=${TOS:-$HOME/hatari-2.6.1_macos/tos-2.06.rom}
 
 REPO=$(cd ../.. && pwd)
-[ -d "$REPO/target/test-classes/org/ymx/rig" ] || (cd "$REPO" && mvn -q test-compile)
-java -ea -Dymx.repo="$REPO" \
-    -cp "$REPO/target/classes:$REPO/target/test-classes" org.ymx.rig.GenData
+# -dotnet as the first argument builds the harness data with the C# tree
+# (dotnet/) instead of the Java one; both produce the same bytes.
+if [ "$1" = "-dotnet" ]; then
+    DLL="$REPO/dotnet/bin/Release/net10.0/ymx.dll"
+    [ -f "$DLL" ] || (cd "$REPO/dotnet" && dotnet build -c Release -v q)
+    YMX_REPO="$REPO" dotnet "$DLL" gendata
+else
+    [ -d "$REPO/target/test-classes/org/ymx/rig" ] || (cd "$REPO" && mvn -q test-compile)
+    java -ea -Dymx.repo="$REPO" \
+        -cp "$REPO/target/classes:$REPO/target/test-classes" org.ymx.rig.GenData
+fi
 # -i. finds the generated ymxdata.inc; -i../../68k the player and the ST4
 # decoders, and -i../../68k/test hatari_util.inc - the console and 200 Hz
 # timing helpers, shared with the ST1 harnesses rather than copied.

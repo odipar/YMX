@@ -48,6 +48,10 @@ build/
 # rig scratch: assembled builds, packed tunes, the SNDH build
 ymx/test/.work/
 
+# the C# tree's build outputs
+dotnet/bin/
+dotnet/obj/
+
 # the rig's output for the real-hardware harness
 ymx/test/tune.ymx
 ymx/test/ymxdata.inc
