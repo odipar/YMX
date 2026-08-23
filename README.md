@@ -80,7 +80,7 @@ player byte for byte.
         bsr     YMX_stop                ; chip quiet, timers stopped
 ```
 
-<!-- The two byte counts below are measured by ymx/test/emu/test_ymx.py,
+<!-- The two byte counts below are measured by the rig (ymx/test/rig.sh),
      which reads them back out of this sentence: keep the shape of it. -->
 [68k/YMX.S](68k/YMX.S) is the player, 3,324 bytes at the `ST4_UNIT` 2 below,
 plus the 288 of [68k/ST4_wrap.S](68k/ST4_wrap.S), the stream decoder it is
@@ -113,11 +113,15 @@ which format a tune came out of.
 ## Tests
 
 ```sh
-mvn test                                   # the packers, and 35 pinned tunes
-python3 ymx/test/emu/test_ymx.py           # the player, under emulation
-python3 ymx/test/sweep.py songs/*.ym       # a YM collection, differentially
-python3 ymx/test/ymr_sweep.py songs/*.ymr  # the same for .YMR
+mvn test                              # the packers, and 35 pinned tunes
+ymx/test/rig.sh                       # the player, under emulation
+ymx/test/sweep.sh songs/*.ym          # a YM collection, differentially
+ymx/test/ymr_sweep.sh songs/*.ymr     # the same for .YMR
 ```
+
+The three player tests run the 68000 player under emulation and need rmac
+and libunicorn (`brew install unicorn`, or `UNICORN_LIB` names the
+library).
 
 The two sweeps are the broadest of these. Each replays a converted tune on the
 real player under emulation and compares every write it makes to the sound

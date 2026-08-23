@@ -103,7 +103,7 @@ where a code byte CHANGES, so bit 3 of the code is flipped on every sample
 trigger, and two pops of one sample at one rate become two different codes
 and two starts.
 
-<!-- The figures in this section are re-measured by ymx/test/emu/test_ymx.py,
+<!-- The figures in this section are re-measured by the rig (ymx/test/rig.sh),
      which reads them back out of these sentences: keep the shape of them. -->
 `ymr/test/deeper.ymr` is 9,984 frames at 50 Hz with a PWM on voice A, a
 sync-buzzer on voice B and a PWM on voice C — three effects at once, which two
@@ -126,7 +126,7 @@ difference paid in bytes, and it buys the flat frame.
 ### What a .ymr gives up
 
 Everything not on this list is exact, and
-[test/ymr_sweep.py](../ymx/test/ymr_sweep.py) says so: it replays a converted
+[test/ymr_sweep.sh](../ymx/test/ymr_sweep.sh) says so: it replays a converted
 tune on the real player and compares every write `YMX_play` makes to the sound
 chip, plus which MFP timers it claimed, against its own decoder and replay of
 the .YMR image. It walks 1,200 frames of a long tune, and the whole of one —
