@@ -378,11 +378,8 @@ public final class Ymr {
             System.out.println("Warning: " + note);
         }
 
-        // The PLAYED length, not the tune's: a rotated split hands the file
-        // some frames twice, and those bytes are in it and were packed. The
-        // line above still counts the tune, because that is the length a
-        // musician has - but a ratio has to be against what was packed.
-        int raw = result.script().frames() * YmxFormat.STREAMS;    // registers and script alike
+        // What was packed: one byte per frame per stream, script included.
+        int raw = result.script().frames() * YmxFormat.STREAMS;
         System.out.printf("%d frames at %d Hz (%d:%02d), %d rings of %d bytes,"
                         + " %d per call%n", tune.frames(), tune.frameRate(),
                 tune.frames() / tune.frameRate() / 60,
@@ -468,8 +465,8 @@ public final class Ymr {
      * Parses a numeric argument, refusing a negative one and, unless
      * {@code zeroAllowed}, a zero.
      *
-     * <p>Zero is a real answer for a loop frame and for every part of the trim
-     * window - {@code -min0 -sec13} is how a caller says thirteen seconds in,
+     * <p>Zero is a real answer for every part of the trim window -
+     * {@code -min0 -sec13} is how a caller says thirteen seconds in,
      * and {@code -startframe0} says the same thing again. It is nonsense for a
      * ring, a chunk, a unit or a rate ceiling, which is why the default stands
      * for those. A window that comes out empty is caught where the window is

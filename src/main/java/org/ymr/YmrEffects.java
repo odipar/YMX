@@ -112,21 +112,17 @@ import org.ymx.YmxFormat;
  * counter, only the prescaler is in the code byte, and a pop that moves the
  * counter alone therefore leaves the code where it was: it compiles to a HOLD
  * carrying the reload flag, and {@code ymx_hold} writes the new count to a
- * timer it never stops. That is RhYMe's live reload exactly, and it is what a
- * pitch slide is made of, so the ordinary case costs nothing.
+ * timer it never stops. That is RhYMe's live reload exactly; a pitch slide
+ * is made of these reloads and costs nothing.
  *
- * <p>What no verb can say is the other half. A pop that moves the PRESCALER
- * changes the code byte, so it compiles to a program verb, and every verb that
- * carries a rate goes through {@code ymx_program}, which stops the timer, loads
- * the count and runs it again, so the period in flight is truncated whichever
- * verb is used - and that is why a prescaler change under a running RTE
- * compiles to a plain START_RETRIGGER and no gentler verb is invented for it.
- * Against START_RETRIGGER, a RETUNE would save one vector write and one patch
- * of a shape the arm has to get right anyway; it would cost the same stream
- * bytes, truncate the same period, and sound the same. The gap that is
- * actually audible - a rate that moves without disturbing the effect under it -
- * is one no verb in the format can close, so it is named here rather than
- * papered over.
+ * <p>The other half is a pop that moves the PRESCALER. It changes the code
+ * byte, and where the effect's parameter - a PWM's volume, an RTE's shape -
+ * did not move on the same frame, it compiles to the live retune: RETUNE
+ * addressed to voice 3, control nibble and reload written with the timer
+ * running, the period in flight completing. Where the parameter moved too,
+ * the ordinary form is emitted - a retune or a fresh start - and the period
+ * in flight is truncated, since every verb that programs a rate goes through
+ * {@code ymx_program}: stop, load, run.
  *
  * <p>One thing is knowingly not handled. A frame that pops the effect stream
  * with the type already running, at the same rate and the same sample, is a

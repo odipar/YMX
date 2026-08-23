@@ -21,7 +21,7 @@ import org.junit.jupiter.api.TestFactory;
  *
  * <p>The unit tests say what each stage does with a fixture built to exercise
  * it. This one says nothing about any stage and everything about the whole:
- * a change that alters a packed file announces itself here, on tunes that were
+ * a change that alters a packed file fails here, on tunes that were
  * chosen for their variety - both YM dialects, digidrums, SID voices, tunes
  * with two voices on the envelope, the shortest and longest in the collection,
  * and the drum rates it reaches.

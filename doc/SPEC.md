@@ -18,7 +18,8 @@ time and stores the outcome; a player compares nothing at run time.
 
 Two terms recur. A **player** performs §7, §8 and §9.2 and checks §9.1. A
 **writer** — a packer, or a tracker emitting the format directly — is bound
-by every rule in this document; §9.3 lists the rules no player checks.
+by every rule in this document; §9.3 lists the rules a player does not
+have to check.
 
 Version 1 began as the `.yx6` container of the [ST4](https://github.com/odipar/ST4)
 repository, renumbered; the layout has changed since, and this document
@@ -115,7 +116,8 @@ read a word at a time. Two container parameters are fixed by this format:
 no back-reference exceeds `N` bytes (§1.3), and no operation exceeds 65535
 units. Every section in a file is packed at one **unit size** — 1, 2 or 4
 bytes, recorded in the section's ST4 signature, not in the YMX header. A
-player accepts only the unit size it was built for (§9.1).
+player must reject a container packed at a unit size other than the one it
+was built for (§9.1).
 
 A section may instead be **stored**: the bytes at its offset are the
 values, one per frame, with no header and no signature, on the same long
@@ -136,7 +138,7 @@ not need them.
 
 ### 1.5 Three stream counts
 
-`S` is fixed at 25; a player rejects any other value. The section table is
+`S` is fixed at 25; a player must reject any other value. The section table is
 therefore always 100 bytes and the payload begins at a constant offset.
 Three counts apply:
 
@@ -552,8 +554,8 @@ a value. Those operations, in full:
 
 ### 9.3 The unchecked rules
 
-No player checks these rules; a file that breaks one is undefined
-behaviour (§9.1). Collected from the sections that define them:
+A player does not have to check these rules; a file that breaks one is
+undefined behaviour (§9.1). Collected from the sections that define them:
 
 The shape:
 

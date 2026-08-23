@@ -6,10 +6,10 @@ package org.ymx;
  * <p>A YM6 file carries its special effects (SID voice, digidrum, sinus-SID,
  * sync-buzzer) in bits that the sound chip itself does not use: the top nibbles
  * of R1/R3, the top bits of R6/R7 and of the three volume registers, plus R14
- * and R15 as effect data. YMX plays no effects, so those bits are
- * masked away here - once, at packing time. That is both correct (they are not
- * chip state) and cheaper: constant high bits compress better, and the player
- * needs no masking code.
+ * and R15 as effect data. In YMX the effects travel as the compiled script,
+ * not in register bits, so those bits are masked away here - once, at packing
+ * time. That is both correct (they are not chip state) and cheaper: constant
+ * high bits compress better, and the player needs no masking code.
  *
  * <p>The one register that is not a plain mask is R13, the envelope shape.
  * A YM frame stores {@code $FF} there to mean "leave the shape alone"; writing

@@ -20,9 +20,9 @@ import org.st4.Units;
  * engine's model and stopped. That lets a second front end be a peer
  * of the first rather than a client of it.
  *
- * <p>Packing the registers separately is the whole point. A register's value
- * usually repeats from frame to frame, and a vector holds one register's
- * values back to back, so the matches are short-range and dense. It also
+ * <p>The registers are packed separately: a register's value usually
+ * repeats from frame to frame, and a vector holds one register's values
+ * back to back, so the matches are short-range and dense. It also
  * gives the player fourteen independent decoders it can advance one at a
  * time, which keeps the per-VBL cost flat.
  *
@@ -32,22 +32,23 @@ import org.st4.Units;
  * every effect at the boundary. Nothing is packed twice and nothing is packed
  * against frames the second pass cannot reach.
  *
- * <p>Each section is packed the way {@code st4} would with
- * {@code -k1 -mN -l65535}: offsets never reach further back than the ring the
- * player decodes through, and no single operation is longer than the word
- * counters in the 68000 decoder. Register vectors are exactly the event
+ * <p>Each section is packed as {@code st4} would with
+ * {@code -k<unit> -m<N/unit> -l65535}: offsets never reach further back than
+ * the ring the player decodes through, and no single operation is longer
+ * than the word counters in the 68000 decoder. Register vectors are exactly the event
  * engine's kind of data - long runs of an unchanging value - so packing is
  * effectively instant.
  */
 public final class YmxEncoder {
 
     /** What packing one stream's vector produced; the first fourteen stream
-     * indices are registers, then M, A1, P1, A2, P2. */
+     * indices are registers, then the script streams in file order - M, X,
+     * T, and each channel's A and P. */
     public record Stream(int register, int frames, int packedSize, int longestOp) {}
 
     /** The finished file plus the per-stream numbers the CLI reports; the
-     * tune is the one that was actually packed, the padded one
-     * where the shape needed padding. */
+     * tune is the one that was actually packed, the padded one where the
+     * length needed padding. */
     public record Result(byte[] file, List<Stream> streams, int ringSize, int chunk,
                          boolean loops, int unit, Tune tune,
                          EffectScript.Result script) {
@@ -56,7 +57,8 @@ public final class YmxEncoder {
             return streams.stream().mapToInt(Stream::packedSize).sum();
         }
 
-        /** The longest operation in any stream; over 65535 the file is unsafe for ST1. */
+        /** The longest operation in any stream; over 65535 the file is
+         * unsafe for the 68000 decoders' word counters. */
         public int longestOp() {
             return streams.stream().mapToInt(Stream::longestOp).max().orElse(0);
         }
@@ -249,7 +251,7 @@ public final class YmxEncoder {
     private static byte[] build(Tune tune, int ringSize, int chunk, int frames,
                                 boolean loops, Section[] sections,
                                 byte[][] samples, int channels) {
-        // Containers carry alignment guarantees of their own - stream A and D
+        // Containers carry alignment rules of their own - stream A and D
         // are read a word at a time - so each is placed on a long boundary. A
         // stored section is read a byte at a time and needs none, but it takes
         // the same boundary: one placement rule, and the four bytes it can
