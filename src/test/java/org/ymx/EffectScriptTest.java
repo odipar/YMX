@@ -27,8 +27,8 @@ import org.ym6.YmEffects;
 
 /**
  * The compiled effect script against the scenes the emulation rig plays - the
- * same tune {@code run_effects} builds, the reference player's expected
- * decisions turned into expected action bytes.
+ * same tune the rig's {@code runEffects} builds, the reference player's
+ * expected decisions turned into expected action bytes.
  *
  * <p>Where this format's frame-aligned semantics deliberately differ from
  * that player's (a drum's voice rejoins the frame write at the computed end's
