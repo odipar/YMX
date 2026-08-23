@@ -85,9 +85,9 @@ which suits a decay and is useless as an oscillator.
 **The envelope's pitch resolution is coarse, and worsens as pitch
 rises.** The divisor is 256, so neighbouring periods are far apart:
 period 18 is 434 Hz, period 17 is 460 Hz - just over a semitone between
-adjacent settings. That is the limit on a buzzer part. A sync buzzer
-escapes it by taking its pitch from a timer instead, which at 440 Hz
-lands within a few cents.
+adjacent settings. That is the limit on a buzzer part. A sync buzzer's
+pitch comes from a timer instead, which at 440 Hz lands within a few
+cents.
 
 Three **voices**, A, B and C. Each has a **volume** and a **mixing**
 setting - which generator signals reach it: tone, noise, both or neither.
@@ -107,8 +107,7 @@ the bottom step is a jump of 8 dB and the rest average nearer 3.3 - so
 material with its peaks near the top keeps the most detail.
 
 **Writing the envelope shape restarts the envelope.** Writing the same
-shape twice is not a wasted write; it is a restart, and that is the whole
-mechanism behind the sync buzzer below. A format therefore needs a way to
+shape twice is a restart - the mechanism behind the sync buzzer below. A format therefore needs a way to
 say "leave the shape alone" on frames that must not restart it. YM stores
 255 for that.
 
@@ -168,7 +167,7 @@ series, and it is ticked.)
 
 | clock | speed | what runs there |
 |---|---|---|
-| **frame clock** | the tune's own rate | frame streams. Also the **control rate**: how often the deciding code runs |
+| **frame clock** | the tune's own rate | frame streams. Also the **control rate**: how often the steering code runs |
 | **timer clocks** | 48 to 25,600 a second in practice | timer streams. Also the **audio rate**: how often a sound-shaping write lands |
 | **YM2149 clock** | 2,000,000 a second | the generators. Software has no access |
 
@@ -337,7 +336,7 @@ forbids a source that moves a sample's rate under a melody. The split
 does say when a rate may change in a given format: independent means
 **set once** - and movable under a running stream where the source says so -
 derived means **per-frame**, renewed on every frame.
-(Not "control-rate": the frame clock already answers to **control
+(Not "control-rate": the frame clock already carries the name **control
 rate**, and a policy and a clock should not share a word.)
 
 **The fourth kind is not a volume stream.** It writes the envelope shape,
@@ -401,7 +400,7 @@ spent - start alone takes four, one each for a toggle, a retrigger, a
 sample and a sample that preempts. Not every action above is a verb. A
 stream expires or loops inside its own tick handler, with nothing to hand
 it; a live retune is a retune addressed to no voice rather than a code of
-its own; and a suppressed start is a decision the packer took and never
+its own; and a suppressed start is resolved at pack time and never
 emitted.
 
 ## Common techniques
@@ -493,8 +492,8 @@ compiler can check.
 **Phase policy** is the one idea without a settled name elsewhere. Synths
 have free-running and retriggered LFOs, the same question.
 Chiptune players are rarely explicit about it though each is consistent -
-which is why two players can disagree audibly on the same file and both
-be self-consistent.
+which is why two players can render the same file audibly differently and
+both be self-consistent.
 
 ## Where this went
 
@@ -567,7 +566,7 @@ ordinary sense.
 | **independent rate** | set by nothing else: a sample's playback pitch |
 | **derived rate** | set against the note playing, so it moves with the melody |
 | **coupling** | what a derived rate is set against. The ratio is what you hear |
-| **frame clock, control rate** | the rate the tune is stepped at. How often the deciding code runs |
+| **frame clock, control rate** | the rate the tune is stepped at. How often the steering code runs |
 | **timer clock, audio rate** | 48 to 25,600 a second in practice. How often a sound-shaping write lands |
 | **YM2149 clock** | 2,000,000 a second. Runs the generators; software has no access |
 | **timer channel** | one place a timer stream can run, numbered 0 to 3. The file says which timer each gets |
@@ -577,7 +576,9 @@ ordinary sense.
 | **disconnect** | mix no generator into a voice, leaving only its volume writes |
 | **frame write** | the once-a-frame round of register writes |
 | **verb** | the code's name for an action the script hands the player. Three bits of an action byte, all eight spent |
-| **packer** | the tool that turns a source file, a `.ym`, into a YMX file. One per front end |
+| **player** | anything that plays a `.ymx` file; SPEC.md states what one performs and checks |
+| **writer** | anything that emits a `.ymx` file: a packer, or a tracker targeting the format directly. SPEC.md states the rules no player checks |
+| **packer** | the tool that turns a source file, a `.ym`, into a YMX file. One per front end, and one kind of **writer** |
 | **front end** | the pair of classes that reads one source format and stops at a `Tune`. `org.ym6` for YM |
 | **tracker** | the program a composer writes music in, with its own file format |
 | **corpus** | the 544 YM files YMX is tested against; 543 readable |

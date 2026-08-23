@@ -2,8 +2,8 @@
 
 Thirty-two tunes from a 544-file collection, and the `.ymx` each one packs to.
 `PinnedCorpusTest` packs them again and compares, so a change anywhere in the
-packer, the script compiler or ST4 announces itself here rather than in the
-field. The test says how to repin after an intended change.
+packer, the script compiler or ST4 fails here rather than in a shipped
+file. The test says how to repin after an intended change.
 
 They were taken by covering features rather than by sampling: both dialects,
 every effect class the collection holds - digidrums, SID voices, and tunes

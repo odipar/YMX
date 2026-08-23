@@ -15,7 +15,7 @@ frame what it means. YMX resolves that at pack time and writes down the
 outcome, so the player compares nothing and every frame costs the same.
 
 [**doc/SPEC.md**](doc/SPEC.md) is the format: the container, the streams, the
-verbs and the frame contract. Everything else worth reading is beside it.
+verbs and the frame contract. The rest of the documentation is beside it.
 
 | | |
 |---|---|
@@ -54,8 +54,8 @@ ym/ym_sndh.sh -t"My Set" my.sndh *.ym    # both steps in one
 ```
 
 SNDH is the Atari ST's standard music container, and where the player lives:
-the `.PRG` is a thin shell around the same blob, so the two share every byte
-that matters.
+the `.PRG` is a thin shell around the same blob, so the two share the
+player byte for byte.
 
 ## Using the player
 
@@ -110,7 +110,7 @@ python3 ymx/test/sweep.py songs/*.ym       # a YM collection, differentially
 python3 ymx/test/ymr_sweep.py songs/*.ymr  # the same for .YMR
 ```
 
-The two sweeps are the ones that matter. Each replays a converted tune on the
+The two sweeps are the broadest of these. Each replays a converted tune on the
 real player under emulation and compares every write it makes to the sound
 chip — and which MFP timers it claimed — against an independent model of the
 source file. A disagreement is reported exactly where it happened, which is

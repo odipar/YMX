@@ -55,14 +55,14 @@ the host's.
 | A SID or buzzer rate above what a real machine can run | dropped to idle | yes |
 | A drum number with no sample behind it | dropped to idle | yes |
 | A drum above the rate ceiling | bandwidth only: the sample is resampled and every trigger's divisor scaled by the same ratio | yes |
-| A tune whose length is not a whole unit | one duplicated frame, chosen to be inaudible | yes |
+| A tune whose length is not a whole unit | one duplicated safe frame, inaudible | yes |
 | A header that loops from a frame other than 0 | the tune starts over from frame 0, so its opening is heard on every pass | yes |
 | The SID gap model | a choice the file cannot record — see below | no |
 
 The four drop counters are counts of YM effects a dialect had to have
 normalised away. They exist because the reference player would not have
-started those codes either: dropping them is what makes the conversion
-faithful, not what makes it lossy.
+started those codes either: dropping them makes the conversion faithful,
+not lossy.
 
 * **Sinus-SID.** Never seen in a dump, and never implemented by any player —
   the format author's included. The packer warns and drops it.
