@@ -166,8 +166,8 @@ parameter moved on the same frame as the rate, which is the row.
 
 * **Three timers bound to voices, against four channels and a map.** A .YMR
   uses Timer A, Timer B and Timer D, and the spec fixes which voice each one
-  drives — A to A, B to B, D to C — so the binding is normative and not the
-  converter's to choose. A `.ymx` has four timer channels and a stream saying
+  drives — A to A, B to B, D to C — so the binding is normative, not the
+  converter's. A `.ymx` has four timer channels and a stream saying
   which MFP timer each runs on, so the converter writes that binding
   into T: channels 0, 1 and 2 take Timers A, B and D, and the fourth channel,
   which no .YMR fills, takes the leftover Timer C, which keeps the map a

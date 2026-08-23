@@ -12,16 +12,15 @@ are smaller (§1.5). Each stream is decoded through its own small ring,
 refilled one stream per frame, so the memory a tune needs is a property of
 the player's configuration rather than of the tune's length.
 
-It extends the YM lineage — YM3, YM4, YM5, YM6 — in one respect that matters:
-what those formats call a "special effect" is a value the *player* had to
-re-derive every frame from bits smuggled into spare register fields. YMX
+It extends the YM lineage — YM3, YM4, YM5, YM6 — in one respect: what those
+formats call a "special effect" is a value the *player* had to re-derive
+every frame from bits carried in spare register fields. YMX
 resolves all of that at pack time and writes down the outcome, so the player
 compares nothing.
 
-This document binds two roles. A **player** performs the operations of §7,
-§8 and §9.2, checking only §9.1. A **writer** — a packer, or a tracker
-emitting the format directly — guarantees the invariants of §9.3; they are
-why the player can check so little.
+A **player** performs §7, §8 and §9.2 and checks only §9.1. A **writer** —
+a packer, or a tracker emitting the format directly — follows every rule in
+this document; the ones no player checks are collected in §9.3.
 
 Version 1 began as the `.yx6` container the [ST4](https://github.com/odipar/ST4)
 repository reached over ten revisions, adopted whole and renumbered; the layout
@@ -123,7 +122,7 @@ through (§1.3), and no single operation is longer than 65535 units, so a
 word-sized counter can run it. Every section in a file is packed at one
 **unit size** — 1, 2 or 4 bytes, recorded in each section's ST4 signature
 rather than in the YMX header — and a player accepts only the unit size it
-serves (§9.1).
+was built for (§9.1).
 
 A section may instead be **stored**: the bytes at its offset are its values,
 one per frame, with no header and no signature. Bit 31 of a section's offset
@@ -144,7 +143,7 @@ reaches the end of a section and the player opens it again from the top
 Packed sizes are not stored. ST4 counts output units rather than input
 bytes, so a decoder never needs them.
 
-### 1.5 Twenty-five is the table, not the traffic
+### 1.5 Three stream counts
 
 `S` is fixed. It is always 25, a player must reject a file that says
 otherwise, and the section table is therefore always 100 bytes, which puts
@@ -162,9 +161,9 @@ rather than by how many are in use, because a player stops at the last channel
 rather than counting them. A tune using only channel 3 still decodes
 25.
 
-So a `.ymx` always has twenty-five slots and rarely twenty-five streams worth
-reading. The channel pairs come last so the difference costs nothing: what a
-tune leaves idle is a tail no player ever touches.
+So a `.ymx` always has twenty-five slots and rarely twenty-five streams a
+player reads. The channel pairs come last so the difference costs nothing:
+what a tune leaves idle is a tail no player ever touches.
 
 ---
 
@@ -195,8 +194,8 @@ the verb consumes one (§3) — and on any other frame its value is
 unspecified. A writer repeats the previous byte there, and the repetition
 packs to nothing.
 
-**Register values carry only the bits their register keeps**; a writer masks
-the rest to zero (§9.3), so a player masks nothing:
+**Register values carry only the bits their register keeps** — a writer
+masks the rest to zero (§9.3), so a player masks nothing:
 
 | register | bits kept |
 |---|---|
@@ -268,7 +267,7 @@ Carrying the shape rather than deriving it keeps the source format out of
 the player. A toggle stream's volume and a PCM stream's sample number are
 read off the voice's own register stream (§3.2); a shape belongs to no voice
 — any number of voices may follow the one generator — so where a source
-files it is an accident of that source, and the writer resolves it into X.
+files it varies by source, and the writer resolves it into X.
 The format carries no flag, shadow or priming for it: a tune that arms a
 retrigger stream before setting any shape carries whatever its source
 defaults to — `0` for a YM dump.
@@ -366,8 +365,8 @@ both its phase and its place inside the half it is in.
 Naming no voice, the live form repatches nothing, so a writer may emit it
 only on a frame where the stream's parameter — a toggle stream's volume, a
 retrigger stream's shape — did not move. Where the parameter moved on the
-same frame, the ordinary form is the correct encoding and the truncated
-period is the price.
+same frame, the ordinary form is the correct encoding, and the period in
+flight is truncated.
 
 ### 3.2 Where a stream's parameter comes from
 
@@ -393,7 +392,7 @@ the held prescaler-slide and nothing else.
 `RESUME` exists for the alternative gap model, in which a release only masks
 the timer interrupt and the timer keeps counting, so a re-arrival resumes the
 toggle stream where it got to. Which model applies is not recoverable from a
-YM file and is chosen at pack time.
+YM file and is fixed at pack time.
 
 ---
 
@@ -452,9 +451,9 @@ selects it starts nothing. A count of 0 is not: the MFP reads it as 256, the
 slowest tick a prescaler gives.
 
 The encodable range is 48 Hz — prescaler 200, count 0, which is 256 — to
-614,400 Hz, prescaler 4 and count 1. What a writer emits is narrower: a rate
-that costs more of the machine than a tune can spare is a packing-time
-decision, not a format limit.
+614,400 Hz, prescaler 4 and count 1. What a writer emits is narrower: how
+much of the machine a rate may cost is a packing-time rule, not a format
+limit.
 
 ---
 
@@ -478,8 +477,8 @@ zero, so the marker plays as one tick of silence.
 
 The **loop point** is a position in the sample, not an address. On the end
 marker, a tick whose loop point is not `$FFFF` moves that position's address
-into its own pointer and plays on — the marker's tick of silence is the
-seam's whole cost. A one-shot stops its timer. `0` is a real loop point —
+into its own pointer and plays on, so a loop costs one tick of silence at
+the seam. A one-shot stops its timer. `0` is a real loop point —
 the sample that repeats whole — so the not-looping value must be one no
 length can reach.
 
@@ -550,9 +549,8 @@ frame 0 the first time, so the second pass runs exactly as the first.
   unit size the player was built for — a tune packed for a different one is
   rejected, not garbled. A stored section has no signature to check.
 
-Beyond that a player checks nothing, and a malformed file is undefined
-behaviour. This is deliberate: the format is a compilation target, and every
-decision that could be made at pack time already was.
+Beyond that a player checks nothing — §9.3 has the rules that go unchecked
+— and a malformed file is undefined behaviour.
 
 ### 9.2 Interpreted data
 
@@ -582,20 +580,20 @@ value. Those operations, in full:
 | refill turn | on frame `f`, stream `f` modulo `C` is decoded `C` values further |
 | a section running out mid-refill | decoding continues from the start of that same section, into the same ring |
 
-### 9.3 What a writer guarantees
+### 9.3 The unchecked rules
 
-Everything §9.1 leaves unchecked is a promise the writer keeps. A player
-performs §9.2 mechanically because these hold; a file that breaks one is
-undefined behaviour.
+No player checks these rules; a file that breaks one is undefined behaviour
+(§9.1). They are gathered here, from the sections that state them, so a
+writer has one list.
 
 The shape:
 
-- `O` is at least 1, and `N` and `C` obey §1.3. At a unit size above 1,
+- `O` is at least 1, and `N` and `C` follow §1.3. At a unit size above 1,
   `O` and `C` are whole units.
 - All twenty-five sections are present, and each decodes to exactly `O`
   values, one byte per frame. No back-reference reaches past `N` bytes and
   no operation is longer than 65535 units (§1.4).
-- The sample table obeys §6: at most 32 samples, each shorter than 65536
+- The sample table follows §6: at most 32 samples, each shorter than 65536
   bytes, each closed by `$80`, each loop point inside its own sample or
   `$FFFF`, and the table on a long boundary.
 
@@ -614,8 +612,8 @@ The values:
 
 The actions:
 
-- At most one timer stream runs on a voice at a time. Where a source starts
-  two, the writer chose — arbitration is packing-time work.
+- At most one timer stream runs on a voice at a time; where a source starts
+  two, the conflict is resolved at pack time.
 - A programming verb's prescaler index is 1 to 7 (§2.4), and its count byte
   may be 0, which the MFP reads as 256 (§5).
 - `RETUNE` to voice 3 is emitted only where the stream's parameter did not
@@ -623,6 +621,6 @@ The actions:
 - `START_PCM_PREEMPT`'s X nibble marks exactly the channels whose timers
   are running a stream this trigger silences; the plain `START_PCM` is the
   encoding when there are none.
-- Stream T obeys §2.3: flagged channels name distinct timers on frame 0,
+- Stream T follows §2.3: flagged channels name distinct timers on frame 0,
   and a change moves only channels that run nothing, among the timers
   claimed at frame 0.
