@@ -27,9 +27,9 @@ What the question did surface, and what was adopted: **the displacement
 patch** — init writes each register's `k·N` into the burst once, and `N` is
 capped at 2520 so `13·N` fits a signed word. 99 harness ticks to 96.
 
-`movep.w` shipped two days later anyway, but not as this speed trick: it
-costs about 4 cycles more per register than the plain pair. It shipped
-because one instruction cannot be split by an interrupt. See *the unmasked
+`movep.w` shipped two days later, but not for speed: it costs about 4
+cycles more per register than the plain pair. It shipped because one
+instruction cannot be split by an interrupt. See *the unmasked
 burst*.
 
 **Register clustering** (2026-08-19). Would packing correlated registers into
@@ -40,7 +40,7 @@ volume triple most of all, since a match must cover every clustered
 register's history at once).
 
 Declined on complexity, not on bytes. An adaptive version needs a
-stream-layout menu in the header, and every consumer pays for that
+stream-layout menu in the header, and every reader of the format pays for that
 configuration space forever: init derives the layout, the burst patcher goes
 table-driven, refills need per-stream budgets, the verification matrix
 multiplies. A permanent cost, paid in bytes, when the limits are cycles
@@ -77,8 +77,8 @@ relying on the metric that says so.
 
 **SID phase semantics** (2026-08-20). A survey rather than a bug: the YM
 format never specified what a re-started square does, so every player renders
-these sections differently, and the composers heard whatever their own driver
-did.
+these sections differently, and each composer heard their own driver's
+rendering.
 
 Shipped: the **ym2149-rs model** — a gap restarts at phase zero, silence
 first. A fresh start writes the voice silent immediately and installs the
@@ -139,8 +139,8 @@ fell inside — longer than a whole tick period at the top of the timer
 range.
 
 The fix is atomicity, not a shorter mask. Every register write became a
-single `movep.w`, which a 68000 cannot split, so tearing is impossible
-whatever the interrupt state. That made the mask **optional** rather than
+single `movep.w`, which a 68000 cannot split, so tearing is impossible with
+interrupts enabled or masked. That made the mask **optional** rather than
 necessary: `YMX_MASK_BURST` is on by default and `-nomask` turns it off.
 
 | what the mask costs | |
@@ -153,7 +153,7 @@ Same chip traffic either way, byte for byte — 16,156 PSG writes over 900 VBLs
 of one tune, identical. The flag moves when ticks run, not what reaches the
 chip.
 
-**Where hardware offers an instruction that does the whole job, it removes
+**Where hardware offers an instruction that does the whole operation, it removes
 the race instead of scheduling around it, and usually costs less than the
 mask it replaces.** For any player driving audio-rate interrupts, measure the
 longest interrupt-free span and compare it against the shortest tick period

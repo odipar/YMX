@@ -98,7 +98,7 @@ ST4_UNIT    equ     2
 | [`org.jx1`](src/main/java/org/jx1) | the ZX1 decoder a `.YMR`'s own streams need, vendored |
 
 The two front ends are peers. Neither is downstream of the other: both read
-their own format and produce a `Tune`, and nothing past that point can ask
+their own format and produce a `Tune`, and no field past that point records
 which format a tune came out of.
 
 ## Tests
