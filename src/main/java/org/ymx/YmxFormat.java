@@ -30,27 +30,30 @@ package org.ymx;
  * like the registers, but they are script data rather than frame streams:
  * their bytes never reach a register. The packer replays the reference
  * player's decisions over the whole timeline and emits prepared actions -
- * M says what acts this frame (zero on the vast majority), X is the operand
- * a verb reads when its action byte has no room for one - today, which
- * timer channels a preempting sample stops - and each channel's A and P
- * name its action and its timer count. The channels come last so that a
+ * M says what acts this frame (zero on the vast majority), X carries the
+ * operands an action byte has no room for - the envelope shape a retrigger
+ * stream restarts, and the timer channels a preempting sample stops - and
+ * each channel's A and P name its action and its timer count. The channels come last so that a
  * tune using two of them leaves the others' pairs at the end of the file,
  * where the player can stop decoding. {@link EffectScript} owns the byte
  * semantics; see doc/SPEC.md for the design.
  *
  * <p>The sample table is {@code count} entries of {byte offset (long),
  * sample length (word), loop point (word)}, each offset pointing at
- * PSG-ready volume bytes 0..15 followed by one end marker with bit 7 set.
+ * PSG-ready volume bytes 0..15 followed by the end marker {@code $80}.
  * A PCM stream plays one of these out, and its tick handler stops on the
  * marker rather than counting - or, where the loop point is not
  * {@link #SAMPLE_ONE_SHOT}, goes back to it and plays on. YM calls them
  * digidrums, and their numbering is the YM file's.
  *
  * <p>Each section is a complete, standard ST4 container - twenty-byte header,
- * then its four streams - packed at unit size 1, placed on a long boundary so
- * the container's own alignment guarantees hold. The player opens each with the
- * eight-instruction sequence ST4.S documents, and {@code dst4} can unpack any
- * section straight out of the file for debugging.
+ * then its four streams - or, where the values are shorter than a container,
+ * stored plain with bit 31 of its offset set ({@link #SECTION_STORED}). Every
+ * container in a file is packed at one unit size, 1, 2 or 4 bytes, recorded
+ * in its ST4 signature; each section begins on a long boundary. The player
+ * opens a container with the eight-instruction sequence ST4.S documents, and
+ * {@code dst4} can unpack any container section straight out of the file for
+ * debugging.
  *
  * <p>Each stream is one section covering every frame. A tune that starts over
  * reaches the end of that section and the player opens it again from the top,
@@ -65,10 +68,10 @@ public final class YmxFormat {
     /** {@code 'YMX!'}, the first four bytes of every file. */
     public static final int MAGIC = 0x594D5821;
 
-    /** The only version this release writes or reads. YMX starts at 1: the
-     * layout it describes is the one the .yx6 container reached over ten
-     * revisions inside the ST4 repository, adopted whole and renumbered,
-     * so there is no version history here to be compatible with. */
+    /** The only version this release writes or reads. YMX starts at 1: it
+     * began as ST4's .yx6 container, adopted and renumbered, and the layout
+     * has moved since - doc/SPEC.md defines it. There is no version history
+     * here to be compatible with. */
     public static final int VERSION = 1;
 
     /** Flag bit 0: the tune starts over at frame 0 instead of ending. */

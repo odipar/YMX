@@ -59,14 +59,14 @@ import java.util.List;
  * stream 20  P1  programs or reloads. Bytes on frames where a stream is
  * stream 21  A2  not consumed are unspecified; the encoder repeats the
  * stream 22  P2  previous byte, which the event optimizer packs away.
- * stream 23  A3  The channels come last so a tune that uses fewer of them
- * stream 24  P3  leaves a tail the player never decodes.
+ * stream 23  A3  The channels come last, so a tune that uses fewer of
+ * stream 24  P3  them leaves streams past what the player decodes.
  * </pre>
  *
  * The verbs:
  *
  * <pre>
- * 0 RESUME             an unmasked toggle stream comes back: flags
+ * 0 RESUME             a masked toggle stream is unmasked: flags
  *                      1 = reload the count, 2 = reload the volume
  * 1 HOLD               flags: 1 = reload the count (P), 2 = track the
  *                      toggle stream's volume, 4 = track the retrigger
@@ -77,7 +77,9 @@ import java.util.List;
  * 3 START_TOGGLE       selects, volume, vector := the loud half, full
  *                      program
  * 4 RETUNE             volume, full stop/count/run - the vector is NOT
- *                      touched: the square keeps its place in the cycle
+ *                      touched: the square keeps its place in the cycle.
+ *                      Addressed to voice 3, the live form: control nibble
+ *                      and reload written with the timer running
  * 5 START_RETRIGGER    shape, vector := the retrigger tick, full program
  * 6 START_PCM          a trigger, fresh or repeated: sample table lookup,
  *                      select, vector, full program
@@ -101,14 +103,13 @@ import java.util.List;
  * costs no stream and is where both genuinely live: they belong to the voice
  * the effect took over. A retrigger stream's shape does not - it belongs to
  * the one envelope generator - so it is CARRIED, in X, resolved by whichever
- * front end knew where its format filed it. That is the whole of why the
- * player is independent of sources: an operand it cannot derive is one it
- * is handed. The ring byte of a voice playing a sample is NOT sanitized: the
+ * front end knew where its format filed it. So the player is independent of
+ * sources: an operand it cannot derive is one it is handed. The ring byte of a voice playing a sample is NOT sanitized: the
  * frame write skips it ({@code ymx_skips} has overwritten that one write with
  * two nops, so the byte never reaches the chip), so nothing edits the
  * ring at runtime and the reference player's whole borrow/patch/restore
- * machinery has no counterpart here. R7 arrives with the disconnection of sample-playing voices
- * baked in ({@link Result#r7force}), which disconnects the voice.
+ * machinery has no counterpart here. R7 arrives with the disconnection of
+ * sample-playing voices baked in ({@link Result#r7force}).
  *
  * <h2>Frame alignment</h2>
  *
@@ -156,7 +157,7 @@ public final class EffectScript {
     public static final int VERB_RETUNE = 4 << 5;
 
     /** The action byte's voice field addressing no voice. There are three,
-     * so 3 is free, and RETUNE spends it on the live rate change. */
+     * so 3 is free, and RETUNE addressed to it is the live rate change. */
     public static final int VOICELESS = 3;
     public static final int VERB_START_RETRIGGER = 5 << 5;
     public static final int VERB_START_PCM = 6 << 5;
@@ -468,13 +469,13 @@ public final class EffectScript {
     }
 
     /**
-     * Whether the effect's parameter byte stood still across the pop. The
+     * Whether the effect's parameter byte changed across the pop. The
      * live retune carries no voice - the encoding room it is packed into is
      * exactly the voice field - so it cannot repatch a volume or a shape
      * on the way through. When one of those moved on the same frame the
-     * ordinary retune, which does repatch, is the accurate encoding and the
-     * truncated period is the price. A PCM stream tracks no register at
-     * all, so it is always free to go live.
+     * ordinary retune, which does repatch, is the accurate encoding, and
+     * the period in flight is truncated. A PCM stream tracks no register,
+     * so its rate can always move live.
      */
     private boolean parameterHeld(int p, Channel channel, int type, int voice) {
         if (type == KIND_TOGGLE) {

@@ -10,8 +10,8 @@ import org.ymx.YmxFormat;
  * out, with every dialect and every unplayable code normalized away on the
  * journey - the player never receives an effect it cannot run.
  *
- * <p>This is where the vocabulary changes, and the change is the whole
- * reason the class exists. On the way in the names are the YM format's,
+ * <p>This is where the vocabulary changes, and that change is the class's
+ * job. On the way in the names are the YM format's,
  * because the bytes are its: effect slots, codes, TP and TC. On the way out
  * they are the engine's, and what leaves here as a pair of bytes per frame
  * is a TIMER STREAM - a series of values written to one register between
@@ -20,10 +20,10 @@ import org.ymx.YmxFormat;
  * toggle stream, a sync-buzzer a retrigger stream.
  *
  * <p>{@link Extraction} is this front end's own report and stays behind
- * with it. Its four drop counters are counts of YM effects that a YM
- * dialect had to have normalized away, which is a sentence only a YM reader
- * can say and only a YM packer's report has any use for; the {@link Tune}
- * that {@link #tune} builds carries none of it. {@code org.ymr} is the
+ * with it. Its four drop counters count the YM effects the front end
+ * normalized away - counts only a YM reader can produce and only a YM
+ * packer's report uses; the {@link Tune} that {@link #tune} builds carries
+ * none of it. {@code org.ymr} is the
  * sibling that does the same job for a RhYMe dump, and reading the two side
  * by side is the quickest way to see which decisions belong to a format and
  * which belong to the engine.
