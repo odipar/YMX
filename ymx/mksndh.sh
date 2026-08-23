@@ -1,11 +1,14 @@
 #!/bin/sh
 # mksndh.sh - combine one or more .ymx files into an SNDH container.
 #
-#   ymx/mksndh.sh [-perf] [-t"Title"] [-c"Composer"] [-Nnamesfile] out.sndh tunes...
+#   ymx/mksndh.sh [-perf] [-nomask] [-tTitle] [-cComposer] [-Nnamesfile]
+#                 [-Pcorefile] output.sndh tune1.ymx [tune2.ymx ...]
 #
 # -c fills the COMM (composer) tag; -N names the subtunes from a file, one
 # per line in tune order, instead of the file stems. -perf uses the core
-# with the raster monitor in (68k/YMX.S has the colors). Flags come first.
+# with the raster monitor in (68k/YMX.S has the colors), -nomask the one
+# whose frame write runs unmasked, and -P a core file instead of resolving
+# one from dist/. Flags come first.
 #
 # The tunes become subtunes 1..N (SNDH '##' tag) and must be packed at one
 # unit size; rings and chunks may differ. The result is a raw (unpacked)

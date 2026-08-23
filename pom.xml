@@ -84,8 +84,8 @@
             <plugin>
                 <!-- The CLIs, runnable from Maven in a forked JVM so -ea is
                      on (malformed-input validation uses asserts):
-                       mvn -q compile exec:exec@st4  -Dargs="-k4 input output.st4"
-                       mvn -q compile exec:exec@dst4 -Dargs="input.st4 output" -->
+                       mvn -q compile exec:exec@ymx -Dargs="-f input.ym output.ymx"
+                       mvn -q compile exec:exec@ymr -Dargs="-f input.ymr output.ymx" -->
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.5.0</version>
