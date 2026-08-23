@@ -8,9 +8,9 @@ import java.util.List;
 
 /**
  * Assembles the prebuilt player binaries: the SNDH cores, one per ST4 unit
- * size and flag combination, and the PRG stub. The one tool that runs rmac;
- * {@link MkSndh} and {@link MkPrg} combine the results without it, and call
- * in here when a binary under {@code dist/} is missing or stale.
+ * size and flag combination, and the PRG stub. The combiners' assembler
+ * step: {@link MkSndh} and {@link MkPrg} combine without one, and call in
+ * here when a binary under {@code dist/} is missing or stale.
  */
 public final class MkCores {
 

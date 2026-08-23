@@ -153,9 +153,9 @@ namespace Ymx
     /// <summary>
     /// Assembles the prebuilt player binaries, ported from org.ymx.MkCores:
     /// the SNDH cores, one per ST4 unit size and flag combination, and the
-    /// PRG stub. The one tool that runs rmac; MkSndh and MkPrg combine the
-    /// results without it, and call in here when a binary under dist/ is
-    /// missing or stale.
+    /// PRG stub. The combiners' assembler step: MkSndh and MkPrg combine
+    /// without one, and call in here when a binary under dist/ is missing
+    /// or stale.
     /// </summary>
     public static class MkCores
     {

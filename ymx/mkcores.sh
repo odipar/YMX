@@ -3,7 +3,7 @@
 #
 #   ymx/mkcores.sh [-perf] [-nomask] [outdir]
 #
-# The one build step that runs rmac. It assembles the SNDH cores - one per
+# The build step that runs rmac. It assembles the SNDH cores - one per
 # ST4 unit size, suffixed by the flags - and, in a plain run, the PRG stub.
 # org.ymx.MkSndh and org.ymx.MkPrg combine the results without an
 # assembler; doc/BINARIES.md is the contract. -perf builds cores with the

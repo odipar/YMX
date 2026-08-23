@@ -43,8 +43,8 @@ window to stop.
 To pack without playing:
 
 ```sh
-mvn -q exec:exec@ymx -Dargs="song.ym song.ymx"
-mvn -q exec:exec@ymr -Dargs="song.ymr song.ymx"
+mvn -q compile exec:exec@ymx -Dargs="song.ym song.ymx"
+mvn -q compile exec:exec@ymr -Dargs="song.ymr song.ymx"
 ```
 
 ## Building a tune into something runnable
@@ -56,8 +56,8 @@ ymx/mkprg.sh MY.PRG build/*.ymx          # a TOS program around those same bytes
 ym/ym_sndh.sh -t"My Set" my.sndh *.ym    # pack and combine in one
 ```
 
-Only `mkcores.sh` runs the assembler, and `mksndh.sh` runs it for you the
-first time. Combining is byte appending and patching — a tracker or another
+The combiners run no assembler: `mkcores.sh` assembles the binaries, and
+`mksndh.sh` runs it for you the first time. Combining is byte appending and patching — a tracker or another
 build system does it without a 68000 toolchain;
 [doc/BINARIES.md](doc/BINARIES.md) is the contract, and
 `ymx/mkrelease.sh -publish` puts every prebuilt variant in a GitHub release
