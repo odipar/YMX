@@ -41,21 +41,14 @@ build/
 .DS_Store
 .claude/worktrees/
 
-# the differential rigs cache packed corpora here
-68k/test/emu/.st4/
-__pycache__/
-
 # the SNDH/PRG build scripts leave their scratch next to the output
 .ym_work/
 .prg_work/
 
-# the YM player rig caches packed corpora and its SNDH build here
-ymx/test/emu/.work/
+# rig scratch: assembled builds, packed tunes, the SNDH build
+ymx/test/.work/
 
-# rig scratch: assembled probes and packed tunes
-ymx/test/emu/.work*/
-
-# gendata.py's output for the real-hardware harness
+# the rig's output for the real-hardware harness
 ymx/test/tune.ymx
 ymx/test/ymxdata.inc
 ymx/test/YMXTEST.PRG

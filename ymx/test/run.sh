@@ -4,15 +4,18 @@
 #   ./run.sh                      # uses the defaults below
 #   HATARI=... TOS=... ./run.sh   # or point it at your own install
 #
-# Needs: rmac (assembler), hatari (emulator) with a TOS or EmuTOS image, and a
-# compiled Java tree for the packer (run `mvn compile` in the repo root).
+# Needs: rmac (assembler), and hatari (emulator) with a TOS or EmuTOS image;
+# the Java tree compiles itself on the first run.
 set -e
 cd "$(dirname "$0")"
 
 HATARI=${HATARI:-hatari}
 TOS=${TOS:-$HOME/hatari-2.6.1_macos/tos-2.06.rom}
 
-python3 gendata.py
+REPO=$(cd ../.. && pwd)
+[ -d "$REPO/target/test-classes/org/ymx/rig" ] || (cd "$REPO" && mvn -q test-compile)
+java -ea -Dymx.repo="$REPO" \
+    -cp "$REPO/target/classes:$REPO/target/test-classes" org.ymx.rig.GenData
 # -i. finds the generated ymxdata.inc; -i../../68k the player and the ST4
 # decoders, and -i../../68k/test hatari_util.inc - the console and 200 Hz
 # timing helpers, shared with the ST1 harnesses rather than copied.
