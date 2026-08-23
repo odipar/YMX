@@ -147,18 +147,18 @@ In order:
    position-independent SNDH file is relocated.
 
 The program takes the machine over, calls play once per VBL, stops on
-SPACE, and switches subtunes on the number keys 1-9.
+SPACE or when a patched frame count runs out, and switches subtunes on
+the number keys 1-9.
 
 ## 5. From the release to a program, step by step
 
-The whole build for a system with no assembler and no JVM: five reads and
-one write.
+The whole build for a system with no assembler and no JVM.
 
 1. **Fetch** the release `binaries-v<format version>` and check each
    file's SHA-256 against `MANIFEST.txt`.
 2. **Pick the core** for the unit size the tunes are packed at — the
-   fourth byte of any non-stored section's ST4 signature (`SPEC.md` §1.4)
-   — and for the flags wanted. Verify its descriptor (§1): `'YMXC'`,
+   fourth byte of any packed section's ST4 signature (`SPEC.md` §1.4) —
+   and for the flags wanted. Verify its descriptor (§1): `'YMXC'`,
    descriptor version 1, the tunes' format version, the unit, the flags.
 3. **Read each tune's header** (`SPEC.md` §1.1): frame count, rate, ring
    size, and flag bit 0 for the `FRMS` entry. One rate across the set.
@@ -170,9 +170,10 @@ one write.
    long.
 
 Step 4 alone gives a file any SNDH host plays; step 5 makes it a program.
-The patches over the whole build: two longs in the core, three
-displacements in the entry triple, three fields in the stub, and the text
-size in the PRG header — every other byte is copied or zero.
+The combiner writes the entry triple, the tag block, the subtune table
+and the PRG header; patches two longs in the core and three fields in the
+stub; copies the tunes; and zero-fills the workspace and the relocation
+long. No instruction changes.
 
 ## 6. Use cases
 
@@ -222,7 +223,7 @@ program.
 init with the subtune number in `d0.w`, play once per frame at the `TC`
 rate, exit to hand the machine back. Every entry preserves d0-a6.
 
-**A changed set.** The file holds no checksums and nothing in it is
-derived from tune bytes except offsets, so adding, dropping or replacing
-a tune is a rebuild from the same parts — §5 steps 4 and 5 again, not a
-patch.
+**A changed set.** The file holds no checksums; the tags, the table and
+the workspace all follow from the tune headers and positions, so adding,
+dropping or replacing a tune is a rebuild from the same parts — §5 steps
+4 and 5 again, not a patch.

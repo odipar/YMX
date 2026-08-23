@@ -53,6 +53,29 @@ final class BinariesConsistencyTest {
         assertEquals(MkPrg.STUB_FLAGS, field(stub, "flags"));
     }
 
+    /** The numbers §1 and §6 carry in prose: the 25 in both workspace
+     * formulas is the stream count, and §6's capped formula uses the ring
+     * cap §1.3 of the specification sets. */
+    @Test
+    void theProseNumbersReadBack() throws IOException {
+        String doc = Files.readString(DOC);
+        Matcher streams = Pattern.compile("F \\+ (\\d+) ·").matcher(doc);
+        int formulas = 0;
+        while (streams.find()) {
+            assertEquals(YmxFormat.STREAMS, Integer.parseInt(streams.group(1)),
+                    "a workspace formula's stream count");
+            formulas++;
+        }
+        assertTrue(formulas >= 2, DOC + " no longer carries the workspace formulas");
+        Matcher cap = Pattern.compile("· (\\d+)` — the cap on `N`").matcher(doc);
+        assertTrue(cap.find(), DOC + " no longer carries the capped formula");
+        int ring = Integer.parseInt(cap.group(1));
+        assertTrue(YmxFormat.checkShape(ring, 28).isEmpty(),
+                "the capped formula's ring size must be usable");
+        assertTrue(!YmxFormat.checkShape(ring + 28, 28).isEmpty(),
+                "the capped formula's ring size must be the largest usable");
+    }
+
     @Test
     void theAssembledBinariesCarryTheDescriptorsTheCombinersRead(@TempDir Path dir)
             throws IOException, InterruptedException {
