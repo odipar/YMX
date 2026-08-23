@@ -23,6 +23,7 @@ final class HouseStyleTest {
     /** Every documentation file the ban list covers. */
     private static final List<Path> DOCS = List.of(
             Path.of("doc", "SPEC.md"),
+            Path.of("doc", "BINARIES.md"),
             Path.of("doc", "terminology.md"),
             Path.of("doc", "experiments.md"),
             Path.of("README.md"),

@@ -22,6 +22,7 @@ verbs and the frame contract. The rest of the documentation is beside it.
 | [doc/SPEC.md](doc/SPEC.md) | the format specification |
 | [ym/CONVERSION.md](ym/CONVERSION.md) | what a YM file loses on the way in |
 | [ymr/CONVERSION.md](ymr/CONVERSION.md) | what a `.YMR` loses on the way in |
+| [doc/BINARIES.md](doc/BINARIES.md) | the prebuilt binaries, and how a tool combines them without an assembler |
 | [doc/terminology.md](doc/terminology.md) | the vocabulary all of these use |
 | [doc/experiments.md](doc/experiments.md) | ideas measured against the real corpus, and what the measurements said |
 
@@ -48,13 +49,21 @@ mvn -q exec:exec@ymr -Dargs="song.ymr song.ymx"
 ## Building a tune into something runnable
 
 ```sh
+ymx/mkcores.sh                           # assemble the player binaries, once
 ymx/mksndh.sh MY.SNDH build/*.ymx        # an SNDH v2.2 file: the canonical build
 ymx/mkprg.sh MY.PRG build/*.ymx          # a TOS program around those same bytes
-ym/ym_sndh.sh -t"My Set" my.sndh *.ym    # both steps in one
+ym/ym_sndh.sh -t"My Set" my.sndh *.ym    # pack and combine in one
 ```
 
+Only `mkcores.sh` runs the assembler, and `mksndh.sh` runs it for you the
+first time. Combining is byte appending and patching — a tracker or another
+build system does it without a 68000 toolchain;
+[doc/BINARIES.md](doc/BINARIES.md) is the contract, and
+`ymx/mkrelease.sh -publish` puts every prebuilt variant in a GitHub release
+for systems without the repository.
+
 SNDH is the Atari ST's standard music container, and where the player lives:
-the `.PRG` is a thin shell around the same blob, so the two share the
+the `.PRG` is a thin stub in front of the same bytes, so the two share the
 player byte for byte.
 
 ## Using the player
@@ -92,7 +101,7 @@ ST4_UNIT    equ     2
 | [`org.ymx.Tune`](src/main/java/org/ymx/Tune.java) | what a front end produces and the engine works on — no format anywhere in it |
 | [`org.ymx.EffectScript`](src/main/java/org/ymx/EffectScript.java) | the script compiler: a `Tune` in, prepared actions out |
 | [68k/YMX.S](68k/YMX.S) | the player |
-| [68k/YMX_sndh.S](68k/YMX_sndh.S), [68k/YMX_player.S](68k/YMX_player.S) | the SNDH and `.PRG` wrappers |
+| [68k/YMX_sndh.S](68k/YMX_sndh.S), [68k/YMX_player.S](68k/YMX_player.S) | the SNDH core and the PRG stub, prebuilt by [ymx/mkcores.sh](ymx/mkcores.sh) |
 | [`org.st4`](src/main/java/org/st4) | the ST4 compressor, vendored |
 | [68k/](68k) | all the 68000 sources: the player, its wrappers, the ST4 decoders |
 | [`org.jx1`](src/main/java/org/jx1) | the ZX1 decoder a `.YMR`'s own streams need, vendored |

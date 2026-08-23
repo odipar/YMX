@@ -1,34 +1,49 @@
 package org.ymx;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.jspecify.annotations.Nullable;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Builds an SNDH v2.2 container around one or more packed tunes - the
- * canonical form of this player, which {@link MkPrg} then wraps in a runnable
- * program around the very same bytes.
+ * Combines a prebuilt SNDH core with packed tunes into an SNDH v2.2 file -
+ * the canonical form of this player, which {@link MkPrg} then wraps in a
+ * runnable program around the very same bytes.
  *
- * <p>The tunes become subtunes 1..N and must share one configuration: one
- * player build serves one unit size, one ring size and one chunk, so a set
- * packed in separate calls with different shapes is refused here rather than
- * crashing on an ST. The result is a raw SNDH file - position independent,
- * loadable anywhere, playable by any SNDH host.
- *
- * <p>The generated tag and tune tables are substituted into a build copy of
- * {@code YMX_sndh.S} rather than left as include files: rmac crashes on that
- * source's include shape, and on long include paths, so the assembler runs
- * inside the work directory on short names.
+ * <p>No assembler runs here: the core is a position-independent binary
+ * {@code ymx/mkcores.sh} assembled once per unit size and flag combination,
+ * and this tool writes
+ * the SNDH header itself and appends the core, the subtune table, the tunes
+ * and an exactly sized workspace - {@code doc/BINARIES.md} is the byte
+ * contract, and any system that follows it produces the same files. The
+ * tunes become subtunes 1..N and must share the core's unit size and one
+ * frame rate; ring and chunk may differ per tune, since the workspace is
+ * sized to the largest.
  */
 public final class MkSndh {
 
     /** SNDH's '##' tag is two ASCII digits. */
     public static final int MAX_SUBTUNES = 99;
+
+    /** The core descriptor: 'YMXC' at this offset, then version, unit,
+     * flags, the format version the core reads and the workspace's fixed
+     * size, words; then the two offsets this tool patches, longs. */
+    public static final int CORE_MAGIC = 12;
+    public static final int CORE_VERSION = 16;
+    public static final int CORE_UNIT = 18;
+    public static final int CORE_FLAGS = 20;
+    public static final int CORE_FORMAT = 22;
+    public static final int CORE_WORK_FIXED = 24;
+    public static final int CORE_TABLE_OFF = 26;
+    public static final int CORE_WORK_OFF = 30;
+
+    /** Core flag bits, matching {@code YMX_sndh.S}. */
+    public static final int CORE_FLAG_PERF = 1;
+    public static final int CORE_FLAG_NOMASK = 2;
 
     private MkSndh() {}
 
@@ -52,71 +67,200 @@ public final class MkSndh {
     public record Result(Path output, int subtunes, YmxHeader shape) {}
 
     public static Result build(Options options) {
-        Path output = options.output().toAbsolutePath();
-        Path work = Tools.directoryOf(output).resolve(".sndh_work");
-        try {
-            Files.createDirectories(work);
-        } catch (IOException e) {
-            throw Tools.fail("mksndh: cannot make " + work);
-        }
+        return build(options, resolveCore(options));
+    }
 
-        @Nullable YmxHeader set = null;
+    /** As above, with the core given rather than resolved from dist/. */
+    public static Result build(Options options, Path corePath) {
+        byte[] core = readCore(corePath, options);
+
+        List<byte[]> tunes = new ArrayList<>();
         List<Integer> frms = new ArrayList<>();
         List<String> names = new ArrayList<>();
-        StringBuilder tunesInc = new StringBuilder();
-        StringBuilder bodies = new StringBuilder();
+        @Nullable YmxHeader first = null;
+        int rate = 0;
+        int maxRing = 0;
         int n = 0;
         for (Path tune : options.tunes()) {
-            if (!Files.isRegularFile(tune)) {
-                throw Tools.fail("mksndh: no such file: " + tune);
-            }
             YmxHeader header;
             try {
                 header = YmxHeader.read(tune);
             } catch (IOException e) {
                 throw Tools.fail("mksndh: " + e.getMessage());
             }
-            if (set == null) {
-                set = header;
-            } else if (header.hz() != set.hz()) {
-                throw Tools.fail("mksndh: " + tune + " plays at " + header.hz()
-                        + " Hz, the set at " + set.hz()
+            if (!header.anyUnit() && header.unit() != word(core, CORE_UNIT)) {
+                throw new IllegalArgumentException(tune + " is packed at unit "
+                        + header.unit() + ", the core serves unit "
+                        + word(core, CORE_UNIT));
+            }
+            String shape = YmxFormat.checkShape(header.ring(), header.chunk(),
+                    header.anyUnit() ? 1 : header.unit(),
+                    YmxFormat.liveStreams(header.flags()));
+            if (!shape.isEmpty()) {
+                throw new IllegalArgumentException(tune + ": " + shape);
+            }
+            if (first == null) {
+                first = header;
+                rate = header.hz();
+            } else if (header.hz() != rate) {
+                throw new IllegalArgumentException(tune + " plays at "
+                        + header.hz() + " Hz, the set at " + rate
                         + " - one SNDH declares one rate");
-            } else if (header.ring() != set.ring() || header.chunk() != set.chunk()
-                    || header.unit() != set.unit()) {
-                throw Tools.fail("mksndh: " + tune + " is packed " + header.shape()
-                        + ", the set started " + set.shape() + " - one player build"
-                        + " needs one configuration (pack the set in one YMX call)");
             }
             n++;
+            maxRing = Math.max(maxRing, header.ring());
             frms.add(header.frms());
             names.add(subtuneName(options, n, tune));
             try {
-                Files.copy(tune, work.resolve("tune" + n + ".ymx"),
-                        StandardCopyOption.REPLACE_EXISTING);
+                tunes.add(Files.readAllBytes(tune));
             } catch (IOException e) {
-                throw Tools.fail("mksndh: cannot stage " + tune);
+                throw Tools.fail("mksndh: cannot read " + tune);
             }
-            tunesInc.append("        dc.l    sndh_tune").append(n)
-                    .append("-sndh_start\n");
-            bodies.append("sndh_tune").append(n).append(":\n")
-                    .append("        incbin  \"tune").append(n).append(".ymx\"\n")
-                    .append("        even\n");
         }
-        tunesInc.append(bodies);
-
-        if (set == null) {
+        if (first == null) {
             throw Tools.fail("mksndh: no tunes");
         }
-        String tagsInc = tags(options, set, n, frms, names);
-        Path build = work.resolve("sndh_build.S");
-        substitute(Tools.asmDir().resolve("YMX_sndh.S"), build, tagsInc, tunesInc.toString());
-        Tools.assemble(work, "sndh_build.S", output,
-                List.of("-fr", "-i" + Tools.asmDir()));
 
-        System.out.println(options.output() + ": " + Tools.size(output) + " bytes, "
-                + Tools.plural(n, "subtune") + ", " + set.shape());
-        return new Result(output, n, set);
+        byte[] file = combine(core, tunes, tags(options, rate, n, frms, names),
+                maxRing);
+        Path output = options.output().toAbsolutePath();
+        try {
+            Files.write(output, file);
+        } catch (IOException e) {
+            throw Tools.fail("mksndh: cannot write " + output);
+        }
+        System.out.println(options.output() + ": " + file.length + " bytes, "
+                + Tools.plural(n, "subtune") + ", unit " + word(core, CORE_UNIT)
+                + ", workspace for rings of " + maxRing);
+        return new Result(output, n, first);
+    }
+
+    /**
+     * The whole file: the twelve-byte entry triple, the tag block, the core
+     * with its two offsets patched, the subtune table, the tunes and the
+     * workspace, every piece even-aligned.
+     *
+     * <p>Each outer entry is {@code bra.w} to the same entry of the core's
+     * own triple, so all three displacements are the header's size minus 2.
+     */
+    static byte[] combine(byte[] core, List<byte[]> tunes, byte[] tags,
+                          int maxRing) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        int header = 12 + tags.length;
+        header += header & 1;                     // the core starts even
+        for (int entry = 0; entry < 3; entry++) {
+            out.write(0x60);                      // bra.w
+            out.write(0x00);
+            out.write((header - 2) >> 8);
+            out.write((header - 2) & 0xFF);
+        }
+        out.writeBytes(tags);
+        if ((out.size() & 1) != 0) {
+            out.write(0);
+        }
+
+        byte[] patched = core.clone();
+        int tableOff = core.length + (core.length & 1);
+        int tableSize = 2 + 4 * tunes.size();
+        int at = tableOff + tableSize + (tableSize & 1);
+        int[] offsets = new int[tunes.size()];
+        for (int i = 0; i < tunes.size(); i++) {
+            offsets[i] = at;
+            at += tunes.get(i).length;
+            at += at & 1;
+        }
+        int workOff = at;
+        putLong(patched, CORE_TABLE_OFF, tableOff);
+        putLong(patched, CORE_WORK_OFF, workOff);
+        out.writeBytes(patched);
+
+        pad(out, header + tableOff);
+        out.write(tunes.size() >> 8);
+        out.write(tunes.size() & 0xFF);
+        for (int offset : offsets) {
+            out.write(offset >>> 24);
+            out.write(offset >>> 16);
+            out.write(offset >>> 8);
+            out.write(offset);
+        }
+        for (int i = 0; i < tunes.size(); i++) {
+            pad(out, header + offsets[i]);
+            out.writeBytes(tunes.get(i));
+        }
+        pad(out, header + workOff);
+        int workspace = word(core, CORE_WORK_FIXED) + YmxFormat.STREAMS * maxRing;
+        out.writeBytes(new byte[workspace]);
+        return out.toByteArray();
+    }
+
+    /** Zero bytes up to a file position, one at most under these layouts. */
+    private static void pad(ByteArrayOutputStream out, int to) {
+        while (out.size() < to) {
+            out.write(0);
+        }
+    }
+
+    /**
+     * The tag block, 'SNDH' through 'HDNS': the tags in the order the spec
+     * requires - the '##' subtune count before any per-subtune table, and
+     * the names last.
+     */
+    static byte[] tags(Options options, int rate, int n,
+                       List<Integer> frms, List<String> names) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        text(out, "SNDH");
+        tag(out, "TITL", clean(options.title()));
+        if (options.composer() != null && !options.composer().isEmpty()) {
+            tag(out, "COMM", clean(options.composer()));
+        }
+        tag(out, "CONV", "Converted from YM by YMX (ZX1 through ST4)");
+        tag(out, String.format("##%02d", n), "");
+        tag(out, "TC" + rate, "");
+        tag(out, "FLAG", "~ady");
+        if ((out.size() & 1) != 0) {
+            out.write(0);
+        }
+        text(out, "FRMS");
+        for (int frames : frms) {
+            out.write(frames >>> 24);
+            out.write(frames >>> 16);
+            out.write(frames >>> 8);
+            out.write(frames);
+        }
+        // The subtune names: SNDH's own track list. The offsets are words
+        // relative to the tag start, and the reference parsers agree on the
+        // '!#SN' spelling (the spec's own text wavers between the two).
+        text(out, "!#SN");
+        int strings = 4 + 2 * n;
+        int[] at = new int[n];
+        for (int i = 0; i < n; i++) {
+            at[i] = strings;
+            strings += clean(names.get(i)).length() + 1;
+        }
+        for (int i = 0; i < n; i++) {
+            out.write(at[i] >> 8);
+            out.write(at[i] & 0xFF);
+        }
+        for (int i = 0; i < n; i++) {
+            text(out, clean(names.get(i)));
+            out.write(0);
+        }
+        if ((out.size() & 1) != 0) {
+            out.write(0);
+        }
+        text(out, "HDNS");
+        return out.toByteArray();
+    }
+
+    /** One text tag: the four tag bytes, the value, a closing NUL. */
+    private static void tag(ByteArrayOutputStream out, String name, String value) {
+        text(out, name);
+        text(out, value);
+        out.write(0);
+    }
+
+    private static void text(ByteArrayOutputStream out, String value) {
+        out.writeBytes(value.getBytes(StandardCharsets.ISO_8859_1));
     }
 
     /** The name file's nth line, or the tune's own stem. */
@@ -128,96 +272,133 @@ public final class MkSndh {
         return tune.getFileName().toString().replaceAll("(?i)\\.ymx$", "");
     }
 
-    /**
-     * The tag block: the player's build-time equates, then the SNDH tags in
-     * the order the spec requires - the '##' subtune count before any
-     * per-subtune table, and the names last.
-     */
-    private static String tags(Options options, YmxHeader set, int n,
-                               List<Integer> frms, List<String> names) {
-        StringBuilder out = new StringBuilder();
-        out.append("ST4_UNIT    equ     ").append(set.unit()).append('\n');
-        out.append("RING_SIZE   equ     ").append(set.ring()).append('\n');
-        out.append("YMX_TUNES   equ     ").append(n).append('\n');
-        out.append("YMX_PERF    equ     ").append(options.perf() ? 1 : 0).append('\n');
-        out.append("YMX_MASK_BURST equ  ").append(options.maskBurst() ? 1 : 0)
-           .append('\n');
-        out.append("        dc.b    'TITL',\"").append(clean(options.title())).append("\",0\n");
-        if (options.composer() != null && !options.composer().isEmpty()) {
-            out.append("        dc.b    'COMM',\"").append(clean(options.composer()))
-               .append("\",0\n");
-        }
-        out.append("        dc.b    'CONV','Converted from YM by YMX (ZX1 through ST4)',0\n");
-        out.append(String.format("        dc.b    '##%02d',0%n", n));
-        out.append("        dc.b    'TC").append(set.hz()).append("',0\n");
-        out.append("        dc.b    'FLAG','~','ady',0\n");
-        out.append("        even\n");
-        out.append("        dc.b    'FRMS'\n");
-        StringBuilder list = new StringBuilder();
-        for (int frames : frms) {
-            list.append(list.isEmpty() ? "" : ",").append(frames);
-        }
-        out.append("        dc.l    ").append(list).append('\n');
-        // The subtune names: SNDH's own track list. The offsets are words
-        // relative to the tag start, and the reference parsers agree on the
-        // '!#SN' spelling (the spec's own text wavers between the two).
-        out.append("        even\n");
-        out.append("sndh_sn:\n");
-        out.append("        dc.b    '!#SN'\n");
-        for (int i = 1; i <= n; i++) {
-            out.append("        dc.w    sndh_sn").append(i).append("-sndh_sn\n");
-        }
-        for (int i = 1; i <= n; i++) {
-            out.append("sndh_sn").append(i).append(":\n")
-               .append("        dc.b    \"").append(clean(names.get(i - 1))).append("\",0\n");
-        }
-        return out.toString();
-    }
-
-    /**
-     * What rmac can hold inside a double-quoted string: printable ASCII with
-     * the quote itself dropped. Titles come out of YM headers, which carry
-     * anything at all - one of them broke the assembler with an apostrophe.
-     */
+    /** Printable ASCII with the NUL-adjacent risks dropped: titles come out
+     * of YM headers, which carry anything at all. */
     static String clean(String text) {
         StringBuilder out = new StringBuilder();
         for (char c : text.toCharArray()) {
-            if (c >= 0x20 && c < 0x7F && c != '"') {
+            if (c >= 0x20 && c < 0x7F) {
                 out.append(c);
             }
         }
         return out.toString();
     }
 
-    /** Copies the SNDH source, replacing its two include lines with the
-     * generated blocks - see the class comment for why. */
-    private static void substitute(Path source, Path target, String tags, String tunes) {
+    /**
+     * The core for these options, from {@code dist/} beside the repo -
+     * assembled on the spot, once, when it is not there yet.
+     */
+    static Path resolveCore(Options options) {
+        String named = System.getProperty("ymx.core");
+        if (named != null) {
+            return Path.of(named);
+        }
+        int unit = unitOf(options.tunes());
+        String suffix = (options.perf() ? "-perf" : "")
+                + (options.maskBurst() ? "" : "-nomask");
+        Path core = Tools.repo().resolve("dist")
+                .resolve("ymxsndh-k" + unit + suffix + ".bin");
+        if (stale(core, "YMX_sndh.S", "YMX.S", "ST4_wrap.S")) {
+            List<String> command = new ArrayList<>(List.of("sh",
+                    Tools.repo().resolve("ymx").resolve("mkcores.sh").toString()));
+            if (options.perf()) {
+                command.add("-perf");
+            }
+            if (!options.maskBurst()) {
+                command.add("-nomask");
+            }
+            Tools.run(Tools.repo(), command);
+        }
+        return core;
+    }
+
+    /** The unit size the set's core must serve: the first tune's, or the
+     * packer's default of 2 where every tune reads the same at any unit. */
+    /** Whether a prebuilt binary is missing or older than a source it was
+     * assembled from, so the resolvers reassemble rather than combine
+     * against the repository's past. */
+    static boolean stale(Path binary, String... sources) {
         try {
-            List<String> lines = Files.readAllLines(source, StandardCharsets.ISO_8859_1);
-            StringBuilder out = new StringBuilder();
-            for (String line : lines) {
-                if (line.contains("include \"sndh_tags.inc\"")) {
-                    out.append(tags);
-                } else if (line.contains("include \"sndh_tunes.inc\"")) {
-                    out.append(tunes);
-                } else {
-                    out.append(line).append('\n');
+            if (!Files.isRegularFile(binary)) {
+                return true;
+            }
+            java.nio.file.attribute.FileTime built = Files.getLastModifiedTime(binary);
+            for (String source : sources) {
+                Path path = Tools.repo().resolve("68k").resolve(source);
+                if (Files.getLastModifiedTime(path).compareTo(built) > 0) {
+                    return true;
                 }
             }
-            Files.writeString(target, out.toString(), StandardCharsets.ISO_8859_1);
+            return false;
         } catch (IOException e) {
-            throw Tools.fail("mksndh: cannot build from " + source + ": " + e.getMessage());
+            return true;
         }
+    }
+
+    private static int unitOf(List<Path> tunes) {
+        for (Path tune : tunes) {
+            try {
+                YmxHeader header = YmxHeader.read(tune);
+                if (!header.anyUnit()) {
+                    return header.unit();
+                }
+            } catch (IOException e) {
+                throw Tools.fail("mksndh: " + e.getMessage());
+            }
+        }
+        return 2;
+    }
+
+    /** The core, its descriptor checked against what the caller asked for. */
+    static byte[] readCore(Path path, Options options) {
+        byte[] core;
+        try {
+            core = Files.readAllBytes(path);
+        } catch (IOException e) {
+            throw Tools.fail("mksndh: cannot read the core " + path);
+        }
+        if (core.length < 34 || core[CORE_MAGIC] != 'Y' || core[CORE_MAGIC + 1] != 'M'
+                || core[CORE_MAGIC + 2] != 'X' || core[CORE_MAGIC + 3] != 'C') {
+            throw new IllegalArgumentException(path + " is not an SNDH core");
+        }
+        if (word(core, CORE_VERSION) != 1) {
+            throw new IllegalArgumentException(path + " is core descriptor version "
+                    + word(core, CORE_VERSION) + ", this tool writes 1");
+        }
+        if (word(core, CORE_FORMAT) != YmxFormat.VERSION) {
+            throw new IllegalArgumentException(path + " reads format version "
+                    + word(core, CORE_FORMAT) + " and the tunes carry "
+                    + YmxFormat.VERSION + " - reassemble it with ymx/mkcores.sh");
+        }
+        int flags = (options.perf() ? CORE_FLAG_PERF : 0)
+                | (options.maskBurst() ? 0 : CORE_FLAG_NOMASK);
+        if (word(core, CORE_FLAGS) != flags) {
+            throw new IllegalArgumentException(path + " is built with flags "
+                    + word(core, CORE_FLAGS) + ", the options ask for " + flags);
+        }
+        return core;
+    }
+
+    static int word(byte[] bytes, int at) {
+        return ((bytes[at] & 0xFF) << 8) | (bytes[at + 1] & 0xFF);
+    }
+
+    private static void putLong(byte[] bytes, int at, int value) {
+        bytes[at] = (byte) (value >>> 24);
+        bytes[at + 1] = (byte) (value >>> 16);
+        bytes[at + 2] = (byte) (value >>> 8);
+        bytes[at + 3] = (byte) value;
     }
 
     private static final String USAGE =
             "usage: mksndh.sh [-perf] [-nomask] [-tTitle] [-cComposer] [-Nnamesfile]"
-            + " output.sndh tune1.ymx [tune2.ymx ...]";
+            + " [-Pcorefile] output.sndh tune1.ymx [tune2.ymx ...]";
 
     public static void main(String[] args) {
         @Nullable String title = null;
         @Nullable String composer = null;
         @Nullable List<String> names = null;
+        @Nullable Path core = null;
         boolean perf = false;
         boolean maskBurst = true;
         int i = 0;
@@ -233,6 +414,8 @@ public final class MkSndh {
                 composer = a.substring(2);
             } else if (a.startsWith("-N")) {
                 names = readNames(Path.of(a.substring(2)));
+            } else if (a.startsWith("-P")) {
+                core = Path.of(a.substring(2));
             } else {
                 break;
             }
@@ -248,7 +431,17 @@ public final class MkSndh {
         if (title == null || title.isEmpty()) {
             title = output.getFileName().toString().replaceAll("(?i)\\.sndh$", "");
         }
-        build(new Options(output, tunes, title, composer, names, perf, maskBurst));
+        Options options = new Options(output, tunes, title, composer, names,
+                perf, maskBurst);
+        try {
+            if (core != null) {
+                build(options, core);
+            } else {
+                build(options);
+            }
+        } catch (IllegalArgumentException e) {
+            throw Tools.fail("mksndh: " + e.getMessage());
+        }
     }
 
     static List<String> readNames(Path file) {
