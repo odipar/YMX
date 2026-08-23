@@ -23,6 +23,7 @@ verbs and the frame contract. The rest of the documentation is beside it.
 | [ym/CONVERSION.md](ym/CONVERSION.md) | what a YM file loses on the way in |
 | [ymr/CONVERSION.md](ymr/CONVERSION.md) | what a `.YMR` loses on the way in |
 | [doc/BINARIES.md](doc/BINARIES.md) | the prebuilt binaries, and how a tool combines them without an assembler |
+| [doc/tools.md](doc/tools.md) | every tool's usage, flags and environment |
 | [doc/terminology.md](doc/terminology.md) | the vocabulary all of these use |
 | [doc/experiments.md](doc/experiments.md) | ideas measured against the real corpus, and what the measurements said |
 

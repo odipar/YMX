@@ -24,6 +24,7 @@ final class HouseStyleTest {
     private static final List<Path> DOCS = List.of(
             Path.of("doc", "SPEC.md"),
             Path.of("doc", "BINARIES.md"),
+            Path.of("doc", "tools.md"),
             Path.of("doc", "terminology.md"),
             Path.of("doc", "experiments.md"),
             Path.of("README.md"),
