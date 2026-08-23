@@ -1390,9 +1390,9 @@ ymx_link:
 ; one timer from another. The claim stays where it is, because it belongs
 ; to the channel and not to the timer under it.
 ;
-; A channel whose timer changes while it runs is not stopped here: the
-; packer only moves a channel between streams, and the design note says
-; why. Clobbers d0-d2, a1-a2; a0 survives, and the frame's caller uses that.
+; A channel whose timer changes while it runs is not stopped here: SPEC
+; 2.3 makes moving only idle channels the writer's promise.
+; Clobbers d0-d2, a1-a2; a0 survives, and the frame's caller uses that.
 ; -----------------------------------------------------------------------------
 ymx_assign:
         lea     ymx_desc_0(pc),a1
