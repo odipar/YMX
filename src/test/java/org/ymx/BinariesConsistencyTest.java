@@ -58,10 +58,8 @@ final class BinariesConsistencyTest {
             throws IOException, InterruptedException {
         assumeTrue(new ProcessBuilder("rmac", "-?").start().waitFor() >= 0,
                 "rmac is not on the PATH");
-        Process build = new ProcessBuilder("sh",
-                Path.of("ymx", "mkcores.sh").toAbsolutePath().toString(),
-                dir.toString()).inheritIO().start();
-        assertEquals(0, build.waitFor(), "mkcores.sh failed");
+        MkCores.cores(dir, false, false);
+        MkCores.stub(dir);
 
         int fixed = fixedFromEquates();
         for (int unit : new int[] {1, 2, 4}) {

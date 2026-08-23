@@ -154,8 +154,7 @@ public final class MkPrg {
         }
         Path stub = Tools.repo().resolve("dist").resolve("ymxprg.bin");
         if (MkSndh.stale(stub, "YMX_player.S")) {
-            Tools.run(Tools.repo(), List.of("sh",
-                    Tools.repo().resolve("ymx").resolve("mkcores.sh").toString()));
+            MkCores.stub(Tools.repo().resolve("dist"));
         }
         return stub;
     }

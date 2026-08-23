@@ -12,10 +12,11 @@ import java.util.List;
 /**
  * Stages a release of the prebuilt player binaries: every core variant -
  * three unit sizes by the perf and mask flags - plus the PRG stub, each
- * assembled by {@code ymx/mkcores.sh}, verified against the descriptors
+ * assembled by {@link MkCores}, verified against the descriptors
  * {@link MkSndh} and {@link MkPrg} read, and listed in a manifest with its
- * SHA-256. {@code ymx/mkrelease.sh} wraps this and publishes the staged
- * directory as a GitHub release.
+ * SHA-256. {@code -publish} creates or updates the GitHub release tagged
+ * {@code binaries-v<format version>}, replacing its assets: a new format is
+ * a new release, and an unchanged one updates in place.
  */
 public final class MkRelease {
 
@@ -46,31 +47,44 @@ public final class MkRelease {
 
     private MkRelease() {}
 
-    /** usage: MkRelease stagedir [source-commit] */
+    private static final String USAGE = "usage: mkrelease.sh [-publish] [stagedir]";
+
     public static void main(String[] args) {
-        if (args.length < 1) {
-            throw Tools.fail("usage: MkRelease stagedir [source-commit]");
+        boolean publish = false;
+        int i = 0;
+        for (; i < args.length; i++) {
+            if (args[i].equals("-publish")) {
+                publish = true;
+            } else if (args[i].startsWith("-")) {
+                throw Tools.fail(USAGE);
+            } else {
+                break;
+            }
         }
-        Path dir = Path.of(args[0]).toAbsolutePath();
-        String commit = args.length > 1 ? args[1] : "unrecorded";
+        if (args.length - i > 1) {
+            throw Tools.fail(USAGE);
+        }
+        Path dir = (i < args.length ? Path.of(args[i])
+                : Tools.repo().resolve("dist").resolve("release")).toAbsolutePath();
+        String commit = Tools.output(Tools.repo(),
+                List.of("git", "rev-parse", "--short", "HEAD"));
         try {
+            if (Files.isDirectory(dir)) {
+                try (var stale = Files.list(dir)) {
+                    for (Path old : stale.toList()) {
+                        Files.delete(old);
+                    }
+                }
+            }
             Files.createDirectories(dir);
         } catch (IOException e) {
-            throw Tools.fail("mkrelease: cannot make " + dir);
+            throw Tools.fail("mkrelease: cannot clear " + dir);
         }
 
-        String script = Tools.repo().resolve("ymx").resolve("mkcores.sh").toString();
         for (int flags = 0; flags < 4; flags++) {
-            List<String> command = new ArrayList<>(List.of("sh", script));
-            if ((flags & 1) != 0) {
-                command.add("-perf");
-            }
-            if ((flags & 2) != 0) {
-                command.add("-nomask");
-            }
-            command.add(dir.toString());
-            Tools.run(Tools.repo(), command);
+            MkCores.cores(dir, (flags & 1) != 0, (flags & 2) != 0);
         }
+        MkCores.stub(dir);
 
         StringBuilder manifest = new StringBuilder();
         manifest.append("YMX player binaries - format version ")
@@ -96,6 +110,33 @@ public final class MkRelease {
         }
         System.out.println(dir + ": " + (matrix().size() + 1)
                 + " binaries and MANIFEST.txt, format version " + YmxFormat.VERSION);
+
+        if (publish) {
+            publish(dir, commit);
+        }
+    }
+
+    /** The GitHub release tagged by format version, its assets replaced. */
+    private static void publish(Path dir, String commit) {
+        String tag = "binaries-v" + YmxFormat.VERSION;
+        if (Tools.status(Tools.repo(),
+                List.of("gh", "release", "view", tag)) != 0) {
+            Tools.run(Tools.repo(), List.of("gh", "release", "create", tag,
+                    "--title", "YMX player binaries, format " + YmxFormat.VERSION,
+                    "--notes", "Prebuilt SNDH cores and the PRG stub, assembled"
+                            + " at " + commit + ". doc/BINARIES.md is the combine"
+                            + " contract; MANIFEST.txt lists sizes and SHA-256"
+                            + " digests."));
+        }
+        List<String> upload = new ArrayList<>(List.of("gh", "release", "upload",
+                tag, "--clobber"));
+        for (Variant variant : matrix()) {
+            upload.add(dir.resolve(variant.name()).toString());
+        }
+        upload.add(dir.resolve("ymxprg.bin").toString());
+        upload.add(dir.resolve("MANIFEST.txt").toString());
+        Tools.run(Tools.repo(), upload);
+        System.out.println("published " + tag);
     }
 
     /** One manifest line: name, size, digest, and the given tail columns. */

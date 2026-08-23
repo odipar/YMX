@@ -299,15 +299,8 @@ public final class MkSndh {
         Path core = Tools.repo().resolve("dist")
                 .resolve("ymxsndh-k" + unit + suffix + ".bin");
         if (stale(core, "YMX_sndh.S", "YMX.S", "ST4_wrap.S")) {
-            List<String> command = new ArrayList<>(List.of("sh",
-                    Tools.repo().resolve("ymx").resolve("mkcores.sh").toString()));
-            if (options.perf()) {
-                command.add("-perf");
-            }
-            if (!options.maskBurst()) {
-                command.add("-nomask");
-            }
-            Tools.run(Tools.repo(), command);
+            MkCores.cores(Tools.repo().resolve("dist"), options.perf(),
+                    !options.maskBurst());
         }
         return core;
     }
