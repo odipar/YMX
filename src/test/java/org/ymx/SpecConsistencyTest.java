@@ -216,6 +216,30 @@ final class SpecConsistencyTest {
                 "SPEC §2.1 no longer puts the skip flag in bit 4");
     }
 
+    /** The register masks are the ones a writer must apply. */
+    @Test
+    void theMaskTableIsWhatTheEncoderApplies() throws IOException {
+        String said = flat();
+        int[][] rows = {
+                {0, 2, 4}, {1, 3, 5}, {6}, {7}, {8, 9, 10}, {11, 12}, {13},
+        };
+        String[] kept = {"8", "4", "5", "6", "5", "8", "4"};
+        String[] labels = {"R0, R2, R4", "R1, R3, R5", "R6", "R7",
+                "R8, R9, R10", "R11, R12", "R13"};
+        for (int row = 0; row < rows.length; row++) {
+            assertTrue(said.contains("| " + labels[row] + " | " + kept[row] + " —"),
+                    "SPEC §2's mask table no longer gives " + labels[row] + " "
+                            + kept[row] + " bits");
+            for (int register : rows[row]) {
+                int mask = Ym2149.mask(register, register == 13 ? 0x7F : 0xFF);
+                assertEquals(Integer.parseInt(kept[row]),
+                        Integer.bitCount(mask), "R" + register + "'s kept bits");
+            }
+        }
+        assertEquals(0xFF, Ym2149.mask(13, 0xFF),
+                "R13's $FF must pass through unmasked - the do-not-write marker");
+    }
+
     /** The section-offset rule, which is one bit of one long. */
     @Test
     void theStoredBitIsBit31() throws IOException {
