@@ -34,12 +34,12 @@
 ; sc68 and native-player practice):
 ;   - INIT (subtune in d0.w, 1-based; out of range plays subtune 1), EXIT
 ;     and PLAY each preserve d0-a6 and return with rts, supervisor assumed;
-;   - the host's own interrupts keep running: nothing is disabled beyond the
-;     two MFP timers a YM tune claims, and everything the player touches -
-;     both timer vectors, TACR, TCDCR's Timer D nibble, TADR, TDDR, the four
-;     enable/mask bits - is saved at INIT and handed back at EXIT. A file
-;     whose T stream names Timer B or C would need those saved here too, and
-;     a Timer C tune could not be hosted from a Timer C hook;
+;   - the host's own interrupts keep running: nothing is disabled beyond
+;     the MFP timers the player claims. INIT saves all four timers' state -
+;     vector, control, data, enable and mask bits - and EXIT hands back
+;     exactly the claimed ones, so a tune on Timers A and D (a YM tune) or
+;     A, B and D (a .ymr) restores what it used and leaves the rest to the
+;     host. A Timer C tune still cannot be hosted from a Timer C hook;
 ;   - INIT called twice without an EXIT restores first;
 ;   - PLAY before INIT is a no-op; PLAY is driven at the TC tag's rate;
 ;   - the USP is never touched (YMX_SUPER_HOST stays 0), and every buffer
@@ -50,6 +50,13 @@
 ; delays Timer D ticks (timer channel 1's) by up to that length - pending,
 ; not lost. VBL- and emulator-hosted playback has no such window.
 ; -----------------------------------------------------------------------------
+
+; The save area, one slot per timer in A B C D order.
+SAV_VEC         equ     0               ; 4 longs: the vectors
+SAV_CTRL        equ     16              ; 4 bytes: the control registers
+SAV_DATA        equ     20              ; 4 bytes: the data registers
+SAV_BITS        equ     24              ; byte: enable bits in the low nibble,
+SAV_SIZE        equ     26              ; mask bits in the high, timer order
 
 sndh_core:
         bra.w   sndh_init
@@ -76,34 +83,58 @@ sndh_init:
         bsr     sndh_stop               ; init without exit: clean up first
 .fresh:
 
-; Save what the player will touch - the list YMX.S assumption 5 gives. The
-; four enable/mask bits are kept as bits, so EXIT can restore them without
-; clobbering the host's own later changes to the same registers.
+; Save every timer's state - a tune may claim any of the four, and which
+; ones is the T stream's, known only inside YMX_init. The enable and mask
+; bits are kept as bits, one per timer in each nibble, so EXIT can restore
+; them without clobbering the host's own later changes to the same
+; registers.
         lea     sndh_saved(pc),a5
-        move.l  $134.w,(a5)+
-        move.l  $110.w,(a5)+
-        move.b  $FFFFFA19.w,(a5)+
-        move.b  $FFFFFA1D.w,(a5)+
-        move.b  $FFFFFA1F.w,(a5)+
-        move.b  $FFFFFA25.w,(a5)+
+        move.l  $134.w,SAV_VEC+0(a5)    ; the vectors, in timer order A B C D
+        move.l  $120.w,SAV_VEC+4(a5)
+        move.l  $114.w,SAV_VEC+8(a5)
+        move.l  $110.w,SAV_VEC+12(a5)
+        move.b  $FFFFFA19.w,SAV_CTRL+0(a5)
+        move.b  $FFFFFA1B.w,SAV_CTRL+1(a5)
+        move.b  $FFFFFA1D.w,SAV_CTRL+2(a5)  ; C and D share TCDCR: the byte
+        move.b  $FFFFFA1D.w,SAV_CTRL+3(a5)  ; twice, each restore masks its own
+        move.b  $FFFFFA1F.w,SAV_DATA+0(a5)
+        move.b  $FFFFFA21.w,SAV_DATA+1(a5)
+        move.b  $FFFFFA23.w,SAV_DATA+2(a5)
+        move.b  $FFFFFA25.w,SAV_DATA+3(a5)
         moveq   #0,d1
-        btst    #5,$FFFFFA07.w
-        beq.s   .iera_off
-        addq.b  #1,d1
-.iera_off:
-        btst    #5,$FFFFFA13.w
-        beq.s   .imra_off
-        addq.b  #2,d1
-.imra_off:
+        btst    #5,$FFFFFA07.w          ; the enable bits, low nibble
+        beq.s   .ena
+        bset    #0,d1
+.ena:
+        btst    #0,$FFFFFA07.w
+        beq.s   .enb
+        bset    #1,d1
+.enb:
+        btst    #5,$FFFFFA09.w
+        beq.s   .enc
+        bset    #2,d1
+.enc:
         btst    #4,$FFFFFA09.w
-        beq.s   .ierb_off
-        addq.b  #4,d1
-.ierb_off:
+        beq.s   .end
+        bset    #3,d1
+.end:
+        btst    #5,$FFFFFA13.w          ; the mask bits, high nibble
+        beq.s   .mba
+        bset    #4,d1
+.mba:
+        btst    #0,$FFFFFA13.w
+        beq.s   .mbb
+        bset    #5,d1
+.mbb:
+        btst    #5,$FFFFFA15.w
+        beq.s   .mbc
+        bset    #6,d1
+.mbc:
         btst    #4,$FFFFFA15.w
-        beq.s   .imrb_off
-        addq.b  #8,d1
-.imrb_off:
-        move.b  d1,(a5)
+        beq.s   .mbd
+        bset    #7,d1
+.mbd:
+        move.b  d1,SAV_BITS(a5)
 
 ; The subtune table the tool appended: a word count, then a long offset per
 ; tune, each offset from sndh_core; d0 is 1-based.
@@ -125,6 +156,31 @@ sndh_init:
         tst.l   d0
         bne.s   .rejected               ; a foreign file: stay silent
         st      (a6)                    ; live
+
+; Record WHICH timers this tune claimed - YMX_stop clears the claims, so
+; EXIT restores from this mask. Each claimed channel's descriptor holds a
+; copy of its timer's vector address, one of the four in sndh_vecs.
+        lea     ymx_desc_0(pc),a0
+        moveq   #YMX_CHANNELS-1,d2
+        moveq   #0,d3
+.claims:
+        tst.w   CH_CLAIMED(a0)
+        beq.s   .unclaimed
+        lea     sndh_vecs(pc),a1
+        moveq   #0,d0
+.which:
+        move.w  CH_VEC(a0),d1
+        cmp.w   (a1)+,d1
+        beq.s   .mark
+        addq.w  #1,d0
+        bra.s   .which
+.mark:
+        bset    d0,d3
+.unclaimed:
+        lea     CH_SIZE(a0),a0
+        dbra    d2,.claims
+        lea     sndh_claims(pc),a0
+        move.b  d3,(a0)
 .rejected:
         movem.l (sp)+,d0-a6
         rts
@@ -144,37 +200,62 @@ sndh_stop:
         clr.b   (a6)                    ; a6 = sndh_live, set by both callers
         lea     sndh_core(pc),a0
         adda.l  sndh_work_off(pc),a0
-        bsr     YMX_stop                ; timers stopped, claim disabled,
-        lea     sndh_saved(pc),a5       ; voices silent - now the handback
+        bsr     YMX_stop                ; timers stopped, claims disabled,
+                                        ; voices silent - now the handback
+
+; Restore each timer the tune CLAIMED - the mask INIT recorded - from its
+; saved slot; an unclaimed timer was never touched and keeps the host's own
+; state. The rows of ymx_timers carry each timer's vector, control, data,
+; keep mask and interrupt bit, in the same A B C D order as the slots.
         move.w  sr,-(sp)
         ori.w   #$0700,sr
-        move.l  (a5)+,$134.w
-        move.l  (a5)+,$110.w
-        move.b  (a5)+,$FFFFFA19.w
-        move.b  (a5)+,d1                ; only Timer D's nibble is ours
-        and.b   #$0F,d1
-        or.b    d1,$FFFFFA1D.w
-        move.b  (a5)+,$FFFFFA1F.w
-        move.b  (a5)+,$FFFFFA25.w
-        move.b  (a5),d1                 ; re-set the bits INIT found set -
-        btst    #0,d1                   ; YMX_stop cleared all four
-        beq.s   .iera_clear
-        bset    #5,$FFFFFA07.w
-.iera_clear:
-        btst    #1,d1
-        beq.s   .imra_clear
-        bset    #5,$FFFFFA13.w
-.imra_clear:
-        btst    #2,d1
-        beq.s   .ierb_clear
-        bset    #4,$FFFFFA09.w
-.ierb_clear:
-        btst    #3,d1
-        beq.s   .imrb_clear
-        bset    #4,$FFFFFA15.w
-.imrb_clear:
+        move.b  sndh_claims(pc),d3
+        lea     ymx_timers(pc),a0
+        lea     sndh_saved(pc),a5
+        moveq   #0,d0                   ; the slot
+.slot:
+        btst    d0,d3
+        beq.s   .unclaimed
+        move.w  d0,d1
+        add.w   d1,d1
+        add.w   d1,d1
+        movea.w CH_VEC(a0),a2           ; the vector back first: a restored
+        move.l  SAV_VEC(a5,d1.w),(a2)   ; control byte may start the timer
+        movea.w CH_DATA(a0),a2          ; the count before the control, so
+        move.b  SAV_DATA(a5,d0.w),(a2)  ; a restart reloads the host's count
+        movea.w CH_CTRL(a0),a2
+        move.b  SAV_CTRL(a5,d0.w),d1    ; our nibble from the save, the
+        move.w  CH_KEEP(a0),d4          ; other nibble as it stands now
+        not.w   d4
+        and.b   d4,d1
+        move.b  (a2),d4
+        move.w  CH_KEEP(a0),d5
+        and.b   d5,d4
+        or.b    d1,d4
+        move.b  d4,(a2)
+        move.b  SAV_BITS(a5),d1         ; the enable and mask bits INIT found
+        movea.w CH_IER(a0),a2           ; set - YMX_stop cleared the claimed
+        move.w  CH_IERBIT(a0),d5        ; ones
+        btst    d0,d1
+        beq.s   .enable_clear
+        bset    d5,(a2)
+.enable_clear:
+        moveq   #4,d4
+        add.w   d0,d4
+        btst    d4,d1
+        beq.s   .mask_clear
+        bset    d5,12(a2)
+.mask_clear:
+.unclaimed:
+        lea     CH_ROW(a0),a0
+        addq.w  #1,d0
+        cmp.w   #YMX_TIMERS,d0
+        bcs.s   .slot
         move.w  (sp)+,sr
         rts
+
+sndh_vecs:
+        dc.w    $134,$120,$114,$110     ; Timer A, B, C, D
 
 ; PLAY: once per tick, from the interrupt the host hung on the TC tag.
 sndh_play:
@@ -196,7 +277,9 @@ sndh_play:
 ; ---------------------------------------------------------------- the state
 sndh_live:
         dc.b    0
+sndh_claims:
+        dc.b    0
         even
 sndh_saved:
-        ds.b    16                      ; 2 vectors, 4 timer bytes, the bits
+        ds.b    SAV_SIZE
         even
