@@ -817,25 +817,37 @@ class Sndh:
 
 
 def run_sndh() -> str:
-    """The SNDH container, end to end: two subtunes built by mksndh.sh, the
+    """The SNDH container, end to end: three subtunes built by mksndh.sh, the
     blob loaded at an arbitrary even address, every entry preserving d0-a6,
     each subtune playing its own data, the machine state handed back at
-    exit, and init-without-exit recovering by itself."""
+    exit - subtunes 1 and 2 run a SID on the default Timer A, subtune 3 the
+    same SID on Timer B, so the per-claim restore covers both - and
+    init-without-exit recovering by itself."""
     frames = 200
-    sets = []
-    for signature in (lambda f: (3 * f + 1) & 0xFF, lambda f: 0x55):
+
+    def build_tune(signature, extra=()):
         values = [bytearray(frames) for _ in range(16)]
         for f in range(frames):
             values[2][f] = signature(f)
             values[13][f] = gen_ym.NO_ENVELOPE_CHANGE
-        sets.append(pack(gen_ym.ym6_file(frames, values), 960, 24, True, 2))
-    for i, packed in enumerate(sets):
-        (SCRATCH / f'sndh_tune{i + 1}.ymx').write_bytes(packed)
+        for f in range(5, frames):              # a held SID on voice A, so
+            values[1][f] |= 0x10                # the tune claims channel 0's
+            values[6][f] |= 1 << 5              # timer
+            values[14][f] = 100
+            values[8][f] = 10
+        return pack(gen_ym.ym6_file(frames, values), 960, 24, True, 2, extra)
+
+    signatures = (lambda f: (3 * f + 1) & 0xFF, lambda f: 0x55,
+                  lambda f: (0xA0 + f) & 0xFF)
+    for i, sig in enumerate(signatures):
+        extra = ('-timersB',) if i == 2 else ()
+        (SCRATCH / f'sndh_tune{i + 1}.ymx').write_bytes(build_tune(sig, extra))
     out = SCRATCH / 'sndh_test.sndh'
     build = subprocess.run(['sh', str(YMX / 'mksndh.sh'), '-tRig',
                             str(out),
                             str(SCRATCH / 'sndh_tune1.ymx'),
-                            str(SCRATCH / 'sndh_tune2.ymx')],
+                            str(SCRATCH / 'sndh_tune2.ymx'),
+                            str(SCRATCH / 'sndh_tune3.ymx')],
                            capture_output=True, text=True)
     if build.returncode:
         return 'sndh: build failed: ' + (build.stderr or build.stdout).strip()[:120]
@@ -844,24 +856,40 @@ def run_sndh() -> str:
         return 'sndh: the header is not an SNDH header'
     # the subtune-name tag: word offsets from the tag start to NUL strings
     sn = blob.index(b'!#SN')
-    for i in range(2):
+    for i in range(3):
         at = sn + int.from_bytes(blob[sn + 4 + 2 * i:sn + 6 + 2 * i], 'big')
         name = blob[at:blob.index(0, at)].decode()
         if name != f'sndh_tune{i + 1}':
             return f'sndh: subtune {i + 1} is named {name!r}'
 
     player = Sndh(blob)
-    # sentinels for everything init must save and exit must hand back
-    player.uc.mem_write(0x134, (0xCAFE0134).to_bytes(4, 'big'))
-    player.uc.mem_write(0x110, (0xCAFE0110).to_bytes(4, 'big'))
-    for address, value in ((0xFFFFFA19, 3), (0xFFFFFA1D, 0x17),
-                           (0xFFFFFA1F, 99), (0xFFFFFA25, 88),
-                           (0xFFFFFA07, 0x21), (0xFFFFFA13, 0x20),
-                           (0xFFFFFA09, 0x10), (0xFFFFFA15, 0x11)):
-        player.uc.mem_write(address, bytes([value]))
+    # sentinels for every timer's state: what a claim must hand back, and
+    # what an unclaimed timer must never touch
+    SENTINELS = ((0x134, 4, 0xCAFE0134), (0x120, 4, 0xCAFE0120),
+                 (0x114, 4, 0xCAFE0114), (0x110, 4, 0xCAFE0110),
+                 (0xFFFFFA19, 1, 3), (0xFFFFFA1B, 1, 7), (0xFFFFFA1D, 1, 0x17),
+                 (0xFFFFFA1F, 1, 99), (0xFFFFFA21, 1, 77),
+                 (0xFFFFFA23, 1, 66), (0xFFFFFA25, 1, 88),
+                 (0xFFFFFA07, 1, 0x21), (0xFFFFFA13, 1, 0x20),
+                 (0xFFFFFA09, 1, 0x10), (0xFFFFFA15, 1, 0x11))
+    for address, width, value in SENTINELS:
+        player.uc.mem_write(address, value.to_bytes(width, 'big'))
+
+    def handback():
+        for address, width, value in SENTINELS:
+            got = int.from_bytes(player.uc.mem_read(address, width), 'big')
+            if address == 0xFFFFFA1D:
+                if got & 0x0F != value & 0x0F:
+                    return "sndh: exit lost Timer D's nibble"
+            elif address == 0xFFFFFA1B:
+                if got & 0x0F != value & 0x0F:
+                    return "sndh: exit lost Timer B's control"
+            elif got != value:
+                return f'sndh: exit lost the state at {address:#x}'
+        return ''
 
     def signature(which, frame):
-        return ((3 * frame + 1) & 0xFF) if which == 1 else 0x55
+        return signatures[which - 1](frame)
 
     def play_and_check(which, count=30):
         for f in range(count):
@@ -882,16 +910,22 @@ def run_sndh() -> str:
     problem = player.call(4, 0xD0D0D0D0)        # exit
     if problem:
         return 'sndh: ' + problem
-    for address, want in ((0x134, 0xCAFE0134), (0x110, 0xCAFE0110)):
-        if int.from_bytes(player.uc.mem_read(address, 4), 'big') != want:
-            return f'sndh: exit lost the vector at {address:#x}'
-    for address, want in ((0xFFFFFA19, 3), (0xFFFFFA1F, 99), (0xFFFFFA25, 88),
-                          (0xFFFFFA07, 0x21), (0xFFFFFA13, 0x20),
-                          (0xFFFFFA09, 0x10), (0xFFFFFA15, 0x11)):
-        if player.uc.mem_read(address, 1)[0] != want:
-            return f'sndh: exit lost the register at {address:#x}'
-    if player.uc.mem_read(0xFFFFFA1D, 1)[0] & 0x0F != 0x07:
-        return 'sndh: exit lost Timer D\'s nibble'
+    problem = handback()                        # Timer A restored, the
+    if problem:                                 # other three untouched
+        return problem
+
+    problem = player.call(0, 3)                 # subtune 3: the SID on
+    if problem:                                 # Timer B
+        return 'sndh: ' + problem
+    problem = play_and_check(3)
+    if problem:
+        return problem
+    problem = player.call(4, 0xD0D0D0D0)        # exit
+    if problem:
+        return 'sndh: ' + problem
+    problem = handback()                        # Timer B restored, the
+    if problem:                                 # other three untouched
+        return problem
 
     problem = player.call(0, 2)                 # subtune 2
     if problem:
@@ -905,7 +939,7 @@ def run_sndh() -> str:
     problem = play_and_check(1)
     if problem:
         return problem
-    problem = player.call(0, 9)                 # out of range: subtune 1
+    problem = player.call(0, 11)                # out of range: subtune 1
     if problem:
         return 'sndh: ' + problem
     problem = play_and_check(1)
