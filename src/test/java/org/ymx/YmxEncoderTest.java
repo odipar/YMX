@@ -31,6 +31,31 @@ final class YmxEncoderTest {
         return ((file[at] & 0xFF) << 8) | (file[at + 1] & 0xFF);
     }
 
+    /** One section's table entry, unsigned: bit 31 marks a stored section. */
+    private static long entry(byte[] file, int table, int register) {
+        return longAt(file, table + 4 * register) & 0xFFFF_FFFFL;
+    }
+
+    /** Where a section's bytes are, whichever kind it is. */
+    private static int sectionAt(byte[] file, int table, int register) {
+        return (int) YmxFormat.sectionOffset(entry(file, table, register));
+    }
+
+    /** A section's values: a stored section is already them. */
+    private static byte[] values(byte[] file, int table, int register, int size) {
+        return values(file, table, register, size, Integer.MAX_VALUE);
+    }
+
+    /** As above, holding a container to an offset limit the ring imposes. */
+    private static byte[] values(byte[] file, int table, int register, int size,
+                                 int offsetLimit) {
+        long e = entry(file, table, register);
+        int from = (int) YmxFormat.sectionOffset(e);
+        return YmxFormat.isStored(e)
+                ? Arrays.copyOfRange(file, from, from + size)
+                : unpack(file, from, size, offsetLimit);
+    }
+
     private static int longAt(byte[] file, int at) {
         return (word(file, at) << 16) | word(file, at + 2);
     }
@@ -61,7 +86,7 @@ final class YmxEncoderTest {
         int expected = YmxFormat.HEADER_SIZE;
         for (int register = 0; register < YmxFormat.STREAMS; register++) {
             expected += (-expected) & 3;
-            assertEquals(expected, longAt(file, YmxFormat.OFFSET_INTRO_TABLE + 4 * register),
+            assertEquals(expected, sectionAt(file, YmxFormat.OFFSET_INTRO_TABLE, register),
                     "offset of section " + register);
             expected += result.streams().get(register).packedSize();
         }
@@ -113,9 +138,8 @@ final class YmxEncoderTest {
         byte[] file = result.file();
 
         for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
-            int from = longAt(file, YmxFormat.OFFSET_INTRO_TABLE + 4 * stream);
-            byte[] unpacked = unpack(file, from,
-                    result.streams().get(stream).packedSize(), Integer.MAX_VALUE);
+            byte[] unpacked = values(file, YmxFormat.OFFSET_INTRO_TABLE, stream,
+                    result.streams().get(stream).packedSize());
             assertArrayEquals(expectedVector(source, stream), unpacked,
                     "stream " + stream + " does not decode to its vector");
         }
@@ -138,9 +162,9 @@ final class YmxEncoderTest {
             YmxEncoder.Result result = YmxEncoder.encode(source, ring, 24, false);
             byte[] file = result.file();
             for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
-                int from = longAt(file, YmxFormat.OFFSET_INTRO_TABLE + 4 * stream);
                 assertArrayEquals(expectedVector(source, stream),
-                        unpack(file, from, result.streams().get(stream).packedSize(), ring),
+                        values(file, YmxFormat.OFFSET_INTRO_TABLE, stream,
+                                result.streams().get(stream).packedSize(), ring),
                         "stream " + stream + " needs more than a " + ring + "-byte ring");
             }
         }
@@ -158,10 +182,15 @@ final class YmxEncoderTest {
         byte[] file = result.file();
 
         for (int register = 0; register < YmxFormat.STREAMS; register++) {
-            int from = longAt(file, YmxFormat.OFFSET_INTRO_TABLE + 4 * register);
+            int size = result.streams().get(register).packedSize();
+            int from = sectionAt(file, YmxFormat.OFFSET_INTRO_TABLE, register);
             assertEquals(0, from % 4, "section " + register + " starts long-aligned");
-            St4Format.Container section = St4Format.read(Arrays.copyOfRange(
-                    file, from, from + result.streams().get(register).packedSize()));
+            if (YmxFormat.isStored(entry(file, YmxFormat.OFFSET_INTRO_TABLE, register))) {
+                assertEquals(FRAMES, size, "stored section " + register + " is its values");
+                continue;
+            }
+            St4Format.Container section = St4Format.read(
+                    Arrays.copyOfRange(file, from, from + size));
             assertEquals(1, section.unit(), "section " + register + " is not k=1");
             assertEquals(FRAMES, section.size(), "section " + register + " frame count");
         }
@@ -199,12 +228,16 @@ final class YmxEncoderTest {
         byte[] file = result.file();
         byte[][] expected = expectedVectors(source, -1, 2);
         for (int register = 0; register < YmxFormat.STREAMS; register++) {
-            int from = longAt(file, YmxFormat.OFFSET_INTRO_TABLE + 4 * register);
-            St4Format.Container section = St4Format.read(Arrays.copyOfRange(
-                    file, from, from + result.streams().get(register).packedSize()));
-            assertEquals(2, section.unit(), "section " + register);
+            int size = result.streams().get(register).packedSize();
+            long e = entry(file, YmxFormat.OFFSET_INTRO_TABLE, register);
+            if (!YmxFormat.isStored(e)) {
+                St4Format.Container section = St4Format.read(Arrays.copyOfRange(
+                        file, (int) YmxFormat.sectionOffset(e),
+                        (int) YmxFormat.sectionOffset(e) + size));
+                assertEquals(2, section.unit(), "section " + register);
+            }
             assertArrayEquals(expected[register],
-                    unpack(file, from, result.streams().get(register).packedSize(), 480),
+                    values(file, YmxFormat.OFFSET_INTRO_TABLE, register, size, 480),
                     "section " + register + " at unit 2");
         }
         assertThrows(IllegalArgumentException.class,

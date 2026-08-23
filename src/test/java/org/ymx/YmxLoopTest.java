@@ -42,13 +42,37 @@ final class YmxLoopTest {
         return ((file[at] & 0xFF) << 8) | (file[at + 1] & 0xFF);
     }
 
+    /** One section's table entry, unsigned: bit 31 marks a stored section. */
+    private static long entry(byte[] file, int table, int register) {
+        return longAt(file, table + 4 * register) & 0xFFFF_FFFFL;
+    }
+
+    /** Where a section's bytes are, whichever kind it is. */
+    private static int sectionAt(byte[] file, int table, int register) {
+        return (int) YmxFormat.sectionOffset(entry(file, table, register));
+    }
+
+    /** A section's values: a stored section is already them. */
+    private static byte[] values(byte[] file, int table, int register, int size) {
+        return values(file, table, register, size, Integer.MAX_VALUE);
+    }
+
+    /** As above, holding a container to an offset limit the ring imposes. */
+    private static byte[] values(byte[] file, int table, int register, int size,
+                                 int offsetLimit) {
+        long e = entry(file, table, register);
+        int from = (int) YmxFormat.sectionOffset(e);
+        return YmxFormat.isStored(e)
+                ? Arrays.copyOfRange(file, from, from + size)
+                : unpack(file, from, size, offsetLimit);
+    }
+
     private static int longAt(byte[] file, int at) {
         return (word(file, at) << 16) | word(file, at + 2);
     }
 
     private static byte[] stream(byte[] file, int table, int register, int packedSize) {
-        int from = longAt(file, table + 4 * register);
-        return unpack(file, from, packedSize, Integer.MAX_VALUE);
+        return values(file, table, register, packedSize);
     }
 
     /** Unpacks one embedded ST4 container, holding it to an offset limit. */
@@ -122,7 +146,7 @@ final class YmxLoopTest {
         assertEquals(FRAMES + split, result.script().frames());
         byte[] file = result.file();
         assertEquals(split, longAt(file, YmxFormat.OFFSET_LOOP_FRAME));
-        assertTrue(longAt(file, YmxFormat.OFFSET_INTRO_TABLE) > 0,
+        assertTrue(entry(file, YmxFormat.OFFSET_INTRO_TABLE, 0) != 0,
                 "the rotation gives the loop-from-zero tune an intro");
     }
 
@@ -135,8 +159,8 @@ final class YmxLoopTest {
         assertEquals(FRAMES, longAt(file, YmxFormat.OFFSET_LOOP_FRAME),
                 "the intro covers everything, so the split sits at the end");
         for (int register = 0; register < YmxFormat.STREAMS; register++) {
-            assertTrue(longAt(file, YmxFormat.OFFSET_INTRO_TABLE + 4 * register) > 0);
-            assertEquals(0, longAt(file, YmxFormat.OFFSET_LOOP_TABLE + 4 * register),
+            assertTrue(entry(file, YmxFormat.OFFSET_INTRO_TABLE, register) != 0);
+            assertEquals(0, entry(file, YmxFormat.OFFSET_LOOP_TABLE, register),
                     "loop offset " + register + " should be unused");
         }
     }
@@ -170,11 +194,11 @@ final class YmxLoopTest {
         for (YmxEncoder.Stream stream : result.streams()) {
             int table = stream.loop() ? YmxFormat.OFFSET_LOOP_TABLE
                     : YmxFormat.OFFSET_INTRO_TABLE;
-            int from = longAt(file, table + 4 * stream.register());
             // An offset within the ring is exactly what ring-safety means;
-            // the limit-checking reference throws on anything further.
+            // the limit-checking reference throws on anything further. A
+            // stored section makes no reference at all.
             assertEquals(stream.frames(),
-                    unpack(file, from, stream.packedSize(), ring).length,
+                    values(file, table, stream.register(), stream.packedSize(), ring).length,
                     "stream " + stream.register() + (stream.loop() ? " loop" : " intro")
                             + " needs more than a " + ring + "-byte ring");
         }
