@@ -11,7 +11,8 @@
 ; includes this file.
 ;
 ;       YMX_TUNES       equ     1       ; subtunes in the blob
-;       YMX_FRAMES      equ     0       ; frames of subtune 1; 0 = loops
+;       YMX_FRAMES      equ     0       ; frames of subtune 1; 0 = endless,
+;                                       ; a tune that starts over
 ;       YMX_EXIT_MARKER equ     0       ; 1 to drop a file when it stops
 ;               include "YMX_player.S"
 ;       sndh:   incbin  "tune.sndh"     ; in .data, at an even address
