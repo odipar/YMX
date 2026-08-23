@@ -32,8 +32,10 @@ import org.junit.jupiter.api.TestFactory;
  */
 final class PinnedCorpusTest {
 
-    /** The tunes and their pinned output, paired by stem. */
-    private static final Path CORPUS = Path.of("ymx", "test", "corpus");
+    /** The tunes and their pinned output, paired by stem: each front end
+     * keeps its own, beside the account of what its conversion costs. */
+    private static final List<Path> CORPORA =
+            List.of(Path.of("ym", "test"), Path.of("ymr", "test"));
 
     /** What a packed source is called beside it. */
     private static final String PINNED = ".ymx";
@@ -41,12 +43,15 @@ final class PinnedCorpusTest {
     @TestFactory
     Stream<DynamicTest> everyPinnedTunePacksToTheSameBytes() throws IOException {
         List<Path> sources = new ArrayList<>();
-        try (Stream<Path> listing = Files.list(CORPUS)) {
-            listing.filter(p -> p.toString().endsWith(".ym") || p.toString().endsWith(".ymr"))
-                    .sorted()
-                    .forEach(sources::add);
+        for (Path corpus : CORPORA) {
+            try (Stream<Path> listing = Files.list(corpus)) {
+                listing.filter(p -> p.toString().endsWith(".ym")
+                                || p.toString().endsWith(".ymr"))
+                        .sorted()
+                        .forEach(sources::add);
+            }
         }
-        assertTrue(!sources.isEmpty(), "no tunes in " + CORPUS.toAbsolutePath());
+        assertTrue(!sources.isEmpty(), "no tunes in " + CORPORA);
         boolean refresh = "refresh".equals(System.getProperty("ymx.pin"));
         return sources.stream().map(source -> dynamicTest(source.getFileName().toString(),
                 () -> checkOrRefresh(source, refresh)));
