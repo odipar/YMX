@@ -1,55 +1,75 @@
-ST4 License
+YMX License
 ===========
 
-ST4 is an Atari ST compression project: a split-stream, unit-aligned data
-format for the plain 68000, grown out of ST1 (https://github.com/odipar/ST1)
-and, through it, the ZX1 data compression format. It contains the ST4 68000
-decompressors, the supporting Java st4 and C# nt4 tools and reference
-implementations, and the YMX chiptune player. It follows the dual licensing
-structure of the original ZX1 (https://github.com/einar-saukas/ZX1) and of
-ST1, whose license this is:
+YMX is a streaming chiptune format for the Atari ST's 68000. This repository
+holds the format specification (doc/SPEC.md, doc/BINARIES.md), the 68000
+players, the Java and C# tools that pack and combine, and the test rigs. It
+vendors the ST4 compression project (https://github.com/odipar/ST4) and,
+through it, the ZX1 data compression format
+(https://github.com/einar-saukas/ZX1), and it follows their dual licensing
+structure:
 
-1. THE COMPRESSOR - the Java and C# compressors and optimizers (St4Block,
-   St4Optimizer, St4FastOptimizer, St4EventOptimizer, St4Compressor, Java
-   St4, and the C# Nt4 counterparts), derived from Einar Saukas' optimal C
-   compressor through ST1's jx1 - is available under the BSD 3-Clause License
-   below. In practice this is relevant only if you modify its source code
-   and/or incorporate the compressor within your own products; if you just
-   execute it to compress files, you can simply ignore these conditions.
+1. THE COMPRESSOR - the compressors and optimizers in Java (org.st4) and C#
+   (dotnet/st4), derived from Einar Saukas' optimal C compressor through
+   ST1's jx1 - is available under the BSD 3-Clause License below. In
+   practice this is relevant only if you modify its source code and/or
+   incorporate the compressor within your own products; if you just execute
+   it to pack files, you can simply ignore these conditions.
 
-2. THE DECOMPRESSORS - Java St4Decompressor/Dst4, the C# Decompressor/Dnt4
-   counterparts, the ST4 decompressors in 68k/ (ST4.S, ST4_wrap.S, and
-   ST4_ring.S), and the YMX chiptune player in ymx/ (YMX.S and YMX_player.S)
-   - can be used freely within your own programs (for any platform), even for
-   commercial releases. The only condition is that you must indicate somehow
-   in your documentation that you have used ZX1, via ST4, st4, or nt4.
+2. THE DECOMPRESSORS AND PLAYERS - the reference decompressors (Java
+   org.st4.St4Decompressor and org.jx1, and their C# counterparts under
+   dotnet/), the ST4 68000 decoders in 68k/ (ST4.S, ST4_wrap.S, ST4_ring.S),
+   the YMX players (68k/YMX.S, 68k/YMX_sndh.S, 68k/YMX_player.S), and the
+   prebuilt binaries the releases carry - can be used freely within your own
+   programs (for any platform), even for commercial releases. The only
+   condition is that you must indicate somehow in your documentation that
+   you have used ZX1, via ST4 or YMX.
+
+The YMX format itself may be implemented freely: doc/SPEC.md and
+doc/BINARIES.md are the contract, and an independent writer, player or
+combiner owes only the same acknowledgement.
 
 Attribution
 -----------
 
 * The ZX1 data compression format and algorithm was designed and implemented
   by Einar Saukas (Copyright (c) 2021), with thanks to introspec/spke. The
-  original C and z80 sources live in the ZX1 repository and, vendored, in
-  odipar/ST1 under c/zx1/.
-* The ST4 format (the four streams, the unit alignment, the container) and
-  the differences from ST1 and ZX1 - see README.md - are Copyright (c) 2026
-  Robbert van Dalen.
-* The Java tools, the C# nt4 port, the ST4 68000 decompressors, the YMX
-  chiptune packer and player, and the emulation/measurement rigs were written
-  by Claude (Anthropic's Claude Code) under the direction of Robbert van
-  Dalen. ST4_wrap.S is based on ST1_wrap.S, which was written for ST1 by
-  OpenAI Codex.
-* The YM6 register-dump format is by Arnaud Carré (Leonard/Oxygene); YMX reads
-  it and is inspired by Steve Clarets' MinYMiser player. The LHA depacker in
-  org.ym6 is ported from the ST-Sound library's LZH code by Arnaud Carré,
-  itself based on LZH code by Haruhiko Okumura (1991) and Kerwin F. Medina
-  (1996).
+  original C and z80 sources live in the ZX1 repository.
+* The ST4 format (the four streams, the unit alignment, the container) is
+  Copyright (c) 2026 Robbert van Dalen, vendored here as org.st4, dotnet/st4
+  and the 68k/ decoders. ST4_wrap.S is based on ST1_wrap.S, which was
+  written for ST1 by OpenAI Codex.
+* The YMX format, the packers and combiners, the SNDH and PRG tooling, the
+  C# tree and the emulation and measurement rigs are Copyright (c) 2026
+  Robbert van Dalen; written by Claude (Anthropic's Claude Code) under
+  Robbert van Dalen's direction.
+* The YM5/YM6 register-dump formats are by Arnaud Carré (Leonard/Oxygene);
+  YMX reads them, and the player was inspired by Steve Clarets' MinYMiser.
+  The LHA depacker in org.ym6 and dotnet/ym6 is ported from the ST-Sound
+  library's LZH code by Arnaud Carré, itself based on LZH code by Haruhiko
+  Okumura (1991) and Kerwin F. Medina (1996).
+* The .YMR register-dump format is the RhYMe tracker's export; the .ymr
+  front end reads it, and ymr/CONVERSION.md records what the conversion
+  keeps and loses.
+* SNDH is the Atari ST scene's shared music container; the SNDH files YMX
+  builds follow its v2 conventions.
+
+Used by the build and the tests, not distributed
+------------------------------------------------
+
+* rmac, the 68000 assembler, assembles the players and prebuilt binaries.
+* Hatari, with a TOS or EmuTOS image, runs the real-hardware harness.
+* The Unicorn engine (GPL-2.0) is loaded at run time by the emulator rigs
+  from the machine's own installed copy; nothing of it is vendored or
+  distributed here.
+* Maven pulls JSpecify, JUnit, Error Prone and NullAway for the Java build;
+  the .NET SDK builds the C# tree. None are vendored.
 
 BSD 3-Clause License (the compressor)
 -------------------------------------
 
 Copyright (c) 2021, Einar Saukas (original ZX1)
-Copyright (c) 2026, Robbert van Dalen (ST4 project additions)
+Copyright (c) 2026, Robbert van Dalen (ST4 and YMX additions)
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without

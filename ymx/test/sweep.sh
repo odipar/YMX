@@ -14,6 +14,15 @@
 set -e
 TEST_DIR=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$TEST_DIR/../.." && pwd)
+
+# -dotnet as the first argument runs the C# tree (dotnet/) instead of the
+# Java one; both produce the same bytes.
+if [ "$1" = "-dotnet" ]; then
+    shift
+    DLL="$REPO/dotnet/bin/Release/net10.0/ymx.dll"
+    [ -f "$DLL" ] || (cd "$REPO/dotnet" && dotnet build -c Release -v q)
+    YMX_REPO="$REPO" exec dotnet "$DLL" sweep "$@"
+fi
 [ -d "$REPO/target/test-classes/org/ymx/rig" ] || (cd "$REPO" && mvn -q test-compile)
 exec java -ea --enable-native-access=ALL-UNNAMED -Dymx.repo="$REPO" \
     -cp "$REPO/target/classes:$REPO/target/test-classes" \
