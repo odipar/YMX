@@ -179,7 +179,7 @@ final class SpecConsistencyTest {
         assertEquals(range[5], Tune.prescaler(1), "the fastest prescaler");
         assertEquals(0, range[2], "a count byte of 0");
         assertEquals(256, range[3], "which the MFP reads as 256");
-        assertTrue(said.contains("A count of 0 is not: the MFP reads it as 256"),
+        assertTrue(said.contains("A count of 0 is read by the MFP as 256"),
                 "SPEC §5's count-of-0 sentence has been reworded");
 
         // The code byte's kinds, which both front ends write.
@@ -244,8 +244,8 @@ final class SpecConsistencyTest {
     @Test
     void theStoredBitIsBit31() throws IOException {
         String said = flat();
-        assertTrue(said.contains("Bit 31 of a section's offset says which of the two"
-                        + " it is, and the offset is the rest"),
+        assertTrue(said.contains("Bit 31 of a table entry set marks a stored section;"
+                        + " bits 30-0 are the offset"),
                 "SPEC §1.4's stored-section sentence has been reworded");
         assertEquals(1L << 31, YmxFormat.SECTION_STORED);
         assertEquals(0x1234, YmxFormat.sectionOffset(0x1234L | YmxFormat.SECTION_STORED));

@@ -10,7 +10,7 @@ same account for a `.YMR`.
 
 A YM file and a `.ymx` hold the same fourteen registers per frame. What
 differs is where the *effects* live. A YM6 frame carries up to two effect
-slots, each three fields smeared across spare register bits:
+slots, each three fields spread across spare register bits:
 
 ```
 slot 1:  code = R1 bits 7-4    prescaler = R6 bits 7-5    count = R14
@@ -23,12 +23,12 @@ parameter:      in the voice's own volume register - a SID's maximum
 ```
 
 YM5 encodes less, in different places: R1 bits 5-4 give a SID voice, R3 bits
-5-4 a digidrum voice, and a drum's prescaler is always in R8 whatever the
+5-4 a digidrum voice, and a drum's prescaler is always in R8, for any
 voice. Both dialects come out of the front end as the same thing — a code
-byte and a count byte per frame per timer channel — so nothing downstream
-can tell which dialect a tune was read out of.
+byte and a count byte per frame per timer channel — so the dialect is not
+recoverable downstream.
 
-The vocabulary changes here too, and that is most of the point:
+The vocabulary changes here too:
 
 * a **SID voice** is a [toggle stream](../doc/terminology.md) — a square made
   by flipping a voice's volume between a level and zero;
@@ -37,7 +37,7 @@ The vocabulary changes here too, and that is most of the point:
 * a **sync-buzzer** is a **retrigger stream** — R13 rewritten at the timer's
   rate, restarting the envelope.
 
-The register streams come out holding what the chip should see: the
+The register streams come out holding what the chip receives: the
 effect bits are stripped, and R7 arrives with the voices a sample owns
 already disconnected.
 
@@ -59,8 +59,8 @@ the host's.
 | A header that loops from a frame other than 0 | the tune starts over from frame 0, so its opening is heard on every pass | yes |
 | The SID gap model | a choice the file cannot record — see below | no |
 
-The four drop counters are counts of YM effects a dialect had to have
-normalised away. They exist because the reference player would not have
+The four drop counters are counts of YM effects the front end normalised
+away. They exist because the reference player would not have
 started those codes either: dropping them makes the conversion faithful,
 not lossy.
 
@@ -92,15 +92,15 @@ not lossy.
 
 * **A tune starts over from its first frame.** A YM header names the frame
   its own player went back to, and 99 of the corpus's 543 readable files name
-  one other than 0 — on those, the opening the header meant to be heard once
-  is 46% of the tune on average, and it is heard on every pass here. What the
-  format buys for it is one section per stream instead of two cut at the loop
-  frame: the half after the cut cannot reference the half before it, so every
-  tune paid for a shape only some tunes used. Each conversion says which
+  one other than 0 — on those, the opening that played once under the header
+  is 46% of the tune on average, and it is heard on every pass here. In
+  exchange, each stream is one section instead of two cut at the loop frame:
+  the half after the cut cannot reference the half before it, so every tune
+  paid for a shape only some tunes used. Each conversion says which
   frame the header named.
 
-* **Samples never loop.** A YM file has no way to say that a digidrum
-  repeats, so every sample crosses marked one-shot. This costs nothing —
+* **Samples never loop.** A YM file has no field for a repeating digidrum,
+  so every sample crosses marked one-shot. This costs nothing —
   nothing in a YM dump needs it — but it is the one
   [format](../doc/SPEC.md#6-the-sample-table) feature a YM tune cannot reach.
 
@@ -113,8 +113,8 @@ not lossy.
 
 * **The SID gap model is a choice, not a fact.** When a square goes away and
   comes back, does it restart at phase zero or resume where it got to? The YM
-  format never specified it, every player renders it differently, and the
-  composers heard whatever their own driver did. The default is the ym2149-rs
+  format never specified it, every player renders it differently, and each
+  composer heard their own driver's rendering. The default is the ym2149-rs
   model — a gap restarts at phase zero, silence first — and `-sidresume`
   selects maxYMiser's, where a release only masks the interrupt and the
   timer keeps counting. Both are ordinary stream verbs the player always
@@ -125,8 +125,8 @@ not lossy.
   envelope shape in the volume register of the voice the buzzer runs on,
   because the parameter field sits at one place for all three kinds and a
   buzzer's voice, following the envelope, leaves that nibble spare. The front
-  end resolves it and writes the number into stream X, so the player never
-  looks. A tune that arms a buzzer before it has written any shape carries 0,
+  end resolves it and writes the number into stream X; the player reads it
+  there. A tune that arms a buzzer before it has written any shape carries 0,
   which is a YM dump's own default. See
   [SPEC.md](../doc/SPEC.md#22-x--the-spare-operands).
 
@@ -135,4 +135,4 @@ not lossy.
 * **YM2's drums.** Mad Max's forty samples are held in the player, not in the
   file; supporting them means embedding the bank in the converter. Not yet.
 * **YM2, YM3 and packed `.ym` files.** The reader takes `YM5!` and `YM6!`
-  only, and says which it found rather than guessing.
+  only, and reports which it found.

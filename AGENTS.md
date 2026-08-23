@@ -20,6 +20,11 @@ No file, program or algorithm wants, knows, decides, expects or refuses. The
 plain verb is there: a source *needs*, a header *declares*, a stage
 *resolves*, a reader *does not validate*.
 
+Roles and abstractions follow the rule. A writer does not *promise*, a
+document section does not *keep* bits, a verb does not *consume* its
+operand, bits do not *stand as they were*. The writer emits, the section
+lists, the verb reads, the bits hold their value.
+
 Established technical vocabulary is not this. A resource has an *owner*, a
 caller *claims* it, a register *survives* a call.
 
@@ -39,6 +44,19 @@ Four habits that state an idea twice:
   memory` for the absence of a file on disk.
 
 Keep a list only where each item carries something the others do not.
+
+## No flourish
+
+Technical prose states the operation and ends. Three habits that decorate
+instead:
+
+- **the sweep.** `whatever value is written`, `wherever it sits` - a
+  trailing clause that generalises what the sentence already said. Name the
+  condition or end the sentence.
+- **the metaphor.** `leaves a tail no reader ever touches`, `the pressure
+  point` - an image in place of the operation. Write the operation.
+- **the verdict.** `this is deliberate`, `asked properly`, `worth reading` -
+  the sentence grading itself or its subject. Delete it.
 
 ## The verb that says the action
 

@@ -102,14 +102,14 @@ hence a measured table rather than a formula (`YmEffects.CURVE`). This
 matters for **samples**: a recording is linear amplitudes, the register
 takes a logarithmic index, so filtering or resampling must happen on the
 amplitudes and convert afterwards. The ladder spans about 54 dB top to
-bottom - about 45 dB if you count 3 dB a step, the two differing because
+bottom - about 45 dB at 3 dB a step, the two differing because
 the bottom step is a jump of 8 dB and the rest average nearer 3.3 - so
 material with its peaks near the top keeps the most detail.
 
 **Writing the envelope shape restarts the envelope.** Writing the same
-shape twice is a restart - the mechanism behind the sync buzzer below. A format therefore needs a way to
-say "leave the shape alone" on frames that must not restart it. YM stores
-255 for that.
+shape twice is a restart - the mechanism behind the sync buzzer below. A
+format therefore needs a way to say "leave the shape alone" on frames that
+must not restart it. YM stores 255 for that.
 
 ## Streams
 
@@ -124,7 +124,7 @@ that pair.
 
 Sources differ - the packed tune, a stored sample, two numbers flipped
 between, a computed waveform - and none of it shows in the write. What
-arrives is a byte, and the sound is the same whatever produced it.
+arrives is a byte.
 
 Not everything here is a stream. A generator has no input. A register is
 where a stream ends. A stored sample is a source, not the delivery. The
@@ -211,7 +211,7 @@ A property of the tune, fixed for the whole of it:
 
 The rate belongs to the tune, not to the file carrying it: stepping the
 music at another speed plays it wrong. Faster frames cost processor time.
-Below, "per frame" means "per player call" at whatever that speed is.
+Below, "per frame" means "per player call".
 
 Not here: a tempo in beats. Tempo lives in the tracker, which turns it
 into rows and rows into frames.
@@ -250,7 +250,7 @@ The player takes the next value from each frame stream and writes them
 one after another. That burst is the **frame write**.
 
 YMX writes all fourteen registers every frame, because a write costs
-about what the comparison to avoid it would cost. Two rules bend it: the
+about what the comparison to avoid it would cost. Two exceptions: the
 envelope shape is left alone where a restart would be wrong, and any
 voice's volume is left out while a timer stream holds it. That is the
 voice's **skip**: `ymx_skips` overwrites the burst's write with two nops,
@@ -264,7 +264,7 @@ Most hard bugs come from a tick landing during a frame write, or both
 writing the same register:
 
 - **tearing**. A tick lands between a register's select and its value,
-  and the value reaches whatever register the tick selected. Two cures:
+  and the value reaches the register the tick selected. Two fixes:
   write select and value in one instruction, which an interrupt cannot
   split, or mask interrupts for the burst - safe but delays
   every tick that falls inside it.
@@ -340,8 +340,8 @@ derived means **per-frame**, renewed on every frame.
 rate**, and a policy and a clock should not share a word.)
 
 **The fourth kind is not a volume stream.** It writes the envelope shape,
-the same shape every tick, so the values say nothing - the point is the
-restart. Do it fast enough and the envelope never finishes its shape; the
+the same shape every tick, so the values are constant; the restart is the
+operation. Do it fast enough and the envelope never finishes its shape; the
 sweep repeats at the tick rate and is heard as a pitch.
 
 It reaches a voice indirectly: one envelope generator serves all three, and
@@ -353,14 +353,14 @@ voices there and both carry it, which real tunes do - 15 of the corpus's
 |---|---|---|---|---|---|
 | sync buzzer | **retrigger stream** | one shape, written again and again | **yes**, until stopped | not written directly; a voice following the envelope sounds it, and more than one can | **derived**: the rate is the pitch |
 
-"Sync stream" would have matched YM6's word, but with three clocks about,
+"Sync stream" would have matched YM6's word, but beside three clocks,
 "sync" would read as clock syncing.
 
 ### What each rate is coupled to
 
-**Coupling** is "derived" said exactly: what a rate is set against -
-always something else on the same voice, with the ratio being what you
-hear. Nothing in the hardware enforces it; it is how the music was
+**Coupling** makes "derived" exact: what a rate is set against - always
+something else on the same voice, with the ratio as the audible quantity.
+Nothing in the hardware enforces it; it is how the music was
 written, and what the **packer** - the tool that turns a source file, a
 `.ym`, into a YMX file - has to preserve.
 
@@ -386,7 +386,7 @@ that boundary loses the place in the cycle.
 | **start** | begin from the beginning |
 | **hold** | keep running, no restart: the count, the toggle level or the shape may be refreshed under it. Emitted only when one of them moved |
 | **retune** | change the rate, keep the place in the cycle. The timer is stopped to reprogram it, so the period in flight is cut short |
-| **live retune** | change the rate with the timer left running: control register, then data register, and the period in flight runs to its own end. Picked only where the source says a rate move was meant that way and the stream's parameter stood still |
+| **live retune** | change the rate with the timer left running: control register, then data register, and the period in flight runs to its own end. Emitted only where the source has a live rate move and the stream's parameter did not change |
 | **release** | stop writing |
 | **resume** | write again, from where it was |
 | **expire** | stop because a one-shot sample ran out. PCM streams only |
@@ -425,7 +425,7 @@ stream nobody named.
 ## The rest of the mapping
 
 The YM format names bytes and fields; YMX names what those bytes do. The
-registers hold bytes - the stream is the reading this engine puts on a
+registers hold bytes - a stream is this engine's interpretation of a
 series of writes.
 
 | YM5/YM6 | YMX |
@@ -473,11 +473,11 @@ downstream of the other.
 
 The packages say the same thing: `org.ym6` is the YM front end, and
 `org.ymx` holds the engine, the format and the tools that work on a `.ymx`
-file whatever made it. A front end is compiled against the engine, and the
-engine against no front end - the layering said in a way the
-compiler can check.
+file from any front end. A front end is compiled against the engine, and the
+engine against no front end - the layering stated so the compiler can
+check it.
 
-## If you know these ideas from elsewhere
+## The same ideas elsewhere
 
 | here | known elsewhere as |
 |---|---|
@@ -521,9 +521,8 @@ front end marks every one of them one-shot, and a YM rate change stays
 the reference player's stop-load-run. Both are there for a source that
 can express them.
 
-Still ahead is the other half of the rate idea: a PCM stream with a
-**derived** rate, a sample tracking the note the way a toggle stream
-does. The format carries a rate the source moves; nothing yet derives one
+Not in the model yet: a PCM stream with a **derived** rate, a sample
+tracking the note the way a toggle stream does. The format carries a rate the source moves; nothing yet derives one
 from a melody. With the loop point, that would be a wavetable in the
 ordinary sense.
 
@@ -553,7 +552,7 @@ ordinary sense.
 | term | meaning |
 |---|---|
 | **frame** | one call to the player |
-| **VBL** | the screen refresh, the usual thing a player is called from |
+| **VBL** | the screen refresh, and the usual source of the frame clock |
 | **signal** | a series of values with a rate |
 | **stream** | values arriving at one register at a steady speed: a target, a source, a rate |
 | **frame stream** | ticked by the player's own call, one value per frame. The music |
@@ -565,7 +564,7 @@ ordinary sense.
 | **per-frame** | the rate is renewed on every frame |
 | **independent rate** | set by nothing else: a sample's playback pitch |
 | **derived rate** | set against the note playing, so it moves with the melody |
-| **coupling** | what a derived rate is set against. The ratio is what you hear |
+| **coupling** | what a derived rate is set against. The ratio is the audible quantity |
 | **frame clock, control rate** | the rate the tune is stepped at. How often the steering code runs |
 | **timer clock, audio rate** | 48 to 25,600 a second in practice. How often a sound-shaping write lands |
 | **YM2149 clock** | 2,000,000 a second. Runs the generators; software has no access |
