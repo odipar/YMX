@@ -15,15 +15,16 @@
 ;    4  'YMXP'                 stub descriptor
 ;    8  .w  1                  descriptor version
 ;   10  .w  1                  subtunes, patched by the tool
-;   12  .l  0                  frames of subtune 1 when it plays once and is
-;                              alone, patched by the tool; 0 = play on
+;   12  .l  0                  frames of subtune 1 when it plays once and
+;                              stands alone, patched by the tool; 0 = play on
 ;   16  .w  0                  flags, patched by the tool: bit 0 = drop
 ;                              YMXDONE.MRK on exit
 ;
 ; Nothing in here is absolute, so the PRG's relocation table is empty. The
-; session: takeover, one play call per VBL, SPACE quits, the number keys
-; 1-9 switch subtunes. Flag bit 0 is for scripted runs - ym/play.sh watches
-; for the marker file so it can close the emulator by itself.
+; session: takeover, one play call per VBL, a stop on SPACE or when a
+; patched frame count runs out, the number keys 1-9 switching subtunes.
+; Flag bit 0 is for scripted runs - ym/play.sh watches for the marker file
+; so it can close the emulator by itself.
 ; -----------------------------------------------------------------------------
 
 GEMDOS      equ     1
