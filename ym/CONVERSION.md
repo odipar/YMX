@@ -55,7 +55,8 @@ the host's.
 | A SID or buzzer rate above what a real machine can run | dropped to idle | yes |
 | A drum number with no sample behind it | dropped to idle | yes |
 | A drum above the rate ceiling | bandwidth only: the sample is resampled and every trigger's divisor scaled by the same ratio | yes |
-| A tune whose length or loop frame is not a whole unit | one duplicated frame, chosen to be inaudible | yes |
+| A tune whose length is not a whole unit | one duplicated frame, chosen to be inaudible | yes |
+| A header that loops from a frame other than 0 | the tune starts over from frame 0, so its opening is heard on every pass | yes |
 | The SID gap model | a choice the file cannot record — see below | no |
 
 The four drop counters are counts of YM effects a dialect had to have
@@ -82,13 +83,21 @@ faithful, not what makes it lossy.
   real-hardware mapping in the reference player's source, not a choice made
   here.
 
-* **Padding to whole units.** At `-k2` or `-k4` the tune length, the loop
-  frame and `C` must be whole units, because a padded section would decode
-  one extra value into the ring and it would be played. A tune with an odd
-  length or loop frame is padded by duplicating a frame that neither writes
-  R13 nor triggers a drum — the chip state is held one inaudible tick longer.
-  Only where no safe frame exists near a boundary does the packer fall back
-  to `-k1`, and it says so.
+* **Padding to whole units.** At `-k2` or `-k4` the tune length and `C` must
+  be whole units, because a padded section would decode one extra value into
+  the ring and it would be played. A tune with an odd length is padded by
+  duplicating a frame that neither writes R13 nor triggers a drum — the chip
+  state is held one inaudible tick longer. Only where no safe frame exists
+  near the end does the packer fall back to `-k1`, and it says so.
+
+* **A tune starts over from its first frame.** A YM header names the frame
+  its own player went back to, and 99 of the corpus's 543 readable files name
+  one other than 0 — on those, the opening the header meant to be heard once
+  is 46% of the tune on average, and it is heard on every pass here. What the
+  format buys for it is one section per stream instead of two cut at the loop
+  frame: the half after the cut cannot reference the half before it, so every
+  tune paid for a shape only some tunes used. Each conversion says which
+  frame the header named.
 
 * **Samples never loop.** A YM file has no way to say that a digidrum
   repeats, so every sample crosses marked one-shot. This costs nothing —

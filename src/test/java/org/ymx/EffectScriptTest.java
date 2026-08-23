@@ -26,15 +26,15 @@ import org.ym6.Ym6Reader;
 import org.ym6.YmEffects;
 
 /**
- * The compiled effect script against the scenes the emulation rig plays -
- * the same tune {@code run_effects} builds, its expected v1 decisions
- * turned into expected v2 action bytes - plus the split rotation on loops
- * the rig cannot reach.
+ * The compiled effect script against the scenes the emulation rig plays - the
+ * same tune {@code run_effects} builds, the reference player's expected
+ * decisions turned into expected action bytes.
  *
- * <p>Where v2's frame-aligned semantics deliberately differ from v1 (a
- * drum's voice rejoins the frame write at the computed end's boundary), the
- * expectations here encode the v2 side; everything else is v1's, the
- * loud-half phase reset on every SID arrival included.
+ * <p>Where this format's frame-aligned semantics deliberately differ from
+ * that player's (a drum's voice rejoins the frame write at the computed end's
+ * boundary), the expectations here encode this side; everything else is the
+ * reference player's, the loud-half phase reset on every SID arrival
+ * included.
  */
 final class EffectScriptTest {
 
@@ -44,13 +44,13 @@ final class EffectScriptTest {
                 0, drums, "", "", "", registers);
     }
 
-    private static EffectScript.Result compile(Ym6Reader.Song song, int loop) {
-        return EffectScript.compile(YmEffects.tune(song), loop, 1);
+    private static EffectScript.Result compile(Ym6Reader.Song song) {
+        return EffectScript.compile(YmEffects.tune(song));
     }
 
-    private static EffectScript.Result compileResume(Ym6Reader.Song song, int loop) {
+    private static EffectScript.Result compileResume(Ym6Reader.Song song) {
         Tune tune = YmEffects.tune(song);
-        return EffectScript.compile(tune.under(tune.semantics().resuming()), loop, 1);
+        return EffectScript.compile(tune.under(tune.semantics().resuming()));
     }
 
     /** The rig's scene, exactly: SID with a reload, a retune pair, drum
@@ -120,7 +120,7 @@ final class EffectScriptTest {
 
     @Test
     void theRigSceneCompilesToItsKnownDecisions() {
-        EffectScript.Result r = compile(rigScene(), -1);
+        EffectScript.Result r = compile(rigScene());
         assertEquals(72, r.frames());
 
         // Idle until the SID starts; its voice is skipped the same frame.
@@ -191,7 +191,7 @@ final class EffectScriptTest {
      * whose timer was seized still full-starts. */
     @Test
     void theResumeModelMasksAndResumes() {
-        EffectScript.Result r = compileResume(rigScene(), -1);
+        EffectScript.Result r = compileResume(rigScene());
         expect(r, 21, M_CHANNEL_0 | M_SKIPS, action(VERB_RELEASE, 0, RELEASE_MASK),
                 0, 0, 0);
         expect(r, 22, M_CHANNEL_0 | M_SKIPS | (1 << M_SKIP_SHIFT),
@@ -203,55 +203,9 @@ final class EffectScriptTest {
                 action(VERB_RELEASE, 0, RELEASE_MASK), 0);
     }
 
-    /** A SID held across the wrap: state converges immediately, c = 0. */
+    /** One pass, straight through: effects may run off the end. */
     @Test
-    void aLoopHeldAcrossTheWrapNeedsNoRotation() {
-        int frames = 40;
-        byte[][] v = new byte[Ym6Reader.Song.YM_REGISTERS][frames];
-        for (int f = 10; f < frames; f++) {     // starts in the intro, holds
-            v[1][f] |= 0x10;                    // through the whole loop
-            v[6][f] |= 1 << 5;
-            v[14][f] = 100;
-            v[8][f] = 10;
-        }
-        EffectScript.Result r = compile(song(frames, v, 20, new byte[0][]), 20);
-        assertEquals(20, r.split(), "no rotation needed");
-        assertEquals(40, r.frames());
-        // The wrap replays frames 20..39: all held, no actions - and the
-        // square's phase free-runs round the loop, exactly v1.
-        for (int f = 21; f < 40; f++) {
-            assertEquals(0, r.m()[f] & 0xFF & ~M_SKIPS, "quiet at " + f);
-        }
-    }
-
-    /** A drum window crossing the wrap: the split rotates past it so both
-     * arrivals agree. */
-    @Test
-    void aDrumAcrossTheWrapRotatesTheSplit() {
-        int frames = 40;
-        byte[][] v = new byte[Ym6Reader.Song.YM_REGISTERS][frames];
-        // One long drum triggered just before the loop point: 60 samples at
-        // 200*250 cycles -> 61 ticks * 50000 / 2457600 = ~1.25s = 62 frames?
-        // No - keep it a few frames: 60 ticks at prediv 4, count 100:
-        // 61*400*50/2457600 = 0.49 -> 1 frame, +1 = 2. Trigger at 19, the
-        // window covers the wrap at 20.
-        v[3][19] = 0x50;                        // drum voice A, slot 2
-        v[8][19] |= 1 << 5;                     // prescaler 1 (prediv 4)
-        v[15][19] = 100;
-        v[8][19] = (byte) (v[8][19] | 0);
-        byte[] drum = new byte[60];
-        EffectScript.Result r = compile(song(frames, v, 20, new byte[][] {drum}), 20);
-        // The window is [19, 19+dur); dur = ceil(61*400*50/2457600 + 1/16)
-        // = 1. The wrap arrival at 20 carries the reopen where the pristine
-        // start is quiet, so the cut rotates one frame past it, to 21.
-        assertEquals(21, r.split(), "rotated past the drum window");
-        assertEquals(41, r.frames());
-        assertTrue(r.notes().stream().anyMatch(n -> n.contains("rotated")));
-    }
-
-    /** Play-once: no loop, no rotation, effects may run off the end. */
-    @Test
-    void playOnceCompilesStraightThrough() {
+    void aScriptCompilesStraightThrough() {
         int frames = 16;
         byte[][] v = new byte[Ym6Reader.Song.YM_REGISTERS][frames];
         v[1][12] |= 0x10;
@@ -262,9 +216,8 @@ final class EffectScriptTest {
             v[6][f] |= 1 << 5;
             v[14][f] = 50;
         }
-        EffectScript.Result r = compile(song(frames, v, 0, new byte[0][]), -1);
+        EffectScript.Result r = compile(song(frames, v, 0, new byte[0][]));
         assertEquals(16, r.frames());
-        assertEquals(16, r.split());
         assertEquals(action(VERB_START_TOGGLE, 0, 1), r.actions()[0][12] & 0xFF);
     }
 
@@ -282,7 +235,7 @@ final class EffectScriptTest {
         v[8][6] |= 6 << 5;                      // two frames later
         v[15][6] = 100;
         v[9][6] = 5;
-        EffectScript.Result r = compile(song(frames, v, 0, new byte[][] {drum}), -1);
+        EffectScript.Result r = compile(song(frames, v, 0, new byte[][] {drum}));
         assertEquals(action(VERB_START_RETRIGGER, 1, 6), r.actions()[1][6] & 0xFF);
         for (int f = 6; f < frames; f++) {      // voice A never frees
             assertEquals(0x09, r.r7force()[f] & 0x09, "stuck at " + f);
@@ -305,7 +258,7 @@ final class EffectScriptTest {
 
     private static EffectScript.Result compile(Ym6Reader.Song song,
                                                EffectScript.Semantics semantics) {
-        return EffectScript.compile(YmEffects.tune(song).under(semantics), -1, 1,
+        return EffectScript.compile(YmEffects.tune(song).under(semantics),
                 YmxFormat.DEFAULT_TIMERS);
     }
 
@@ -364,7 +317,8 @@ final class EffectScriptTest {
             v[15][f] = 90;
         }
 
-        // v1's arbitration: a sample owns the volume register, so the SID
+        // The reference player's arbitration: a sample owns the volume
+        // register, so the SID
         // clears itself and retries - for the sample's whole computed length.
         EffectScript.Result runs = compile(song, RUNS_ON);
         for (int f = 8; f < 17; f++) {
@@ -385,7 +339,7 @@ final class EffectScriptTest {
     /** M is exact everywhere: a byte is nonzero exactly when something acts. */
     @Test
     void masterBytesAreExact() {
-        EffectScript.Result r = compile(rigScene(), -1);
+        EffectScript.Result r = compile(rigScene());
         for (int f = 0; f < r.frames(); f++) {
             int mm = r.m()[f] & 0xFF;
             if ((mm & M_CHANNEL_0) != 0) {
@@ -394,33 +348,8 @@ final class EffectScriptTest {
             if ((mm & M_CHANNEL_1) != 0) {
                 assertTrue((r.actions()[1][f] & 0xFF) != 0, "A2 empty at " + f);
             }
-            // v7 filled the byte: channels 0-3, the skip flag, and a
+            // The byte is full: channels 0-3, the skip flag, and a
             // three-bit mask reaching bit 7. Nothing is reserved.
         }
-    }
-
-    /** A tune whose state never repeats across its loop is a pack error,
-     * not a broken file. */
-    @Test
-    void anUnsplittableLoopFailsLoudly() {
-        // Degenerate: a 1-frame loop cycle re-triggering a drum every
-        // frame whose window is longer than the cycle - the state can
-        // never agree... actually a retrigger resets the window each pass,
-        // so states DO converge. Genuinely unsplittable states need the
-        // stuck flag: a cut drum whose STUCK never matches a live window.
-        int frames = 8;
-        byte[][] v = new byte[Ym6Reader.Song.YM_REGISTERS][frames];
-        byte[] drum = new byte[200];
-        v[3][2] = 0x50;                         // drum on voice A (intro)
-        v[8][2] |= 1 << 5;
-        v[15][2] = (byte) 200;
-        v[3][4] = (byte) 0xE6;                  // buzzer sticks it (intro)
-        v[8][4] |= 6 << 5;
-        v[15][4] = 100;
-        // Loop [6,8): quiet - but voice A is STUCK from the intro and the
-        // second pass carries the same stuck state, so c = 0 works after
-        // all. Convergence is hard to defeat; assert it converges.
-        EffectScript.Result r = compile(song(frames, v, 6, new byte[][] {drum}), 6);
-        assertEquals(6, r.split());
     }
 }

@@ -53,9 +53,9 @@ effect for the same reason.
   envelope generator back to the start of its shape, so the envelope becomes
   the waveform and the timer's rate becomes its pitch. The one difference is
   where each format FILES the shape — RhYMe in its own copy of R13, a YM dump
-  in a voice's spare nibble — and since v9 neither place is where the player
-  looks: the front end resolves it and stream X carries it. So nothing is
-  written over a volume register for an RTE either.
+  in a voice's spare nibble — and neither place is where the player looks: the
+  front end resolves it and stream X carries it. So nothing is written over a
+  volume register for an RTE either.
 
 Two more correspondences say why the register vector needs so little done to it.
 
@@ -80,10 +80,10 @@ write is skipped — `ymx_skips` has overwritten it with two `nop`s,
 so it does not reach the chip. A retrigger stream's shape cannot: an RTE
 leaves the voice's volume to the song, so that byte is delivered, and a shape
 hidden in its low nibble would cost the voice its level on any frame not
-already following the envelope. Format v9 is the answer to that — see **Where a
-retrigger stream's shape comes from** — and the shape rides in X whatever the
-source, so the only parameter this conversion writes is a PCM stream's sample
-number.
+already following the envelope. Carrying it is the answer to that — see
+**Where a retrigger stream's shape comes from** — and the shape rides in X
+whatever the source, so the only parameter this conversion writes is a PCM
+stream's sample number.
 
 One engine reads both dialects, and four flags say which. A held PCM code
 does not retrigger, because a .YMR's trigger is a pop and not the code's
@@ -106,21 +106,20 @@ and two starts.
 
 <!-- The figures in this section are re-measured by ymx/test/emu/test_ymx.py,
      which reads them back out of these sentences: keep the shape of them. -->
-`signals-grouped.ymr` is 9,984 frames at 50 Hz with a PWM on voice A, a
+`ymr/test/deeper.ymr` is 9,984 frames at 50 Hz with a PWM on voice A, a
 sync-buzzer on voice B and a PWM on voice C — three effects at once, which two
 fixed channels could not have carried, and which is the case the four-channel
 generalisation and the T stream were built for. Packed with the default shape,
 
 ```sh
-java -ea -cp target/classes org.ymr.Ymr -f signals-grouped.ymr doc.ymx
+java -ea -cp target/classes org.ymr.Ymr -f ymr/test/deeper.ymr doc.ymx
 ```
 
-reports 252,000 bytes of register and script data packed into 12,448 (4.9%) in
-a 13,860-byte file, 25 rings of 960 bytes, decoding 23 of the 25 streams so
-that one of the default `C`=24's slots is idle; the tune loops from its start,
-and the encoder rotated the split forward 96 frames so the effect state at the
-wrap matches its first arrival. 5,328 of those 12,448 packed bytes are the
-eleven script streams, which the `.YMR` — 10,488 bytes — does not carry:
+reports 249,600 bytes of register and script data packed into 11,348 (4.5%) in
+a 12,656-byte file, 25 rings of 960 bytes, decoding 23 of the 25 streams so
+that one of the default `C`=24's slots is idle. 4,860 of those 11,348 packed
+bytes are the eleven script streams, which the `.YMR` — 10,488 bytes — does
+not carry:
 RhYMe's player reconciles its three timers every frame from what popped, and
 this one replays decisions taken at pack time. That is the bookkeeping
 difference paid in bytes, and what it buys is the flat frame.
@@ -132,8 +131,8 @@ Everything not on this list is exact, and
 tune on the real player and compares every write `YMX_play` makes to the sound
 chip, plus which MFP timers it claimed, against its own decoder and replay of
 the .YMR image. It walks 1,200 frames of a long tune, and the whole of one —
-the rotation frames and the wrap included — with `YMR_FRAME_CAP` raised;
-`signals-grouped.ymr` passes both. Two things it does not establish: it packs
+the wrap included — with `YMR_FRAME_CAP` raised;
+`ymr/test/deeper.ymr` passes both. Two things it does not establish: it packs
 at `-k1`, so the played frames are the .YMR's own and the padding the default
 `-k2` may insert is never walked, and it does not compare what a timer was
 PROGRAMMED to — that is the directed effect test's, and it is the dimension
@@ -159,11 +158,11 @@ parameter too, is the next paragraph's subject.
 
 Rate pops are on almost none of these lines, because almost none of them cost
 anything; **Moving a prescaler under a running timer** below has the
-mechanism. The corpus bears it out: on `signals-grouped.ymr` the compiled
-script carries 3,827 live reloads and 325 live retunes against no verb that
-stops a timer to change its rate, and `bla-grouped.ymr` has 678 live retunes
-and 2 that stop — those 2 being the frames where the effect's parameter moved
-on the same frame as the rate, which is the row.
+mechanism. The corpus bears it out: on `ymr/test/deeper.ymr` the compiled
+script carries 3,795 live reloads and 321 live retunes against no verb that
+stops a timer to change its rate, and `ymr/test/signals.ymr` has 339 live
+retunes and 2 that stop — those 2 being the frames where the effect's
+parameter moved on the same frame as the rate, which is the row.
 
 * **Three timers bound to voices, against four channels and a map.** A .YMR
   uses Timer A, Timer B and Timer D, and the spec fixes which voice each one
@@ -188,32 +187,30 @@ on the same frame as the rate, which is the row.
   ceiling, and a file that breaks it loses whatever it is over by.
 * **A PCM tick still has no compare, and loops anyway.** It walks forward and
   stops on the first byte with bit 7 set, the whole of its end
-  condition and the reason it costs no compare per tick. From **v10** the
-  sample table carries a loop word beside each sample, `YMX_init` resolves it
-  to an address once, and the tick that meets the end marker moves that
-  address into its own operand instead of stopping the timer. A one-shot says
-  so with `$FFFF`, a value no length can reach — 0 is a real loop point, the
-  sample that repeats whole. The end tick has already written the marker as a
-  level by the time it tests it, so a loop costs one sample of silence at the
-  seam and nothing else; a one-shot's end path is unchanged, marker byte,
-  middle volume, timer stopped. Before v10 the loop region had to be written
-  out again and again towards a ceiling, which made a long loop both wrong and
-  enormous.
+  condition and the reason it costs no compare per tick. The sample table
+  carries a loop word beside each sample, `YMX_init` resolves it to an address
+  once, and the tick that meets the end marker moves that address into its own
+  operand instead of stopping the timer. A one-shot says so with `$FFFF`, a
+  value no length can reach — 0 is a real loop point, the sample that repeats
+  whole. The end tick has already written the marker as a level by the time it
+  tests it, so a loop costs one sample of silence at the seam and nothing
+  else; a one-shot's end path is marker byte, middle volume, timer stopped.
+  The alternative — writing the loop region out again and again towards a
+  ceiling — makes a long loop both wrong and enormous.
 * **Moving a prescaler under a running timer.** RhYMe pops a rate on
   its own to slide a pitch: control register, then data register, the timer
   never stopped, so a running PWM keeps its phase and a running sample its
-  place and only the rate moves. From **v10** all of that is preserved by
-  the conversion.
+  place and only the rate moves. All of that is preserved by the conversion.
   A .YMR rate entry is a prescaler and a counter, only the prescaler is in the
   code byte, and a pop that moves the counter alone therefore leaves the code
   where it was: the script emits a HOLD carrying the reload flag, and
   `ymx_hold` writes the new count to a timer it never stops — RhYMe's own live
   reload, verb for verb. That is what a pitch slide is made of, and it costs
   nothing. A pop that moves the PRESCALER cannot be said that way: it changes
-  the code byte, so before v10 it had to compile to a program verb, and every
-  verb that carries a rate goes through `ymx_program`, which stops the timer,
-  loads the count and runs it again — the period in flight truncated, whichever
-  verb it was. v10 gives it an encoding of its own instead. The action byte's
+  the code byte, and every verb that carries a rate goes through
+  `ymx_program`, which stops the timer, loads the count and runs it again —
+  the period in flight truncated, whichever verb it was. So it has an encoding
+  of its own instead. The action byte's
   voice field addresses three voices in two bits, so 3 is none of them, and
   RETUNE spends that corner on a live rate change: `ymx_live` masks the
   timer's nibble out of the control byte it reads back, ORs the new prescaler
@@ -252,8 +249,5 @@ Everything else the conversion has to change, it counts and names the same way:
   recognise and a wrong guess is a wrong sound;
 * a timer configured with a prescaler of 0, the MFP's stopped state, or with
   a counter of 0, which the MFP reads as 256;
-* a sample index with no block behind it;
-* and a sample trigger landing on the loop frame with the code the song's last
-  frame already ends on, which the wrap swallows — coming round from the end
-  the code has not changed, and the script acts on codes that change.
+* and a sample index with no block behind it.
 

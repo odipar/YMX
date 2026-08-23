@@ -73,7 +73,7 @@ that matters.
 
 <!-- The two byte counts below are measured by ymx/test/emu/test_ymx.py,
      which reads them back out of this sentence: keep the shape of it. -->
-[68k/YMX.S](68k/YMX.S) is the player, 3,288 bytes at the `ST4_UNIT` 2 below,
+[68k/YMX.S](68k/YMX.S) is the player, 3,324 bytes at the `ST4_UNIT` 2 below,
 plus the 288 of [68k/ST4_wrap.S](68k/ST4_wrap.S), the stream decoder it is
 built on. Include both, with the unit size defined first:
 
@@ -118,7 +118,7 @@ how most of the bugs in this player were found.
 
 ## Where this came from
 
-YMX is the `.yx6` container from the
+YMX began as the `.yx6` container from the
 [ST4](https://github.com/odipar/ST4) repository, adopted whole and renumbered
 to version 1. ST4 is the compression format underneath, and stays there; this
 repository vendors the parts it needs and has its own life-cycle.

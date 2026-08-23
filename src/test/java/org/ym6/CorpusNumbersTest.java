@@ -28,12 +28,14 @@ import org.ymx.Tune;
  */
 final class CorpusNumbersTest {
 
-    /** The document whose figures these are. */
+    /** The documents whose figures these are. */
     private static final Path DOC = Path.of("doc", "terminology.md");
+    private static final Path CONVERSION = Path.of("ym", "CONVERSION.md");
 
-    /** One tune, reduced to what the document says about the collection. */
+    /** One tune, reduced to what the documents say about the collection. */
     private record Surveyed(String name, int playerHz, int drumFrames, long slowestDrum,
-                            long fastestDrum, int sinus, int voicesOnEnvelopeAtOnce) {}
+                            long fastestDrum, int sinus, int voicesOnEnvelopeAtOnce,
+                            int loopFrame, int frames) {}
 
     @Test
     void theCorpusIsWhatTheVocabularySaysItIs() throws IOException {
@@ -98,6 +100,49 @@ final class CorpusNumbersTest {
         assertEquals(envelope[1], readable.size(), "readable files, as the envelope line has it");
     }
 
+    @Test
+    void whatStartingOverCostsIsWhatTheConversionDocSaysItCosts() throws IOException {
+        String corpus = System.getenv("YM_CORPUS");
+        assumeTrue(corpus != null && Files.isDirectory(Path.of(corpus)),
+                "set YM_CORPUS to the directory holding the YM collection"
+                        + " ym/CONVERSION.md counts");
+
+        String said = String.join(" ", Files.readString(CONVERSION).split("\\s+"));
+        int[] census = numbers(said,
+                "([\\d,]+) of the corpus's ([\\d,]+) readable files name one other than 0",
+                "the files that loop from a frame other than 0");
+        int[] share = numbers(said, "is (\\d+)% of the tune on average",
+                "how much of a tune such an opening is");
+
+        List<Surveyed> readable = readable(corpus);
+        List<Surveyed> late = readable.stream()
+                .filter(t -> t.loopFrame() > 0 && t.loopFrame() < t.frames()).toList();
+        assertEquals(census[1], readable.size(), "readable files");
+        assertEquals(census[0], late.size(), "files looping from a frame other than 0");
+        long mean = late.stream().mapToLong(t -> 100L * t.loopFrame() / t.frames()).sum()
+                / late.size();
+        assertEquals(share[0], mean, "the mean opening, as a percentage of the tune");
+    }
+
+    /** Every readable tune in the collection, surveyed. */
+    private static List<Surveyed> readable(String corpus) throws IOException {
+        List<Path> files = new ArrayList<>();
+        try (Stream<Path> walk = Files.walk(Path.of(corpus))) {
+            walk.filter(p -> p.toString().toLowerCase().endsWith(".ym")).sorted()
+                    .forEach(files::add);
+        }
+        List<Surveyed> readable = new ArrayList<>();
+        for (Path file : files) {
+            try {
+                readable.add(survey(file.getFileName().toString(),
+                        Ym6Reader.read(Files.readAllBytes(file))));
+            } catch (RuntimeException unreadable) {
+                continue;               // counted by difference in the test above
+            }
+        }
+        return readable;
+    }
+
     /** One tune's contribution to the figures, in a single pass over its frames. */
     private static Surveyed survey(String name, Ym6Reader.Song song) {
         YmEffects.Extraction effects = YmEffects.extract(song);
@@ -130,7 +175,8 @@ final class CorpusNumbersTest {
             }
         }
         return new Surveyed(name, song.playerHz(), drumFrames, slowest, fastest,
-                effects.sinus(), together);
+                effects.sinus(), together,
+                (int) Math.min(song.loopFrame(), Integer.MAX_VALUE), song.frames());
     }
 
     /** The numbers one documented sentence gives, or a failure naming the sentence. */

@@ -103,11 +103,11 @@ def expected_writes(frames, source=None):
     return per_frame
 
 
-def frame_order(frames, loop_frame, count):
-    """Which frame of the tune each played frame shows, following the loop.
+def frame_order(frames, loops, count):
+    """Which frame of the tune each played frame shows.
 
-    A looping tune runs 0, 1, ... O-1, L, L+1, ... O-1, L, ...; one that plays
-    once just stops. Pass loop_frame=None for that.
+    A tune that starts over runs 0, 1, ... O-1, 0, 1, ... O-1, 0, ...; one that
+    plays once stops at O-1. Pass loops=False for that.
     """
     order = []
     frame = 0
@@ -115,13 +115,13 @@ def frame_order(frames, loop_frame, count):
         order.append(frame)
         frame += 1
         if frame >= frames:
-            if loop_frame is None:
+            if not loops:
                 break
-            frame = loop_frame
+            frame = 0
     return order
 
 
-def chip_states(frames, source=None, loop_frame=None, count=None):
+def chip_states(frames, source=None, loops=False, count=None):
     """What the sound chip must hold after each played frame.
 
     A player is free to skip writing a register whose value has not changed -
@@ -130,7 +130,7 @@ def chip_states(frames, source=None, loop_frame=None, count=None):
     frame also reports whether R13 was written, which is observable.
     """
     vectors = masked(frames, source)
-    order = frame_order(frames, loop_frame, count if count is not None else frames)
+    order = frame_order(frames, loops, count if count is not None else frames)
     state = [0] * PLAY_REGISTERS
     history = []
     for frame in order:

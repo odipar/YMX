@@ -6,10 +6,9 @@ the YM truth, frame by frame, in the Unicorn rig.
 Each tune is packed at k=1 - no padding, so the YM registers are the exact
 expectation - then played through the real 68000 player under emulation.
 Every chip write is compared against the masked YM data, R13's hold/shape
-semantics included, the loop crossing exercised for tunes up to 3000 frames
-(longer ones play their first 1200). The v2 split rotation is replayed here:
-a rotated tune's played timeline shows some source frames twice, and the
-walk follows the same map the packer compiled.
+semantics included, the wrap exercised for tunes up to 3000 frames (longer
+ones play their first 1200). A tune that starts over plays its frames again
+from frame 0, so the walk is the source's own frames, over and over.
 
 The effect-owned registers are checked against an INDEPENDENT model of the
 script semantics, written here in Python: a skipped voice's volume register
@@ -162,6 +161,16 @@ class Model:
         self.silenced = 0               # voices whose SID starts this frame
         STUCK = None
 
+    def restart(self):
+        """The tune starts over, so nothing is running from its end: the state
+        the compiler began from, which the player puts the machine back into
+        on the frame that ends the tune."""
+        self.elast = [0, 0]
+        self.owner = [-1, -1, -1]
+        self.left = [0, 0, 0]
+        self.skipped = 0
+        self.silenced = 0
+
     def step(self, f):
         """Advances one played frame showing source frame f; returns
         (skipped_mask, forced_mask, silenced_mask) for the frame's writes.
@@ -243,7 +252,8 @@ class Model:
 
     def _cut(self, slot, skip=-1):
         """A program on this slot's timer: a drum it still owes ticks to is
-        cut, its marker never runs, its voice stays skipped - v1 semantics."""
+        cut, its marker never runs, its voice stays skipped - as the
+        reference player left it."""
         for v in range(3):
             if v != skip and self.owner[v] == slot and self.left[v] > 0:
                 self.left[v] = -1                           # stuck
@@ -269,14 +279,11 @@ def sweep(path):
         if out.returncode:
             return f'PACKFAIL {name}: {(out.stderr or out.stdout).strip().splitlines()[-1][:70]}'
         warns = [l for l in out.stdout.splitlines()
-                 if 'Warning' in l or 'rotated' in l or 'muted' in l]
+                 if 'Warning' in l or 'Padded' in l]
         packed = open(ymx, 'rb').read()
         ring = struct.unpack('>H', packed[16:18])[0]
         header_frames = struct.unpack('>I', packed[8:12])[0]
-        split = struct.unpack('>I', packed[20:24])[0]
         loops = struct.unpack('>H', packed[6:8])[0] & 1
-        rotation = header_frames - frames               # the played surplus
-        loop_frame = split - rotation                   # the musical L
         player = T.Player(packed, T.YMX_FIXED + T.STREAMS * ring)
         if player.init() != 0:
             return f'INITFAIL {name}'
@@ -285,12 +292,10 @@ def sweep(path):
         budget = frames + 200 if frames <= 3000 else 1200
         wrapped = False
         played = 0
-        cycle = header_frames - split
         for f in range(budget):
-            # The played timeline: the packer's split rotation replayed.
-            p = played if played < header_frames else \
-                split + (played - split) % cycle if cycle else header_frames - 1
-            src = p if p < frames else loop_frame + (p - frames)
+            src = played % header_frames    # the same frames, over and over
+            if played and src == 0:
+                model.restart()             # the player silenced everything
             result, writes = player.frame()
             if result == -1:
                 if f < frames:
@@ -333,7 +338,7 @@ def sweep(path):
             played += 1
             if not loops and played == frames:
                 break
-        loop = 'looped' if wrapped else 'partial' if frames > 3000 else 'once'
+        loop = 'started over' if wrapped else 'partial' if frames > 3000 else 'once'
         w = (' [' + '; '.join(warns)[:60] + ']') if warns else ''
         return f'OK {name} ({min(budget, frames + 200)}f {loop}){w}'
     except AssertionError as e:

@@ -55,20 +55,14 @@ import org.jspecify.annotations.Nullable;
  * thing in two arrays, which the compact constructor keeps true.
  * {@code semantics} is what the source dialect implies about triggering and
  * stopping and cannot be read out of the codes - see
- * {@link EffectScript.Semantics}. {@code loopFrame} is the SOURCE's loop
- * frame, which is a default and not a decision: a CLI may override it, drop
- * it, or find it outside the tune. READ IT ONLY THROUGH A CLI THAT HAS DONE
- * THAT: a front end whose format can say "no loop" has nowhere in an int to
- * say it, and {@code org.ymr} writes {@code frames} there, while
- * {@code org.ym6} writes whatever the header held even when that is past the
- * end. Both are ranges the field cannot distinguish from a real loop frame,
- * so a third consumer that relies on it will be wrong about one format or the
- * other. {@code name}, {@code author} and
+ * {@link EffectScript.Semantics}. {@code loops} is what the SOURCE says the
+ * end of the tune does - start over, or stop - and is a default a CLI may
+ * override. {@code name}, {@code author} and
  * {@code comment} are what a report and the SNDH tags need, empty where a
  * format carries no such thing, and {@code notes} is what the front end had
  * to change on the way here, in the order it found it.
  */
-public record Tune(int frames, int frameRate, long masterClock, int loopFrame,
+public record Tune(int frames, int frameRate, long masterClock, boolean loops,
                    byte[][] registers, byte[][] codes, byte[][] counts,
                    byte[] shapes, byte[][] samples, int[] sampleLoops,
                    EffectScript.Semantics semantics,
@@ -82,7 +76,7 @@ public record Tune(int frames, int frameRate, long masterClock, int loopFrame,
      * this is how it says so without every layer between carrying a flag.
      */
     public Tune under(EffectScript.Semantics semantics) {
-        return new Tune(frames, frameRate, masterClock, loopFrame, registers,
+        return new Tune(frames, frameRate, masterClock, loops, registers,
                 codes, counts, shapes, samples, sampleLoops, semantics, name,
                 author, comment, notes);
     }
@@ -173,47 +167,38 @@ public record Tune(int frames, int frameRate, long masterClock, int loopFrame,
     }
 
     /**
-     * Pads the tune so its length and its loop split are whole {@code unit}s,
-     * by duplicating frames the front end says are safe to duplicate: one that
-     * holds the chip state a tick longer without being heard. The split is
-     * evened by duplicating a safe frame inside the intro, the length by
-     * duplicating one at the tail.
+     * Pads the tune so its length is a whole number of {@code unit}s, by
+     * duplicating a frame the front end says is safe to duplicate: one that
+     * holds the chip state a tick longer without being heard.
      *
      * <p>What counts as safe is the SOURCE FORMAT's question - a YM dump and a
      * .YMR disagree about where a sample's arrival is written, and both have
      * to keep away from a frame that restarts the envelope - so the predicate
      * comes in from the front end and only the mechanism is here. The
      * mechanism is the part that must not be written twice: every stream is
-     * stretched at the same two frames, because a frame is a column across all
-     * of them and padding the registers alone would silently desynchronise the
+     * stretched at the same frame, because a frame is a column across all of
+     * them and padding the registers alone would silently desynchronise the
      * timer streams from them.
      *
-     * <p>Returns the tune itself when the shape already fits, a padded tune
+     * <p>Returns the tune itself when the length already fits, a padded tune
      * otherwise, or {@code null} when no safe frame exists within
-     * {@value #PAD_SEARCH} frames of a boundary that needs one - which leaves
-     * the caller to drop to a unit size that needs no padding.
+     * {@value #PAD_SEARCH} frames of the end - which leaves the caller to drop
+     * to a unit size that needs no padding.
      */
-    public static @Nullable Tune padToUnit(Tune tune, int loopFrame, int unit,
+    public static @Nullable Tune padToUnit(Tune tune, int unit,
                                            IntPredicate safeToDuplicate) {
-        int split = loopFrame > 0 ? loopFrame : 0;
-        int splitPad = split > 0 ? (unit - split % unit) % unit : 0;
-        int endPad = (unit - (tune.frames + splitPad) % unit) % unit;
-        if (splitPad == 0 && endPad == 0) {
+        int endPad = (unit - tune.frames % unit) % unit;
+        if (endPad == 0) {
             return tune;
         }
-        int atSplit = splitPad > 0 ? safeFrame(safeToDuplicate, split - 1, 0) : -1;
-        if (splitPad > 0 && atSplit < 0) {
+        int atEnd = safeFrame(safeToDuplicate, tune.frames - 1,
+                tune.frames - PAD_SEARCH);
+        if (atEnd < 0) {
             return null;
         }
-        int atEnd = endPad > 0 ? safeFrame(safeToDuplicate, tune.frames - 1,
-                Math.max(split, tune.frames - PAD_SEARCH)) : -1;
-        if (endPad > 0 && atEnd < 0) {
-            return null;
-        }
-        Padding padding = new Padding(tune.frames, atSplit, splitPad, atEnd, endPad,
-                tune.frames + splitPad + endPad);
-        return new Tune(padding.total, tune.frameRate, tune.masterClock,
-                split > 0 ? split + splitPad : tune.loopFrame,
+        Padding padding = new Padding(tune.frames, atEnd, endPad,
+                tune.frames + endPad);
+        return new Tune(padding.total, tune.frameRate, tune.masterClock, tune.loops,
                 padding.stretch(tune.registers), padding.stretch(tune.codes),
                 padding.stretch(tune.counts), padding.stretch(tune.shapes),
                 tune.samples, tune.sampleLoops, tune.semantics,
@@ -234,8 +219,7 @@ public record Tune(int frames, int frameRate, long masterClock, int loopFrame,
 
     /** Which two frames are duplicated and how often - one plan, applied to
      * every stream, the only way they stay one timeline. */
-    private record Padding(int frames, int atSplit, int splitPad, int atEnd,
-                           int endPad, int total) {
+    private record Padding(int frames, int atEnd, int endPad, int total) {
 
         /** One stream, duplicated frame for frame with the rest of them:
          * a shape that did not follow its registers would arm a buzzer on
@@ -252,11 +236,6 @@ public record Tune(int frames, int frameRate, long masterClock, int loopFrame,
                 int at = 0;
                 for (int frame = 0; frame < frames; frame++) {
                     padded[at++] = values[frame];
-                    if (frame == atSplit) {
-                        for (int copy = 0; copy < splitPad; copy++) {
-                            padded[at++] = values[frame];
-                        }
-                    }
                     if (frame == atEnd) {
                         for (int copy = 0; copy < endPad; copy++) {
                             padded[at++] = values[frame];

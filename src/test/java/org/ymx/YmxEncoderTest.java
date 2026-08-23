@@ -62,7 +62,7 @@ final class YmxEncoderTest {
 
     @Test
     void headerDescribesTheStreams() {
-        YmxEncoder.Result result = YmxEncoder.encode(tune(true), 960, 24, false);
+        YmxEncoder.Result result = YmxEncoder.encode(tune(true), 960, 24, false, false);
         byte[] file = result.file();
 
         assertEquals(YmxFormat.MAGIC, longAt(file, YmxFormat.OFFSET_MAGIC));
@@ -72,8 +72,6 @@ final class YmxEncoderTest {
         assertEquals(0, word(file, YmxFormat.OFFSET_FLAGS) & YmxFormat.flagChannel(2),
                 "a YM frame starts at most two effects, so no YM tune ever asks"
                         + " for the third timer channel - and the host keeps its timer");
-        assertEquals(FRAMES, longAt(file, YmxFormat.OFFSET_LOOP_FRAME),
-                "a play-once tune loops at its end");
         assertEquals(FRAMES, longAt(file, YmxFormat.OFFSET_FRAMES));
         assertEquals(50, word(file, YmxFormat.OFFSET_PLAYER_HZ));
         assertEquals(YmxFormat.STREAMS, word(file, YmxFormat.OFFSET_STREAM_COUNT));
@@ -86,33 +84,29 @@ final class YmxEncoderTest {
         int expected = YmxFormat.HEADER_SIZE;
         for (int register = 0; register < YmxFormat.STREAMS; register++) {
             expected += (-expected) & 3;
-            assertEquals(expected, sectionAt(file, YmxFormat.OFFSET_INTRO_TABLE, register),
+            assertEquals(expected, sectionAt(file, YmxFormat.OFFSET_SECTION_TABLE, register),
                     "offset of section " + register);
             expected += result.streams().get(register).packedSize();
         }
         assertTrue(file.length - expected < 4, "nothing after the last section but padding");
     }
 
-    /** Every vector as the encoder should build them: registers
-     * source-mapped through the split rotation with R7 carrying the baked
-     * mixer force, then the compiled script streams with their unread
-     * bytes repeating. The same assembly the encoder performs -
+    /** Every vector as the encoder should build them: the registers with R7
+     * carrying the baked mixer force, then the compiled script streams with
+     * their unread bytes repeating. The same assembly the encoder performs -
      * the point: the file must decode back to exactly this. */
-    static byte[][] expectedVectors(Tune source, int loopFrame, int unit) {
-        EffectScript.Result script = EffectScript.compile(source, loopFrame, unit);
+    static byte[][] expectedVectors(Tune source) {
+        EffectScript.Result script = EffectScript.compile(source);
         byte[][] vectors = new byte[YmxFormat.STREAMS][];
         for (int register = 0; register < YmxFormat.REGISTER_STREAMS; register++) {
-            byte[] masked = Ym2149.mask(register, source.registers()[register]);
-            byte[] played = new byte[script.frames()];
-            for (int p = 0; p < played.length; p++) {
-                played[p] = masked[script.source()[p]];
-            }
+            byte[] values = Ym2149.mask(register, source.registers()[register]);
             if (register == 7) {
-                for (int p = 0; p < played.length; p++) {
-                    played[p] |= script.r7force()[p];
+                values = values.clone();
+                for (int p = 0; p < values.length; p++) {
+                    values[p] |= script.r7force()[p];
                 }
             }
-            vectors[register] = played;
+            vectors[register] = values;
         }
         vectors[YmxFormat.STREAM_M] = script.m();
         vectors[YmxFormat.STREAM_X] = script.x();
@@ -128,17 +122,17 @@ final class YmxEncoderTest {
     }
 
     static byte[] expectedVector(Tune source, int index) {
-        return expectedVectors(source, -1, 1)[index];
+        return expectedVectors(source)[index];
     }
 
     @Test
     void everyStreamUnpacksToItsVector() {
         Tune source = tune(true);
-        YmxEncoder.Result result = YmxEncoder.encode(source, 960, 24, false);
+        YmxEncoder.Result result = YmxEncoder.encode(source, 960, 24, false, false);
         byte[] file = result.file();
 
         for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
-            byte[] unpacked = values(file, YmxFormat.OFFSET_INTRO_TABLE, stream,
+            byte[] unpacked = values(file, YmxFormat.OFFSET_SECTION_TABLE, stream,
                     result.streams().get(stream).packedSize());
             assertArrayEquals(expectedVector(source, stream), unpacked,
                     "stream " + stream + " does not decode to its vector");
@@ -147,8 +141,8 @@ final class YmxEncoderTest {
 
     @Test
     void interleavedAndPerFrameFilesPackIdentically() {
-        assertArrayEquals(YmxEncoder.encode(tune(true), 960, 24, false).file(),
-                YmxEncoder.encode(tune(false), 960, 24, false).file());
+        assertArrayEquals(YmxEncoder.encode(tune(true), 960, 24, false, false).file(),
+                YmxEncoder.encode(tune(false), 960, 24, false, false).file());
     }
 
     @Test
@@ -163,7 +157,7 @@ final class YmxEncoderTest {
             byte[] file = result.file();
             for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
                 assertArrayEquals(expectedVector(source, stream),
-                        values(file, YmxFormat.OFFSET_INTRO_TABLE, stream,
+                        values(file, YmxFormat.OFFSET_SECTION_TABLE, stream,
                                 result.streams().get(stream).packedSize(), ring),
                         "stream " + stream + " needs more than a " + ring + "-byte ring");
             }
@@ -178,14 +172,14 @@ final class YmxEncoderTest {
         // player's C-sized-call shape itself is exercised by the emulation
         // rig, through the real 68000 decoder.
         Tune source = tune(true);
-        YmxEncoder.Result result = YmxEncoder.encode(source, 240, 24, false);
+        YmxEncoder.Result result = YmxEncoder.encode(source, 240, 24, false, false);
         byte[] file = result.file();
 
         for (int register = 0; register < YmxFormat.STREAMS; register++) {
             int size = result.streams().get(register).packedSize();
-            int from = sectionAt(file, YmxFormat.OFFSET_INTRO_TABLE, register);
+            int from = sectionAt(file, YmxFormat.OFFSET_SECTION_TABLE, register);
             assertEquals(0, from % 4, "section " + register + " starts long-aligned");
-            if (YmxFormat.isStored(entry(file, YmxFormat.OFFSET_INTRO_TABLE, register))) {
+            if (YmxFormat.isStored(entry(file, YmxFormat.OFFSET_SECTION_TABLE, register))) {
                 assertEquals(FRAMES, size, "stored section " + register + " is its values");
                 continue;
             }
@@ -198,38 +192,38 @@ final class YmxEncoderTest {
 
     @Test
     void everyOperationFitsAWordCounter() {
-        assertTrue(YmxEncoder.encode(tune(true), 960, 24, false).longestOp() <= 65535);
+        assertTrue(YmxEncoder.encode(tune(true), 960, 24, false, false).longestOp() <= 65535);
     }
 
     @Test
     void rejectsShapesThePlayerCannotRun() {
         Tune source = tune(true);
         // Fewer values per call than registers: the round-robin cannot fit.
-        assertThrows(IllegalArgumentException.class, () -> YmxEncoder.encode(source, 960, 13, false));
+        assertThrows(IllegalArgumentException.class, () -> YmxEncoder.encode(source, 960, 13, false, false));
         // Ring smaller than two chunks: the group being written would land on
         // the group being read.
-        assertThrows(IllegalArgumentException.class, () -> YmxEncoder.encode(source, 24, 24, false));
+        assertThrows(IllegalArgumentException.class, () -> YmxEncoder.encode(source, 24, 24, false, false));
         // ST1_wrap needs the chunk to divide the ring.
-        assertThrows(IllegalArgumentException.class, () -> YmxEncoder.encode(source, 1000, 24, false));
+        assertThrows(IllegalArgumentException.class, () -> YmxEncoder.encode(source, 1000, 24, false, false));
         // The burst reads register k's ring through an assembled-in k*N
         // displacement: 13*N must fit a signed word, so N stops at 2520.
-        assertThrows(IllegalArgumentException.class, () -> YmxEncoder.encode(source, 2544, 24, false));
+        assertThrows(IllegalArgumentException.class, () -> YmxEncoder.encode(source, 2544, 24, false, false));
     }
 
     @Test
     void widerUnitsRoundTripAndAreRejectedWhenTheyCannot() {
         // FRAMES is even, so k=2 works end to end; each section must carry
         // k=2 in its signature, which is what the player checks its build
-        // against. A loop frame that is not a whole number of units cannot be
-        // packed - a padded section would decode one extra value into
+        // against. A tune whose length is not a whole number of units cannot
+        // be packed - a padded section would decode one extra value into
         // the ring, and it would be played.
         Tune source = tune(true);
-        YmxEncoder.Result result = YmxEncoder.encode(source, 960, 24, -1, false, 2);
+        YmxEncoder.Result result = YmxEncoder.encode(source, 960, 24, false, false, 2);
         byte[] file = result.file();
-        byte[][] expected = expectedVectors(source, -1, 2);
+        byte[][] expected = expectedVectors(source);
         for (int register = 0; register < YmxFormat.STREAMS; register++) {
             int size = result.streams().get(register).packedSize();
-            long e = entry(file, YmxFormat.OFFSET_INTRO_TABLE, register);
+            long e = entry(file, YmxFormat.OFFSET_SECTION_TABLE, register);
             if (!YmxFormat.isStored(e)) {
                 St4Format.Container section = St4Format.read(Arrays.copyOfRange(
                         file, (int) YmxFormat.sectionOffset(e),
@@ -237,14 +231,17 @@ final class YmxEncoderTest {
                 assertEquals(2, section.unit(), "section " + register);
             }
             assertArrayEquals(expected[register],
-                    values(file, YmxFormat.OFFSET_INTRO_TABLE, register, size, 480),
+                    values(file, YmxFormat.OFFSET_SECTION_TABLE, register, size, 480),
                     "section " + register + " at unit 2");
         }
+        byte[][] odd = Ym6TestData.registers(FRAMES - 1);
+        Tune oddLength = YmEffects.tune(Ym6Reader.read(
+                Ym6TestData.file(odd, FRAMES - 1, true)));
         assertThrows(IllegalArgumentException.class,
-                () -> YmxEncoder.encode(source, 960, 24, 397, false, 2),
-                "an odd loop frame cannot be a whole number of 2-byte units");
+                () -> YmxEncoder.encode(oddLength, 960, 24, true, false, 2),
+                "an odd tune length cannot be a whole number of 2-byte units");
         assertThrows(IllegalArgumentException.class,
-                () -> YmxEncoder.encode(source, 960, 30, -1, false, 4),
+                () -> YmxEncoder.encode(source, 960, 30, false, false, 4),
                 "a chunk of 30 is not a whole number of 4-byte units");
     }
 
@@ -253,7 +250,7 @@ final class YmxEncoderTest {
         byte[][] registers = Ym6TestData.registers(FRAMES);
         Tune source = YmEffects.tune(Ym6Reader.read(
                 Ym6TestData.file(registers, FRAMES, true, "YM6!", 50, 2, 0)));
-        byte[] file = YmxEncoder.encode(source, 960, 24, false).file();
+        byte[] file = YmxEncoder.encode(source, 960, 24, false, false).file();
 
         assertEquals(2, word(file, YmxFormat.OFFSET_SAMPLE_COUNT));
         int table = longAt(file, YmxFormat.OFFSET_SAMPLE_TABLE);
@@ -273,7 +270,7 @@ final class YmxEncoderTest {
 
     @Test
     void aDrumlessFileHasNoDrumTable() {
-        byte[] file = YmxEncoder.encode(tune(true), 960, 24, false).file();
+        byte[] file = YmxEncoder.encode(tune(true), 960, 24, false, false).file();
         assertEquals(0, longAt(file, YmxFormat.OFFSET_SAMPLE_TABLE));
         assertEquals(0, word(file, YmxFormat.OFFSET_SAMPLE_COUNT));
     }

@@ -5,13 +5,13 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * The compiled effect script - format v2's replacement for the player's
- * effect interpreter.
+ * The compiled effect script - what this format carries instead of an effect
+ * interpreter in the player.
  *
- * <p>The v1 player re-derived, on every frame, decisions that are pure
+ * <p>The reference player re-derived, on every frame, decisions that are pure
  * functions of the tune: is this code new or held, does the count need
  * reloading, which channel's timer must stop for whose sample. This replays
- * exactly that decision logic - the branch structure of the v1 player's
+ * exactly that decision logic - the branch structure of that player's
  * effect stage, transcribed - over the whole timeline at pack time, and
  * emits eight streams of prepared actions the player executes without
  * comparing anything against remembered state.
@@ -71,7 +71,8 @@ import java.util.List;
  * 1 HOLD               flags: 1 = reload the count (P), 2 = track the
  *                      toggle stream's volume, 4 = track the retrigger
  *                      stream's shape - emitted only on frames where the
- *                      value actually changed (v1 repatched every frame)
+ *                      value actually changed (the reference player
+ *                      repatched every frame)
  * 2 RELEASE            stop this channel's timer; bit 0 masks instead
  * 3 START_TOGGLE       selects, volume, vector := the loud half, full
  *                      program
@@ -95,7 +96,8 @@ import java.util.List;
  * prescaler-slide.
  *
  * <p>A toggle stream's volume and a PCM stream's sample number are read by
- * the player out of the voice's own register ring (v1's mechanism), which
+ * the player out of the voice's own register ring, the reference player's
+ * own mechanism, which
  * costs no stream and is where both genuinely live: they belong to the voice
  * the effect took over. A retrigger stream's shape does not - it belongs to
  * the one envelope generator - so it is CARRIED, in X, resolved by whichever
@@ -104,8 +106,8 @@ import java.util.List;
  * is handed. The ring byte of a voice playing a sample is NOT sanitized: the
  * frame write skips it ({@code ymx_skips} has overwritten that one write with
  * two nops, so the byte never reaches the chip), so nothing edits the
- * ring at runtime and v1's whole borrow/patch/restore machinery has no v2
- * counterpart. R7 arrives with the disconnection of sample-playing voices
+ * ring at runtime and the reference player's whole borrow/patch/restore
+ * machinery has no counterpart here. R7 arrives with the disconnection of sample-playing voices
  * baked in ({@link Result#r7force}), which disconnects the voice.
  *
  * <h2>Frame alignment</h2>
@@ -117,27 +119,23 @@ import java.util.List;
  * computed end - never before, so a frame write can never race a live
  * sample. The computation
  * allows for the arming phase (the trigger runs a bounded slice into its
- * frame) and no more: v1 reopened at the marker tick itself, and a whole
- * frame of grace on top of that parks the voice at the sample's tail
- * volume, disconnected, 20ms longer than v1 - an audible click after
- * every sample. (v1 reopened at the marker tick itself.)
+ * frame) and no more: the reference player reopened at the marker tick
+ * itself, and a whole frame of grace on top of that parks the voice at the
+ * sample's tail volume, disconnected, 20ms longer than that - an audible
+ * click after every sample.
  *
  * <p>A source that can end a sample itself ({@link Semantics#channelEndsPcm})
  * has no such event to wait for: the end is a frame's own command, so the
  * voice rejoins the frame write on that frame and its volume comes back out
  * of that frame's register burst.
  *
- * <h2>The split rotation</h2>
+ * <h2>One pass, and then another</h2>
  *
- * v2's loop sections are compiled against one entry state, but the state
- * arriving from the intro and the state arriving from the wrap owe each
- * other nothing. A loop is a cycle, so it is cut where the states agree:
- * the smallest unit-aligned {@code c} with S(L+c) = S(O+c) rotates the
- * split to L+c, the intro absorbs the first {@code c} loop frames, and the
- * loop section is one full cycle taken from the steady window. The played
- * sequence is exactly v1's; the rotation is inaudible. Convergence within
- * one pass follows from determinism; if a tune needs more, the intro
- * absorbs a whole extra pass, and failing even that is a pack error.
+ * A script is compiled once over the tune's own frames, from the state a
+ * tune starts in. A tune that repeats plays that pass again: the player
+ * stops what is running and opens every skip at the boundary, which is the
+ * state this compile began from, so the second pass is the first. Nothing
+ * has to be simulated past the end, and no pass is compiled twice.
  */
 public final class EffectScript {
 
@@ -169,9 +167,9 @@ public final class EffectScript {
 
     // The master byte.
     /** M's bit per timer channel, numbered as the format numbers them,
-     * from zero. Four channels take bits 0 to 3, so the skip flag and its
-     * mask moved up again when v7 made room; {@code M_CHANNEL_0 << c} is
-     * channel c's, and the byte is now full. */
+     * from zero. Four channels take bits 0 to 3, the skip flag bit 4 and its
+     * mask bits 7-5; {@code M_CHANNEL_0 << c} is channel c's, and the byte is
+     * full. */
     public static final int M_CHANNEL_0 = 1;
     public static final int M_CHANNEL_1 = 2;
     public static final int M_CHANNEL_2 = 4;
@@ -239,14 +237,13 @@ public final class EffectScript {
     }
 
     /**
-     * The compiled script: {@code frames} played frames splitting at
-     * {@code split}, {@code source[p]} naming the dump frame each played
-     * frame shows, the script streams - M plus an action and a count byte
-     * per timer channel - and the mixer bits to OR into R7. {@code reopens}
-     * lists {playedFrame, voice} for every sample end edge - the differential
-     * test's skew windows - and {@code notes} what a packer should report.
+     * The compiled script: {@code frames} frames, the script streams - M plus
+     * an action and a count byte per timer channel - and the mixer bits to OR
+     * into R7. {@code reopens} lists {frame, voice} for every sample end edge
+     * - the differential test's skew windows - and {@code notes} what a packer
+     * should report.
      */
-    public record Result(int frames, int split, int[] source,
+    public record Result(int frames,
                          byte[] m, byte[][] actions, byte[][] counts, byte[] x,
                          byte[] timers,
                          byte[] r7force, List<int[]> reopens, List<String> notes) {
@@ -266,8 +263,8 @@ public final class EffectScript {
     }
 
     /** A voice never rejoins the frame write: its sample was cut mid-play and
-     * the marker that would have cleared the skip will never run (v1's stuck
-     * flag, replicated for differential exactness). */
+     * the marker that would have cleared the skip will never run - the
+     * reference player's stuck flag, replicated for differential exactness. */
     private static final int STUCK = Integer.MAX_VALUE;
 
 
@@ -275,8 +272,8 @@ public final class EffectScript {
     private static final int KIND_PCM = Tune.KIND_PCM;
     private static final int KIND_RETRIGGER = Tune.KIND_RETRIGGER;
 
-    /** One channel's remembered state - the v1 descriptor, field for field,
-     * minus the machine addresses. */
+    /** One channel's remembered state - the reference player's descriptor,
+     * field for field, minus the machine addresses. */
     private static final class Channel {
         int elast;                      // CH_ELAST
         int tlast;                      // CH_TLAST
@@ -288,68 +285,57 @@ public final class EffectScript {
         boolean masked;                 // a released toggle: interrupt masked,
                                         // the timer still counting
         int prescaler = -1;             // what the control register runs at
-
-        int[] snapshot() {
-            return new int[] {elast, tlast, vec, vecVoice, sel, vol, shape,
-                    masked ? 1 : 0, prescaler};
-        }
     }
 
     private final Tune tune;
-    private final int loopFrame;
     // One descriptor per timer channel the format carries. A YM frame can
     // only start two effects, so the last two stay idle for every YM source
     // and their streams pack to nothing; they are here for sources that
     // need them, and the compiler walks all of them regardless.
     private final Channel[] channels = new Channel[YmxFormat.CHANNELS];
-    private final int[] drumEnd = {-1, -1, -1};   // played frame the voice's
+    private final int[] drumEnd = {-1, -1, -1};   // the frame the voice's
     private final int[] drumOwner = {-1, -1, -1}; // the skip lifts; -1 = free
     private int skips;                            // bit v = skipped
     private final List<int[]> reopens = new ArrayList<>();
     private final List<String> notes = new ArrayList<>();
     private final Semantics semantics;  // what the source format fixes
 
-    // The emission arrays, over the full simulated horizon; cut at the end.
+    // The emission arrays, one byte a frame.
     private final byte[] m;
     private final byte[][] actions = new byte[YmxFormat.CHANNELS][];
     private final byte[][] counts = new byte[YmxFormat.CHANNELS][];
     private final byte[] x;
     private final byte[] timers;
     private final byte[] r7;
-    private final int horizon;
+    private final int frames;
     private boolean stuckNoted;
 
-    private EffectScript(Tune tune, int loopFrame) {
+    private EffectScript(Tune tune) {
         this.tune = tune;
-        this.loopFrame = loopFrame;
         this.semantics = tune.semantics();
-        int total = tune.frames();
-        boolean loops = loopFrame >= 0 && loopFrame < total;
-        // Simulate far enough to compare three loop passes.
-        horizon = loops ? total + 3 * (total - loopFrame) : total;
-        m = new byte[horizon];
-        x = new byte[horizon];
+        frames = tune.frames();
+        m = new byte[frames];
+        x = new byte[frames];
         // The channel-to-timer map. A YM tune never moves it, so the stream
         // is one value repeated and packs to nothing.
-        timers = new byte[horizon];
-        java.util.Arrays.fill(timers, (byte) YmxFormat.DEFAULT_TIMERS);
+        timers = new byte[frames];
+        Arrays.fill(timers, (byte) YmxFormat.DEFAULT_TIMERS);
         for (int c = 0; c < YmxFormat.CHANNELS; c++) {
             channels[c] = new Channel();
-            actions[c] = new byte[horizon];
-            counts[c] = new byte[horizon];
+            actions[c] = new byte[frames];
+            counts[c] = new byte[frames];
         }
-        r7 = new byte[horizon];
+        r7 = new byte[frames];
     }
 
     /**
-     * Compiles the script. {@code loopFrame} is the effective loop start
-     * (after any CLI override), or negative for a play-once tune;
-     * {@code unit} aligns the rotated split the way the encoder needs.
+     * Compiles the script: one pass over the tune's frames, from the state a
+     * tune starts in. A tune that repeats plays that pass again.
      */
-    public static Result compile(Tune tune, int loopFrame, int unit) {
+    public static Result compile(Tune tune) {
         // The default map is a YM tune's; a .ymr binds its channels to Timers
         // A, B and D and passes its own. See YmxEncoder.encode's shorthand.
-        return compile(tune, loopFrame, unit, YmxFormat.DEFAULT_TIMERS);
+        return compile(tune, YmxFormat.DEFAULT_TIMERS);
     }
 
     /**
@@ -365,117 +351,26 @@ public final class EffectScript {
      * arrive already normalized, and the semantics say only what the codes
      * leave open.
      */
-    public static Result compile(Tune tune, int loopFrame, int unit, int timerMap) {
-        EffectScript script = new EffectScript(tune, loopFrame);
-        java.util.Arrays.fill(script.timers, (byte) timerMap);
-        return script.run(unit);
+    public static Result compile(Tune tune, int timerMap) {
+        EffectScript script = new EffectScript(tune);
+        Arrays.fill(script.timers, (byte) timerMap);
+        return script.run();
     }
 
-    private Result run(int unit) {
-        int total = tune.frames();
-        boolean loops = loopFrame >= 0 && loopFrame < total;
-        int cycle = loops ? total - loopFrame : 0;
-
-        int[][] snaps = new int[horizon + 1][];
-        for (int p = 0; p < horizon; p++) {
-            snaps[p] = snapshot(p);
-            frame(p, source(p, total));
-        }
-        snaps[horizon] = snapshot(horizon);
-
-        int split;
-        int frames;
-        if (!loops) {
-            split = total;              // "looping at the end": one rule
-            frames = total;
-        } else {
-            int cut = findCut(snaps, total, cycle, unit);
-            split = cut;
-            frames = cut + cycle;
-            if (cut != loopFrame) {
-                notes.add("loop split rotated by " + (cut - loopFrame)
-                        + " frames so the wrap state matches");
-            }
-            // Belt and braces: the loop's first frame re-asserts the skip
-            // bits both arrivals agree on, unless it sets them itself.
-            if ((m[split] & M_SKIPS) == 0) {
-                int mask = snaps[split][snaps[split].length - 1];
-                if (mask != 0 || m[split] != 0) {
-                    m[split] |= M_SKIPS | (mask << M_SKIP_SHIFT);
-                }
-            }
-        }
-
-        int[] source = new int[frames];
+    private Result run() {
         for (int p = 0; p < frames; p++) {
-            source[p] = source(p, total);
+            frame(p);
         }
-        reopens.removeIf(r -> r[0] >= frames);
-        return new Result(frames, split, source,
-                Arrays.copyOf(m, frames), trim(actions, frames),
-                trim(counts, frames), Arrays.copyOf(x, frames),
-                Arrays.copyOf(timers, frames), Arrays.copyOf(r7, frames),
+        // Copies, so a caller holding the result cannot reach this compiler's
+        // own arrays.
+        return new Result(frames, m.clone(), copy(actions), copy(counts),
+                x.clone(), timers.clone(), r7.clone(),
                 List.copyOf(reopens), List.copyOf(notes));
     }
 
-    /** The dump frame played frame {@code p} shows. */
-    private int source(int p, int total) {
-        if (p < total) {
-            return p;
-        }
-        return loopFrame + (p - total) % (total - loopFrame);
-    }
-
-    /**
-     * The smallest unit-aligned cut with S(L+c) = S(O+c); if one pass is
-     * not enough for convergence, the intro absorbs a whole pass and the
-     * search repeats one cycle later.
-     */
-    private int findCut(int[][] snaps, int total, int cycle, int unit) {
-        for (int base = loopFrame; base <= total; base += cycle) {
-            for (int c = 0; c < cycle; c += unit) {
-                if (Arrays.equals(snaps[base + c], snaps[base + c + cycle])) {
-                    return base + c;
-                }
-            }
-            if (base + 2 * cycle + cycle > snaps.length - 1) {
-                break;
-            }
-        }
-        throw new IllegalArgumentException("the effect state never repeats "
-                + "across the loop - this tune cannot be split (loop frame "
-                + loopFrame + " of " + total + ")");
-    }
-
-    /** Everything two arrivals must agree on before sharing loop sections.
-     * Sample ends compare as frames-remaining; the toggle's half is
-     * deliberately absent - phase free-runs in v1 too. Every channel is in
-     * here, in channel order: one a source never uses contributes its
-     * untouched initial state to both sides of every comparison.
-     *
-     * The envelope shape is not among them: it is a function of the frame,
-     * not of anything a pass round the loop accumulates, so two arrivals at
-     * one frame always agree on it. */
-    private int[] snapshot(int frame) {
-        int width = channels[0].snapshot().length;
-        int[] out = new int[channels.length * width + 7];
-        int at = 0;
-        for (Channel channel : channels) {
-            System.arraycopy(channel.snapshot(), 0, out, at, width);
-            at += width;
-        }
-        for (int v = 0; v < 3; v++) {
-            out[at++] = drumOwner[v];
-            out[at++] = drumEnd[v] < 0 ? -1
-                    : drumEnd[v] == STUCK ? STUCK : drumEnd[v] - frame;
-        }
-        out[at] = skips;                // last: run() reads the mask here
-        return out;
-    }
-
     // -------------------------------------------------------------------------
-    // One played frame: expire sample windows, then every timer channel in
-    // turn, lowest first - exactly the order the v1 player discovers the same
+    // One frame: expire sample windows, then every timer channel in
+    // turn, lowest first - exactly the order the reference player discovers the same
     // events in, and the order arbitration between two channels wanting one
     // voice is decided by.
     // -------------------------------------------------------------------------
@@ -483,12 +378,12 @@ public final class EffectScript {
     private int skipsBefore;
 
 
-    private void frame(int p, int f) {
+    private void frame(int p) {
         skipsBefore = skips;
         // X's high nibble is this frame's shape - the packer resolved
         // it, so the player never has to look for it. It changes rarely, which is
         // what keeps a stream carrying one value on almost every frame.
-        x[p] = (byte) (shape(f) << 4);
+        x[p] = (byte) (shape(p) << 4);
 
         for (int v = 0; v < 3; v++) {
             if (drumOwner[v] >= 0 && drumEnd[v] == p) {
@@ -500,7 +395,7 @@ public final class EffectScript {
         }
 
         for (int c = 0; c < channels.length; c++) {
-            channel(p, f, c);
+            channel(p, c);
         }
 
         if (semantics.forceMixerOnPcm()) {
@@ -515,17 +410,18 @@ public final class EffectScript {
         }
     }
 
-    /** ymx_slot, transcribed: the labels in the comments are v1's. */
-    private void channel(int p, int f, int index) {
+    /** ymx_slot, transcribed: the labels in the comments are the reference
+     * player's. */
+    private void channel(int p, int index) {
         Channel channel = channels[index];
-        int code = tune.codes()[index][f] & 0xFF;
-        int count = tune.counts()[index][f] & 0xFF;
+        int code = tune.codes()[index][p] & 0xFF;
+        int count = tune.counts()[index][p] & 0xFF;
 
         if (code == channel.elast) {
             if (code == 0) {
                 return;                 // the idle frame
             }
-            hold(p, f, index, channel, code, count);
+            hold(p, index, channel, code, count);
             return;
         }
         int old = channel.elast;           // move.b (a5),d4
@@ -536,16 +432,16 @@ public final class EffectScript {
         }
         int voice = ((code >> 4) & 3) - 1;
         int type = code & 0xC0;
-        if (retunesLive(old, code) && parameterHeld(f, channel, type, voice)) {
+        if (retunesLive(old, code) && parameterHeld(p, channel, type, voice)) {
             liveRetune(p, index, channel, code, count);
         } else if (type == KIND_TOGGLE) {         // .toggle
-            toggle(p, f, index, channel, code, count, voice, old);
+            toggle(p, index, channel, code, count, voice, old);
         } else if (type == KIND_PCM && retunesPcm(old, code)) {
             pcmRetune(p, index, channel, code, count, voice);
         } else if (type == KIND_PCM) { // .pcm
-            pcm(p, f, index, channel, code, count, voice, old);
+            pcm(p, index, channel, code, count, voice, old);
         } else {                        // the retrigger arm
-            retrigger(p, f, index, channel, code, count, voice);
+            retrigger(p, index, channel, code, count, voice);
         }
     }
 
@@ -580,11 +476,11 @@ public final class EffectScript {
      * truncated period is the price. A PCM stream tracks no register at
      * all, so it is always free to go live.
      */
-    private boolean parameterHeld(int f, Channel channel, int type, int voice) {
+    private boolean parameterHeld(int p, Channel channel, int type, int voice) {
         if (type == KIND_TOGGLE) {
-            return parameter(f, voice) == channel.vol;
+            return parameter(p, voice) == channel.vol;
         }
-        return type == KIND_PCM || shape(f) == channel.shape;
+        return type == KIND_PCM || shape(p) == channel.shape;
     }
 
     /**
@@ -635,14 +531,14 @@ public final class EffectScript {
 
     /** .held: a running effect's count reload and parameter tracking -
      * emitted only on frames where a value actually changed. */
-    private void hold(int p, int f, int index, Channel channel, int code, int count) {
+    private void hold(int p, int index, Channel channel, int code, int count) {
         int type = code & 0xC0;
         int voice = ((code >> 4) & 3) - 1;
         // A source with no trigger but the code itself fires the sample again
         // on every frame that repeats the code, with THAT frame's number; one
         // whose trigger is an explicit pop said start once, and means it.
         if (type == KIND_PCM && semantics.pcmHoldRetriggers()) {
-            pcm(p, f, index, channel, code, count, voice, code);
+            pcm(p, index, channel, code, count, voice, code);
             return;
         }
         int flags = 0;
@@ -654,14 +550,15 @@ public final class EffectScript {
         // sample, not off the chip - so a held one carries the reload and
         // nothing else. Only a source that leaves samples playing gets here
         // with one at all.
-        if (type == KIND_TOGGLE) {             // .track: v1 repatched blindly
-            int value = parameter(f, voice);
+        if (type == KIND_TOGGLE) {             // .track: the reference player
+                                               // repatched blindly
+            int value = parameter(p, voice);
             if (value != channel.vol) {
                 channel.vol = value;
                 flags |= HOLD_VOLUME;
             }
         } else if (type != KIND_PCM) {
-            int value = shape(f);
+            int value = shape(p);
             if (value != channel.shape) {
                 channel.shape = value;
                 flags |= HOLD_SHAPE;
@@ -715,7 +612,7 @@ public final class EffectScript {
         emit(p, index, action(VERB_RELEASE, 0, 0), 0);
     }
 
-    private void toggle(int p, int f, int index, Channel channel, int code, int count,
+    private void toggle(int p, int index, Channel channel, int code, int count,
                      int voice, int old) {
         // A sample this same channel is playing is not a rival for the voice:
         // one timer runs both, so arming the square necessarily ends the
@@ -732,7 +629,7 @@ public final class EffectScript {
             openOld(old);
             return;                     // nothing armed, nothing emitted
         }
-        int value = parameter(f, voice);
+        int value = parameter(p, voice);
         // The gap models fork on {@code masked}, which only a resume-mode
         // release sets (doc/experiments.md, "SID phase semantics"):
         // a re-arrival on a channel whose masked timer still runs this stream's
@@ -778,7 +675,7 @@ public final class EffectScript {
         emit(p, index, action(VERB_START_TOGGLE, voice, code & 7), count);
     }
 
-    private void pcm(int p, int f, int index, Channel channel, int code, int count,
+    private void pcm(int p, int index, Channel channel, int code, int count,
                       int voice, int old) {
         if (old != code) {              // the old-effect cleanup; a
             if ((old & 0xC0) == KIND_TOGGLE && old != 0) {
@@ -816,11 +713,11 @@ public final class EffectScript {
         channel.vecVoice = voice;
         skips |= 1 << voice;
         drumOwner[voice] = index;
-        drumEnd[voice] = p + duration(f, code, count, voice);
+        drumEnd[voice] = p + duration(p, code, count, voice);
         emit(p, index, action(verb, voice, code & 7), count);
     }
 
-    private void retrigger(int p, int f, int index, Channel channel, int code, int count,
+    private void retrigger(int p, int index, Channel channel, int code, int count,
                       int voice) {
         // The same takeover the toggle arm does, with the opposite skip: a
         // retrigger stream writes R13 and never a volume register, so the
@@ -832,7 +729,7 @@ public final class EffectScript {
         channel.tlast = count;
         channel.masked = false;
         channel.prescaler = code & 7;
-        channel.shape = shape(f);
+        channel.shape = shape(p);
         channel.vec = KIND_RETRIGGER;
         channel.vecVoice = voice;
         emit(p, index, action(VERB_START_RETRIGGER, voice, code & 7), count);
@@ -848,7 +745,8 @@ public final class EffectScript {
     /**
      * Any action that programs or stops this channel's timer cuts a sample the
      * channel still owes ticks to: its marker will never run, so its voice
-     * stays skipped and forced - v1's stuck flag, replicated and logged.
+     * stays skipped and forced - the reference player's stuck flag,
+     * replicated and logged.
      */
     private void cut(int p, int index, int keep) {
         for (int v = 0; v < 3; v++) {
@@ -861,7 +759,7 @@ public final class EffectScript {
                     stuckNoted = true;
                     notes.add("an effect armed over its own channel's running "
                             + "drum: voice " + (char) ('A' + v)
-                            + " stays skipped (v1 semantics)");
+                            + " stays skipped, as the reference player left it");
                 }
             }
         }
@@ -920,8 +818,8 @@ public final class EffectScript {
      * Changing where the shape comes from is a format revision, not a
      * refactor.
      */
-    private int parameter(int f, int voice) {
-        return tune.registers()[8 + voice][f] & 15;
+    private int parameter(int p, int voice) {
+        return tune.registers()[8 + voice][p] & 15;
     }
 
     /**
@@ -930,8 +828,8 @@ public final class EffectScript {
      * compiler needs no such knowledge; the script carries it to the player in X's
      * high nibble, and the player needs none either.
      */
-    private int shape(int f) {
-        return tune.shapes()[f] & 15;
+    private int shape(int p) {
+        return tune.shapes()[p] & 15;
     }
 
     /**
@@ -940,10 +838,11 @@ public final class EffectScript {
      * rate, plus a sixteenth of a frame for the arming phase - the trigger
      * action runs a bounded slice into its VBL, so the last tick lands that
      * much later than the tick count alone says. A whole frame here instead
-     * held every voice skipped 20ms past its drum: the click v1 never had.
+     * held every voice skipped 20ms past its drum: a click the reference
+     * player never had.
      */
-    private int duration(int f, int code, int count, int voice) {
-        int number = tune.registers()[8 + voice][f] & 31;
+    private int duration(int p, int code, int count, int voice) {
+        int number = tune.registers()[8 + voice][p] & 31;
         long ticks = tune.samples()[number].length + 1L;
         long divisor = (long) Tune.prescaler(code & 7) * count;
         long scaled = ticks * divisor * tune.frameRate()
@@ -957,12 +856,11 @@ public final class EffectScript {
         counts[index][p] = (byte) count;
     }
 
-
-    /** Every channel's stream cut to the played length. */
-    private static byte[][] trim(byte[][] streams, int frames) {
+    /** Every channel's stream, copied. */
+    private static byte[][] copy(byte[][] streams) {
         byte[][] out = new byte[streams.length][];
         for (int c = 0; c < streams.length; c++) {
-            out[c] = Arrays.copyOf(streams[c], frames);
+            out[c] = streams[c].clone();
         }
         return out;
     }

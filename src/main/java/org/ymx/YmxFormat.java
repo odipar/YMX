@@ -12,20 +12,18 @@ package org.ymx;
  * <pre>
  *   0   4  'YMX!'
  *   4   2  format version (1)
- *   6   2  flags: bit 0 set when the tune loops, bits 1-4 one per timer
- *           channel, set when the tune uses it
+ *   6   2  flags: bit 0 set when the tune starts over at the end, bits 1-4
+ *           one per timer channel, set when the tune uses it
  *   8   4  O, the number of frames
  *  12   2  frame rate in Hz: how often the player is called (50 usually)
  *  14   2  S, the stream count (25: R0..R13, then M X T and four A/P pairs)
  *  16   2  N, the ring size in bytes each stream decodes through
  *  18   2  C, the chunk size one ST4_resume call produces
- *  20   4  L, the loop frame; equal to O when the tune does not loop
- *  24   4  YM master clock in Hz, informational
- *  28   4  byte offset of the sample table; zero when there are none
- *  32   2  sample count
- *  34   4*S  byte offset of each intro section, covering frames [0, L)
- * 134   4*S  byte offset of each loop section, covering frames [L, O)
- * 234   ...  the body: the packed sections, then the sample table
+ *  20   4  YM master clock in Hz, informational
+ *  24   4  byte offset of the sample table; zero when there are none
+ *  28   2  sample count
+ *  30   4*S  byte offset of each stream's section, covering frames [0, O)
+ * 130   ...  the body: the packed sections, then the sample table
  * </pre>
  *
  * <p>Streams 14-24 carry the compiled effect script, one byte per frame
@@ -37,11 +35,8 @@ package org.ymx;
  * timer channels a preempting sample stops - and each channel's A and P
  * name its action and its timer count. The channels come last so that a
  * tune using two of them leaves the others' pairs at the end of the file,
- * where the player can stop decoding. O and L count PLAYED frames: a loop
- * whose wrap state differs from its first arrival is rotated until the two
- * agree, so the file may carry a few frames twice, compiled differently.
- * {@link EffectScript} owns the byte semantics; see doc/SPEC.md for the
- * design.
+ * where the player can stop decoding. {@link EffectScript} owns the byte
+ * semantics; see doc/SPEC.md for the design.
  *
  * <p>The sample table is {@code count} entries of {byte offset (long),
  * sample length (word), loop point (word)}, each offset pointing at
@@ -57,16 +52,13 @@ package org.ymx;
  * eight-instruction sequence ST4.S documents, and {@code dst4} can unpack any
  * section straight out of the file for debugging.
  *
- * <p>Each register is packed as two sections rather than one, because looping
- * a stream means starting a decoder over: the intro covers the frames before
- * the loop point and the loop covers the rest, and the player restarts the
- * loop decoders every time round. A tune that loops from the start has no
- * intro sections, and one that does not loop has no loop sections; the unused
- * half of the table is zero.
+ * <p>Each stream is one section covering every frame. A tune that starts over
+ * reaches the end of that section and the player opens it again from the top,
+ * which is the only way to restart a decoder.
  *
- * <p>The player needs {@code O}, {@code L}, {@code N}, {@code C} and the
- * offsets; the packed sizes are implied by the next offset and never needed,
- * because ST4_wrap counts output units rather than input bytes.
+ * <p>The player needs {@code O}, {@code N}, {@code C} and the offsets; the
+ * packed sizes are implied by the next offset and never needed, because
+ * ST4_wrap counts output units rather than input bytes.
  */
 public final class YmxFormat {
 
@@ -79,7 +71,7 @@ public final class YmxFormat {
      * so there is no version history here to be compatible with. */
     public static final int VERSION = 1;
 
-    /** Flag bit 0: the tune loops back to {@code L} instead of ending. */
+    /** Flag bit 0: the tune starts over at frame 0 instead of ending. */
     public static final int FLAG_LOOPS = 1;
 
     /** Flag bit {@code 1 + channel}: the tune uses that timer channel, so
@@ -138,8 +130,8 @@ public final class YmxFormat {
     public static final int TIMER_D = 3;
 
     /** The map a YM tune is packed with. Channels 0 and 1 land on Timers A
-     * and D, which is where v6 put its first two, so a YM tune sounds
-     * exactly as it did; the rest fill in the unused timers. */
+     * and D, which is where the reference player put its first two, so a YM
+     * tune sounds exactly as it did; the rest fill in the unused timers. */
     public static final int DEFAULT_TIMERS =
             TIMER_A | (TIMER_D << 2) | (TIMER_B << 4) | (TIMER_C << 6);
 
@@ -156,16 +148,15 @@ public final class YmxFormat {
     public static final int OFFSET_STREAM_COUNT = 14;
     public static final int OFFSET_RING_SIZE = 16;
     public static final int OFFSET_CHUNK = 18;
-    public static final int OFFSET_LOOP_FRAME = 20;
-    public static final int OFFSET_MASTER_CLOCK = 24;
-    public static final int OFFSET_SAMPLE_TABLE = 28;
-    public static final int OFFSET_SAMPLE_COUNT = 32;
+    public static final int OFFSET_MASTER_CLOCK = 20;
+    public static final int OFFSET_SAMPLE_TABLE = 24;
+    public static final int OFFSET_SAMPLE_COUNT = 28;
     /**
      * Bit 31 of a section offset: the bytes at that offset are the section's
      * values, one per frame, and there is no container around them.
      *
      * <p>Twenty of a container's bytes are header, so a section shorter than
-     * that costs more packed than plain - a one-frame intro carries one value.
+     * that costs more packed than plain - a one-frame tune carries one value.
      * The offset's top bit says which a section is, and a file is far too
      * small for the bit to be an offset.
      */
@@ -181,10 +172,10 @@ public final class YmxFormat {
         return (entry & SECTION_STORED) != 0;
     }
 
-    public static final int OFFSET_INTRO_TABLE = 34;
-    public static final int OFFSET_LOOP_TABLE = OFFSET_INTRO_TABLE + 4 * STREAMS;
+    /** One long offset per stream, in stream order: where its section is. */
+    public static final int OFFSET_SECTION_TABLE = 30;
 
-    public static final int HEADER_SIZE = OFFSET_LOOP_TABLE + 4 * STREAMS;
+    public static final int HEADER_SIZE = OFFSET_SECTION_TABLE + 4 * STREAMS;
 
     /** A sample table entry: a long offset and a word length. */
     public static final int SAMPLE_ENTRY_SIZE = 8;
@@ -244,10 +235,10 @@ public final class YmxFormat {
 
     /**
      * As above, for a tune whose live stream count is known. The round-robin
-     * has to refill every stream the player decodes once per C frames, and
-     * since v6 the player decodes only as far as the last channel the tune
-     * names - so a tune that leaves channels idle may use a smaller C than
-     * the format's full stream count would allow.
+     * has to refill every stream the player decodes once per C frames, and a
+     * player decodes only as far as the last channel the tune names - so a
+     * tune that leaves channels idle may use a smaller C than the format's
+     * full stream count would allow.
      */
     public static String checkShape(int ringSize, int chunk, int unit, int live) {
         if (!org.st4.St4Format.isUnitSize(unit)) {
