@@ -40,6 +40,33 @@ final class ToolsDocTest {
         map.put("src/main/java/org/ymr/YmrPlay.java", "### ymr.sh");
         map.put("src/main/java/org/st4/St4.java", "### st4 and dst4");
         map.put("src/main/java/org/st4/Dst4.java", "### st4 and dst4");
+        // The C# tree parses the same flags; PlayTools.cs holds the three
+        // listening tools in one file, so it binds to their whole chapter.
+        map.put("dotnet/ym6/Ymx.cs", "### org.ym6.Ymx");
+        map.put("dotnet/ymr/Ymr.cs", "### org.ymr.Ymr");
+        map.put("dotnet/ymx/MkSndh.cs", "### mksndh.sh");
+        map.put("dotnet/ymx/MkPrg.cs", "### mkprg.sh");
+        map.put("dotnet/ymx/Tools.cs", "### mkcores.sh");
+        map.put("dotnet/ymx/MkRelease.cs", "### mkrelease.sh");
+        map.put("dotnet/ym6/PlayTools.cs", "## Listening");
+        map.put("dotnet/ymr/YmrPlay.cs", "### ymr.sh");
+        map.put("dotnet/st4/St4Cli.cs", "### st4 and dst4");
+        return map;
+    }
+
+    /** The tools that exist in both trees, Java sources against the C#
+     * file that carries the same parser. */
+    private static final Map<String, String> TWINS = twins();
+
+    private static Map<String, String> twins() {
+        Map<String, String> map = new LinkedHashMap<>();
+        map.put("src/main/java/org/ym6/Ymx.java", "dotnet/ym6/Ymx.cs");
+        map.put("src/main/java/org/ymr/Ymr.java", "dotnet/ymr/Ymr.cs");
+        map.put("src/main/java/org/ymx/MkSndh.java", "dotnet/ymx/MkSndh.cs");
+        map.put("src/main/java/org/ymx/MkPrg.java", "dotnet/ymx/MkPrg.cs");
+        map.put("src/main/java/org/ymx/MkCores.java", "dotnet/ymx/Tools.cs");
+        map.put("src/main/java/org/ymx/MkRelease.java", "dotnet/ymx/MkRelease.cs");
+        map.put("src/main/java/org/ymr/YmrPlay.java", "dotnet/ymr/YmrPlay.cs");
         return map;
     }
 
@@ -49,12 +76,16 @@ final class ToolsDocTest {
 
     private static Map<String, String> environment() {
         Map<String, String> map = new LinkedHashMap<>();
-        map.put("HATARI", "src/main/java/org/ym6/Play.java");
-        map.put("TOS", "src/main/java/org/ym6/Play.java");
-        map.put("UNICORN_LIB", "src/test/java/org/ymx/rig/Unicorn.java");
-        map.put("YMX_NOMASK", "src/test/java/org/ymx/rig/Rig.java");
-        map.put("YMX_PACK_OPTIONS", "src/test/java/org/ymx/rig/Sweep.java");
-        map.put("YMR_FRAME_CAP", "src/test/java/org/ymx/rig/YmrSweep.java");
+        map.put("HATARI", "src/main/java/org/ym6/Play.java,dotnet/ym6/PlayTools.cs");
+        map.put("TOS", "src/main/java/org/ym6/Play.java,dotnet/ym6/PlayTools.cs");
+        map.put("UNICORN_LIB",
+                "src/test/java/org/ymx/rig/Unicorn.java,dotnet/rig/Unicorn.cs");
+        map.put("YMX_NOMASK",
+                "src/test/java/org/ymx/rig/Rig.java,dotnet/rig/RigCore.cs");
+        map.put("YMX_PACK_OPTIONS",
+                "src/test/java/org/ymx/rig/Sweep.java,dotnet/rig/Sweep.cs");
+        map.put("YMR_FRAME_CAP",
+                "src/test/java/org/ymx/rig/YmrSweep.java,dotnet/rig/YmrSweep.cs");
         map.put("ymx.repo", "src/main/java/org/ymx/Tools.java");
         map.put("ymx.core", "src/main/java/org/ymx/MkSndh.java");
         map.put("ymx.stub", "src/main/java/org/ymx/MkPrg.java");
@@ -64,24 +95,31 @@ final class ToolsDocTest {
         return map;
     }
 
-    /** The flag literals a source's argument loop compares against. */
+    /** The flag literals a source's argument loop compares against - the
+     * Java forms and the C# ones. */
     private static Set<String> parsedFlags(String source) {
         Set<String> flags = new LinkedHashSet<>();
         Matcher compared = Pattern.compile(
-                "(?:equals|startsWith)\\(\"(--?[a-zA-Z-]+)\"\\)"
-                + "|case \"(-[a-zA-Z-]+)\"").matcher(source);
+                "(?:equals|startsWith|StartsWith)\\(\"(--?[a-zA-Z-]+)\"\\)"
+                + "|case \"(-[a-zA-Z-]+)\"|== \"(--?[a-zA-Z-]+)\"")
+                .matcher(source);
         while (compared.find()) {
-            flags.add(compared.group(1) != null ? compared.group(1)
-                    : compared.group(2));
+            for (int group = 1; group <= 3; group++) {
+                if (compared.group(group) != null) {
+                    flags.add(compared.group(group));
+                }
+            }
         }
         return flags;
     }
 
-    /** One section's text: from its heading to the next heading. */
+    /** One section's text: from its heading to the next heading of the
+     * same or a higher level, so a chapter covers its subsections. */
     private static String section(String doc, String heading) {
         int start = doc.indexOf(heading + "\n");
         assertTrue(start >= 0, DOC + " no longer carries the section " + heading);
-        Matcher next = Pattern.compile("(?m)^##").matcher(doc);
+        int level = heading.length() - heading.replace("#", "").length();
+        Matcher next = Pattern.compile("(?m)^#{1," + level + "}\\s").matcher(doc);
         int end = next.find(start + heading.length()) ? next.start() : doc.length();
         return doc.substring(start, end);
     }
@@ -144,9 +182,22 @@ final class ToolsDocTest {
         for (Map.Entry<String, String> variable : ENVIRONMENT.entrySet()) {
             assertTrue(doc.contains(variable.getKey()),
                     "the environment table does not list " + variable.getKey());
-            assertTrue(Files.readString(Path.of(variable.getValue()))
-                            .contains("\"" + variable.getKey() + "\""),
-                    variable.getValue() + " no longer reads " + variable.getKey());
+            for (String reader : variable.getValue().split(",")) {
+                assertTrue(Files.readString(Path.of(reader))
+                                .contains("\"" + variable.getKey() + "\""),
+                        reader + " no longer reads " + variable.getKey());
+            }
+        }
+    }
+
+    @Test
+    void theTwoTreesParseTheSameFlags() throws IOException {
+        for (Map.Entry<String, String> twin : TWINS.entrySet()) {
+            Set<String> java = parsedFlags(Files.readString(Path.of(twin.getKey())));
+            Set<String> cs = parsedFlags(Files.readString(Path.of(twin.getValue())));
+            assertTrue(java.equals(cs), twin.getKey() + " parses " + java
+                    + " and " + twin.getValue() + " parses " + cs
+                    + " - the trees have drifted");
         }
     }
 
