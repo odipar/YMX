@@ -87,7 +87,8 @@ with different rings and chunks combine into one file.
 
 ## 2. An SNDH file from a core
 
-In order, with every part after the tag block even-aligned:
+In order, with every part after the tag block even-aligned and every pad
+byte written 0:
 
 1. **The entry triple**, 12 bytes: three `bra.w` instructions
    (`$60 $00`, then a word displacement). Each branches to the same entry
@@ -95,7 +96,8 @@ In order, with every part after the tag block even-aligned:
    plus the tag block, padded even — all three displacements are `H − 2`.
 2. **The tag block**: `'SNDH'`, then the tags, then `'HDNS'`, padded even.
    The reference combiner writes, in order: `TITL` (NUL-terminated text),
-   `COMM` (when there is a composer), `CONV`, `'##'` plus two ASCII digits
+   `COMM` (when there is a composer), `CONV` (NUL-terminated text naming
+   the converter), `'##'` plus two ASCII digits
    of the subtune count plus NUL, `TC` plus the frame rate in ASCII plus
    NUL, `FLAG~ady` plus NUL, an even pad, `FRMS` with one long frame count
    per subtune (0 for a tune that starts over), `!#SN` with one word offset
@@ -146,3 +148,81 @@ In order:
 
 The program takes the machine over, calls play once per VBL, stops on
 SPACE, and switches subtunes on the number keys 1-9.
+
+## 5. From the release to a program, step by step
+
+The whole build for a system with no assembler and no JVM: five reads and
+one write.
+
+1. **Fetch** the release `binaries-v<format version>` and check each
+   file's SHA-256 against `MANIFEST.txt`.
+2. **Pick the core** for the unit size the tunes are packed at — the
+   fourth byte of any non-stored section's ST4 signature (`SPEC.md` §1.4)
+   — and for the flags wanted. Verify its descriptor (§1): `'YMXC'`,
+   descriptor version 1, the tunes' format version, the unit, the flags.
+3. **Read each tune's header** (`SPEC.md` §1.1): frame count, rate, ring
+   size, and flag bit 0 for the `FRMS` entry. One rate across the set.
+4. **Write the SNDH file** (§2): the tag block first — its length sets
+   the three displacements — then the core with its two offsets patched,
+   the subtune table, the tunes, the workspace.
+5. **Wrap it** (§4): the 28-byte PRG header, the stub with its three
+   fields patched from the SNDH file's own tags, the SNDH file, one zero
+   long.
+
+Step 4 alone gives a file any SNDH host plays; step 5 makes it a program.
+The patches over the whole build: two longs in the core, three
+displacements in the entry triple, three fields in the stub, and the text
+size in the PRG header — every other byte is copied or zero.
+
+## 6. Use cases
+
+Each case is §5 with one decision changed.
+
+**One tune, its own sizes.** Read the tune's header, take the core its
+sections' unit selects — `ymxsndh-k1.bin` for a tune packed at unit 1 —
+write the SNDH with one table entry and a workspace of `F + 25 · N`, wrap
+it. The stub's frame count is the tune's frame count when header flag
+bit 0 is clear, 0 when the tune starts over.
+
+**A chosen workspace.** `N` is the packer's decision, written in the
+tune's header — the maximum back-reference distance, not a combiner
+option. A combiner chooses only the workspace size: anything at or above
+`F + 25 · max(N)` (§1). `F + 25 · 2520` — the cap on `N` (`SPEC.md`
+§1.3) — covers every legal tune, so a combiner may write that once and
+skip the per-set maximum.
+
+**Mixed tunes.** Tunes with different rings and chunks combine into one
+file: the workspace takes the largest `N`, and the core reads each tune's
+own header at init. The rules that stay: one unit size, one frame rate,
+at most 99 subtunes.
+
+**A tune with only stored sections.** Reads the same at any unit size and
+combines with any core (§2).
+
+**A measuring build.** The `-perf` cores carry the raster monitor, the
+`-nomask` cores write the frame unmasked. Pick by name, verify by the
+flags word (§1): the descriptor says what a core is, not the file name.
+
+**Another format version.** A tune's header word at offset 4 gives its
+format version; the release for it is `binaries-v<that version>`. A new
+format is a new release and the old releases stay published, so a
+combiner pins the tag its tunes need and verifies the core's word at
+offset 22 against them.
+
+**A program that reports its end.** One tune with header flag bit 0
+clear, and stub flag bit 0 set (§3): the program plays the patched frame
+count, drops `YMXDONE.MRK` on exit, and a harness watching for the file
+closes the emulator by itself.
+
+**A jukebox host.** Stop after §5 step 4: an SNDH host plays the file as
+it stands. The stub and PRG header are only for running it as a TOS
+program.
+
+**A driver of its own.** Take the §2 file and call its triple directly:
+init with the subtune number in `d0.w`, play once per frame at the `TC`
+rate, exit to hand the machine back. Every entry preserves d0-a6.
+
+**A changed set.** The file holds no checksums and nothing in it is
+derived from tune bytes except offsets, so adding, dropping or replacing
+a tune is a rebuild from the same parts — §5 steps 4 and 5 again, not a
+patch.
