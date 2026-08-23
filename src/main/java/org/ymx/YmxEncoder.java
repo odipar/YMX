@@ -197,8 +197,8 @@ public final class YmxEncoder {
         }
 
         var streams = new ArrayList<Stream>(2 * YmxFormat.STREAMS);
-        var intro = new byte[YmxFormat.STREAMS][];
-        var loop = new byte[YmxFormat.STREAMS][];
+        var intro = new Section[YmxFormat.STREAMS];
+        var loop = new Section[YmxFormat.STREAMS];
         for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
             byte[] values = vectors[stream];
             intro[stream] = pack(streams, stream, false, progress,
@@ -243,37 +243,52 @@ public final class YmxEncoder {
         return out;
     }
 
+    /** One section as it goes into the file: packed, or the values themselves. */
+    private record Section(byte[] bytes, boolean stored) {
+
+        static final Section ABSENT = new Section(new byte[0], false);
+    }
+
     /**
-     * Packs one section of one register as a complete ST4 container; an empty
-     * section produces no container.
+     * Packs one section of one register; an empty section produces nothing.
+     *
+     * <p>A short section costs more as a container than as itself: twenty of
+     * the bytes are header before a value is written down, and a one-frame
+     * intro carries one value. Where the values are the smaller of the two,
+     * they are what the file gets, and the section's offset says so.
      */
-    private static byte[] pack(List<Stream> streams, int register, boolean loop,
-                               boolean progress, byte[] values, int offsetLimit,
-                               int unit) {
+    private static Section pack(List<Stream> streams, int register, boolean loop,
+                                boolean progress, byte[] values, int offsetLimit,
+                                int unit) {
         if (values.length == 0) {
-            return new byte[0];
+            return Section.ABSENT;
         }
         int[] units = Units.split(values, unit);
         St4Compressor.Result result = St4Compressor.compress(
                 St4EventOptimizer.optimize(units, unit, offsetLimit, progress),
                 units, unit, St4Format.MAX_OP);
         byte[] container = St4.container(result);
-        streams.add(new Stream(register, loop, values.length, container.length,
+        boolean stored = values.length < container.length;
+        byte[] bytes = stored ? values : container;
+        streams.add(new Stream(register, loop, values.length, bytes.length,
                 result.longestOp()));
-        return container;
+        return new Section(bytes, stored);
     }
 
     private static byte[] build(Tune tune, int ringSize, int chunk, int frames,
-                                int split, boolean loops, byte[][] intro, byte[][] loop,
+                                int split, boolean loops, Section[] intro, Section[] loop,
                                 byte[][] samples, int channels) {
         // Containers carry alignment guarantees of their own - stream A and D
-        // are read a word at a time - so each is placed on a long boundary.
+        // are read a word at a time - so each is placed on a long boundary. A
+        // stored section is read a byte at a time and needs none, but it takes
+        // the same boundary: one placement rule, and the four bytes it can
+        // cost are what a section of its size is trying to save.
         int total = YmxFormat.HEADER_SIZE;
-        for (byte[] container : intro) {
-            total = align(total) + container.length;
+        for (Section section : intro) {
+            total = align(total) + section.bytes().length;
         }
-        for (byte[] container : loop) {
-            total = align(total) + container.length;
+        for (Section section : loop) {
+            total = align(total) + section.bytes().length;
         }
         int sampleTable = samples.length == 0 ? 0 : align(total);
         if (samples.length > 0) {
@@ -326,16 +341,18 @@ public final class YmxEncoder {
         return file;
     }
 
-    /** Copies one table's containers into the file and fills in its offsets. */
-    private static int place(byte[] file, int table, byte[][] containers, int at) {
+    /** Copies one table's sections into the file and fills in its offsets. */
+    private static int place(byte[] file, int table, Section[] sections, int at) {
         for (int register = 0; register < YmxFormat.STREAMS; register++) {
-            if (containers[register].length == 0) {
+            byte[] bytes = sections[register].bytes();
+            if (bytes.length == 0) {
                 continue;                       // no such section: the offset stays 0
             }
             at = align(at);
-            putLong(file, table + 4 * register, at);
-            System.arraycopy(containers[register], 0, file, at, containers[register].length);
-            at += containers[register].length;
+            putLong(file, table + 4 * register,
+                    sections[register].stored() ? at | YmxFormat.SECTION_STORED : at);
+            System.arraycopy(bytes, 0, file, at, bytes.length);
+            at += bytes.length;
         }
         return at;
     }

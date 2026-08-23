@@ -331,6 +331,9 @@ YS_QUEUE        equ     28              ; word  d0, bit queue
 YS_START        equ     32              ; long  this stream's ring
 YS_END          equ     36              ; long  one past its last byte
 YS_LEFT         equ     40              ; long  values left in the current section
+YS_STORED       equ     44              ; word  set when the section is its own
+                                        ; values: fill copies them instead of
+                                        ; running a decoder over them
 ; The movem block starts at the top of the state, so the two movems address it
 ; as plain (a2) - see the note where they are used.
 
@@ -486,6 +489,15 @@ YMX_init:
         add.w   d4,d0
         movea.l YMX_FILE(a3),a0
         move.l  0(a0,d0.w),d0
+        clr.w   YS_STORED(a2)           ; clr writes the flags, so the test
+        tst.l   d0                      ; comes after it: the offset's top bit
+        bpl.s   .container              ; marks a section stored
+        bclr    #31,d0
+        adda.l  d0,a0                   ; the values, read a byte at a time
+        move.l  a0,YS_INPUT(a2)
+        move.w  #1,YS_STORED(a2)
+        bra.s   .opened
+.container:
         adda.l  d0,a0                   ; the section's ST4 container
         cmp.l   #ST4_SIGNATURE,(a0)     ; magic, version and unit in one compare:
         bne     .rejected               ; a tune packed for another unit size
@@ -505,6 +517,7 @@ YMX_init:
         move.w  d0,YS_QUEUE(a1)
         move.l  d1,YS_D1(a1)
         move.l  d2,YS_D2(a1)
+.opened:
 
         move.w  YMX_INDEX(a3),d0        ; and its first group
         lsl.w   #6,d0
@@ -685,6 +698,8 @@ YMX_fill:
         sub.l   d0,YS_LEFT(a2)
         sub.l   d0,d7
         move.w  d0,d3                   ; a piece is at most C, so it fits a word
+        tst.w   YS_STORED(a2)
+        bne.s   .copy                   ; stored: the section is the values
 ; The decoder's budget counts units of ST4_UNIT bytes. The packer enforces
 ; that every piece boundary - C, the loop frame, the tune length - is a whole
 ; number of units, so this shift never drops a remainder.
@@ -723,6 +738,26 @@ YMX_fill:
         movem.l (sp)+,d6-d7/a6
         rts
 
+; A stored section: the file holds the values, so a piece is a copy. The ring
+; end is handled the way a decode's is - C divides N, so a piece lands on the
+; end or short of it, never across.
+.copy:
+        movea.l YS_INPUT(a2),a0
+        movea.l YS_WRITE(a2),a1
+        subq.w  #1,d3                   ; a piece is never empty
+.byte:
+        move.b  (a0)+,(a1)+
+        dbra    d3,.byte
+        move.l  a0,YS_INPUT(a2)
+        cmpa.l  YS_END(a2),a1
+        bne.s   .in_ring
+        movea.l YS_START(a2),a1         ; the copy landed on the ring end
+.in_ring:
+        move.l  a1,YS_WRITE(a2)
+        tst.l   d7
+        bne     .piece                  ; the copy sits past .done, so the two
+        bra     .done                   ; ways back are word displacements
+
 ; -----------------------------------------------------------------------------
 ; YMX_start_loop: a2 = state block. Starts this register's loop stream over -
 ; a fresh decoder, reading from the top of the loop section, still writing
@@ -744,6 +779,16 @@ YMX_start_loop:
                                         ; BYTE - so the base moves instead
         suba.w  #YH_LOOP_TABLE,a0       ; a0 is the file again below
         beq.s   .no_loop                ; this tune has no loop section
+        tst.l   d0
+        bpl.s   .container              ; the offset's top bit: stored values
+        bclr    #31,d0
+        adda.l  d0,a0
+        move.l  a0,YS_INPUT(a2)         ; the values, read a byte at a time
+        move.w  #1,YS_STORED(a2)
+        move.l  YMX_LOOPLEN(a6),YS_LEFT(a2)
+        rts
+.container:
+        clr.w   YS_STORED(a2)
         adda.l  d0,a0                   ; the loop section's ST4 container
         movea.l YS_START(a2),a1         ; read before a2 becomes stream B
         bsr.s   ymx_open

@@ -44,11 +44,21 @@ public record YmxHeader(int ring, int chunk, int unit, int hz, int flags, int fr
                     + ", this build reads " + YmxFormat.VERSION
                     + " - repack the tune from its .ym source");
         }
-        int section = (int) longAt(file, YmxFormat.OFFSET_INTRO_TABLE);
-        if (section == 0) {
-            section = (int) longAt(file, YmxFormat.OFFSET_LOOP_TABLE);
+        // A stored section carries no signature, so the unit size comes from
+        // the first section that is a container. Every tune has one: a whole
+        // tune's worth of values never packs larger than itself.
+        int section = 0;
+        for (int stream = 0; stream < YmxFormat.STREAMS && section == 0; stream++) {
+            for (int table : new int[] {YmxFormat.OFFSET_INTRO_TABLE,
+                                        YmxFormat.OFFSET_LOOP_TABLE}) {
+                long entry = longAt(file, table + 4 * stream);
+                if (entry != 0 && !YmxFormat.isStored(entry)) {
+                    section = (int) YmxFormat.sectionOffset(entry);
+                    break;
+                }
+            }
         }
-        if (section + 3 >= file.length) {
+        if (section == 0 || section + 3 >= file.length) {
             throw new IOException(path + " has no readable first section");
         }
         return new YmxHeader(word(file, YmxFormat.OFFSET_RING_SIZE),

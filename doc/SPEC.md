@@ -122,6 +122,13 @@ built for (§9.1). A player opens one with the eight-instruction sequence ST4.S
 documents, and `dst4` unpacks any section straight out of a `.ymx` for
 debugging.
 
+A section shorter than the container that would hold it is **stored**: the
+bytes at its offset are its values, one per frame, with no header and no
+signature. Bit 31 of a section's offset says which of the two it is, and the
+offset is the rest. A container spends twenty bytes on its header before a
+value is written down, so a one-frame intro is one stored byte a stream rather
+than twenty-five containers.
+
 Every stream is packed twice, because restarting it at the loop frame means
 starting a decoder over: the intro section covers `[0, L)`, the loop section
 covers `[L, O)`, and the player starts the loop section again every time round
@@ -498,8 +505,9 @@ frames twice, compiled differently. Nothing at play time distinguishes them.
 - the magic is `'YMX!'`;
 - the version is 1;
 - the stream count is 25 — it is fixed, not a size to adapt to;
-- every section's own ST4 signature matches the unit size the reader was
-  built for — a tune packed for a different one is rejected, not garbled.
+- every section that is a container carries an ST4 signature matching the
+  unit size the reader was built for — a tune packed for a different one is
+  rejected, not garbled. A stored section has no signature to check.
 
 Beyond that a player checks nothing, and a malformed file is undefined
 behaviour. This is deliberate: the format is a compilation target, and every
@@ -515,6 +523,7 @@ value. Those operations, in full:
 |---|---|
 | M bit 4 with bits 7-5 | the three skip bits take the value in 7-5. On a frame with bit 4 clear they keep the value they had; nothing else changes them |
 | skip bit set for voice v | no write to R8+v occurs in the frame write |
+| a section offset with bit 31 set | the bytes at that offset are the section's values, one per frame: read them, do not decode them |
 | R7 bits 7-6 | the value written there comes from the host. Bits 5-0 come from the stream |
 | R13 = `$FF` | R13 is not written this frame |
 | X bits 7-4 | the value written to R13 when a retrigger stream starts, and when a `HOLD` with flag 4 runs |

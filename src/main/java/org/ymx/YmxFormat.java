@@ -160,6 +160,27 @@ public final class YmxFormat {
     public static final int OFFSET_MASTER_CLOCK = 24;
     public static final int OFFSET_SAMPLE_TABLE = 28;
     public static final int OFFSET_SAMPLE_COUNT = 32;
+    /**
+     * Bit 31 of a section offset: the bytes at that offset are the section's
+     * values, one per frame, and there is no container around them.
+     *
+     * <p>Twenty of a container's bytes are header, so a section shorter than
+     * that costs more packed than plain - a one-frame intro carries one value.
+     * The offset's top bit says which a section is, and a file is far too
+     * small for the bit to be an offset.
+     */
+    public static final long SECTION_STORED = 0x8000_0000L;
+
+    /** Where a section's bytes begin, whether it is stored or a container. */
+    public static long sectionOffset(long entry) {
+        return entry & ~SECTION_STORED;
+    }
+
+    /** Whether a section's bytes are its values rather than a container. */
+    public static boolean isStored(long entry) {
+        return (entry & SECTION_STORED) != 0;
+    }
+
     public static final int OFFSET_INTRO_TABLE = 34;
     public static final int OFFSET_LOOP_TABLE = OFFSET_INTRO_TABLE + 4 * STREAMS;
 
