@@ -104,7 +104,7 @@ which format a tune came out of.
 ## Tests
 
 ```sh
-mvn test                                   # the packers: formats, effects, shapes
+mvn test                                   # the packers, and 35 pinned tunes
 python3 ymx/test/emu/test_ymx.py           # the player, under emulation
 python3 ymx/test/sweep.py songs/*.ym       # a YM collection, differentially
 python3 ymx/test/ymr_sweep.py songs/*.ymr  # the same for .YMR
