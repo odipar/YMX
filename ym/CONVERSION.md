@@ -67,8 +67,8 @@ away. They exist because the reference player would not have
 started those codes either: dropping them makes the conversion faithful,
 not lossy.
 
-* **Sinus-SID.** Never seen in a dump, and never implemented by any player -
-  the format author's included. The packer warns and drops it.
+* **Sinus-SID.** ST-Sound, the format author's own player, reads the effect
+  code and runs an empty handler. The packer warns and drops it.
 
 * **A drum above the rate ceiling is rescued, not dropped.** The sample is
   resampled to the highest MFP-representable rate under the ceiling, through
@@ -160,11 +160,11 @@ not lossy.
   end resolves it and writes the number into stream X; the player reads it
   there. A tune that arms a buzzer before it has written any shape carries 0,
   which is a YM dump's own default. See
-  [SPEC.md](../doc/SPEC.md#22-x--the-spare-operands).
+  [SPEC.md](../doc/SPEC.md#22-x---the-spare-operands).
 
 ## What it does not do
 
 * **YM2's drums.** Mad Max's forty samples are held in the player, not in the
   file; supporting them means embedding the bank in the converter. Not yet.
-* **YM2, YM3 and packed `.ym` files.** The reader takes `YM5!` and `YM6!`
-  only, and reports which it found.
+* **YM2, YM3, YM4 and packed `.ym` files.** The reader takes `YM5!` and
+  `YM6!` only, and reports which it found.

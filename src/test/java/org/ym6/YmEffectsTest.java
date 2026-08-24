@@ -10,8 +10,8 @@ import org.junit.jupiter.api.Test;
  * slots, the YM5 dialect (including its fixed-R8 drum prescaler), every drop
  * rule, and the drum conversion in both sample widths. The reference corpus
  * facts these encode: inert TP/TC codes are no-ops (Ninja Remix carries 151
- * of them), Sinus-SID is unplayed everywhere, and a drum trigger without a
- * sample must vanish at pack time.
+ * of them), the reference player runs an empty handler for Sinus-SID, and a
+ * drum trigger without a sample must vanish at pack time.
  */
 final class YmEffectsTest {
 
@@ -77,7 +77,7 @@ final class YmEffectsTest {
         r[14][0] = 100;
         r[1][1] = (byte) 0x10;          // SID with count 0: inert
         r[6][1] = (byte) (1 << 5);
-        r[1][2] = (byte) 0x90;          // Sinus-SID: dropped everywhere
+        r[1][2] = (byte) 0x90;          // Sinus-SID: dropped at pack time
         r[6][2] = (byte) (1 << 5);
         r[14][2] = 100;
         r[1][3] = (byte) 0x10;          // 2457600/4/10 = 61440 Hz: too fast

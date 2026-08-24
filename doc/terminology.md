@@ -7,16 +7,19 @@ audio.
 
 The format was written for the Atari ST's YM2149, though YM files exist
 for other machines with the same chip family. The early versions - YM2,
-YM3, YM3b - are bare register dumps. **YM5** added a header (title,
-author, loop frame, chip clock, player rate) and stored samples, and
-widened the frame to sixteen bytes so two of them could carry effect
-fields. **YM6** spent the spare codes in those fields on two more
-effects. All of it comes from Arnaud Carré's ST-Sound, the reference
+YM3, YM3b - are bare register dumps: fourteen register values a frame,
+and in YM3b a loop frame after the last of them. **YM4** added a header
+(title, author, loop frame, digidrum count), stored samples, and widened
+the frame to sixteen bytes, the two added bytes carrying effect fields
+rather than chip settings. **YM5** put the chip clock and the player rate
+in that header. **YM6** spent the spare codes in the effect fields on two
+more effects. All of it comes from Arnaud Carré's ST-Sound, the reference
 player, which is why the format's names are that player's names - and why
 a file carries `LeOnArD!` as its check string. Distributed `.ym` files
 are usually LHA-compressed. The YM front end reads YM5 and YM6.
 
-YM5 carries digidrum and SID voice; YM6 adds sync buzzer and sinus SID.
+A YM5 file carries digidrum and SID voice, a YM6 file those two with sync
+buzzer and sinus SID.
 
 **YMX** is this repository's format and player: YM6's ideas, packed as
 streams in a compressed container. The 6 is YM6's; the X marks the

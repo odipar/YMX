@@ -80,6 +80,7 @@ public final class MkSndh {
         @Nullable YmxHeader first = null;
         int rate = 0;
         int maxRing = 0;
+        int claimed = 0;
         int n = 0;
         for (Path tune : options.tunes()) {
             YmxHeader header;
@@ -109,6 +110,7 @@ public final class MkSndh {
             }
             n++;
             maxRing = Math.max(maxRing, header.ring());
+            claimed |= header.claimedTimers();
             frms.add(header.frms());
             names.add(subtuneName(options, n, tune));
             try {
@@ -121,8 +123,8 @@ public final class MkSndh {
             throw Tools.fail("mksndh: no tunes");
         }
 
-        byte[] file = combine(core, tunes, tags(options, rate, n, frms, names),
-                maxRing);
+        byte[] file = combine(core, tunes,
+                tags(options, rate, n, frms, names, claimed), maxRing);
         Path output = options.output().toAbsolutePath();
         try {
             Files.write(output, file);
@@ -201,12 +203,20 @@ public final class MkSndh {
     }
 
     /**
-     * The tag block, 'SNDH' through 'HDNS': the tags in the order the spec
-     * requires - the '##' subtune count before any per-subtune table, and
-     * the names last.
+     * The tag block, 'SNDH' through 'HDNS'. The SNDH specification fixes no
+     * tag order: its tag table is a list, no sentence in it states an
+     * ordering rule, and its own example header writes an order this
+     * combiner does not. The order below fixes one thing of its own: the
+     * '##' subtune count comes before FRMS and before the subtune names,
+     * because a reader sizes both of those tables by the count it has read.
+     * The two pads put FRMS's longs on an even address and 'HDNS' on the
+     * even boundary the specification requires.
+     *
+     * <p>{@code claimed} is the set's MFP timers, one bit per timer, which
+     * the FLAG tag spells out.
      */
     static byte[] tags(Options options, int rate, int n,
-                       List<Integer> frms, List<String> names) {
+                       List<Integer> frms, List<String> names, int claimed) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         text(out, "SNDH");
         tag(out, "TITL", clean(options.title()));
@@ -216,7 +226,7 @@ public final class MkSndh {
         tag(out, "CONV", "Converted from YM by YMX (ZX1 through ST4)");
         tag(out, String.format("##%02d", n), "");
         tag(out, "TC" + rate, "");
-        tag(out, "FLAG", "~ady");
+        tag(out, "FLAG", flag(claimed));
         if ((out.size() & 1) != 0) {
             out.write(0);
         }
@@ -227,9 +237,15 @@ public final class MkSndh {
             out.write(frames >>> 8);
             out.write(frames);
         }
-        // The subtune names: SNDH's own track list. The offsets are words
-        // relative to the tag start, and the reference parsers agree on the
-        // '!#SN' spelling (the spec's own text wavers between the two).
+        // The subtune names: SNDH's own track list. The specification prints
+        // this tag '#!SN' in every place it appears, and two parsers that
+        // read v2.2 files, PSG Play and the AtariAudio library, both match
+        // '!#SN'; a file spelled the way the specification prints it loses
+        // its names in both. The offsets are words counted from the tag's
+        // first byte, one per subtune, which is what PSG Play adds them to -
+        // the specification's example writes a base offset and then deltas
+        // instead, which lands on the wrong addresses there.
+        // doc/BINARIES.md §2 states both departures.
         text(out, "!#SN");
         int strings = 4 + 2 * n;
         int[] at = new int[n];
@@ -250,6 +266,24 @@ public final class MkSndh {
         }
         text(out, "HDNS");
         return out.toByteArray();
+    }
+
+    /**
+     * The FLAG tag's value for a set claiming these MFP timers: '~', then
+     * 'a' to 'd' for each timer some tune in the set claims, then 'y' for
+     * the YM2149 the player drives. The specification's letters run in that
+     * order. A claimed timer is one the player takes over at init and hands
+     * back at exit.
+     */
+    static String flag(int claimed) {
+        String letters = "abcd";                  // the MFP's four timers
+        StringBuilder value = new StringBuilder("~");
+        for (int timer = 0; timer < letters.length(); timer++) {
+            if ((claimed & (1 << timer)) != 0) {
+                value.append(letters.charAt(timer));
+            }
+        }
+        return value.append('y').toString();
     }
 
     /** One text tag: the four tag bytes, the value, a closing NUL. */

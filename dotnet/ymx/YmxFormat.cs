@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using St4;
 
 namespace Ymx
 {
@@ -279,16 +280,37 @@ namespace Ymx
 
     /// <summary>
     /// The .ymx header fields the build tools need, ported from
-    /// org.ymx.YmxHeader. The unit size lives in the first embedded ST4
-    /// container's signature; a tune whose sections are all stored reads at
-    /// any unit and reports 0.
+    /// org.ymx.YmxHeader. Two of them are not in the header: the unit size
+    /// lives in the first embedded ST4 container's signature, and a tune
+    /// whose sections are all stored reads at any unit and reports 0; the
+    /// channel-to-timer map lives in the T stream, whose first frame this
+    /// unpacks.
     /// </summary>
     public sealed record YmxHeader(int Ring, int Chunk, int Unit, int Hz,
-            int Flags, int Frames)
+            int Flags, int Frames, int Timers)
     {
         public bool AnyUnit()
         {
             return Unit == 0;
+        }
+
+        /// <summary>
+        /// The MFP timers the tune claims, one bit per timer, 1 shifted by
+        /// the timer number YmxFormat.TimerA and its neighbours give. The
+        /// player claims one timer per timer channel the flags mark, and
+        /// Timers says which timer that channel runs on.
+        /// </summary>
+        public int ClaimedTimers()
+        {
+            int claimed = 0;
+            for (int channel = 0; channel < YmxFormat.Channels; channel++)
+            {
+                if ((Flags & YmxFormat.FlagChannel(channel)) != 0)
+                {
+                    claimed |= 1 << YmxFormat.TimerOf(Timers, channel);
+                }
+            }
+            return claimed;
         }
 
         public bool Loops()
@@ -347,7 +369,42 @@ namespace Ymx
                     section == 0 ? 0 : file[section + 3],
                     Word(file, YmxFormat.OffsetPlayerHz),
                     Word(file, YmxFormat.OffsetFlags),
-                    (int) LongAt(file, YmxFormat.OffsetFrames));
+                    (int) LongAt(file, YmxFormat.OffsetFrames),
+                    TimerMap(file, path));
+        }
+
+        /// <summary>
+        /// The T stream's first frame: the packer writes one channel-to-timer
+        /// map over a whole tune, so frame 0 gives the map. A container says
+        /// its own size, so what is unpacked is the rest of the file from the
+        /// section's first byte.
+        /// </summary>
+        private static int TimerMap(byte[] file, string path)
+        {
+            long entry = LongAt(file,
+                    YmxFormat.OffsetSectionTable + 4 * YmxFormat.StreamT);
+            int from = (int) YmxFormat.SectionOffset(entry);
+            if (entry == 0 || from >= file.Length)
+            {
+                throw new IOException(path + " has no timer stream");
+            }
+            if (YmxFormat.IsStored(entry))
+            {
+                return file[from];
+            }
+            St4Format.Container section;
+            try
+            {
+                section = St4Format.Read(file[from..]);
+            }
+            catch (ArgumentException e)
+            {
+                throw new IOException(path + ": its timer stream is not"
+                        + " readable: " + e.Message);
+            }
+            return St4Decompressor.Decompress(section.Control, section.Literal,
+                    section.ByteOffsets, section.WordOffsets, section.Unit,
+                    section.Size)[0];
         }
 
         /// <summary>The offset of one table's first section that is a

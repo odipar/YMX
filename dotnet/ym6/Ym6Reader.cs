@@ -70,8 +70,8 @@ namespace Ym6
             if (format != "YM6!" && format != "YM5!")
             {
                 throw new FormatException("not a YM5!/YM6! file (starts with \""
-                        + format + "\"); YM2/YM3 and packed .ym files are not"
-                        + " supported");
+                        + format + "\"); YM2/YM3/YM4 and packed .ym files are"
+                        + " not supported");
             }
             string check = Ascii(8);
             if (check != "LeOnArD!")

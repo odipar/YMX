@@ -5,9 +5,10 @@
 ; streams, one per sound register, and eleven carrying the compiled effect
 ; script - every one packed as its own embedded ST4 container and decoded
 ; through its own small ring by ST4_wrap.S. Written by Claude (Anthropic's
-; Claude Code) under Robbert's direction, based on ZX1 v1.5 by Einar Saukas and
-; inspired by Steve Clarets' MinYMiser. Use it freely, including commercially,
-; as long as your documentation says you used ZX1 through ST4 (see LICENSE).
+; Claude Code) under Robbert's direction, based on ZX1 v1.5 by Einar Saukas
+; and inspired by Steven Tattersall's MinYMiser. Use it freely, including
+; commercially, as long as you indicate somehow in your documentation that you
+; have used ZX1, via ST4 or YMX (see LICENSE).
 ;
 ; It plays the fourteen standard sound registers, starts over at the end, and
 ; plays what the YM format calls its special effects - digidrums, SID voices,
@@ -18,7 +19,8 @@
 ; claimed only when a tune says it uses that channel. A channel's streams are
 ; TIMER STREAMS: series of values written to one register between frames,
 ; timer-driven, as against the FRAME STREAMS that carry the music itself.
-; Sinus-SID is dropped at pack time, as it is in every other player.
+; Sinus-SID is dropped at pack time. ST-Sound, the format author's own
+; player, reads the effect code and runs an empty handler.
 ; doc/SPEC.md is the format and doc/terminology.md the vocabulary.
 ;
 ; REQUIRES ST4_wrap.S, built for the SAME unit size the tune was packed with

@@ -77,6 +77,7 @@ namespace Ymx
             YmxHeader? first = null;
             int rate = 0;
             int maxRing = 0;
+            int claimed = 0;
             int n = 0;
             foreach (string tune in options.Tunes)
             {
@@ -115,6 +116,7 @@ namespace Ymx
                 }
                 n++;
                 maxRing = Math.Max(maxRing, header.Ring);
+                claimed |= header.ClaimedTimers();
                 frms.Add(header.Frms());
                 names.Add(SubtuneName(options, n, tune));
                 try
@@ -131,8 +133,8 @@ namespace Ymx
                 throw Tools.Fail("mksndh: no tunes");
             }
 
-            byte[] file = Combine(core, tunes, Tags(options, rate, n, frms, names),
-                    maxRing);
+            byte[] file = Combine(core, tunes,
+                    Tags(options, rate, n, frms, names, claimed), maxRing);
             string output = Path.GetFullPath(options.Output);
             try
             {
@@ -219,10 +221,20 @@ namespace Ymx
             }
         }
 
-        /// <summary>The tag block, 'SNDH' through 'HDNS': the tags in the
-        /// order the spec requires.</summary>
+        /// <summary>
+        /// The tag block, 'SNDH' through 'HDNS'. The SNDH specification fixes
+        /// no tag order: its tag table is a list, no sentence in it states an
+        /// ordering rule, and its own example header writes an order this
+        /// combiner does not. The order below fixes one thing of its own: the
+        /// '##' subtune count comes before FRMS and before the subtune names,
+        /// because a reader sizes both of those tables by the count it has
+        /// read. The two pads put FRMS's longs on an even address and 'HDNS'
+        /// on the even boundary the specification requires. claimed is the
+        /// set's MFP timers, one bit per timer, which the FLAG tag spells
+        /// out.
+        /// </summary>
         internal static byte[] Tags(Options options, int rate, int n,
-                List<int> frms, List<string> names)
+                List<int> frms, List<string> names, int claimed)
         {
             var block = new MemoryStream();
             Text(block, "SNDH");
@@ -234,7 +246,7 @@ namespace Ymx
             Tag(block, "CONV", "Converted from YM by YMX (ZX1 through ST4)");
             Tag(block, "##" + n.ToString("00"), "");
             Tag(block, "TC" + rate, "");
-            Tag(block, "FLAG", "~ady");
+            Tag(block, "FLAG", Flag(claimed));
             if ((block.Length & 1) != 0)
             {
                 block.WriteByte(0);
@@ -247,8 +259,16 @@ namespace Ymx
                 block.WriteByte((byte) (frames >>> 8));
                 block.WriteByte((byte) frames);
             }
-            // The subtune names: word offsets relative to the tag start, and
-            // the reference parsers agree on the '!#SN' spelling.
+            // The subtune names: SNDH's own track list. The specification
+            // prints this tag '#!SN' in every place it appears, and two
+            // parsers that read v2.2 files, PSG Play and the AtariAudio
+            // library, both match '!#SN'; a file spelled the way the
+            // specification prints it loses its names in both. The offsets
+            // are words counted from the tag's first byte, one per subtune,
+            // which is what PSG Play adds them to - the specification's
+            // example writes a base offset and then deltas instead, which
+            // lands on the wrong addresses there. doc/BINARIES.md section 2
+            // states both departures.
             Text(block, "!#SN");
             int strings = 4 + 2 * n;
             int[] at = new int[n];
@@ -273,6 +293,27 @@ namespace Ymx
             }
             Text(block, "HDNS");
             return block.ToArray();
+        }
+
+        /// <summary>
+        /// The FLAG tag's value for a set claiming these MFP timers: '~',
+        /// then 'a' to 'd' for each timer some tune in the set claims, then
+        /// 'y' for the YM2149 the player drives. The specification's letters
+        /// run in that order. A claimed timer is one the player takes over at
+        /// init and hands back at exit.
+        /// </summary>
+        internal static string Flag(int claimed)
+        {
+            const string letters = "abcd";        // the MFP's four timers
+            var value = new StringBuilder("~");
+            for (int timer = 0; timer < letters.Length; timer++)
+            {
+                if ((claimed & (1 << timer)) != 0)
+                {
+                    value.Append(letters[timer]);
+                }
+            }
+            return value.Append('y').ToString();
         }
 
         /// <summary>One text tag: the four tag bytes, the value, a closing

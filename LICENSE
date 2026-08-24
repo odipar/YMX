@@ -9,21 +9,33 @@ through it, the ZX1 data compression format
 (https://github.com/einar-saukas/ZX1), and it follows their dual licensing
 structure:
 
-1. THE COMPRESSOR - the compressors and optimizers in Java (org.st4) and C#
-   (dotnet/st4), derived from Einar Saukas' optimal C compressor through
-   ST1's jx1 - is available under the BSD 3-Clause License below. In
+1. THE COMPRESSOR - the compressors and optimizers in Java
+   (src/main/java/org/st4) and C# (dotnet/st4), derived from Einar Saukas'
+   optimal C compressor through ST1's jx1, apart from the decompressor files
+   clause 2 lists - is available under the BSD 3-Clause License below. In
    practice this is relevant only if you modify its source code and/or
    incorporate the compressor within your own products; if you just execute
    it to pack files, you can simply ignore these conditions.
 
-2. THE DECOMPRESSORS AND PLAYERS - the reference decompressors (Java
-   org.st4.St4Decompressor and org.jx1, and their C# counterparts under
-   dotnet/), the ST4 68000 decoders in 68k/ (ST4.S, ST4_wrap.S, ST4_ring.S),
-   the YMX players (68k/YMX.S, 68k/YMX_sndh.S, 68k/YMX_player.S), and the
-   prebuilt binaries the releases carry - can be used freely within your own
+2. THE DECOMPRESSORS, PLAYERS AND TOOLS can be used freely within your own
    programs (for any platform), even for commercial releases. The only
    condition is that you must indicate somehow in your documentation that
-   you have used ZX1, via ST4 or YMX.
+   you have used ZX1, via ST4 or YMX. They are:
+
+   * The reference decompressors: src/main/java/org/st4/St4Decompressor.java,
+     src/main/java/org/st4/Dst4.java, src/main/java/org/jx1/,
+     dotnet/st4/St4Decompressor.cs, dotnet/st4/Dst4Cli.cs and dotnet/jx1/.
+   * The ST4 68000 decoders: 68k/ST4.S, 68k/ST4_wrap.S, 68k/ST4_ring.S.
+   * The YMX players: 68k/YMX.S, 68k/YMX_sndh.S, 68k/YMX_player.S.
+   * The packers, combiners and front ends: src/main/java/org/ymx/,
+     src/main/java/org/ym6/, src/main/java/org/ymr/, dotnet/ymx/,
+     dotnet/ym6/, dotnet/ymr/, dotnet/Program.cs and dotnet/Check.cs.
+   * The rigs and tests: src/test/, dotnet/rig/, 68k/test/ and ymx/test/.
+   * The shell scripts: ym/*.sh, ymr/*.sh and ymx/*.sh.
+   * The prebuilt binaries in dist/ and the ones the releases carry.
+
+   The tunes under ym/test and ymr/test are test input; this licence says
+   nothing about the music in them.
 
 The YMX format itself may be implemented freely: doc/SPEC.md and
 doc/BINARIES.md are the contract, and an independent writer, player or
@@ -37,22 +49,22 @@ Attribution
   original C and z80 sources live in the ZX1 repository.
 * The ST4 format (the four streams, the unit alignment, the container) is
   Copyright (c) 2026 Robbert van Dalen, vendored here as org.st4, dotnet/st4
-  and the 68k/ decoders. ST4_wrap.S is based on ST1_wrap.S, which was
-  written for ST1 by OpenAI Codex.
+  and the 68k/ decoders. ST4_wrap.S is based on ST1_wrap.S, which OpenAI
+  Codex adapted for ST1 from ST1_ring.S.
 * The YMX format, the packers and combiners, the SNDH and PRG tooling, the
   C# tree and the emulation and measurement rigs are Copyright (c) 2026
   Robbert van Dalen; written by Claude (Anthropic's Claude Code) under
   Robbert van Dalen's direction.
 * The YM5/YM6 register-dump formats are by Arnaud Carré (Leonard/Oxygene);
-  YMX reads them, and the player was inspired by Steve Clarets' MinYMiser.
-  The LHA depacker in org.ym6 and dotnet/ym6 is ported from the ST-Sound
-  library's LZH code by Arnaud Carré, itself based on LZH code by Haruhiko
-  Okumura (1991) and Kerwin F. Medina (1996).
+  YMX reads them, and the player was inspired by Steven Tattersall's
+  MinYMiser. The LHA depacker in org.ym6 and dotnet/ym6 is ported from the
+  ST-Sound library's LZH code by Arnaud Carré, itself based on LZH code by
+  Haruhiko Okumura (1991) and Kerwin F. Medina (1996).
 * The .YMR register-dump format is the RhYMe tracker's export; the .ymr
   front end reads it, and ymr/CONVERSION.md records what the conversion
   keeps and loses.
 * SNDH is the Atari ST scene's shared music container; the SNDH files YMX
-  builds follow its v2 conventions.
+  builds follow revision 2.2 of its file structure.
 
 Used by the build and the tests, not distributed
 ------------------------------------------------
@@ -96,3 +108,57 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ST-Sound notices (the LHA depacker)
+-----------------------------------
+
+The LHA depacker in src/main/java/org/ym6/Lha.java and dotnet/ym6/Lha.cs is a
+port of StSoundLibrary/LZH/LzhLib.cpp from ST-Sound, which carries both
+notices below.
+
+MIT License
+
+Copyright (c) 2021 Arnaud Carré
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+ST-Sound, ATARI-ST Music Emulator
+Copyright (c) 1995-1999 Arnaud Carre ( http://leonard.oxg.free.fr )
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGE.

@@ -102,22 +102,56 @@ with different rings and chunks combine into one file.
 
 The result is a raw SNDH v2.2 file; [sndh.atari.org](http://sndh.atari.org/)
 holds that format's own reference, and the recipe here is complete for
-these files. In order, with every part after the tag block even-aligned
-and every pad byte written 0:
+these files.
+
+Three details depart from that reference, and each of them follows two
+parsers that read v2.2 files instead - PSG Play (`frno7/psgplay`) and the
+AtariAudio library in Arnaud Carré's SNDH Archive Player
+(`arnaud-carre/sndh-player`). A file written from this recipe is read by
+both:
+
+* **The subtune-names tag reads `!#SN`.** The reference prints it `#!SN`
+  in every place it appears. Both parsers match `!#SN` and neither matches
+  `#!SN`, so a file spelled the reference's way loses its names in both.
+* **Each subtune-name offset counts from that tag's first byte.** The
+  reference's example writes the first offset from the first table word
+  and the rest as deltas between successive names. PSG Play adds every
+  word to the address of the `!#SN` bytes; the other parser steps over the
+  table without reading it.
+* **The `'##'` subtune count ends in a NUL.** The reference's tag table
+  gives that tag no termination and its example writes the four bytes
+  bare. PSG Play reads the two digits and then a NUL, warning when none
+  follows; the other parser steps over one.
+
+The reference fixes no tag order: its tag table is a list, and its own
+example header writes an order this recipe does not. The order below fixes
+one thing of its own - the `'##'` count comes before `FRMS` and before
+`!#SN`, because a parser sizes both of those tables by the count it has
+read.
+
+In order, with every part after the tag block even-aligned and every pad
+byte written 0:
 
 1. **The entry triple**, 12 bytes: three `bra.w` instructions
    (`$60 $00`, then a word displacement). Each branches to the same entry
    of the core's own triple, so with the header `H` bytes long - the triple
    plus the tag block, padded even - all three displacements are `H - 2`.
 2. **The tag block**: `'SNDH'`, then the tags, then `'HDNS'`, padded even.
-   A combiner writes, in order: `TITL` (NUL-terminated text),
-   `COMM` (when there is a composer), `CONV` (NUL-terminated text naming
-   the converter), `'##'` plus two ASCII digits
-   of the subtune count plus NUL, `TC` plus the frame rate in ASCII plus
-   NUL, `FLAG~ady` plus NUL, an even pad, `FRMS` with one long frame count
-   per subtune (0 for a tune that starts over), `!#SN` with one word offset
-   per subtune - each relative to the `!#SN` bytes - followed by the
+   A combiner writes, in order: `TITL` (NUL-terminated text), `COMM` (when
+   there is a composer), `CONV` (NUL-terminated text naming the
+   converter), `'##'` plus two ASCII digits of the subtune count plus NUL,
+   `TC` plus the frame rate in ASCII plus NUL, `FLAG~` plus one letter per
+   MFP timer the subtunes claim - `a` to `d`, in that order - plus `y` for
+   the YM2149 plus NUL, an even pad, `FRMS` with one long frame count per
+   subtune (0 for a tune that starts over), `!#SN` with one word offset per
+   subtune - each counted from the `!#SN` bytes - followed by the
    NUL-terminated names, an even pad, `HDNS`.
+   A subtune claims one MFP timer per timer channel its header flags mark,
+   on the timer its T stream gives that channel, and the tag names every
+   timer any subtune claims: a tune using two channels on the packer's
+   default map claims Timers A and D, and the same tune with those two
+   channels moved to Timers B and C claims those instead. A tune using no
+   timer channel claims none, and the tag reads `FLAG~y`.
 3. **The core**, with its two offsets patched.
 4. **The subtune table** (§1).
 5. **The tunes**, each even-aligned.
