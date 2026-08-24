@@ -240,6 +240,28 @@ final class SpecConsistencyTest {
                 "R13's $FF must pass through unmasked - the do-not-write marker");
     }
 
+    /** Every version mention against {@link YmxFormat#VERSION} - the same
+     * sites {@code ymx/setversion.sh} rewrites, read back so a bump that
+     * misses one fails by name. */
+    @Test
+    void everyVersionMentionIsTheConstant() throws IOException {
+        String said = flat();
+        String hex = String.format("$%04X", YmxFormat.VERSION);
+        String name = YmxFormat.versionName();
+        assertTrue(said.contains("Version " + name + ". Big-endian throughout."),
+                "SPEC's opening line no longer carries version " + name);
+        assertTrue(said.contains("— **" + hex + "**, version " + name),
+                "SPEC §1.1's version row no longer carries " + hex);
+        assertTrue(said.contains("the version is " + hex + " — " + name),
+                "SPEC §9.1 no longer names version " + hex);
+        Matcher constant = Pattern.compile(
+                "public const int Version = 0x([0-9A-Fa-f]{4});").matcher(
+                        Files.readString(Path.of("dotnet", "ymx", "YmxFormat.cs")));
+        assertTrue(constant.find(), "YmxFormat.cs no longer declares Version");
+        assertEquals(YmxFormat.VERSION, Integer.parseInt(constant.group(1), 16),
+                "the C# Version differs from the Java one");
+    }
+
     /** The section-offset rule, which is one bit of one long. */
     @Test
     void theStoredBitIsBit31() throws IOException {

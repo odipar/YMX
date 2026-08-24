@@ -15,8 +15,22 @@ namespace Ymx
         /// <summary>'YMX!', the first four bytes of every file.</summary>
         public const int Magic = 0x594D5821;
 
-        /// <summary>The only version this release writes or reads.</summary>
-        public const int Version = 1;
+        /// <summary>The only version this release writes or reads: the
+        /// major in the high byte, the minor in the low, so versions order
+        /// numerically - 0.4 is $0004, a later 1.0 is $0100.</summary>
+        public const int Version = 0x0004;
+
+        /// <summary>A version word as prose: Version reads "0.4".</summary>
+        public static string VersionName(int word)
+        {
+            return (word >> 8) + "." + (word & 0xFF);
+        }
+
+        /// <summary>This release's version as prose.</summary>
+        public static string VersionName()
+        {
+            return VersionName(Version);
+        }
 
         /// <summary>Flag bit 0: the tune starts over at frame 0.</summary>
         public const int FlagLoops = 1;

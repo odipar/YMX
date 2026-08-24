@@ -1,6 +1,6 @@
 # The YMX format — specification
 
-Version 1. Big-endian throughout.
+Version 0.4. Big-endian throughout.
 
 YMX is a streaming register-dump format for the YM2149 sound chip in the
 Atari ST, playable by a 68000 without the tune resident in memory. A file
@@ -21,7 +21,7 @@ Two terms recur. A **player** performs §7, §8 and §9.2 and checks §9.1. A
 by every rule in this document; §9.3 lists the rules a player does not
 have to check.
 
-Version 1 began as the `.yx6` container of the [ST4](https://github.com/odipar/ST4)
+The format began as the `.yx6` container of the [ST4](https://github.com/odipar/ST4)
 repository, renumbered; the layout has changed since, and this document
 defines the current layout. No older YMX version exists to stay compatible
 with.
@@ -56,7 +56,7 @@ source formats and their tools use:
 | offset | size | field |
 |---:|---:|---|
 | 0 | 4 | `'YMX!'` — `$594D5821` |
-| 4 | 2 | format version — **1** |
+| 4 | 2 | format version, the major byte then the minor — **$0004**, version 0.4 |
 | 6 | 2 | flags (§1.2) |
 | 8 | 4 | `O`, the frame count |
 | 12 | 2 | frame rate in Hz: how often the player is called |
@@ -112,35 +112,42 @@ idle.
 
 ### 1.4 The sections
 
-Each section is a complete ST4 container — signature, twenty-byte header,
-four streams. The container layout is defined by the
-[ST4](https://github.com/odipar/ST4) repository's specification, the
-normative companion of this document for packed sections; a writer with no
-ST4 compressor stores every section instead (below) and emits no
-container. Every section begins on a long boundary, so a player may read
-a container's header a long at a time. Two container parameters are fixed
-by this format: no back-reference exceeds `N` bytes (§1.3), and no
-operation exceeds 65535 units. Every section in a file is packed at one
-**unit size** — 1, 2 or 4 bytes, recorded with the ST4 format version in
-the section's signature, not in the YMX header. A player must reject a
-container packed at a unit size, or an ST4 version, other than the one it
-was built for (§9.1).
+A section carries one stream's values for frames `[0, O)`, packed or
+stored. `O` is at least 1 and all twenty-five table entries are nonzero.
+Section order in the file is not significant; a section is located only
+by its offset.
 
-A section may instead be **stored**: the bytes at its offset are the
-values, one per frame, with no header and no signature, on the same long
-boundary. Bit 31 of a table entry set marks a stored section; bits 30-0
-are the offset. A container's header is twenty bytes, so a section shorter
-than twenty bytes is smaller stored (a one-frame tune stores one byte per
+**Packed sections.** A packed section is a complete ST4 container —
+signature, twenty-byte header, four streams. The container layout is
+defined by the [ST4](https://github.com/odipar/ST4) repository's
+specification, the normative companion of this document for packed
+sections. A writer with no ST4 compressor stores every section instead
+(below) and emits no container.
+
+**Two fixed parameters.** No back-reference exceeds `N` bytes (§1.3),
+and no operation exceeds 65535 units.
+
+**Unit size.** Every section in a file is packed at one unit size — 1, 2
+or 4 bytes, recorded with the ST4 format version in the section's
+signature, not in the YMX header. A player must reject a container
+packed at a unit size, or an ST4 version, other than the one it was
+built for (§9.1).
+
+**Stored sections.** A section may instead be stored: the bytes at its
+offset are the values, one per frame, with no header and no signature.
+Bit 31 of a table entry set marks a stored section; bits 30-0 are the
+offset. A container's header is twenty bytes, so a section shorter than
+twenty bytes is smaller stored (a one-frame tune stores one byte per
 stream). A stored section is read the same at any unit size; a file with
 only stored sections plays on any build.
 
-Each stream is packed as one section covering `[0, O)`. `O` is at least 1
-and all twenty-five table entries are nonzero. Section order in the file
-is not significant; a section is located only by its offset. Bytes
-between one part and the next long boundary are padding: nothing reads
-them, and their value is free. When a tune
-with flag bit 0 set reaches the end of a section, the player reopens the
-section from its start (§8).
+**Alignment.** Every section, packed or stored, begins on a long
+boundary, so a player may read a container's header a long at a time.
+Bytes between one part and the next long boundary are padding: nothing
+reads them, and their value is free.
+
+**Starting over.** When a tune with flag bit 0 set reaches the end of a
+section, the player reopens the section from its start (§8).
 
 Packed sizes are not stored: ST4 counts output units, so a decoder does
 not need them.
@@ -231,8 +238,8 @@ write R13. R13 is four bits wide, every genuine shape is `$00`-`$0F`, and
 | 3 | timer channel 3 acts |
 | 4 | bits 7-5 are meaningful this frame — apply them |
 | 5 | a set bit **skips** voice A |
-| 6 | voice B |
-| 7 | voice C |
+| 6 | a set bit skips voice B |
+| 7 | a set bit skips voice C |
 
 Channels marked in one frame act in channel order, 0 first (§7).
 
@@ -251,20 +258,18 @@ unchanged.
 | bits | meaning |
 |---:|---|
 | 7-4 | the envelope shape a retrigger stream restarts |
-| 3-0 | what `START_PCM_PREEMPT` preempts: bit `c` marks timer channel `c`, whose timer must be stopped first |
+| 3-0 | the channels `START_PCM_PREEMPT` stops before programming its own timer: bit `c` marks timer channel `c` (§3) |
 
 The shape is one per frame, not one per channel: the chip has one envelope
 generator, and per-channel shapes would drive it at two shapes and two
 rates.
 
-The shape is carried rather than derived, which keeps the player
-independent of the source format. A toggle stream's volume and a PCM
-stream's sample number are read from the voice's register stream (§3.2).
-A shape is not a voice's — any number of voices may follow the one
-generator — and its storage location differs by source format; the writer
-resolves it into X. The format has no flag, shadow or priming for the
-shape: a tune that arms a retrigger stream before any shape is set
-carries the shape the writer chooses for the tune's start.
+Where a source keeps its shape differs by format; the writer resolves it
+into X, and a player derives nothing. A toggle stream's volume and a PCM
+stream's sample number come from the voice's register stream (§3.2); a
+shape has no voice to come from. A tune that arms a retrigger stream
+before any shape is set carries the shape the writer chooses for the
+tune's start.
 
 ### 2.3 T — the channel-to-timer map
 
@@ -418,7 +423,7 @@ The four **kinds** of timer stream:
 |---:|---|---|
 | `00` | **toggle stream** | a square wave made by flipping a voice's volume between a level and zero — a "SID voice" |
 | `01` | **PCM stream** | a stored sample played out through a voice's volume register — a "digidrum" |
-| `10` | **wave stream** | a table read out the same way. Reserved: a version-1 writer does not emit it |
+| `10` | **wave stream** | a table read out the same way. Reserved: a writer of this version does not emit it |
 | `11` | **retrigger stream** | R13 rewritten at the timer's rate, restarting the envelope — a "sync-buzzer" |
 
 The **code byte** does not appear in the file. It is the intermediate a
@@ -571,7 +576,7 @@ first pass, so every pass is identical.
 ### 9.1 What a player checks
 
 - the magic is `'YMX!'`;
-- the version is 1;
+- the version is $0004 — 0.4;
 - the stream count is 25 — it is fixed, not a size to adapt to;
 - every section that is a container carries an ST4 signature matching the
   format version and unit size the player was built for — a tune packed

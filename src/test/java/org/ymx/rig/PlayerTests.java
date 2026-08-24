@@ -389,7 +389,7 @@ final class PlayerTests {
         int table = at;
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         out.writeBytes("YMX!".getBytes(StandardCharsets.US_ASCII));
-        word(out, 1);                               // version
+        word(out, org.ymx.YmxFormat.VERSION);
         word(out, 1);                               // flags: starts over
         longWord(out, frames);
         word(out, 50);

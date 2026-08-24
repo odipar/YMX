@@ -349,12 +349,11 @@ YH_SECTIONS     equ     30              ; one offset per stream: its section,
                                         ; covering every frame of the tune
 
 YMX_MAGIC       equ     $594D5821       ; 'YMX!'
-YMX_VERSION     equ     1               ; YMX starts at 1: it began as ST4's
-                                        ; .yx6 container, adopted and
-                                        ; renumbered, and the layout has moved
-                                        ; since - doc/SPEC.md is where it is
-                                        ; now. There is no older version to
-                                        ; stay compatible with
+YMX_VERSION     equ     $0004           ; the format version: the major in
+                                        ; the high byte, the minor in the
+                                        ; low. There is no older version to
+                                        ; stay compatible with; doc/SPEC.md
+                                        ; defines the layout
 YMX_FLAG_LOOPS  equ     1               ; header flag: the tune starts over
 YMX_FLAG_CHAN   equ     2               ; and one per timer channel, from bit
                                         ; 1 up: set when the tune uses it,

@@ -68,11 +68,21 @@ public final class YmxFormat {
     /** {@code 'YMX!'}, the first four bytes of every file. */
     public static final int MAGIC = 0x594D5821;
 
-    /** The only version this release writes or reads. YMX starts at 1: it
-     * began as ST4's .yx6 container, adopted and renumbered, and the layout
-     * has moved since - doc/SPEC.md defines it. There is no version history
-     * here to be compatible with. */
-    public static final int VERSION = 1;
+    /** The only version this release writes or reads: the major in the
+     * high byte, the minor in the low, so versions order numerically -
+     * 0.4 is $0004, a later 1.0 is $0100. There is no version history
+     * here to be compatible with; doc/SPEC.md defines the layout. */
+    public static final int VERSION = 0x0004;
+
+    /** A version word as prose: {@code VERSION} reads "0.4". */
+    public static String versionName(int word) {
+        return (word >> 8) + "." + (word & 0xFF);
+    }
+
+    /** This release's version as prose. */
+    public static String versionName() {
+        return versionName(VERSION);
+    }
 
     /** Flag bit 0: the tune starts over at frame 0 instead of ending. */
     public static final int FLAG_LOOPS = 1;
