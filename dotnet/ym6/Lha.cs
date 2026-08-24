@@ -6,7 +6,7 @@ namespace Ym6
     /// <summary>
     /// Unpacks the LHA archives distributed .ym files come wrapped in,
     /// entirely in memory - ported from org.ym6.Lha, itself from the ST-Sound
-    /// library's LZH depacker by Arnaud Carre, based on LZH code by Haruhiko
+    /// library's LZH depacker by Arnaud Carré, based on LZH code by Haruhiko
     /// Okumura (1991) and Kerwin F. Medina (1996). Level-0 headers, -lh5-
     /// inflated and -lh0- copied out; the first member is the answer.
     /// </summary>

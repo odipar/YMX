@@ -83,7 +83,7 @@ public final class Ym6Reader {
         String format = ascii(4);
         if (!format.equals("YM6!") && !format.equals("YM5!")) {
             throw new FormatException("not a YM5!/YM6! file (starts with \"" + format
-                    + "\"); YM2/YM3 and packed .ym files are not supported");
+                    + "\"); YM2/YM3/YM4 and packed .ym files are not supported");
         }
         String check = ascii(8);
         if (!check.equals("LeOnArD!")) {

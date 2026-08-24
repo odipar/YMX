@@ -5,9 +5,10 @@
 ; streams, one per sound register, and eleven carrying the compiled effect
 ; script - every one packed as its own embedded ST4 container and decoded
 ; through its own small ring by ST4_wrap.S. Written by Claude (Anthropic's
-; Claude Code) under Robbert's direction, based on ZX1 v1.5 by Einar Saukas and
-; inspired by Steve Clarets' MinYMiser. Use it freely, including commercially,
-; as long as your documentation says you used ZX1 through ST4 (see LICENSE).
+; Claude Code) under Robbert's direction, based on ZX1 v1.5 by Einar Saukas
+; and inspired by Steven Tattersall's MinYMiser. Use it freely, including
+; commercially, as long as you indicate somehow in your documentation that you
+; have used ZX1, via ST4 or YMX (see LICENSE).
 ;
 ; It plays the fourteen standard sound registers, starts over at the end, and
 ; plays what the YM format calls its special effects - digidrums, SID voices,
@@ -18,7 +19,8 @@
 ; claimed only when a tune says it uses that channel. A channel's streams are
 ; TIMER STREAMS: series of values written to one register between frames,
 ; timer-driven, as against the FRAME STREAMS that carry the music itself.
-; Sinus-SID is dropped at pack time, as it is in every other player.
+; Sinus-SID is dropped at pack time. ST-Sound, the format author's own
+; player, reads the effect code and runs an empty handler.
 ; doc/SPEC.md is the format and doc/terminology.md the vocabulary.
 ;
 ; REQUIRES ST4_wrap.S, built for the SAME unit size the tune was packed with
@@ -103,12 +105,19 @@
 ;
 ;   YMX_SIZE = YMX_FIXED + 25 * N       ; 1658 + 25 * N bytes
 ;
-; For the default 960-byte rings that is 25658 bytes. A program with N at
-; build time can reserve it with
+; N is the file's own, the header word at YH_RING, and the packer raises it
+; above the ring size it was asked for where one pass of a tune needs a
+; longer ring: a file packed for 960-byte rings can carry N = 1776. A
+; program sizing at run time reads that word and takes
+; YMX_FIXED+(YMX_STREAMS*N) bytes. A program sizing at build time reserves
+; for the format's cap of 2520 bytes a ring, the largest N a file carries:
 ;
-;       ds.b    YMX_FIXED+(YMX_STREAMS*960)
+;       ds.b    YMX_FIXED+(YMX_STREAMS*2520)    ; 64658 bytes
 ;
 ; where the parentheses matter: rmac evaluates expressions left to right.
+; A workspace reserved for 960 holds only the files whose header says 960
+; or less: the player writes a longer file's rings past the end, and init
+; checks nothing (assumption 2).
 ;
 ; CALLS AND REGISTERS
 ;

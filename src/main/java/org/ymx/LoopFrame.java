@@ -124,9 +124,10 @@ public final class LoopFrame {
         }
         if (entered < 0) {
             notes.add(String.format("The source starts over at frame %d, and no frame"
-                    + " from there to %d can be entered with the timers stopped and"
-                    + " the skips cleared: the tune starts over from frame 0 instead,"
-                    + " so its first %d frames are heard on every pass",
+                    + " from there to %d can be entered with the timers stopped, the"
+                    + " skips cleared and the envelope generator not restarted: the"
+                    + " tune starts over from frame 0 instead, so its first %d frames"
+                    + " are heard on every pass",
                     given, last, given));
             return new Plan(0, ringSize, false, notes);
         }
@@ -144,15 +145,17 @@ public final class LoopFrame {
         int frame = ringFrame >= 0 ? ringFrame : cutFrame;
         if (entered != given) {
             notes.add(String.format("The source starts over at frame %d, which cannot be"
-                    + " entered with the timers stopped and the skips cleared: the tune"
-                    + " starts over from frame %d instead, %d frame%s later",
+                    + " entered with the timers stopped, the skips cleared and the"
+                    + " envelope generator not restarted: the tune starts over from"
+                    + " frame %d instead, %d frame%s later",
                     given, entered, entered - given, entered - given == 1 ? "" : "s"));
         }
         if (ringFrame >= 0) {
             if (ring != ringSize) {
                 notes.add(String.format("Rings raised from %d to %d bytes so the %d"
-                        + " frames from the loop frame fit one: %d bytes of workspace"
-                        + " rather than %d, and no file bytes",
+                        + " frames from the loop frame fit one: %d bytes of rings"
+                        + " rather than %d, and no file bytes. The header carries"
+                        + " the raised size, and a host sizes its workspace from it",
                         ringSize, ring, tune.frames() - frame,
                         YmxFormat.STREAMS * ring, YmxFormat.STREAMS * ringSize));
             }

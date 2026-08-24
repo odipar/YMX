@@ -11,7 +11,8 @@ namespace Ymx
     /// the Java, C# and 68k format constants, SPEC.md's three mentions,
     /// and the two patch constants. A site must match exactly once, so a
     /// reworded sentence fails loudly instead of being skipped, and
-    /// nothing is written unless every site matched.
+    /// nothing is written unless every site matched. The prose around the
+    /// two constants names no version, so these eight are the whole list.
     /// </summary>
     public static class SetVersion
     {

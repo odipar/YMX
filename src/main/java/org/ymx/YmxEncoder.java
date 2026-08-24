@@ -81,7 +81,8 @@ public final class YmxEncoder {
                 return "Plays once, then stops";
             }
             if (loopFrame == 0) {
-                return "Plays through, then starts over";
+                return String.format("Plays through, then starts over from frame 0,"
+                        + " replaying all of its %d frames", tune.frames());
             }
             return String.format("Plays through, then starts over from frame %d,"
                     + " replaying %d of its %d frames", loopFrame,

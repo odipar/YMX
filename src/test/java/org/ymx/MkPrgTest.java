@@ -22,7 +22,7 @@ import org.junit.jupiter.api.io.TempDir;
 final class MkPrgTest {
 
     /** A stub-shaped byte block: 'YMXP' at 4, version 1, even-sized. */
-    private static byte[] stub() {
+    static byte[] stub() {
         byte[] stub = new byte[40];
         stub[0] = 0x60;
         stub[4] = 'Y';

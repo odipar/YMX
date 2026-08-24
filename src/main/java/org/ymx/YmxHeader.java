@@ -3,21 +3,42 @@ package org.ymx;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import org.st4.St4Decompressor;
+import org.st4.St4Format;
 
 /**
  * The handful of {@code .ymx} header fields the build tools need: what the
  * player must be assembled for, and what the SNDH tags declare.
  *
- * <p>The unit size is not in the YMX header - it lives in the low byte
- * of the first embedded ST4 container's signature, which is why this reads a
- * section offset first.
+ * <p>Two of them are not in the YMX header. The unit size lives in the low
+ * byte of the first embedded ST4 container's signature, which is why this
+ * reads a section offset first; the channel-to-timer map lives in the T
+ * stream, whose first frame this unpacks.
  */
-public record YmxHeader(int ring, int chunk, int unit, int hz, int flags, int frames) {
+public record YmxHeader(int ring, int chunk, int unit, int hz, int flags, int frames,
+                        int timers) {
 
     /** Whether the tune reads the same at any unit size: every section is
      * stored, so no ST4 signature names one. {@link #unit} is 0. */
     public boolean anyUnit() {
         return unit == 0;
+    }
+
+    /**
+     * The MFP timers the tune claims, one bit per timer, {@code 1 << } the
+     * timer number {@link YmxFormat#TIMER_A} and its neighbours give. The
+     * player claims one timer per timer channel the flags mark, and
+     * {@link #timers} says which timer that channel runs on.
+     */
+    public int claimedTimers() {
+        int claimed = 0;
+        for (int channel = 0; channel < YmxFormat.CHANNELS; channel++) {
+            if ((flags & YmxFormat.flagChannel(channel)) != 0) {
+                claimed |= 1 << YmxFormat.timerOf(timers, channel);
+            }
+        }
+        return claimed;
     }
 
     /** Bit 0 of the flags: the tune starts over instead of ending. */
@@ -49,7 +70,7 @@ public record YmxHeader(int ring, int chunk, int unit, int hz, int flags, int fr
             throw new IOException(path + " is format version "
                     + YmxFormat.versionName(version) + ", this build reads "
                     + YmxFormat.versionName()
-                    + " - repack the tune from its .ym source");
+                    + " - repack the tune from its .ym or .ymr source");
         }
         // A stored section carries no signature, so the unit size comes from
         // the first section that is a container - out of either table, since
@@ -69,7 +90,36 @@ public record YmxHeader(int ring, int chunk, int unit, int hz, int flags, int fr
                 section == 0 ? 0 : file[section + 3] & 0xFF,
                 word(file, YmxFormat.OFFSET_PLAYER_HZ),
                 word(file, YmxFormat.OFFSET_FLAGS),
-                (int) longAt(file, YmxFormat.OFFSET_FRAMES));
+                (int) longAt(file, YmxFormat.OFFSET_FRAMES),
+                timerMap(file, path));
+    }
+
+    /**
+     * The T stream's first frame: the packer writes one channel-to-timer map
+     * over a whole tune, so frame 0 gives the map. A container says its own
+     * size, so what is unpacked is the rest of the file from the section's
+     * first byte.
+     */
+    private static int timerMap(byte[] file, Path path) throws IOException {
+        long entry = longAt(file,
+                YmxFormat.OFFSET_SECTION_TABLE + 4 * YmxFormat.STREAM_T);
+        int from = (int) YmxFormat.sectionOffset(entry);
+        if (entry == 0 || from >= file.length) {
+            throw new IOException(path + " has no timer stream");
+        }
+        if (YmxFormat.isStored(entry)) {
+            return file[from] & 0xFF;
+        }
+        St4Format.Container section;
+        try {
+            section = St4Format.read(Arrays.copyOfRange(file, from, file.length));
+        } catch (IllegalArgumentException e) {
+            throw new IOException(path + ": its timer stream is not readable: "
+                    + e.getMessage());
+        }
+        return St4Decompressor.decompress(section.control(), section.literal(),
+                section.byteOffsets(), section.wordOffsets(), section.unit(),
+                section.size())[0] & 0xFF;
     }
 
     /** The offset of one table's first section that is a container, or 0

@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -53,10 +54,15 @@ final class MkSndhTest {
 
     /** A real packed tune, so the header the combiner reads is genuine. */
     private static byte[] tune(int frames, boolean loops) {
+        return tune(frames, loops, YmxFormat.DEFAULT_TIMERS);
+    }
+
+    /** As above, on a given channel-to-timer map. */
+    private static byte[] tune(int frames, boolean loops, int timerMap) {
         byte[][] registers = Ym6TestData.registers(frames);
         Tune source = YmEffects.tune(Ym6Reader.read(
                 Ym6TestData.file(registers, frames, true)));
-        return YmxEncoder.encode(source, 960, 24, loops, false).file();
+        return YmxEncoder.encode(source, 960, 24, loops, false, 1, timerMap).file();
     }
 
     @Test
@@ -81,13 +87,17 @@ final class MkSndhTest {
         assertEquals(0, header & 1, "the core starts even");
         assertEquals('Y', file[header + 12], "the core sits at the branch target");
 
-        // The tags, in spec order, ending in HDNS just before the core.
+        // The tags, in the combiner's own order, ending in HDNS just before
+        // the core: the '##' count first of the three tables, since a reader
+        // sizes FRMS and the names by it.
         String tags = new String(file, 12, header - 12, StandardCharsets.ISO_8859_1);
         assertTrue(tags.startsWith("SNDH"));
         assertTrue(tags.indexOf("TITLSet\0") < tags.indexOf("COMMComposer\0"));
         assertTrue(tags.contains("##02\0"));
+        assertTrue(tags.indexOf("##02\0") < tags.indexOf("FRMS"));
+        assertTrue(tags.indexOf("##02\0") < tags.indexOf("!#SN"));
         assertTrue(tags.contains("TC50\0"));
-        assertTrue(tags.contains("FLAG~ady\0"));
+        assertTrue(tags.contains("FLAG~ay\0"));
         assertTrue(tags.indexOf("FRMS") < tags.indexOf("!#SN"));
         assertTrue(tags.replaceAll("\0+$", "").endsWith("HDNS"));
 
@@ -122,6 +132,49 @@ final class MkSndhTest {
         for (int i = header + workOff; i < file.length; i++) {
             assertEquals(0, file[i], "workspace byte " + i);
         }
+    }
+
+    /** The map {@code -timersBC} compiles to: channels 0 and 1 on Timers B
+     * and C, and the channels the flag leaves out taking the timers it did
+     * not, in order. */
+    private static final int TIMERS_BC = YmxFormat.TIMER_B
+            | (YmxFormat.TIMER_C << 2) | (YmxFormat.TIMER_A << 4)
+            | (YmxFormat.TIMER_D << 6);
+
+    /** The map {@code -timersD} compiles to, the same way. */
+    private static final int TIMERS_D = YmxFormat.TIMER_D
+            | (YmxFormat.TIMER_A << 2) | (YmxFormat.TIMER_B << 4)
+            | (YmxFormat.TIMER_C << 6);
+
+    /**
+     * The FLAG tag names the MFP timers the tunes claim, so the packer's
+     * {@code -timers} map moves it: the tune the default map puts on Timer A
+     * declares 'b' when it is packed on Timer B. A set declares every timer
+     * any of its subtunes takes, since a host reads one tag for the file.
+     */
+    @Test
+    void theFlagTagNamesTheTimersTheTunesClaim(@TempDir Path dir) throws IOException {
+        assertEquals("~ay", flagOf(dir, "one", tune(240, true)));
+        assertEquals("~by", flagOf(dir, "two", tune(240, true, TIMERS_BC)));
+        assertEquals("~ady", flagOf(dir, "set",
+                tune(240, true), tune(240, true, TIMERS_D)));
+    }
+
+    /** The FLAG tag's value out of the file the combiner writes from these
+     * tunes: the bytes between 'FLAG' and its closing NUL. */
+    private static String flagOf(Path dir, String name, byte[]... tunes)
+            throws IOException {
+        List<Path> paths = new ArrayList<>();
+        for (int i = 0; i < tunes.length; i++) {
+            paths.add(write(dir, name + i + ".ymx", tunes[i]));
+        }
+        Path out = dir.resolve(name + ".sndh");
+        MkSndh.build(new MkSndh.Options(out, paths, "Set", null, null,
+                false, true), write(dir, name + "core.bin", core(1)));
+        String file = new String(Files.readAllBytes(out),
+                StandardCharsets.ISO_8859_1);
+        int at = file.indexOf("FLAG") + 4;
+        return file.substring(at, file.indexOf(0, at));
     }
 
     @Test

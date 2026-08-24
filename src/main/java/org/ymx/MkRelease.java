@@ -105,6 +105,7 @@ public final class MkRelease {
             }
             byte[] stub = MkPrg.readStub(
                     dir.resolve("ymxprg" + Tools.binarySuffix() + ".bin"));
+            verifyStub(stub);
             manifest.append(entry("ymxprg" + Tools.binarySuffix() + ".bin",
                     stub, "-  -"));
             Files.writeString(dir.resolve("MANIFEST.txt"), manifest.toString(),
@@ -130,23 +131,56 @@ public final class MkRelease {
     /** The GitHub release tagged by the release version, its assets
      * replaced and its notes rewritten, so the commit they name is the
      * one the assets were assembled at and the account of what changed
-     * is this release's section of doc/RELEASES.md. */
+     * is this release's section of doc/RELEASES.md. A release created
+     * here is tagged at the staged commit; a tag that exists stays where
+     * it is, so a run whose HEAD has moved past it stops instead of
+     * posting notes naming a commit the tag does not reach. */
     private static void publish(Path dir, String commit) {
         String tag = tag();
+        String head = Tools.output(Tools.repo(),
+                List.of("git", "rev-parse", "HEAD"));
         String notes = releaseNotes() + "\n\nPrebuilt SNDH cores and the PRG"
                 + " stub, assembled at " + commit + ". doc/BINARIES.md is the"
                 + " combine contract; MANIFEST.txt lists sizes and SHA-256"
                 + " digests.";
         if (Tools.status(Tools.repo(),
                 List.of("gh", "release", "view", tag)) != 0) {
-            Tools.run(Tools.repo(), List.of("gh", "release", "create", tag,
-                    "--title", "YMX player binaries " + YmxFormat.releaseName()
-                            + ", format " + YmxFormat.versionName(),
-                    "--notes", notes));
+            Tools.run(Tools.repo(), createCommand(tag, head, notes));
         } else {
-            Tools.run(Tools.repo(), List.of("gh", "release", "edit", tag,
-                    "--notes", notes));
+            String tagged = Tools.output(Tools.repo(), List.of("gh", "api",
+                    "repos/{owner}/{repo}/commits/" + tag, "--jq", ".sha"));
+            if (!tagged.equals(head)) {
+                throw new IllegalArgumentException("mkrelease: " + tag
+                        + " is tagged at " + shortSha(tagged) + " and this run"
+                        + " staged " + commit + " - stage from "
+                        + shortSha(tagged) + ", or delete the release and its"
+                        + " tag and publish again");
+            }
+            Tools.run(Tools.repo(), editCommand(tag, notes));
         }
+        Tools.run(Tools.repo(), uploadCommand(dir, tag));
+        System.out.println("published " + tag + " at " + commit);
+    }
+
+    /** The command that creates the release: {@code --target} tags the
+     * commit whose bytes are staged, rather than the default branch's
+     * head. The whole SHA goes in, not the short form the notes carry. */
+    static List<String> createCommand(String tag, String head, String notes) {
+        return List.of("gh", "release", "create", tag, "--target", head,
+                "--title", "YMX player binaries " + YmxFormat.releaseName()
+                        + ", format " + YmxFormat.versionName(),
+                "--notes", notes);
+    }
+
+    /** The command that rewrites an existing release's notes. It moves no
+     * tag, which is why the caller reads the tag's commit first. */
+    static List<String> editCommand(String tag, String notes) {
+        return List.of("gh", "release", "edit", tag, "--notes", notes);
+    }
+
+    /** The command that replaces every asset: each core, the stub and the
+     * manifest, out of the staging directory. */
+    static List<String> uploadCommand(Path dir, String tag) {
         List<String> upload = new ArrayList<>(List.of("gh", "release", "upload",
                 tag, "--clobber"));
         for (Variant variant : matrix()) {
@@ -155,8 +189,13 @@ public final class MkRelease {
         upload.add(dir.resolve("ymxprg" + Tools.binarySuffix() + ".bin")
                 .toString());
         upload.add(dir.resolve("MANIFEST.txt").toString());
-        Tools.run(Tools.repo(), upload);
-        System.out.println("published " + tag);
+        return upload;
+    }
+
+    /** A commit as the notes spell it: the first seven characters of
+     * the SHA, or all of a shorter string. */
+    private static String shortSha(String sha) {
+        return sha.length() > 7 ? sha.substring(0, 7) : sha;
     }
 
     /** The tag this release publishes under: the release version, the
@@ -205,6 +244,8 @@ public final class MkRelease {
      * once at release time against the variant each file is named for. */
     static void verifyCore(byte[] core, Variant variant) {
         if (core.length < 34 || core[MkSndh.CORE_MAGIC] != 'Y'
+                || core[MkSndh.CORE_MAGIC + 1] != 'M'
+                || core[MkSndh.CORE_MAGIC + 2] != 'X'
                 || core[MkSndh.CORE_MAGIC + 3] != 'C') {
             throw new IllegalArgumentException(variant.name() + " is not an SNDH core");
         }
@@ -228,9 +269,63 @@ public final class MkRelease {
                     + MkSndh.word(core, MkSndh.CORE_FLAGS) + ", its name says "
                     + variant.flags());
         }
+        int fixed = MkSndh.word(core, MkSndh.CORE_WORK_FIXED);
+        if (fixed == 0 || (fixed & 1) != 0) {
+            throw new IllegalArgumentException(variant.name() + " gives F = "
+                    + fixed + ", the workspace bytes before the rings:"
+                    + " nonzero and even");
+        }
+        if (!zeroLong(core, MkSndh.CORE_TABLE_OFF)) {
+            throw new IllegalArgumentException(variant.name() + " carries a"
+                    + " table offset; a combiner patches that long, so a"
+                    + " released core carries 0");
+        }
+        if (!zeroLong(core, MkSndh.CORE_WORK_OFF)) {
+            throw new IllegalArgumentException(variant.name() + " carries a"
+                    + " workspace offset; a combiner patches that long, so a"
+                    + " released core carries 0");
+        }
         if ((core.length & 1) != 0) {
             throw new IllegalArgumentException(variant.name() + " is odd-sized");
         }
+    }
+
+    /** The descriptor checks {@link MkPrg} performs at wrap time, run once
+     * at release time, with two of the fields a combiner patches read
+     * back: a released stub carries the frame count and the flags as the
+     * assembler left them. */
+    static void verifyStub(byte[] stub) {
+        String name = "ymxprg" + Tools.binarySuffix() + ".bin";
+        if (stub.length < 18 || stub[MkPrg.STUB_MAGIC] != 'Y'
+                || stub[MkPrg.STUB_MAGIC + 1] != 'M'
+                || stub[MkPrg.STUB_MAGIC + 2] != 'X'
+                || stub[MkPrg.STUB_MAGIC + 3] != 'P') {
+            throw new IllegalArgumentException(name + " is not a PRG stub");
+        }
+        if (MkSndh.word(stub, MkPrg.STUB_VERSION) != 1) {
+            throw new IllegalArgumentException(name
+                    + " carries stub descriptor version "
+                    + MkSndh.word(stub, MkPrg.STUB_VERSION) + ", not 1");
+        }
+        if (!zeroLong(stub, MkPrg.STUB_FRAMES)) {
+            throw new IllegalArgumentException(name + " carries a frame count;"
+                    + " a combiner patches that long, so a released stub"
+                    + " carries 0");
+        }
+        if (MkSndh.word(stub, MkPrg.STUB_FLAGS) != 0) {
+            throw new IllegalArgumentException(name + " carries flags "
+                    + MkSndh.word(stub, MkPrg.STUB_FLAGS) + "; a combiner"
+                    + " patches that word, so a released stub carries 0");
+        }
+        if ((stub.length & 1) != 0) {
+            throw new IllegalArgumentException(name + " is odd-sized");
+        }
+    }
+
+    /** Whether the long at an offset is zero - the value the assembler
+     * writes where a combiner patches. */
+    private static boolean zeroLong(byte[] bytes, int at) {
+        return MkSndh.word(bytes, at) == 0 && MkSndh.word(bytes, at + 2) == 0;
     }
 
     static String sha256(byte[] bytes) {

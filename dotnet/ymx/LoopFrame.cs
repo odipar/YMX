@@ -109,9 +109,10 @@ namespace Ymx
             {
                 notes.Add(string.Format("The source starts over at frame {0}, and no"
                         + " frame from there to {1} can be entered with the timers"
-                        + " stopped and the skips cleared: the tune starts over from"
-                        + " frame 0 instead, so its first {2} frames are heard on"
-                        + " every pass", given, last, given));
+                        + " stopped, the skips cleared and the envelope generator not"
+                        + " restarted: the tune starts over from frame 0 instead, so"
+                        + " its first {2} frames are heard on every pass",
+                        given, last, given));
                 return new Plan(0, ringSize, false, notes);
             }
             if (ringFrame < 0 && cutFrame < 0)
@@ -130,9 +131,10 @@ namespace Ymx
             if (entered != given)
             {
                 notes.Add(string.Format("The source starts over at frame {0}, which"
-                        + " cannot be entered with the timers stopped and the skips"
-                        + " cleared: the tune starts over from frame {1} instead,"
-                        + " {2} frame{3} later", given, entered, entered - given,
+                        + " cannot be entered with the timers stopped, the skips"
+                        + " cleared and the envelope generator not restarted: the tune"
+                        + " starts over from frame {1} instead, {2} frame{3} later",
+                        given, entered, entered - given,
                         entered - given == 1 ? "" : "s"));
             }
             if (ringFrame >= 0)
@@ -141,7 +143,9 @@ namespace Ymx
                 {
                     notes.Add(string.Format("Rings raised from {0} to {1} bytes so the"
                             + " {2} frames from the loop frame fit one: {3} bytes of"
-                            + " workspace rather than {4}, and no file bytes",
+                            + " rings rather than {4}, and no file bytes. The header"
+                            + " carries the raised size, and a host sizes its"
+                            + " workspace from it",
                             ringSize, ring, tune.Frames - frame,
                             YmxFormat.Streams * ring, YmxFormat.Streams * ringSize));
                 }

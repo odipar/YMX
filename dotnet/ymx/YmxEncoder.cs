@@ -50,7 +50,8 @@ namespace Ymx
                 }
                 if (LoopFrame == 0)
                 {
-                    return "Plays through, then starts over";
+                    return string.Format("Plays through, then starts over from frame"
+                            + " 0, replaying all of its {0} frames", Tune.Frames);
                 }
                 return string.Format("Plays through, then starts over from frame {0},"
                         + " replaying {1} of its {2} frames", LoopFrame,

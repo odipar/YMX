@@ -75,10 +75,9 @@ public final class YmxFormat {
     public static final int MAGIC = 0x594D5821;
 
     /** The only version this release writes or reads: the major in the
-     * high byte, the minor in the low, so versions order numerically -
-     * $0005, version 0.5, sorts before $0100, version 1.0. There is no
-     * version history here to be compatible with; doc/SPEC.md defines
-     * the layout. */
+     * high byte, the minor in the low, so versions order numerically.
+     * There is no version history here to be compatible with;
+     * doc/SPEC.md defines the layout. */
     public static final int VERSION = 0x0005;
 
     /** The released binaries' patch number: it moves when the binaries
@@ -87,8 +86,8 @@ public final class YmxFormat {
      * number never reaches the format word. */
     public static final int PATCH = 0;
 
-    /** The release's version as prose: the format version plus the
-     * patch, "0.5.0". */
+    /** The release's version as prose: the format version, then the
+     * patch, a dot between them. */
     public static String releaseName() {
         return versionName() + "." + PATCH;
     }

@@ -10,11 +10,11 @@ reads them, and it reads them with the ZX1 implementation that already exists
 rather than with a second one written to match it: two ports of one format
 drift as soon as either changes.
 
-`Decompressor.java` is `org.jx1.Decompressor` from
-[jx1](https://github.com/odipar/jx1), which is itself a port of `dzx1.c`. It
-streams its output through a caller-supplied ring, which is exactly the
-contract `.YMR` is packed for - the ring is at once the decoder's window and
-its output queue, and the packer never looks further back than it.
+`Decompressor.java` is `org.jx1.Decompressor` from jx1, the repository since
+renamed [odipar/ST1](https://github.com/odipar/ST1), and is itself a port of
+`dzx1.c`. It streams its output through a caller-supplied ring, which is
+exactly the contract `.YMR` is packed for - the ring is at once the decoder's
+window and its output queue, and the packer never looks further back than it.
 
 ## What was changed
 

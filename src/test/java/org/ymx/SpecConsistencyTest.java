@@ -358,6 +358,53 @@ final class SpecConsistencyTest {
                 "the release name is the format version plus the patch");
     }
 
+    /** The prose around the two constants, and terminology.md's row for
+     * the release version, name no version: {@code ymx/setversion.sh}
+     * rewrites eight sites, and a version spelled outside them goes
+     * stale at the next bump with nothing to catch it. */
+    @Test
+    void theProseAroundTheConstantsNamesNoVersion() throws IOException {
+        String java = Files.readString(
+                Path.of("src", "main", "java", "org", "ymx", "YmxFormat.java"));
+        String cs = Files.readString(Path.of("dotnet", "ymx", "YmxFormat.cs"));
+        namesNoVersion(commentAbove(java, "public static final int VERSION"),
+                "YmxFormat.java's VERSION comment");
+        namesNoVersion(commentAbove(java, "public static String releaseName()"),
+                "YmxFormat.java's releaseName comment");
+        namesNoVersion(commentAbove(cs, "public const int Version ="),
+                "YmxFormat.cs's Version comment");
+        namesNoVersion(commentAbove(cs, "public static string ReleaseName()"),
+                "YmxFormat.cs's ReleaseName comment");
+        String row = Files.readString(Path.of("doc", "terminology.md")).lines()
+                .filter(line -> line.startsWith("| **release version** |"))
+                .findFirst().orElse("");
+        assertTrue(!row.isEmpty(),
+                "doc/terminology.md no longer carries a release-version row");
+        namesNoVersion(row, "doc/terminology.md's release-version row");
+    }
+
+    /** The comment above a declaration: from the last comment opener
+     * before it up to the declaration. */
+    private static String commentAbove(String source, String declaration) {
+        int at = source.indexOf(declaration);
+        assertTrue(at >= 0, "the declaration \"" + declaration + "\" has moved");
+        String before = source.substring(0, at < 0 ? 0 : at);
+        int start = Math.max(before.lastIndexOf("/**"),
+                before.lastIndexOf("/// <summary>"));
+        assertTrue(start >= 0, "\"" + declaration + "\" carries no comment");
+        return before.substring(start < 0 ? 0 : start);
+    }
+
+    /** Fails where a text spells a MAJOR.MINOR version. */
+    private static void namesNoVersion(String text, String what) {
+        Matcher version = Pattern.compile("\\d+\\.\\d+").matcher(text);
+        String found = version.find() ? version.group() : "";
+        assertTrue(found.isEmpty(), what + " names version " + found
+                + " - ymx/setversion.sh rewrites eight sites and this is not"
+                + " one of them, so say what the version is made of rather"
+                + " than which one it is");
+    }
+
     /** The section-offset rule, which is one bit of one long. */
     @Test
     void theStoredBitIsBit31() throws IOException {

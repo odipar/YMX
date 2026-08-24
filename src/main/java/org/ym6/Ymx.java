@@ -17,7 +17,8 @@ import org.ymx.YmxFormat;
  *
  * <p>The player covers the fourteen standard YM2149 registers and the YM
  * special effects - digidrums, SID voices, the sync-buzzer - extracted into
- * their own streams; only the never-implemented sinus-SID is dropped.
+ * their own streams; only sinus-SID is dropped, for which the reference
+ * player runs an empty handler.
  *
  * <p>The class is named after the format it writes rather than the one it
  * reads, which reads oddly beside {@code org.ymr.Ymr} in the package next
@@ -469,8 +470,8 @@ public final class Ymx {
                     effects.samples().length == 1 ? "" : "s", bytes);
         }
         if (effects.sinus() > 0) {
-            System.out.printf(Locale.ROOT, "Warning: %d Sinus-SID frame%s dropped (unimplemented "
-                    + "everywhere, the reference player included)%n",
+            System.out.printf(Locale.ROOT, "Warning: %d Sinus-SID frame%s dropped "
+                    + "(the reference player runs an empty handler)%n",
                     effects.sinus(), effects.sinus() == 1 ? "" : "s");
         }
         if (effects.tooFast() > 0) {

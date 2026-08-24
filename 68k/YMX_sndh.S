@@ -22,7 +22,10 @@
 ;   22  .w  YMX_VERSION        the format version this build reads: a tool
 ;                              combines only tunes of the same version
 ;   24  .w  YMX_FIXED          workspace bytes before the rings: a tool
-;                              sizes the workspace as this + 25 x max N
+;                              sizes the workspace as this + 25 x the
+;                              largest N in the combined tunes' headers,
+;                              which the packer raises above the ring size
+;                              it was asked for
 ;   26  .l  0                  table offset, patched by the tool: a word
 ;                              subtune count, then a long offset per tune
 ;   30  .l  0                  workspace offset, patched by the tool

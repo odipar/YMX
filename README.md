@@ -1,12 +1,12 @@
 # YMX - a streaming YM format for the plain 68000
 
-YMX extends the YM family - YM3, YM4, YM5, YM6 - into a format a 68000 plays
-without ever holding the tune in memory. A `.ymx` file carries twenty-five
-independently compressed streams: fourteen for the YM2149's sound registers,
-one value per frame, and eleven carrying a **compiled effect script** that
-drives the MFP's timers. Each stream decodes through its own small ring,
-refilled one stream per frame, so a tune's cost in RAM follows the player's
-configuration, not the tune's length.
+YMX extends the YM family - its packer reads YM5 and YM6 - into a format a
+68000 plays without ever holding the tune in memory. A `.ymx` file carries
+twenty-five independently compressed streams: fourteen for the YM2149's sound
+registers, one value per frame, and eleven carrying a **compiled effect
+script** that drives the MFP's timers. Each stream decodes through its own
+small ring, refilled one stream per frame, so a tune's cost in RAM follows the
+player's configuration, not the tune's length.
 
 YMX changes one thing about the YM lineage: where the work happens.
 What those formats call a "special effect" - a SID voice, a digidrum, a
@@ -65,9 +65,9 @@ toolchain; [doc/BINARIES.md](doc/BINARIES.md) is the contract, and
 `ymx/mkrelease.sh -publish` puts every prebuilt variant in a GitHub release
 for systems without the repository.
 
-SNDH is the Atari ST's standard music container, and where the player lives:
-the `.PRG` is a thin stub in front of the same bytes, so the two share the
-player byte for byte.
+SNDH is the Atari ST scene's shared music container, and where the player
+lives: the `.PRG` is a thin stub in front of the same bytes, so the two share
+the player byte for byte.
 
 ## Using the player
 
@@ -82,6 +82,12 @@ player byte for byte.
         lea     workspace,a0
         bsr     YMX_stop                ; chip quiet, timers stopped
 ```
+
+`YMX_SIZE` follows the ring size the tune's own header gives, and the packer
+raises that above the `-n` it was asked for where one pass of a tune needs a
+longer ring: a program reads the header word rather than the flag the tune
+was packed with, or reserves for the format's cap. [68k/YMX.S](68k/YMX.S)
+gives both forms.
 
 <!-- The two byte counts below are measured by the rig (ymx/test/rig.sh),
      which reads them back out of this sentence: keep the shape of it. -->
@@ -155,9 +161,9 @@ them.
 
 ST4 is built on [ZX1](https://github.com/einar-saukas/ZX1) by Einar Saukas,
 through [ST1](https://github.com/odipar/ST1). Use it freely, including
-commercially, as long as your documentation says you used ZX1 through ST4.
-See [LICENSE](LICENSE).
+commercially, as long as you indicate somehow in your documentation that you
+have used ZX1, via ST4 or YMX. See [LICENSE](LICENSE).
 
-The player was inspired by Steve Clarets' MinYMiser. Sinus-SID is the one YM
-effect this player leaves unplayed, as every other player does, including the
-format author's.
+The player was inspired by Steven Tattersall's MinYMiser. Sinus-SID is the one
+YM effect this player leaves unplayed. ST-Sound, the format author's own
+player, reads the effect code and runs an empty handler.

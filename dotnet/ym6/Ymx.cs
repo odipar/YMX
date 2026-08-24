@@ -473,8 +473,8 @@ namespace Ym6
             if (effects.Sinus > 0)
             {
                 Console.WriteLine(string.Format("Warning: {0} Sinus-SID frame{1}"
-                        + " dropped (unimplemented everywhere, the reference"
-                        + " player included)", effects.Sinus,
+                        + " dropped (the reference player runs an empty"
+                        + " handler)", effects.Sinus,
                         effects.Sinus == 1 ? "" : "s"));
             }
             if (effects.TooFast > 0)

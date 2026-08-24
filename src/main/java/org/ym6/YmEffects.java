@@ -41,12 +41,11 @@ import org.ymx.YmxFormat;
  *   T = the timer count
  * </pre>
  *
- * <p>Codes are dropped to idle when the reference player would not start
+ * <p>Codes are dropped to idle when the reference player sounds nothing for
  * them: prescaler or count of zero (wild files carry many such inert codes),
  * a SID or buzzer rate above what a real machine survives, a drum number
- * with no sample behind it, and Sinus-SID - which no player, the format
- * author's included, has ever implemented. The drop counters report what
- * happened.
+ * with no sample behind it, and Sinus-SID, which that player starts into an
+ * empty handler. The drop counters report what happened.
  *
  * <p>A DRUM above the rate ceiling is rescued rather than dropped: the
  * sample is resampled to the highest MFP-representable rate under the

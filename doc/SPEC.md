@@ -12,7 +12,7 @@ Each stream is decoded through a ring of `N` bytes, one stream refilled per
 frame, so memory use depends on the player configuration, not on tune
 length.
 
-The YM formats - YM3 to YM6 - store "special effects" as values the player
+The YM formats - YM4 to YM6 - store "special effects" as values the player
 re-derives every frame from spare register bits. YMX resolves them at pack
 time and stores the outcome; a player compares nothing at run time.
 

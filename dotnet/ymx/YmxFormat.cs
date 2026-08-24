@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using St4;
 
 namespace Ymx
 {
@@ -17,8 +18,7 @@ namespace Ymx
 
         /// <summary>The only version this release writes or reads: the
         /// major in the high byte, the minor in the low, so versions order
-        /// numerically - $0005, version 0.5, sorts before $0100, version
-        /// 1.0.</summary>
+        /// numerically.</summary>
         public const int Version = 0x0005;
 
         /// <summary>The released binaries' patch number: it moves when
@@ -28,8 +28,8 @@ namespace Ymx
         /// word.</summary>
         public const int Patch = 0;
 
-        /// <summary>The release's version as prose: the format version
-        /// plus the patch, "0.5.0".</summary>
+        /// <summary>The release's version as prose: the format version,
+        /// then the patch, a dot between them.</summary>
         public static string ReleaseName()
         {
             return VersionName() + "." + Patch;
@@ -280,16 +280,37 @@ namespace Ymx
 
     /// <summary>
     /// The .ymx header fields the build tools need, ported from
-    /// org.ymx.YmxHeader. The unit size lives in the first embedded ST4
-    /// container's signature; a tune whose sections are all stored reads at
-    /// any unit and reports 0.
+    /// org.ymx.YmxHeader. Two of them are not in the header: the unit size
+    /// lives in the first embedded ST4 container's signature, and a tune
+    /// whose sections are all stored reads at any unit and reports 0; the
+    /// channel-to-timer map lives in the T stream, whose first frame this
+    /// unpacks.
     /// </summary>
     public sealed record YmxHeader(int Ring, int Chunk, int Unit, int Hz,
-            int Flags, int Frames)
+            int Flags, int Frames, int Timers)
     {
         public bool AnyUnit()
         {
             return Unit == 0;
+        }
+
+        /// <summary>
+        /// The MFP timers the tune claims, one bit per timer, 1 shifted by
+        /// the timer number YmxFormat.TimerA and its neighbours give. The
+        /// player claims one timer per timer channel the flags mark, and
+        /// Timers says which timer that channel runs on.
+        /// </summary>
+        public int ClaimedTimers()
+        {
+            int claimed = 0;
+            for (int channel = 0; channel < YmxFormat.Channels; channel++)
+            {
+                if ((Flags & YmxFormat.FlagChannel(channel)) != 0)
+                {
+                    claimed |= 1 << YmxFormat.TimerOf(Timers, channel);
+                }
+            }
+            return claimed;
         }
 
         public bool Loops()
@@ -327,7 +348,7 @@ namespace Ymx
                 throw new IOException(path + " is format version "
                         + YmxFormat.VersionName(version) + ", this build reads "
                         + YmxFormat.VersionName()
-                        + " - repack the tune from its .ym source");
+                        + " - repack the tune from its .ym or .ymr source");
             }
             // A stored section carries no signature, so the unit size comes
             // from the first section that is a container - out of either
@@ -348,7 +369,42 @@ namespace Ymx
                     section == 0 ? 0 : file[section + 3],
                     Word(file, YmxFormat.OffsetPlayerHz),
                     Word(file, YmxFormat.OffsetFlags),
-                    (int) LongAt(file, YmxFormat.OffsetFrames));
+                    (int) LongAt(file, YmxFormat.OffsetFrames),
+                    TimerMap(file, path));
+        }
+
+        /// <summary>
+        /// The T stream's first frame: the packer writes one channel-to-timer
+        /// map over a whole tune, so frame 0 gives the map. A container says
+        /// its own size, so what is unpacked is the rest of the file from the
+        /// section's first byte.
+        /// </summary>
+        private static int TimerMap(byte[] file, string path)
+        {
+            long entry = LongAt(file,
+                    YmxFormat.OffsetSectionTable + 4 * YmxFormat.StreamT);
+            int from = (int) YmxFormat.SectionOffset(entry);
+            if (entry == 0 || from >= file.Length)
+            {
+                throw new IOException(path + " has no timer stream");
+            }
+            if (YmxFormat.IsStored(entry))
+            {
+                return file[from];
+            }
+            St4Format.Container section;
+            try
+            {
+                section = St4Format.Read(file[from..]);
+            }
+            catch (ArgumentException e)
+            {
+                throw new IOException(path + ": its timer stream is not"
+                        + " readable: " + e.Message);
+            }
+            return St4Decompressor.Decompress(section.Control, section.Literal,
+                    section.ByteOffsets, section.WordOffsets, section.Unit,
+                    section.Size)[0];
         }
 
         /// <summary>The offset of one table's first section that is a
