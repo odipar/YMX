@@ -15,11 +15,12 @@ import java.util.regex.Pattern;
 
 /**
  * Differential tests for the YMX player: does the ST write the right YM
- * frames? Each check packs a tune with the real packer, assembles YMX.S with
- * the decoder, runs the player under emulation as a plain 68000, and
- * captures every write to the sound chip. The captured pairs must match,
- * frame by frame and in order, what a YM2149 should have received - which
- * {@link GenYm} computes independently of both the packer and the player.
+ * frames? Most checks pack a tune with the real packer - one builds its
+ * file by hand - assemble YMX.S with the decoder, run the player under
+ * emulation as a plain 68000, and capture every write to the sound chip.
+ * The captured pairs must match, frame by frame and in order, what a
+ * YM2149 should have received - which {@link GenYm} computes independently
+ * of both the packer and the player.
  *
  * <p>{@code ymx/test/rig.sh [--quick]} runs the whole battery; each check
  * returns a problem line, or the empty string when it holds.
@@ -344,8 +345,8 @@ final class PlayerTests {
      * in any sample long enough to hold it - and init resolves it to an
      * absolute address. A sign-extended resolve lands 65536 bytes low, so
      * the proof is the resolved long against the arithmetic done by hand.
-     * The packers keep samples short, so the file is built here, stored
-     * sections alone. */
+     * The rig's packed tunes carry short samples, so the file is built
+     * here, stored sections alone. */
     static String runLoopPointResolve() {
         int loop = 0x8084;
         byte[] packed = storedYmx(4, loop + 96, loop);

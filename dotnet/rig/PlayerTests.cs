@@ -7,11 +7,12 @@ namespace Rig
 {
     /// <summary>
     /// Differential tests for the YMX player, ported from the Java rig's
-    /// PlayerTests: each check packs a tune with the real packer, assembles
-    /// YMX.S with the decoder, runs the player under emulation as a plain
-    /// 68000, and compares every chip write against what GenYm computes
-    /// independently. `ymx/test/rig.sh -dotnet [--quick]` runs the battery;
-    /// each check returns a problem line, or the empty string.
+    /// PlayerTests: most checks pack a tune with the real packer - one
+    /// builds its file by hand - assemble YMX.S with the decoder, run the
+    /// player under emulation as a plain 68000, and compare every chip
+    /// write against what GenYm computes independently.
+    /// `ymx/test/rig.sh -dotnet [--quick]` runs the battery; each check
+    /// returns a problem line, or the empty string.
     /// </summary>
     public static class PlayerTests
     {
@@ -384,8 +385,8 @@ namespace Rig
         /// $FFFE is legal in any sample long enough to hold it - and init
         /// resolves it to an absolute address. A sign-extended resolve lands
         /// 65536 bytes low, so the proof is the resolved long against the
-        /// arithmetic done by hand. The packers keep samples short, so the
-        /// file is built here, stored sections alone.</summary>
+        /// arithmetic done by hand. The rig's packed tunes carry short
+        /// samples, so the file is built here, stored sections alone.</summary>
         public static string RunLoopPointResolve()
         {
             int loop = 0x8084;
