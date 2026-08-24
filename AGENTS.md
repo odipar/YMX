@@ -32,14 +32,14 @@ caller *claims* it, a register *survives* a call.
 
 Four habits that state an idea twice:
 
-- **three of a kind.** `no stale value, no zero, no bus cycle` — say what
+- **three of a kind.** `no stale value, no zero, no bus cycle` - say what
   happens and stop.
 - **the cleft.** `X is what makes Y` is `X makes Y`.
-- **the restatement.** `— which is a compile-time edit` is `— a compile-time
+- **the restatement.** `- which is a compile-time edit` is `- a compile-time
   edit`. Drop `which is` where a comma already carries the appositive; keep it
   before a predicate (`which is true whether…`) or an explanation (`which is
   why…`).
-- **filler.** `simply`, `actually`, `precisely`, `entirely`, `at all` — cut
+- **filler.** `simply`, `actually`, `precisely`, `entirely`, `at all` - cut
   unless the word carries the meaning: `exactly` for an equality, `entirely in
   memory` for the absence of a file on disk.
 
@@ -67,7 +67,7 @@ thing is called.
 ## A specification states operations
 
 Describe what happens, in terms an implementer can check: what is written, in
-what order, and what is left alone. Name no product, routine or source file —
+what order, and what is left alone. Name no product, routine or source file -
 an implementation follows the specification, not the other way round. A rule
 that needs a cross-reference to be understood is not yet stated operationally.
 
@@ -93,3 +93,5 @@ needs a different convention, the cell says so.
 
 Wrap at one width and hold it. Rewrap the paragraph you changed and no other:
 a blanket reflow buries the words that moved.
+
+No em dash construct anywhere: a dash that must stay is a single `-`.

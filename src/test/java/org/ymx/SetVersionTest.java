@@ -47,7 +47,7 @@ final class SetVersionTest {
         assertTrue(spec.contains("Version 1.12. Big-endian throughout."),
                 "SPEC's opening line");
         assertTrue(spec.contains("**$010C**, version 1.12"), "SPEC §1.1's row");
-        assertTrue(spec.contains("the version is $010C — 1.12;"),
+        assertTrue(spec.contains("the version is $010C - 1.12;"),
                 "SPEC §9.1's bullet");
     }
 

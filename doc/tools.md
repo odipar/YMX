@@ -3,15 +3,15 @@
 Every tool is a shell wrapper around one class: the wrapper finds the
 repository and the classes, compiles them when they are missing, and hands
 the arguments over. Each wrapper takes `-dotnet` as its FIRST argument to
-run the C# tree in `dotnet/` instead of the Java one — the same tools,
+run the C# tree in `dotnet/` instead of the Java one - the same tools,
 producing the same bytes. `ToolsDocTest` reads this document back against
 the sources: a flag a tool parses must appear in its section here, and the
 defaults quoted below are the constants' own values.
 
 | script | class | one line |
 |---|---|---|
-| — (`java -cp target/classes org.ym6.Ymx`) | `org.ym6.Ymx` | pack a `.ym` into a `.ymx` |
-| — (`java -cp target/classes org.ymr.Ymr`) | `org.ymr.Ymr` | pack a `.ymr` into a `.ymx` |
+| - (`java -cp target/classes org.ym6.Ymx`) | `org.ym6.Ymx` | pack a `.ym` into a `.ymx` |
+| - (`java -cp target/classes org.ymr.Ymr`) | `org.ymr.Ymr` | pack a `.ymr` into a `.ymx` |
 | `ymx/mksndh.sh` | `org.ymx.MkSndh` | combine packed tunes into an SNDH file |
 | `ymx/mkprg.sh` | `org.ymx.MkPrg` | wrap an SNDH file in a runnable program |
 | `ymx/mkcores.sh` | `org.ymx.MkCores` | assemble the prebuilt binaries (needs rmac) |
@@ -37,8 +37,8 @@ arguments at all - and this document is the same information in one place.
 
 ### org.ym6.Ymx
 
-Reads a YM5!/YM6! register dump — LHA-archived or unpacked, the reader
-tells them apart — and writes a `.ymx`.
+Reads a YM5!/YM6! register dump - LHA-archived or unpacked, the reader
+tells them apart - and writes a `.ymx`.
 
     ymx [-f] [-o] [-nN] [-cC] [-kK] input.ym [output.ymx]
     ymx [options] one.ym two.ym more.ym output-dir/
@@ -54,19 +54,19 @@ tells them apart — and writes a `.ymx`.
 | `-startframeF` `-endframeF` `-framesN` | the same window in frames: start, end, or a length cap |
 | `-drumhzH` | the drum rate ceiling (default 25600): a faster drum is resampled to fit, with a warning |
 | `-timersT` | which MFP timer each channel runs on, one letter per channel from 0 up (`-timersBC` puts channel 0 on Timer B); the default is AD |
-| `-sidresume` | the resume gap model (SPEC.md §3.3): a released toggle stream's timer keeps counting and a re-arrival resumes its phase — the model tunes written in maxYMiser need |
+| `-sidresume` | the resume gap model (SPEC.md §3.3): a released toggle stream's timer keeps counting and a re-arrival resumes its phase - the model tunes written in maxYMiser need |
 | `-meta` | print the header's title, author and frame rate, one per line, and pack nothing |
 | `-script` | dump the compiled effect script instead of packing |
 
 With a trailing DIRECTORY, every argument before it is an input, each
-packed with the identical configuration into `<dir>/<stem>.ymx` — the set
+packed with the identical configuration into `<dir>/<stem>.ymx` - the set
 one player build can hold as subtunes. The trim options take one tune.
 
 ### org.ymr.Ymr
 
 Reads a RhYMe `.YMR` version 1.3 register dump and writes the same `.ymx`.
 The flags shared with the YM packer mean the same things; what a `.YMR`
-does not have, the tool does not offer — no `-drumhz` (a `.YMR` sample has
+does not have, the tool does not offer - no `-drumhz` (a `.YMR` sample has
 no rate of its own), no `-timers` (the timer-to-voice binding is
 normative), no `-sidresume` (a YM argument) and no `-meta` (a `.YMR`
 carries no metadata).
@@ -127,8 +127,8 @@ it for every variant.
 
 ### mkrelease.sh
 
-Stages every core variant — three unit sizes by the `-perf` and `-nomask`
-flags — plus the stub, verifies each descriptor, and writes MANIFEST.txt
+Stages every core variant - three unit sizes by the `-perf` and `-nomask`
+flags - plus the stub, verifies each descriptor, and writes MANIFEST.txt
 with sizes and SHA-256 digests.
 
     ymx/mkrelease.sh [-publish] [stagedir]
@@ -168,7 +168,7 @@ work directory next to the first tune, named after it and the shape.
 | `-nN` `-cC` `-kK` `-o` | passed to the packer, as its own |
 | `-h`, `--help` | print the usage and stop |
 
-Any other `-flag` goes to the packer unread — the trim window and
+Any other `-flag` goes to the packer unread - the trim window and
 `-drumhz` among them. `HATARI=` and `TOS=` point at your own install.
 
 ### ym_sndh.sh
@@ -225,14 +225,14 @@ image; without arguments it sweeps `ymr/test/deeper.ymr`.
 
     ymx/test/ymr_sweep.sh [song.ymr ...]
 
-`YMR_FRAME_CAP` raises the walk's frame cap (default 1200) — the only way
+`YMR_FRAME_CAP` raises the walk's frame cap (default 1200) - the only way
 to reach a long tune's wrap.
 
 ### run.sh
 
 The real-hardware harness: generates the tune and expected checksum,
 assembles `YMXTEST.PRG` and runs it under Hatari. The output is the
-verdict — it must reach DONE, and no line may report BAD.
+verdict - it must reach DONE, and no line may report BAD.
 
     ymx/test/run.sh [-dotnet]
 

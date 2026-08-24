@@ -607,7 +607,7 @@ namespace Rig
                     + " (\\d+) streams", "the ring shape");
             List<string>? scriptStreams = Said(flat,
                     "([\\d,]+) of those ([\\d,]+) packed bytes are the eleven"
-                    + " script streams, which the `\\.YMR` \u2014 ([\\d,]+) bytes",
+                    + " script streams, which the `\\.YMR` - ([\\d,]+) bytes",
                     "the script streams");
             if (tuneAndLength == null || packedSizes == null || ringShape == null
                     || scriptStreams == null)

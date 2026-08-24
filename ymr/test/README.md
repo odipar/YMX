@@ -5,7 +5,7 @@ tunes in [../../ym/test](../../ym/test) are: `PinnedCorpusTest` packs them
 again and compares.
 
 They carry what no YM dump in that collection does. `dd.ymr` plays once,
-4,044 frames, with samples and squares across all three voices — the only
+4,044 frames, with samples and squares across all three voices - the only
 source in either collection whose header says the tune stops. `deeper.ymr`
 starts over, and its script holds 321 retunes that leave the timer running.
 `signals.ymr` runs 9,792 frames with 336 sync-buzzer starts.

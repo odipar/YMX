@@ -1,7 +1,7 @@
-# org.jx1 — the vendored ZX1 decoder
+# org.jx1 - the vendored ZX1 decoder
 
 ST4's own format is not [ZX1](https://github.com/einar-saukas/ZX1), so nothing
-here is on ST4's path — this is a single file kept for the one job ST4's own
+here is on ST4's path - this is a single file kept for the one job ST4's own
 decoders cannot do: reading somebody else's ZX1.
 
 RhYMe's `.YMR` register dumps are ZX1, one stream at a time, each packed
@@ -14,7 +14,7 @@ either is touched.
 `Decompressor.java` is `org.jx1.Decompressor` from
 [jx1](https://github.com/odipar/jx1), which is itself a port of `dzx1.c`. It
 streams its output through a caller-supplied ring, which is exactly the
-contract `.YMR` is packed for — the ring is at once the decoder's window and
+contract `.YMR` is packed for - the ring is at once the decoder's window and
 its output queue, and the packer never looks further back than it.
 
 ## What was changed
