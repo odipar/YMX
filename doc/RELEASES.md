@@ -13,29 +13,37 @@ patch of it.
 
 ## 0.5.0
 
-Room in the header for a loop frame. Format version 0.5: a tune packed
-at 0.4 has to be repacked from its `.ym` or `.ymr` source.
+A loop frame in the header, and the sections to reach it. Format version
+0.5: a tune packed at 0.4 has to be repacked from its `.ym` or `.ymr`
+source.
 
 - The header is 138 bytes, eight more than 0.4 carried. The long at
   offset 30 is `L`, the frame a tune that starts over goes back to; the
   long at 34 is the offset of a loop table. The section table follows
   at 38.
-- The loop table offset carries 0: no file carries a loop table.
 - `L` carries the frame the source starts over from, where the packer can
   keep it: the frame has to be one the wrap can enter with the timers
-  stopped and the skips cleared, and the frames from it to the end have to
-  fit a ring. Where the frame cannot be entered the packer takes the next
-  one that can, and where the body does not fit it raises `N` until it
-  does. Where neither holds, `L` carries 0 and the tune starts over from
-  its first frame, as it did at 0.4. Each conversion says which.
+  stopped and the skips cleared. Where it cannot be entered the packer
+  takes the next one that can, up to a second later; where no frame in
+  reach can be, `L` carries 0 and the tune starts over from its first
+  frame, as it did at 0.4. Each conversion says which.
 - A tune whose pass fits a ring - `O - L` at most `N` - is decoded once.
   The refills stop at `O` values, and the wrap moves the read position
   back `O - L` bytes in every ring, so a second pass decodes nothing.
   The values written to the sound chip are the same either way.
-- Raising `N` costs workspace and no file bytes, and a bigger ring lets a
-  back-reference reach further.
-- The workspace before the rings is four bytes larger: 1,650 bytes, plus
-  25 `N` for the rings.
+- Raising `N` to hold a pass costs workspace and no file bytes, and a
+  bigger ring lets a back-reference reach further, so a body past the ring
+  raises it, up to the cap SPEC.md §1.3 sets.
+- Past that cap the file carries two sections per stream instead: the
+  section table locates frames `[0, L)` and the loop table, twenty-five
+  entries at the offset in the header, locates `[L, O)`. A stream opens
+  its loop section when the first runs out and every time after that.
+  This costs file bytes rather than workspace - the replayed frames are
+  packed on their own - and a section is a whole number of units, so a cut
+  falls on one.
+- The workspace before the rings is twelve bytes larger: 1,658 bytes, plus
+  25 `N` for the rings. The two longs are the table a stream reopens from
+  and the values a section of it carries.
 
 ## 0.4.1
 

@@ -36,7 +36,7 @@ source formats and their tools use:
 | **stream** | a series of values arriving at one destination |
 | **frame stream** | a stream delivering one value per frame - the fourteen sound registers |
 | **timer stream** | a stream delivering values *between* frames, at a rate an MFP timer sets |
-| **section** | one stream's values for the whole tune, packed |
+| **section** | one stream's values for a run of frames, packed |
 
 ---
 
@@ -46,6 +46,7 @@ source formats and their tools use:
 +--------------------------------+
 | header, 38 bytes fixed         |
 | section table, 4 x S           |
+| loop table, 4 x S, or absent   |
 | sections, located by offset    |
 | sample table + sample bytes    |
 +--------------------------------+
@@ -67,8 +68,8 @@ source formats and their tools use:
 | 24 | 4 | byte offset of the sample table; 0 when there are none |
 | 28 | 2 | sample count |
 | 30 | 4 | `L`, the frame a tune that starts over goes back to (§8), within the bounds §9.3 gives it; 0 where the tune plays once through |
-| 34 | 4 | byte offset of the loop table; 0 when there is none |
-| 38 | 4·S | byte offset of each **section**, covering frames `[0, O)` |
+| 34 | 4 | byte offset of the **loop table** (§1.4); 0 where the sections cover the whole tune |
+| 38 | 4·S | byte offset of each **section** (§1.4) |
 
 With `S` fixed at 25 the header is **138 bytes**. Everything after it is
 body: the sections (§1.4), then the sample table (§6). Content in the body
@@ -114,10 +115,18 @@ idle.
 
 ### 1.4 The sections
 
-A section carries one stream's values for frames `[0, O)`, packed or
-stored. `O` is at least 1 and all twenty-five table entries are nonzero.
-Section order in the file is not significant; a section is located only
-by its offset.
+A section carries one stream's values, packed or stored. `O` is at least
+1 and all twenty-five section-table entries are nonzero. Section order in
+the file is not significant; a section is located only by its offset.
+
+**One set of sections or two.** Where the header's loop table offset is
+0, each stream has one section, covering frames `[0, O)`. Where it is
+not, it locates a second table of twenty-five long entries, read exactly
+as the section table is and beginning on a long boundary: each stream then
+has two sections, the section table's covering frames `[0, L)` and the
+loop table's covering `[L, O)`. Two sections carry the tune between them,
+each frame in one of the pair, and the second is where a pass after the
+first reads its values (§8).
 
 **Packed sections.** A packed section is a complete ST4 container -
 signature, twenty-byte header, four streams. The container layout is
@@ -137,11 +146,11 @@ built for (§9.1).
 
 **Stored sections.** A section may instead be stored: the bytes at its
 offset are the values, one per frame, with no header and no signature.
-Bit 31 of a table entry set marks a stored section; bits 30-0 are the
-offset. A container's header is twenty bytes, so a section shorter than
-twenty bytes is smaller stored (a one-frame tune stores one byte per
-stream). A stored section is read the same at any unit size; a file with
-only stored sections plays on any build.
+Bit 31 of an entry set marks a stored section, in either table; bits 30-0
+are the offset. A container's header is twenty bytes, so a section
+shorter than twenty bytes is smaller stored (a one-frame tune stores one
+byte per stream). A stored section is read the same at any unit size; a
+file with only stored sections plays on any build.
 
 **Alignment.** Every section, packed or stored, begins on a long
 boundary, so a player may read a container's header a long at a time.
@@ -149,7 +158,9 @@ Bytes between one part and the next long boundary are padding: nothing
 reads them, and their value is free.
 
 **Starting over.** When a tune with flag bit 0 set reaches the end of a
-section, the player reopens the section from its start (§8).
+section, the player opens a section from its start: the loop table's
+section for that stream where the file carries a loop table, the same
+section again where it does not (§8).
 
 Packed sizes are not stored: ST4 counts output units, so a decoder does
 not need them.
@@ -566,20 +577,28 @@ frame write is therefore optional.
 
 A tune with flag bit 0 set plays its frames again from frame `L`, so one
 pass is `O - L` frames and the first pass is the only one that plays the
-frames before `L`. A wrap takes one of two forms, and `O - L` against `N`
-selects which.
-
-Where `O - L` is larger than `N`, the streams are decoded again. A packed
-stream restarts only from its beginning, so a section that runs out
-mid-refill is opened again - a fresh decoder writing into the same ring -
-and the ring contents stay one continuous sequence. `O` need not fall on
-a group boundary.
+frames before `L`. A wrap takes one of three forms; `O - L` against `N`
+and the loop table offset select which.
 
 Where `O - L` is at most `N`, every value a pass reads is in the rings
 when the pass ends. Refilling stops at `O` values (§7), and on the wrap
 the read position in every ring moves back `O - L` bytes, then forward
 `N` where that lands before the ring's first byte. Nothing is decoded a
 second time.
+
+Where `O - L` is larger than `N`, the streams are decoded again. A packed
+stream restarts only from its beginning, so a section that runs out
+mid-refill is opened again - a fresh decoder writing into the same ring -
+and the ring contents stay one continuous sequence. `O` need not fall on
+a group boundary. The loop table offset selects which section is opened.
+
+With no loop table, `L` is 0 and a stream opens its own section again, so
+the values that follow are frame 0's onwards. With one, a stream opens
+the loop table's section, and every section it opens after that is the
+same one: the section table's sections carry the `L` values a stream
+reads once, the loop table's the `O - L` values it reads on every pass
+from the first wrap on. Every first section runs out at the same value,
+`L`, so the twenty-five streams cross to the loop table together.
 
 On the frame that ends the tune, after that frame's write, actions and
 refill: every claimed timer is stopped, its vector is parked on a routine
@@ -630,7 +649,8 @@ a value. Those operations, in full:
 | the frame's order | skip bits, then the fourteen register writes, then the frame's actions in channel order, then one refill |
 | the frame after the last, flag bit 0 set | every claimed timer is stopped, its vector parked, its interrupt enabled with nothing pending, and every skip bit cleared, before frame `L` is played again |
 | refill turn | on frame `f`, stream `f` modulo `C` is decoded `C` values further |
-| a section running out mid-refill | decoding continues from the start of that same section, into the same ring |
+| a section running out mid-refill | decoding continues into the same ring, from the start of a section |
+| a loop table offset that is not 0 | the section opened there, and at every later one, is the loop table's for that stream; with 0 it is the same section again |
 
 ### 9.3 The unchecked rules
 
@@ -641,12 +661,16 @@ The shape:
 
 - `O` is at least 1; `N` and `C` are within §1.3. At a unit size above 1,
   `O` and `C` are multiples of the unit size.
-- The loop table offset is 0: no player reads a loop table. Where `L` is
-  not 0, `L` is less than `O` and `O` - `L` is at most `N`, so a wrap
-  reaches back one pass into the rings and no further (§8).
-- All twenty-five sections are present, and each decodes to exactly `O`
-  values of one byte. No back-reference exceeds `N` bytes and no operation
-  exceeds 65535 units (§1.4).
+- Where `L` is not 0, `L` is less than `O`.
+- Where the loop table offset is 0, each of the twenty-five sections
+  decodes to `O` values, and `L` is 0 or leaves `O` - `L` at most `N`, so
+  a wrap reaches back one pass into the rings and no further (§8).
+- Where the loop table offset is not 0 it is a long boundary, `L` is not
+  0, and the loop table's twenty-five entries are nonzero: each section
+  table's section decodes to `L` values and each loop table's to `O` -
+  `L`. At a unit size above 1, `L` is a multiple of the unit size.
+- Every section decodes to values of one byte. No back-reference exceeds
+  `N` bytes and no operation exceeds 65535 units (§1.4).
 - The sample table is within §6: at most 32 samples, the `$80` marker at
   each sample's length offset, each loop point less than its sample's
   length or `$FFFF`, the table on a long boundary.

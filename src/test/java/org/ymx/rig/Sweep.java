@@ -394,6 +394,9 @@ final class Sweep {
                 | (packed[9] & 0xFF) << 16 | (packed[10] & 0xFF) << 8
                 | (packed[11] & 0xFF));
         boolean loops = (packed[7] & 1) != 0;
+        int loopFrame = (int) ((long) (packed[30] & 0xFF) << 24
+                | (packed[31] & 0xFF) << 16 | (packed[32] & 0xFF) << 8
+                | (packed[33] & 0xFF));
         Player player = new Player(packed, Rig.workspaceSize(ring));
         if (player.init() != 0) {
             return "INITFAIL " + name;
@@ -404,8 +407,12 @@ final class Sweep {
         boolean wrapped = false;
         int played = 0;
         for (int f = 0; f < budget; f++) {
-            int src = played % headerFrames;    // the same frames, over and
-            if (played != 0 && src == 0) {      // over
+            // The first pass plays every frame; each pass after it plays
+            // from the loop frame, which is 0 where the file gives none.
+            int body = headerFrames - loopFrame;
+            int past = played - headerFrames;
+            int src = played < headerFrames ? played : loopFrame + past % body;
+            if (played != 0 && src == loopFrame && past % body == 0) {
                 model.restart();                // the player silenced everything
             }
             Player.Frame frame = player.frame();

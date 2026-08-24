@@ -25,16 +25,21 @@ import java.util.List;
  *       envelope and the phase a voice would hear differs between passes.</li>
  * </ul>
  *
- * <p>The second is the ring. A player wraps to {@code L} by moving the read
- * position in every ring back {@code O - L} bytes, which reaches only as far
- * as the ring holds, so a file with {@code L} above 0 has to keep {@code O - L}
- * at or under {@code N} (SPEC.md 9.3). Raising {@code N} to hold the body costs
- * workspace and no file bytes, so that is what the packer does, up to the
- * format's cap.
+ * <p>The second is how the player reaches the frame again, in one of two
+ * ways. A wrap that moves the read position in every ring back {@code O - L}
+ * bytes reaches only as far as the ring holds, so it needs {@code O - L} at or
+ * under {@code N}; raising {@code N} to hold the body costs workspace and no
+ * file bytes, so that is what the packer does, up to the format's cap. Past
+ * the cap the file carries two sections per stream instead - frames
+ * {@code [0, L)} in the section table's, {@code [L, O)} in the loop table's -
+ * which the player opens in turn (SPEC.md 1.4, 8). That one costs file bytes,
+ * since the replayed frames are packed on their own, so the ring comes first
+ * wherever it fits.
  *
- * <p>Where neither the state rule nor the ring can be met, {@code L} is 0: the
- * tune starts over from its first frame, as every file before format version
- * 0.5 did, and the packer reports it.
+ * <p>Where the state rule holds for no frame within the budget, and where a
+ * cut has no frame it can start at, {@code L} is 0: the tune starts over from
+ * its first frame, as every file before format version 0.5 did, and the packer
+ * reports it.
  */
 public final class LoopFrame {
 
@@ -55,10 +60,11 @@ public final class LoopFrame {
 
     /**
      * What the packer settled on: the {@code frame} the file carries, the
-     * {@code ringSize} it needs to reach it, and the {@code notes} saying what
-     * moved and what it cost.
+     * {@code ringSize} it needs to reach it, whether the streams are
+     * {@code cut} in two at that frame, and the {@code notes} saying what moved
+     * and what it cost.
      */
-    public record Plan(int frame, int ringSize, List<String> notes) {
+    public record Plan(int frame, int ringSize, boolean cut, List<String> notes) {
 
         public Plan {
             notes = List.copyOf(notes);
@@ -71,62 +77,105 @@ public final class LoopFrame {
      * <p>{@code loops} is what the file's flag bit 0 will say: a tune that
      * plays once through has no loop frame and carries 0. {@code ringSize} and
      * {@code chunk} are the shape the caller asked for; the plan's ring size is
-     * that one or a larger multiple of the chunk.
+     * that one or a larger multiple of the chunk. {@code unit} is the size the
+     * sections are packed at, which a cut has to fall on: each of the two
+     * sections is a whole number of units.
      */
     public static Plan resolve(Tune tune, EffectScript.Result script, boolean loops,
-                               int ringSize, int chunk) {
+                               int ringSize, int chunk, int unit) {
         List<String> notes = new ArrayList<>();
         if (!loops || tune.loopFrame() == 0) {
-            return new Plan(0, ringSize, notes);
+            return new Plan(0, ringSize, false, notes);
         }
         int given = tune.loopFrame();
         int budget = budget(tune.frameRate());
-        int frame = -1;
-        for (int candidate = given;
-                candidate <= given + budget && candidate < tune.frames(); candidate++) {
-            if (qualifies(tune, script, candidate)) {
-                frame = candidate;
+        int last = Math.min(given + budget, tune.frames() - 1);
+        // Three answers out of one walk: the first frame that can be entered,
+        // the first a ring can reach back over - the body shrinks as the frame
+        // moves later, so once one fits every later one does - and the first a
+        // cut can start at.
+        int entered = -1;
+        int ringFrame = -1;
+        int ring = ringSize;
+        int cutFrame = -1;
+        for (int candidate = given; candidate <= last; candidate++) {
+            if (!qualifies(tune, script, candidate)) {
+                continue;
+            }
+            if (entered < 0) {
+                entered = candidate;
+            }
+            int body = tune.frames() - candidate;
+            // The chunk divides it and two chunks fit, since a body past the
+            // ring is already past a ring of at least two; the cap is what is
+            // left to check.
+            int needed = body <= ringSize ? ringSize
+                    : ((body + chunk - 1) / chunk) * chunk;
+            if (needed <= YmxFormat.MAX_RING_SIZE) {
+                ringFrame = candidate;
+                ring = needed;
                 break;
             }
+            if (cutFrame < 0 && candidate % unit == 0) {
+                cutFrame = candidate;
+            }
         }
-        if (frame < 0) {
+        if (entered < 0) {
             notes.add(String.format("The source starts over at frame %d, and no frame"
                     + " from there to %d can be entered with the timers stopped and"
                     + " the skips cleared: the tune starts over from frame 0 instead,"
                     + " so its first %d frames are heard on every pass",
-                    given, Math.min(given + budget, tune.frames() - 1), given));
-            return new Plan(0, ringSize, notes);
+                    given, last, given));
+            return new Plan(0, ringSize, false, notes);
+        }
+        if (ringFrame < 0 && cutFrame < 0) {
+            notes.add(String.format("The source starts over at frame %d, leaving %d"
+                    + " frames to replay, more than the %d bytes the largest ring"
+                    + " holds, and no frame from there to %d that can be entered"
+                    + " falls on a %d-byte unit: the tune starts over from frame 0"
+                    + " instead, so its first %d frames are heard on every pass",
+                    given, tune.frames() - entered, YmxFormat.MAX_RING_SIZE, last,
+                    unit, given));
+            return new Plan(0, ringSize, false, notes);
         }
 
-        int body = tune.frames() - frame;
-        int ring = ringSize;
-        if (body > ring) {
-            // The chunk divides it and two chunks fit, since the body is
-            // already past a ring of at least two; the cap is what is left to
-            // check.
-            int needed = ((body + chunk - 1) / chunk) * chunk;
-            if (needed > YmxFormat.MAX_RING_SIZE) {
-                notes.add(String.format("The source starts over at frame %d, leaving"
-                        + " %d frames to replay, and a ring of %d bytes is past the"
-                        + " %d the format allows: the tune starts over from frame 0"
-                        + " instead, so its first %d frames are heard on every pass",
-                        given, body, needed, YmxFormat.MAX_RING_SIZE, given));
-                return new Plan(0, ringSize, notes);
-            }
-            notes.add(String.format("Rings raised from %d to %d bytes so the %d frames"
-                    + " from the loop frame fit one: %d bytes of workspace rather"
-                    + " than %d, and no file bytes",
-                    ring, needed, body, YmxFormat.STREAMS * needed,
-                    YmxFormat.STREAMS * ring));
-            ring = needed;
-        }
-        if (frame != given) {
+        int frame = ringFrame >= 0 ? ringFrame : cutFrame;
+        if (entered != given) {
             notes.add(String.format("The source starts over at frame %d, which cannot be"
                     + " entered with the timers stopped and the skips cleared: the tune"
                     + " starts over from frame %d instead, %d frame%s later",
-                    given, frame, frame - given, frame - given == 1 ? "" : "s"));
+                    given, entered, entered - given, entered - given == 1 ? "" : "s"));
         }
-        return new Plan(frame, ring, notes);
+        if (ringFrame >= 0) {
+            if (ring != ringSize) {
+                notes.add(String.format("Rings raised from %d to %d bytes so the %d"
+                        + " frames from the loop frame fit one: %d bytes of workspace"
+                        + " rather than %d, and no file bytes",
+                        ringSize, ring, tune.frames() - frame,
+                        YmxFormat.STREAMS * ring, YmxFormat.STREAMS * ringSize));
+            }
+            if (frame != entered) {
+                notes.add(String.format("Frame %d leaves more frames to replay than"
+                        + " the largest ring holds, so the tune starts over from"
+                        + " frame %d instead, the first one a ring reaches back"
+                        + " over", entered, frame));
+            }
+            return new Plan(frame, ring, false, notes);
+        }
+        if (frame != entered) {
+            notes.add(String.format("Frame %d is not a whole number of %d-byte units,"
+                    + " which a section is: the tune starts over from frame %d"
+                    + " instead, %d frame%s later", entered, unit, frame,
+                    frame - entered, frame - entered == 1 ? "" : "s"));
+        }
+        int body = tune.frames() - frame;
+        notes.add(String.format("The %d frames from frame %d are past the %d bytes the"
+                + " largest ring holds, so every stream is packed as two sections -"
+                + " one of the %d frames before it, one of the %d from it - and the"
+                + " file carries a loop table locating the second: file bytes rather"
+                + " than workspace", body, frame, YmxFormat.MAX_RING_SIZE, frame,
+                body));
+        return new Plan(frame, ringSize, true, notes);
     }
 
     /**

@@ -116,6 +116,74 @@ final class CorpusNumbersTest {
         }
     }
 
+    /**
+     * What cutting the streams in two costs, against the tunes it is done to:
+     * every {@code .ymx} in {@code ym/test} that carries a loop table, beside
+     * the same source packed with {@code -l0} - one set of sections, the file
+     * the packer wrote before the cut existed.
+     */
+    @Test
+    void whatACutCostsIsWhatTheConversionDocSaysItCosts() throws IOException {
+        String said = String.join(" ", Files.readString(CONVERSION).split("\\s+"));
+        int[] range = numbers(said,
+                "the file is (\\d+) to (\\d+) per cent larger than the same tune"
+                        + " packed with `-l0`", "what a cut costs");
+        List<Path> cut = new ArrayList<>();
+        try (Stream<Path> listing = Files.list(Path.of("ym", "test"))) {
+            listing.filter(p -> p.toString().endsWith(".ymx")).sorted()
+                    .filter(CorpusNumbersTest::carriesALoopTable).forEach(cut::add);
+        }
+        assertTrue(!cut.isEmpty(), "no packed tune in ym/test carries a loop table,"
+                + " so this test is measuring nothing");
+        long smallest = Long.MAX_VALUE;
+        long largest = 0;
+        for (Path packed : cut) {
+            String name = packed.getFileName().toString();
+            Path source = packed.resolveSibling(
+                    name.substring(0, name.lastIndexOf('.')) + ".ym");
+            Path flat = Files.createTempFile("uncut", ".ymx");
+            try {
+                packStartingOverAtZero(source, flat);
+                long grown = Math.round(100.0
+                        * (Files.size(packed) - Files.size(flat)) / Files.size(flat));
+                smallest = Math.min(smallest, grown);
+                largest = Math.max(largest, grown);
+            } finally {
+                Files.deleteIfExists(flat);
+            }
+        }
+        assertEquals(range[0], smallest, "the smallest a cut file grows");
+        assertEquals(range[1], largest, "the largest a cut file grows");
+    }
+
+    /** Whether a packed file locates a second section per stream. */
+    private static boolean carriesALoopTable(Path packed) {
+        try {
+            byte[] file = Files.readAllBytes(packed);
+            long offset = 0;
+            for (int at = 0; at < 4; at++) {
+                offset = (offset << 8) | (file[org.ymx.YmxFormat.OFFSET_LOOP_TABLE + at]
+                        & 0xFF);
+            }
+            return offset != 0;
+        } catch (IOException e) {
+            throw new IllegalStateException(packed + ": " + e);
+        }
+    }
+
+    /** One tune through its own CLI, told to start over from frame 0: the
+     * options the pinned file was packed with, minus the loop frame. */
+    private static void packStartingOverAtZero(Path source, Path out) {
+        java.io.PrintStream spoken = System.out;
+        System.setOut(new java.io.PrintStream(java.io.OutputStream.nullOutputStream(),
+                true, java.nio.charset.StandardCharsets.ISO_8859_1));
+        try {
+            Ymx.main(new String[] {"-f", "-l0", source.toString(), out.toString()});
+        } finally {
+            System.setOut(spoken);
+        }
+    }
+
     @Test
     void whatStartingOverCostsIsWhatTheConversionDocSaysItCosts() throws IOException {
         String corpus = System.getenv("YM_CORPUS");

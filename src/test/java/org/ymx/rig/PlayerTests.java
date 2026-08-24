@@ -447,6 +447,110 @@ final class PlayerTests {
         return out.toByteArray();
     }
 
+    /**
+     * A file cut in two at its loop frame, every section stored: the section
+     * table locates frames {@code [0, L)} and the loop table {@code [L, O)}.
+     * A short replay packs smaller stored than as a container, so this is a
+     * shape a writer reaches; here it also puts the loop table's own entries
+     * on the stored path. {@code L} is under one group, so the first refill
+     * of every stream already runs into the second section.
+     */
+    static String runStoredCut() {
+        int frames = 96;
+        int loop = 12;
+        int ring = 48;
+        byte[] file = storedCutYmx(frames, loop, ring, 24);
+        Player player = new Player(file, Rig.workspaceSize(ring), 1);
+        if (player.init() != 0) {
+            return "stored cut: YMX_init rejected the file";
+        }
+        // Two passes past the first: R0 carries the frame number, so the
+        // values written to it are the frames the player played.
+        for (int index = 0; index < frames + 2 * (frames - loop); index++) {
+            Player.Frame played = player.frame();
+            int wanted = index < frames ? index
+                    : loop + (index - frames) % (frames - loop);
+            Integer got = null;
+            for (Player.Pair write : played.writes()) {
+                if (write.register() == 0) {
+                    got = write.value();
+                }
+            }
+            if (got == null || got != wanted) {
+                return "stored cut: call " + index + " wrote R0=" + got
+                        + ", want frame " + wanted;
+            }
+        }
+        return "";
+    }
+
+    /** The file {@link #runStoredCut} plays: twenty-five stored sections of
+     * {@code loop} values, twenty-five more of the rest, and the two tables
+     * that locate them. R0 carries the frame number and every other stream
+     * holds one value, so what reaches the chip says which frame is playing. */
+    private static byte[] storedCutYmx(int frames, int loop, int ring, int chunk) {
+        int table = align(org.ymx.YmxFormat.HEADER_SIZE);
+        int at = table + 4 * Rig.STREAMS;
+        int[] first = new int[Rig.STREAMS];
+        int[] second = new int[Rig.STREAMS];
+        ByteArrayOutputStream body = new ByteArrayOutputStream();
+        for (int half = 0; half < 2; half++) {
+            for (int stream = 0; stream < Rig.STREAMS; stream++) {
+                while (at % 4 != 0) {
+                    body.write(0);
+                    at++;
+                }
+                int from = half == 0 ? 0 : loop;
+                int to = half == 0 ? loop : frames;
+                (half == 0 ? first : second)[stream] = at;
+                for (int frame = from; frame < to; frame++) {
+                    body.write(streamByte(stream, frame));
+                }
+                at += to - from;
+            }
+        }
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.writeBytes("YMX!".getBytes(StandardCharsets.US_ASCII));
+        word(out, org.ymx.YmxFormat.VERSION);
+        word(out, 1);                               // flags: starts over
+        longWord(out, frames);
+        word(out, 50);
+        word(out, Rig.STREAMS);
+        word(out, ring);
+        word(out, chunk);
+        longWord(out, 2000000);
+        longWord(out, 0);                           // no samples
+        word(out, 0);
+        longWord(out, loop);                        // L, where it starts over
+        longWord(out, table);                       // and the table for [L, O)
+        for (int stream = 0; stream < Rig.STREAMS; stream++) {
+            longWord(out, 0x80000000 | first[stream]);  // bit 31: stored
+        }
+        while (out.size() < table) {
+            out.write(0);
+        }
+        for (int stream = 0; stream < Rig.STREAMS; stream++) {
+            longWord(out, 0x80000000 | second[stream]);
+        }
+        out.writeBytes(body.toByteArray());
+        return out.toByteArray();
+    }
+
+    /** One stream's byte on one frame of that file. */
+    private static int streamByte(int stream, int frame) {
+        return switch (stream) {
+            case 0 -> frame & 0xFF;                 // R0: the frame number
+            case 13 -> 0xFF;                        // R13: no envelope restart
+            case 16 -> 0xE4;                        // T: 0->A 1->B 2->C 3->D
+            default -> 0;
+        };
+    }
+
+    private static int align(int at) {
+        return at + ((-at) & 3);
+    }
+
     private static void word(ByteArrayOutputStream out, int value) {
         out.write(value >>> 8);
         out.write(value);
@@ -966,7 +1070,17 @@ final class PlayerTests {
                 new Object[] {600, 960, 24, "loops from frame 599", true, 3, 1, 599},
                 new Object[] {600, 240, 24, "a body past the ring", true, 2, 1, 100},
                 new Object[] {600, 960, 24, "loops from frame 200, unit 2",
-                    true, 2, 2, 200}));
+                    true, 2, 2, 200},
+                // A body past the largest ring the format allows: the packer
+                // cuts every stream at the loop frame and the file carries a
+                // loop table, so the wrap opens the second section rather
+                // than moving the cursor back.
+                new Object[] {2688, 960, 24, "cut at frame 100", true, 2, 1, 100},
+                // A first section shorter than a group: every stream runs out
+                // of it inside its own first fill, at init, and opens the
+                // loop table's before frame 0 is played.
+                new Object[] {2688, 960, 24, "cut at frame 12, unit 2",
+                    true, 2, 2, 12}));
         if (!quick) {
             shapes.add(new Object[] {4000, 960, 24, "four thousand frames",
                     true, 1, 1});
@@ -1008,6 +1122,8 @@ final class PlayerTests {
             failures += report(runSampleLoop(perf), String.format(
                     "the sample loop%-9s    (back to the loop, not stopped)", build));
         }
+        failures += report(runStoredCut(),
+                "the stored cut           (both tables, values not containers)");
         failures += report(runLoopPointResolve(),
                 "the loop-point resolve   (an unsigned word, $8000 and up)");
         failures += report(runLiveRetune(),

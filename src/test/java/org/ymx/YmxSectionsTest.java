@@ -45,6 +45,16 @@ final class YmxSectionsTest {
                 : unpack(file, from, size, offsetLimit);
     }
 
+    /** The values of a section located out of either table, by the count it
+     * carries: a container says its own size, so what is unpacked is the rest
+     * of the file from its first byte. */
+    private static byte[] sectionValues(byte[] file, long entry, int count) {
+        int from = (int) YmxFormat.sectionOffset(entry);
+        return YmxFormat.isStored(entry)
+                ? Arrays.copyOfRange(file, from, from + count)
+                : unpack(file, from, file.length - from, Integer.MAX_VALUE);
+    }
+
     private static int longAt(byte[] file, int at) {
         return (word(file, at) << 16) | word(file, at + 2);
     }
@@ -79,6 +89,48 @@ final class YmxSectionsTest {
             assertArrayEquals(expected[stream],
                     values(file, stream, packedSize(result, stream), Integer.MAX_VALUE),
                     "stream " + stream);
+        }
+    }
+
+    /**
+     * A tune whose replay is longer than the largest ring: the packer cuts
+     * every stream at the loop frame, the file carries a loop table, and the
+     * two sections of a stream hold the frames before and from it.
+     */
+    @Test
+    void aTuneCutAtItsLoopFrameCarriesBothHalves() {
+        int frames = 2688;
+        int loop = 100;
+        byte[][] registers = Ym6TestData.registers(frames);
+        for (int frame = 0; frame < frames; frame++) {
+            registers[1][frame] &= 0x0F;        // no effect codes, so no timer
+            registers[3][frame] &= 0x0F;        // stream is running at the
+        }                                       // frame the wrap enters
+        Tune source = YmEffects.tune(Ym6Reader.read(Ym6TestData.file(registers,
+                frames, true, "YM6!", 50, 0, loop)));
+        YmxEncoder.Result result = YmxEncoder.encode(source, 960, 24, true, false);
+        byte[] file = result.file();
+
+        assertEquals(loop, longAt(file, YmxFormat.OFFSET_LOOP_FRAME),
+                "the frame the file starts over from");
+        int loopTable = longAt(file, YmxFormat.OFFSET_LOOP_TABLE);
+        assertTrue(loopTable != 0, "a body past the largest ring carries a"
+                + " loop table");
+        assertEquals(0, loopTable % 4, "the loop table is on a long boundary");
+        assertEquals(960, word(file, YmxFormat.OFFSET_RING_SIZE),
+                "a cut leaves the ring where it was");
+
+        byte[][] expected = YmxEncoderTest.expectedVectors(source);
+        for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
+            long first = entry(file, stream);
+            long second = longAt(file, loopTable + 4 * stream) & 0xFFFF_FFFFL;
+            assertTrue(second != 0, "stream " + stream + " has no loop section");
+            assertArrayEquals(Arrays.copyOfRange(expected[stream], 0, loop),
+                    sectionValues(file, first, loop),
+                    "stream " + stream + " before the loop frame");
+            assertArrayEquals(Arrays.copyOfRange(expected[stream], loop, frames),
+                    sectionValues(file, second, frames - loop),
+                    "stream " + stream + " from the loop frame");
         }
     }
 

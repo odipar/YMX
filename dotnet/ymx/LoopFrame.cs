@@ -19,12 +19,16 @@ namespace Ymx
     /// by that frame's own M, and no voice follows the envelope generator before
     /// the first frame at or after it that writes R13.</para>
     ///
-    /// <para>The second is the ring. A player wraps to L by moving the read
-    /// position in every ring back O - L bytes, so a file with L above 0 has to
-    /// keep O - L at or under N (SPEC.md 9.3). Raising N to hold the body costs
+    /// <para>The second is how the player reaches the frame again, in one of
+    /// two ways. A wrap that moves the read position in every ring back O - L
+    /// bytes needs O - L at or under N; raising N to hold the body costs
     /// workspace and no file bytes, so that is what the packer does, up to the
-    /// format's cap. Where neither the state rule nor the ring can be met, L is
-    /// 0 and the packer reports it.</para>
+    /// format's cap. Past the cap the file carries two sections per stream
+    /// instead - frames [0, L) in the section table's, [L, O) in the loop
+    /// table's - which the player opens in turn (SPEC.md 1.4, 8), and that one
+    /// costs file bytes. Where the state rule holds for no frame within the
+    /// budget, and where a cut has no frame it can start at, L is 0 and the
+    /// packer reports it.</para>
     /// </summary>
     public static class LoopFrame
     {
@@ -42,79 +46,128 @@ namespace Ymx
         }
 
         /// <summary>What the packer settled on: the Frame the file carries,
-        /// the RingSize it needs to reach it, and the Notes saying what moved
-        /// and what it cost.</summary>
-        public sealed record Plan(int Frame, int RingSize, IReadOnlyList<string> Notes);
+        /// the RingSize it needs to reach it, whether the streams are Cut in
+        /// two at that frame, and the Notes saying what moved and what it
+        /// cost.</summary>
+        public sealed record Plan(int Frame, int RingSize, bool Cut,
+                IReadOnlyList<string> Notes);
 
         /// <summary>Resolves the frame a file starts over from. loops is what
         /// the file's flag bit 0 will say; ringSize and chunk are the shape the
         /// caller asked for, and the plan's ring size is that one or a larger
-        /// multiple of the chunk.</summary>
+        /// multiple of the chunk. unit is the size the sections are packed at,
+        /// which a cut has to fall on: each of the two sections is a whole
+        /// number of units.</summary>
         public static Plan Resolve(Tune tune, EffectScript.Result script, bool loops,
-                int ringSize, int chunk)
+                int ringSize, int chunk, int unit)
         {
             var notes = new List<string>();
             if (!loops || tune.LoopFrame == 0)
             {
-                return new Plan(0, ringSize, notes);
+                return new Plan(0, ringSize, false, notes);
             }
             int given = tune.LoopFrame;
             int budget = Budget(tune.FrameRate);
-            int frame = -1;
-            for (int candidate = given;
-                    candidate <= given + budget && candidate < tune.Frames; candidate++)
+            int last = Math.Min(given + budget, tune.Frames - 1);
+            // Three answers out of one walk: the first frame that can be
+            // entered, the first a ring can reach back over - the body shrinks
+            // as the frame moves later, so once one fits every later one does -
+            // and the first a cut can start at.
+            int entered = -1;
+            int ringFrame = -1;
+            int ring = ringSize;
+            int cutFrame = -1;
+            for (int candidate = given; candidate <= last; candidate++)
             {
-                if (Qualifies(tune, script, candidate))
+                if (!Qualifies(tune, script, candidate))
                 {
-                    frame = candidate;
+                    continue;
+                }
+                if (entered < 0)
+                {
+                    entered = candidate;
+                }
+                int size = tune.Frames - candidate;
+                // The chunk divides it and two chunks fit, since a body past
+                // the ring is already past a ring of at least two; the cap is
+                // what is left to check.
+                int needed = size <= ringSize ? ringSize
+                        : ((size + chunk - 1) / chunk) * chunk;
+                if (needed <= YmxFormat.MaxRingSize)
+                {
+                    ringFrame = candidate;
+                    ring = needed;
                     break;
                 }
+                if (cutFrame < 0 && candidate % unit == 0)
+                {
+                    cutFrame = candidate;
+                }
             }
-            if (frame < 0)
+            if (entered < 0)
             {
                 notes.Add(string.Format("The source starts over at frame {0}, and no"
                         + " frame from there to {1} can be entered with the timers"
                         + " stopped and the skips cleared: the tune starts over from"
                         + " frame 0 instead, so its first {2} frames are heard on"
-                        + " every pass",
-                        given, Math.Min(given + budget, tune.Frames - 1), given));
-                return new Plan(0, ringSize, notes);
+                        + " every pass", given, last, given));
+                return new Plan(0, ringSize, false, notes);
+            }
+            if (ringFrame < 0 && cutFrame < 0)
+            {
+                notes.Add(string.Format("The source starts over at frame {0}, leaving"
+                        + " {1} frames to replay, more than the {2} bytes the largest"
+                        + " ring holds, and no frame from there to {3} that can be"
+                        + " entered falls on a {4}-byte unit: the tune starts over"
+                        + " from frame 0 instead, so its first {5} frames are heard"
+                        + " on every pass", given, tune.Frames - entered,
+                        YmxFormat.MaxRingSize, last, unit, given));
+                return new Plan(0, ringSize, false, notes);
             }
 
-            int body = tune.Frames - frame;
-            int ring = ringSize;
-            if (body > ring)
-            {
-                // The chunk divides it and two chunks fit, since the body is
-                // already past a ring of at least two; the cap is what is left
-                // to check.
-                int needed = ((body + chunk - 1) / chunk) * chunk;
-                if (needed > YmxFormat.MaxRingSize)
-                {
-                    notes.Add(string.Format("The source starts over at frame {0},"
-                            + " leaving {1} frames to replay, and a ring of {2} bytes"
-                            + " is past the {3} the format allows: the tune starts"
-                            + " over from frame 0 instead, so its first {4} frames"
-                            + " are heard on every pass",
-                            given, body, needed, YmxFormat.MaxRingSize, given));
-                    return new Plan(0, ringSize, notes);
-                }
-                notes.Add(string.Format("Rings raised from {0} to {1} bytes so the {2}"
-                        + " frames from the loop frame fit one: {3} bytes of workspace"
-                        + " rather than {4}, and no file bytes",
-                        ring, needed, body, YmxFormat.Streams * needed,
-                        YmxFormat.Streams * ring));
-                ring = needed;
-            }
-            if (frame != given)
+            int frame = ringFrame >= 0 ? ringFrame : cutFrame;
+            if (entered != given)
             {
                 notes.Add(string.Format("The source starts over at frame {0}, which"
                         + " cannot be entered with the timers stopped and the skips"
                         + " cleared: the tune starts over from frame {1} instead,"
-                        + " {2} frame{3} later",
-                        given, frame, frame - given, frame - given == 1 ? "" : "s"));
+                        + " {2} frame{3} later", given, entered, entered - given,
+                        entered - given == 1 ? "" : "s"));
             }
-            return new Plan(frame, ring, notes);
+            if (ringFrame >= 0)
+            {
+                if (ring != ringSize)
+                {
+                    notes.Add(string.Format("Rings raised from {0} to {1} bytes so the"
+                            + " {2} frames from the loop frame fit one: {3} bytes of"
+                            + " workspace rather than {4}, and no file bytes",
+                            ringSize, ring, tune.Frames - frame,
+                            YmxFormat.Streams * ring, YmxFormat.Streams * ringSize));
+                }
+                if (frame != entered)
+                {
+                    notes.Add(string.Format("Frame {0} leaves more frames to replay"
+                            + " than the largest ring holds, so the tune starts over"
+                            + " from frame {1} instead, the first one a ring reaches"
+                            + " back over", entered, frame));
+                }
+                return new Plan(frame, ring, false, notes);
+            }
+            if (frame != entered)
+            {
+                notes.Add(string.Format("Frame {0} is not a whole number of {1}-byte"
+                        + " units, which a section is: the tune starts over from frame"
+                        + " {2} instead, {3} frame{4} later", entered, unit, frame,
+                        frame - entered, frame - entered == 1 ? "" : "s"));
+            }
+            int replayed = tune.Frames - frame;
+            notes.Add(string.Format("The {0} frames from frame {1} are past the {2}"
+                    + " bytes the largest ring holds, so every stream is packed as two"
+                    + " sections - one of the {3} frames before it, one of the {4}"
+                    + " from it - and the file carries a loop table locating the"
+                    + " second: file bytes rather than workspace", replayed, frame,
+                    YmxFormat.MaxRingSize, frame, replayed));
+            return new Plan(frame, ringSize, true, notes);
         }
 
         /// <summary>

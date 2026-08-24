@@ -52,15 +52,14 @@ public record YmxHeader(int ring, int chunk, int unit, int hz, int flags, int fr
                     + " - repack the tune from its .ym source");
         }
         // A stored section carries no signature, so the unit size comes from
-        // the first section that is a container. A tune short enough to
-        // store every section reads the same at any unit size, and its
-        // unit here is 0.
-        int section = 0;
-        for (int stream = 0; stream < YmxFormat.STREAMS && section == 0; stream++) {
-            long entry = longAt(file, YmxFormat.OFFSET_SECTION_TABLE + 4 * stream);
-            if (entry != 0 && !YmxFormat.isStored(entry)) {
-                section = (int) YmxFormat.sectionOffset(entry);
-            }
+        // the first section that is a container - out of either table, since
+        // a file cut at its loop frame may store the frames before it and
+        // pack the frames from it. A tune short enough to store every
+        // section reads the same at any unit size, and its unit here is 0.
+        int section = container(file, YmxFormat.OFFSET_SECTION_TABLE);
+        long loopTable = longAt(file, YmxFormat.OFFSET_LOOP_TABLE);
+        if (section == 0 && loopTable != 0) {
+            section = container(file, (int) loopTable);
         }
         if (section + 3 >= file.length) {
             throw new IOException(path + " has no readable first section");
@@ -71,6 +70,18 @@ public record YmxHeader(int ring, int chunk, int unit, int hz, int flags, int fr
                 word(file, YmxFormat.OFFSET_PLAYER_HZ),
                 word(file, YmxFormat.OFFSET_FLAGS),
                 (int) longAt(file, YmxFormat.OFFSET_FRAMES));
+    }
+
+    /** The offset of one table's first section that is a container, or 0
+     * where every section it locates is stored. */
+    private static int container(byte[] file, int table) {
+        for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
+            long entry = longAt(file, table + 4 * stream);
+            if (entry != 0 && !YmxFormat.isStored(entry)) {
+                return (int) YmxFormat.sectionOffset(entry);
+            }
+        }
+        return 0;
     }
 
     private static int word(byte[] file, int at) {

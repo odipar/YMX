@@ -453,6 +453,9 @@ namespace Rig
             int headerFrames = (packed[8] << 24) | (packed[9] << 16)
                     | (packed[10] << 8) | packed[11];
             bool loops = (packed[7] & 1) != 0;
+            int loopFrame = (int) ((long) (packed[30] & 0xFF) << 24
+                    | (packed[31] & 0xFF) << 16 | (packed[32] & 0xFF) << 8
+                    | (packed[33] & 0xFF));
             var player = new Player(packed, Rig.WorkspaceSize(ring));
             if (player.Init() != 0)
             {
@@ -465,8 +468,14 @@ namespace Rig
             int played = 0;
             for (int f = 0; f < budget; f++)
             {
-                int src = played % headerFrames;    // the same frames, over
-                if (played != 0 && src == 0)        // and over
+                // The first pass plays every frame; each pass after it
+                // plays from the loop frame, which is 0 where the file
+                // gives none.
+                int body = headerFrames - loopFrame;
+                int past = played - headerFrames;
+                int src = played < headerFrames ? played
+                        : loopFrame + past % body;
+                if (played != 0 && src == loopFrame && past % body == 0)
                 {
                     model.Restart();    // the player silenced everything
                 }

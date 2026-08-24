@@ -58,7 +58,8 @@ the host's.
 | A tune whose length is not a whole unit | one duplicated safe frame, inaudible | yes |
 | A loop frame the wrap cannot enter | the repeat starts at the next frame it can | yes |
 | A loop frame further from the end than a ring holds | the rings grow to hold the frames between | yes |
-| A loop frame no ring the format allows can hold | the tune starts over from frame 0, so its opening is heard on every pass | yes |
+| A loop frame further from the end than the largest ring holds | every stream is packed as two sections, which costs file bytes | yes |
+| A loop frame with no unit boundary in reach, packing at 2 or 4 bytes a unit | the tune starts over from frame 0, so its opening is heard on every pass | yes |
 | The SID gap model | a choice the file cannot record - see below | no |
 
 The four drop counters are counts of YM effects the front end normalised
@@ -108,12 +109,23 @@ not lossy.
   header's frame fails one of them, the packer takes the next frame that
   holds all three, up to 1 second later.
 
-  The second is the ring. The wrap moves the read position in every ring back
-  by the length of a pass, which reaches only as far as a ring holds, so the
-  frames from `L` to the end have to fit one. Where they do not, the rings
-  grow to the smallest size that holds them, which costs workspace and no
-  file bytes. Where the largest ring the format allows still will not hold
-  them, the file carries 0 and the tune starts over from its first frame, as
+  The second is how the player gets back to it. A wrap that moves the read
+  position in every ring back by the length of a pass reaches only as far as
+  a ring holds, so the frames from `L` to the end have to fit one. Where they
+  do not, the rings grow to the smallest size that holds them, which costs
+  workspace and no file bytes.
+
+  Where the largest ring the format allows still will not hold them, every
+  stream is packed as two sections instead - the frames before `L`, then the
+  frames from `L` on - and the player opens the second at the wrap. That one
+  costs file bytes, since the replayed frames are packed on their own and no
+  match reaches across the cut: on the three tunes in `test` that take it,
+  the file is 14 to 41 per cent larger than the same tune packed with `-l0`.
+  The rings stay the size they were.
+
+  A section is a whole number of units, so at `-k2` or `-k4` the cut falls on
+  a unit boundary: where no frame near `L` that the wrap can enter falls on
+  one, the file carries 0 and the tune starts over from its first frame, as
   every file before format version 0.5 did.
 
   Each conversion says what it did with the frame. `-lF` gives a frame of its

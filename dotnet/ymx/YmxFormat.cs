@@ -127,9 +127,10 @@ namespace Ymx
         /// once through carries 0.</summary>
         public const int OffsetLoopFrame = 30;
 
-        /// <summary>Byte offset of the loop table; zero where the file
-        /// carries no such table, which is every file this release
-        /// writes.</summary>
+        /// <summary>Byte offset of the loop table: one long per stream, read
+        /// exactly as the section table is, locating the section that covers
+        /// frames [L, O). Zero where one section per stream covers the whole
+        /// tune, which is every file whose pass fits a ring.</summary>
         public const int OffsetLoopTable = 34;
 
         /// <summary>Bit 31 of a section offset: the bytes there are the
@@ -328,14 +329,15 @@ namespace Ymx
                         + YmxFormat.VersionName()
                         + " - repack the tune from its .ym source");
             }
-            int section = 0;
-            for (int stream = 0; stream < YmxFormat.Streams && section == 0; stream++)
+            // A stored section carries no signature, so the unit size comes
+            // from the first section that is a container - out of either
+            // table, since a file cut at its loop frame may store the frames
+            // before it and pack the frames from it.
+            int section = Container(file, YmxFormat.OffsetSectionTable);
+            long loopTable = LongAt(file, YmxFormat.OffsetLoopTable);
+            if (section == 0 && loopTable != 0)
             {
-                long entry = LongAt(file, YmxFormat.OffsetSectionTable + 4 * stream);
-                if (entry != 0 && !YmxFormat.IsStored(entry))
-                {
-                    section = (int) YmxFormat.SectionOffset(entry);
-                }
+                section = Container(file, (int) loopTable);
             }
             if (section + 3 >= file.Length)
             {
@@ -347,6 +349,21 @@ namespace Ymx
                     Word(file, YmxFormat.OffsetPlayerHz),
                     Word(file, YmxFormat.OffsetFlags),
                     (int) LongAt(file, YmxFormat.OffsetFrames));
+        }
+
+        /// <summary>The offset of one table's first section that is a
+        /// container, or 0 where every section it locates is stored.</summary>
+        private static int Container(byte[] file, int table)
+        {
+            for (int stream = 0; stream < YmxFormat.Streams; stream++)
+            {
+                long entry = LongAt(file, table + 4 * stream);
+                if (entry != 0 && !YmxFormat.IsStored(entry))
+                {
+                    return (int) YmxFormat.SectionOffset(entry);
+                }
+            }
+            return 0;
         }
 
         private static int Word(byte[] file, int at)
