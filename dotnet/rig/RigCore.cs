@@ -48,11 +48,24 @@ namespace Rig
 
         /// <summary>YMX.S plus the decoder, built for one unit size, as one
         /// flat blob. perf builds the raster monitor in. YMX_NOMASK in the
-        /// environment runs the whole rig against the unmasked-frame-write
-        /// build.</summary>
+        /// environment runs the rig - the size check aside - against the
+        /// unmasked-frame-write build.</summary>
         public static Build Assemble(int unit, bool perf)
         {
-            string tag = unit + (perf ? "p" : "");
+            return Assemble(unit, perf,
+                    Environment.GetEnvironmentVariable("YMX_NOMASK") == null);
+        }
+
+        /// <summary>The masked build regardless of YMX_NOMASK: the README's
+        /// byte counts quote it, so the size check measures it.</summary>
+        public static Build AssembleMasked(int unit, bool perf)
+        {
+            return Assemble(unit, perf, true);
+        }
+
+        private static Build Assemble(int unit, bool perf, bool masked)
+        {
+            string tag = unit + (perf ? "p" : "") + (masked ? "" : "n");
             if (Assembled.TryGetValue(tag, out Build? held))
             {
                 return held;
@@ -61,8 +74,7 @@ namespace Rig
             string source = Path.Combine(Scratch, "link" + tag + ".S");
             File.WriteAllText(source, "ST4_UNIT    equ     " + unit + "\n"
                     + (perf ? "YMX_PERF    equ     1\n" : "")
-                    + (Environment.GetEnvironmentVariable("YMX_NOMASK") != null
-                            ? "YMX_MASK_BURST equ  0\n" : "")
+                    + (masked ? "" : "YMX_MASK_BURST equ  0\n")
                     + "        include \"YMX.S\"\n"
                     + "        include \"ST4_wrap.S\"\n");
             string binary = Path.Combine(Scratch, "link" + tag + ".bin");

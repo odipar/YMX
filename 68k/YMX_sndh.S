@@ -42,8 +42,8 @@
 ;     host. A Timer C tune still cannot be hosted from a Timer C hook;
 ;   - INIT called twice without an EXIT restores first;
 ;   - PLAY before INIT is a no-op; PLAY is driven at the TC tag's rate;
-;   - the USP is never touched, and every buffer
-;     lives inside the combined file.
+;   - the USP is never touched, and every buffer lives inside the
+;     combined file.
 ;
 ; One real limitation: a native host that dispatches PLAY from its Timer C
 ; hook holds the MFP's Timer C in-service for the length of the call, which

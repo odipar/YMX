@@ -10,7 +10,7 @@
 ; checksum.
 ;
 ; Then it plays the tune again, untimed by read-back, and reports the ticks it
-; took - the number the README asks you to measure with your own tune.
+; took - the player's cost on real hardware.
 ;
 ; Output: "SUM=OK" or "SUM=BAD", "T <frames> <ticks>", "CALIB <n> <ticks>", DONE.
 ; -----------------------------------------------------------------------------

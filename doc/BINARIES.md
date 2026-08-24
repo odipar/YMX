@@ -191,10 +191,9 @@ Each case is §5 with one decision changed.
 
 **One tune, its own sizes.** Read the tune's header, take the core its
 sections' unit selects - `ymxsndh-k1-v<format version>.bin` for a tune
-packed at unit 1 -
-write the SNDH with one table entry and a workspace of `F + 25 · N`, wrap
-it. The stub's frame count is the tune's frame count when header flag
-bit 0 is clear, 0 when the tune starts over.
+packed at unit 1 - write the SNDH with one table entry and a workspace
+of `F + 25 · N`, wrap it. The stub's frame count is the tune's frame
+count when header flag bit 0 is clear, 0 when the tune starts over.
 
 **A chosen workspace.** `N` is the packer's decision, written in the
 tune's header - the maximum back-reference distance, not a combiner

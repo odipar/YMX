@@ -603,7 +603,7 @@ public final class EffectScript {
         }                               // on the frame the marker ended it
         cut(p, index, -1);
         if (type == KIND_TOGGLE) {
-            openOld(old);               // bsr ymx_burst_open_old
+            openOld(old);
             if (tune.semantics().sidResume()) {
                 channel.masked = true;
                 emit(p, index, action(OPCODE_RELEASE, 0, RELEASE_MASK), 0);

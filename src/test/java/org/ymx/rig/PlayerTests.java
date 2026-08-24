@@ -687,7 +687,7 @@ final class PlayerTests {
                     + " them out of";
         }
         int unit = Integer.parseInt(playerSaid.group(2));
-        Rig.Build build = Rig.assemble(unit, false);
+        Rig.Build build = Rig.assembleMasked(unit, false);
         int player = Rig.symbol(build.symbols(), "ST4_init");
         int wrap = build.binary().length - player;
         long saidPlayer = number(playerSaid.group(1));
