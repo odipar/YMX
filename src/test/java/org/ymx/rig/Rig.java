@@ -14,14 +14,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.ymx.Tools;
 
 /**
  * What every rig shares: the repository's paths, the assembled player builds
  * with their symbol tables, the packers run as the tools a user runs, and a
  * hand-built .YMR image. The scratch directory caches packs on the tune
- * bytes and options, NOT on the packer's code - after changing the packer,
- * {@code rm -rf ymx/test/.work}.
+ * bytes, the options and the compiled packer, so a pack from an earlier
+ * build is never read back into a later one.
  */
 final class Rig {
 
@@ -139,7 +140,8 @@ final class Rig {
         }
         String tag = String.join("", extra);
         Path cached = SCRATCH.resolve(sha1(tune) + "-n" + ring + "-c" + chunk
-                + "-k" + unit + (loops ? "loops" : "once") + tag + ".ymx");
+                + "-k" + unit + (loops ? "loops" : "once") + tag
+                + "-" + packerBuild() + ".ymx");
         if (!Files.exists(cached)) {
             packWith("org.ym6.Ymx", tune, ".ym", cached, join(
                     List.of("-f", "-n" + ring, "-c" + chunk, "-k" + unit),
@@ -151,7 +153,7 @@ final class Rig {
     /** The real .ymr packer, so the header flags are the ones it writes. */
     static byte[] packYmr(byte[] image, int ring, int chunk) {
         Path cached = SCRATCH.resolve("ymr-" + sha1(image) + "-n" + ring
-                + "-c" + chunk + ".ymx");
+                + "-c" + chunk + "-" + packerBuild() + ".ymx");
         if (!Files.exists(cached)) {
             packWith("org.ymr.Ymr", image, ".ymr", cached,
                     List.of("-f", "-n" + ring, "-c" + chunk, "-k1"));
@@ -290,6 +292,29 @@ final class Rig {
         word(out, value >>> 16);
         word(out, value);
     }
+
+    /** A digest of the compiled classes the packers run from, part of every
+     * pack's cache name. Without it a pack made before a packer change is
+     * read back after it, and the disagreement reads as a player fault. */
+    private static String packerBuild() {
+        if (PACKER_BUILD == null) {
+            ByteArrayOutputStream classes = new ByteArrayOutputStream();
+            try (Stream<Path> walk = Files.walk(CLASSES)) {
+                for (Path file : walk.filter(path -> path.toString().endsWith(".class"))
+                        .sorted().toList()) {
+                    classes.writeBytes(CLASSES.relativize(file).toString()
+                            .getBytes(StandardCharsets.UTF_8));
+                    classes.writeBytes(Files.readAllBytes(file));
+                }
+            } catch (IOException e) {
+                throw new IllegalStateException("reading " + CLASSES + ": " + e);
+            }
+            PACKER_BUILD = sha1(classes.toByteArray());
+        }
+        return PACKER_BUILD;
+    }
+
+    private static @org.jspecify.annotations.Nullable String PACKER_BUILD;
 
     static String sha1(byte[] bytes) {
         try {

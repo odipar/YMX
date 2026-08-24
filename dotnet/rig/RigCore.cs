@@ -12,9 +12,9 @@ namespace Rig
     /// What every rig shares, ported from the Java rig: the repository's
     /// paths, the assembled player builds with their symbol tables, the
     /// packers run as the tools a user runs, and a hand-built .YMR image.
-    /// The scratch directory caches packs on the tune bytes and options, NOT
-    /// on the packer's code - after changing the packer,
-    /// rm -rf ymx/test/.work.
+    /// The scratch directory caches packs on the tune bytes, the options and
+    /// the built packer, so a pack from an earlier build is never read back
+    /// into a later one.
     /// </summary>
     public static class Rig
     {
@@ -141,7 +141,7 @@ namespace Rig
             string tag = string.Join("", extra);
             string cached = Path.Combine(Scratch, Sha1(tune) + "-n" + ring
                     + "-c" + chunk + "-k" + unit + (loops ? "loops" : "once")
-                    + tag + ".ymx");
+                    + tag + "-" + PackerBuild() + ".ymx");
             if (!File.Exists(cached))
             {
                 var options = new List<string> {"-f", "-n" + ring, "-c" + chunk,
@@ -156,12 +156,24 @@ namespace Rig
             return File.ReadAllBytes(cached);
         }
 
+        /// <summary>A digest of the built packer, part of every pack's cache
+        /// name. Without it a pack made before a packer change is read back
+        /// after it, and the disagreement reads as a player fault.</summary>
+        private static string PackerBuild()
+        {
+            packerBuild ??= Sha1(File.ReadAllBytes(
+                    Path.Combine(AppContext.BaseDirectory, "ymx.dll")));
+            return packerBuild;
+        }
+
+        private static string? packerBuild;
+
         /// <summary>The real .ymr packer, so the header flags are the ones
         /// it writes.</summary>
         public static byte[] PackYmr(byte[] image, int ring, int chunk)
         {
             string cached = Path.Combine(Scratch, "ymr-" + Sha1(image) + "-n"
-                    + ring + "-c" + chunk + ".ymx");
+                    + ring + "-c" + chunk + "-" + PackerBuild() + ".ymx");
             if (!File.Exists(cached))
             {
                 PackWith("ymr", image, ".ymr", cached,
