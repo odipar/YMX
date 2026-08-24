@@ -229,6 +229,11 @@ namespace Ymx
             PutLong(file, YmxFormat.OffsetMasterClock, tune.MasterClock);
             PutLong(file, YmxFormat.OffsetSampleTable, sampleTable);
             PutWord(file, YmxFormat.OffsetSampleCount, samples.Length);
+            // L is 0: a tune that starts over goes back to the beginning,
+            // and a tune that plays once through has no loop frame. The loop
+            // table offset is 0, which says the file carries no such table.
+            PutLong(file, YmxFormat.OffsetLoopFrame, 0);
+            PutLong(file, YmxFormat.OffsetLoopTable, 0);
 
             Place(file, YmxFormat.OffsetSectionTable, sections, YmxFormat.HeaderSize);
 

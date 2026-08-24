@@ -284,6 +284,11 @@ public final class YmxEncoder {
         putLong(file, YmxFormat.OFFSET_MASTER_CLOCK, tune.masterClock());
         putLong(file, YmxFormat.OFFSET_SAMPLE_TABLE, sampleTable);
         putWord(file, YmxFormat.OFFSET_SAMPLE_COUNT, samples.length);
+        // L is 0: a tune that starts over goes back to the beginning, and a
+        // tune that plays once through has no loop frame. The loop table
+        // offset is 0, which says the file carries no such table.
+        putLong(file, YmxFormat.OFFSET_LOOP_FRAME, 0);
+        putLong(file, YmxFormat.OFFSET_LOOP_TABLE, 0);
 
         place(file, YmxFormat.OFFSET_SECTION_TABLE, sections, YmxFormat.HEADER_SIZE);
 

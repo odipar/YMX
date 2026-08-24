@@ -115,7 +115,7 @@ java -ea -cp target/classes org.ymr.Ymr -f ymr/test/deeper.ymr doc.ymx
 ```
 
 reports 249,600 bytes of register and script data packed into 11,348 (4.5%) in
-a 12,656-byte file, 25 rings of 960 bytes, decoding 23 of the 25 streams so
+a 12,664-byte file, 25 rings of 960 bytes, decoding 23 of the 25 streams so
 that one of the default `C`=24's slots is idle. 4,860 of those 11,348 packed
 bytes are the eleven script streams, which the `.YMR` - 10,488 bytes - does
 not carry:

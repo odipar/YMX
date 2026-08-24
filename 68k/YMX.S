@@ -329,11 +329,16 @@ YH_CHUNK        equ     18
 YH_CLOCK        equ     20
 YH_SAMPLES        equ     24              ; long: the sample table, 0 when none
 YH_SAMPLECOUNT    equ     28              ; word
-YH_SECTIONS     equ     30              ; one offset per stream: its section,
+YH_LOOP         equ     30              ; long: L, the frame a tune that
+                                        ; starts over goes back to; it has a
+                                        ; meaning only where the loop flag
+                                        ; is set
+YH_LOOPTAB      equ     34              ; long: the loop table, 0 when none
+YH_SECTIONS     equ     38              ; one offset per stream: its section,
                                         ; covering every frame of the tune
 
 YMX_MAGIC       equ     $594D5821       ; 'YMX!'
-YMX_VERSION     equ     $0004           ; the format version: the major in
+YMX_VERSION     equ     $0005           ; the format version: the major in
                                         ; the high byte, the minor in the
                                         ; low. There is no older version to
                                         ; stay compatible with; doc/SPEC.md

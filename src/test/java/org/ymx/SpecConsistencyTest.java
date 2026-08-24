@@ -50,6 +50,8 @@ final class SpecConsistencyTest {
         java.put("master clock", YmxFormat.OFFSET_MASTER_CLOCK);
         java.put("sample table", YmxFormat.OFFSET_SAMPLE_TABLE);
         java.put("sample count", YmxFormat.OFFSET_SAMPLE_COUNT);
+        java.put("`L`, the frame", YmxFormat.OFFSET_LOOP_FRAME);
+        java.put("loop table", YmxFormat.OFFSET_LOOP_TABLE);
         java.put("section", YmxFormat.OFFSET_SECTION_TABLE);
 
         for (Map.Entry<String, Integer> field : java.entrySet()) {
@@ -74,6 +76,8 @@ final class SpecConsistencyTest {
                 Map.entry("YH_CLOCK", YmxFormat.OFFSET_MASTER_CLOCK),
                 Map.entry("YH_SAMPLES", YmxFormat.OFFSET_SAMPLE_TABLE),
                 Map.entry("YH_SAMPLECOUNT", YmxFormat.OFFSET_SAMPLE_COUNT),
+                Map.entry("YH_LOOP", YmxFormat.OFFSET_LOOP_FRAME),
+                Map.entry("YH_LOOPTAB", YmxFormat.OFFSET_LOOP_TABLE),
                 Map.entry("YH_SECTIONS", YmxFormat.OFFSET_SECTION_TABLE));
         offsets.forEach((name, at) -> assertEquals(at.intValue(), equate(asm, name), name));
         assertEquals((int) YmxFormat.MAGIC, equate(asm, "YMX_MAGIC"), "YMX_MAGIC");

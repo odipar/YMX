@@ -22,8 +22,10 @@ package org.ymx;
  *  20   4  YM master clock in Hz, informational
  *  24   4  byte offset of the sample table; zero when there are none
  *  28   2  sample count
- *  30   4*S  byte offset of each stream's section, covering frames [0, O)
- * 130   ...  the body: the packed sections, then the sample table
+ *  30   4  L, the frame a tune that starts over goes back to
+ *  34   4  byte offset of the loop table; zero when there is none
+ *  38   4*S  byte offset of each stream's section, covering frames [0, O)
+ * 138   ...  the body: the packed sections, then the sample table
  * </pre>
  *
  * <p>Streams 14-24 carry the compiled effect script, one byte per frame
@@ -70,19 +72,19 @@ public final class YmxFormat {
 
     /** The only version this release writes or reads: the major in the
      * high byte, the minor in the low, so versions order numerically -
-     * $0004, version 0.4, sorts before $0100, version 1.0. There is no
+     * $0005, version 0.5, sorts before $0100, version 1.0. There is no
      * version history here to be compatible with; doc/SPEC.md defines
      * the layout. */
-    public static final int VERSION = 0x0004;
+    public static final int VERSION = 0x0005;
 
     /** The released binaries' patch number: it moves when the binaries
      * change and the format does not - an optimized player, a fixed
      * stub. The format version above is the compatibility gate; this
      * number never reaches the format word. */
-    public static final int PATCH = 1;
+    public static final int PATCH = 0;
 
     /** The release's version as prose: the format version plus the
-     * patch, "0.4.1". */
+     * patch, "0.5.0". */
     public static String releaseName() {
         return versionName() + "." + PATCH;
     }
@@ -177,6 +179,16 @@ public final class YmxFormat {
     public static final int OFFSET_MASTER_CLOCK = 20;
     public static final int OFFSET_SAMPLE_TABLE = 24;
     public static final int OFFSET_SAMPLE_COUNT = 28;
+
+    /** {@code L}, the frame a tune that starts over goes back to. It has a
+     * meaning only where {@link #FLAG_LOOPS} is set, and a tune that plays
+     * once through carries 0. */
+    public static final int OFFSET_LOOP_FRAME = 30;
+
+    /** Byte offset of the loop table; zero where the file carries no such
+     * table, which is every file this release writes. */
+    public static final int OFFSET_LOOP_TABLE = 34;
+
     /**
      * Bit 31 of a section offset: the bytes at that offset are the section's
      * values, one per frame, and there is no container around them.
@@ -199,7 +211,7 @@ public final class YmxFormat {
     }
 
     /** One long offset per stream, in stream order: where its section is. */
-    public static final int OFFSET_SECTION_TABLE = 30;
+    public static final int OFFSET_SECTION_TABLE = 38;
 
     public static final int HEADER_SIZE = OFFSET_SECTION_TABLE + 4 * STREAMS;
 
