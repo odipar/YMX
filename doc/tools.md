@@ -16,6 +16,7 @@ defaults quoted below are the constants' own values.
 | `ymx/mkprg.sh` | `org.ymx.MkPrg` | wrap an SNDH file in a runnable program |
 | `ymx/mkcores.sh` | `org.ymx.MkCores` | assemble the prebuilt binaries (needs rmac) |
 | `ymx/mkrelease.sh` | `org.ymx.MkRelease` | stage and publish the binaries release |
+| `ymx/setversion.sh` | `org.ymx.SetVersion` | rewrite the format version at every site that carries it |
 | `ym/ym_sndh.sh` | `org.ym6.YmSndh` | pack a set of `.ym` dumps and combine, in one command |
 | `ym/play.sh` | `org.ym6.Play` | pack, build a program, run it under Hatari |
 | `ymr/ymr.sh` | `org.ymr.YmrPlay` | the same test drive for a `.ymr` |
@@ -259,7 +260,8 @@ of `dotnet dotnet/bin/Release/net10.0/ymx.dll` names the tool:
 |---|---|
 | `ymx`, `ymr` | the two packers |
 | `st4`, `dst4` | the ST4 CLIs |
-| `mksndh`, `mkprg`, `mkcores`, `mkrelease`, `setversion` | the combiners and `setversion.sh` |
+| `mksndh`, `mkprg`, `mkcores`, `mkrelease` | the combiners |
+| `setversion` | `setversion.sh` |
 | `ymsndh`, `play`, `ymrplay` | `ym_sndh.sh`, `play.sh`, `ymr.sh` |
 | `rig`, `sweep`, `ymrsweep`, `gendata` | the test rigs and `run.sh`'s data step |
 

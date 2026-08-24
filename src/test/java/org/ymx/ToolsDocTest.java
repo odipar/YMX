@@ -5,8 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -177,6 +179,55 @@ final class ToolsDocTest {
         }
         assertTrue(found >= 15, "dotnet/Program.cs dispatches " + found
                 + " tools; the dispatcher has moved");
+        // And the other direction: every bare name the section backticks
+        // is a case the dispatcher carries. Spans with a dot, dash or
+        // space - wrapper names, flags, the dll path - are not names.
+        Matcher listed = Pattern.compile("`(\\w+)`").matcher(doc);
+        while (listed.find()) {
+            assertTrue(program.contains("case \"" + listed.group(1) + "\""),
+                    "the C# tool names section lists " + listed.group(1)
+                    + ", which dotnet/Program.cs does not dispatch");
+        }
+    }
+
+    /** The two SetVersion implementations, site list against site list:
+     * each {@code new Site(file, pattern, template)} triple must agree
+     * once the C# format placeholders are read as the Java ones. */
+    @Test
+    void theTwoTreesRewriteTheSameSites() throws IOException {
+        List<String[]> java = sites(Files.readString(
+                Path.of("src", "main", "java", "org", "ymx", "SetVersion.java")));
+        List<String[]> cs = sites(Files.readString(
+                Path.of("dotnet", "ymx", "SetVersion.cs")));
+        assertTrue(java.size() == 6, "SetVersion.java carries " + java.size()
+                + " sites; doc/tools.md and SetVersion's own doc say six");
+        assertTrue(java.size() == cs.size(), "SetVersion.java carries "
+                + java.size() + " sites and SetVersion.cs " + cs.size());
+        for (int at = 0; at < java.size(); at++) {
+            String[] ours = java.get(at);
+            String[] theirs = cs.get(at);
+            for (int part = 0; part < 3; part++) {
+                String cSharp = theirs[part]
+                        .replace("{0:X4}", "%04X").replace("{1}", "%2$s");
+                assertTrue(ours[part].equals(cSharp), "site " + at
+                        + " differs between the trees: " + ours[part]
+                        + " against " + theirs[part]);
+            }
+        }
+    }
+
+    /** Each {@code new Site(...)} triple in a source, with concatenated
+     * string literals joined. The arguments carry no quotes of their own,
+     * so after the join each is one literal. */
+    private static List<String[]> sites(String source) {
+        String joined = source.replaceAll("\"\\s*\\+\\s*\"", "");
+        Matcher site = Pattern.compile("new Site\\(\"([^\"]*)\",\\s*"
+                + "\"([^\"]*)\",\\s*\"([^\"]*)\"\\)").matcher(joined);
+        List<String[]> found = new ArrayList<>();
+        while (site.find()) {
+            found.add(new String[] {site.group(1), site.group(2), site.group(3)});
+        }
+        return found;
     }
 
     @Test

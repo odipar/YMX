@@ -14,8 +14,9 @@ import java.util.regex.Pattern;
  * that carries it: the Java, C# and 68k constants and SPEC.md's three
  * mentions. A site is found by the exact text around the version and must
  * match exactly once, so a reworded sentence fails loudly instead of
- * being skipped; {@code SpecConsistencyTest} reads the same sites back
- * against {@link YmxFormat#VERSION}.
+ * being skipped - and nothing is written unless every site matched.
+ * {@code SpecConsistencyTest} reads the same sites back against
+ * {@link YmxFormat#VERSION}.
  */
 public final class SetVersion {
 
@@ -48,24 +49,41 @@ public final class SetVersion {
                     "the version is $%04X — %2$s;"));
 
     public static void main(String[] args) {
-        if (args.length != 1 || !args[0].matches("\\d+\\.\\d+")) {
+        if (args.length != 1) {
             throw Tools.fail("usage: setversion.sh MAJOR.MINOR");
         }
-        String[] halves = args[0].split("\\.");
+        try {
+            set(Tools.repo(), args[0]);
+        } catch (IllegalArgumentException e) {
+            String message = e.getMessage();
+            throw Tools.fail(message == null ? e.toString() : message);
+        }
+    }
+
+    /** Rewrites every site under {@code repo} to {@code version}, given
+     * as MAJOR.MINOR. Every site is matched before the first write, so a
+     * refusal leaves every file as it was. */
+    static void set(Path repo, String version) {
+        if (!version.matches("[0-9]{1,3}\\.[0-9]{1,3}")) {
+            throw new IllegalArgumentException("usage: setversion.sh MAJOR.MINOR");
+        }
+        String[] halves = version.split("\\.");
         int major = Integer.parseInt(halves[0]);
         int minor = Integer.parseInt(halves[1]);
         if (major > 255 || minor > 255) {
-            throw Tools.fail("setversion: each half is a byte, 0 to 255");
+            throw new IllegalArgumentException(
+                    "setversion: each half is a byte, 0 to 255");
         }
         int word = (major << 8) | minor;
         String name = major + "." + minor;
 
         Map<String, String> texts = new LinkedHashMap<>();
         for (Site site : SITES) {
-            String text = texts.computeIfAbsent(site.file(), SetVersion::read);
+            String text = texts.computeIfAbsent(site.file(),
+                    file -> read(repo.resolve(file)));
             Matcher found = Pattern.compile(site.pattern()).matcher(text);
             if (!(found.find() && !found.find())) {
-                throw Tools.fail("setversion: " + site.file()
+                throw new IllegalArgumentException("setversion: " + site.file()
                         + " does not carry exactly one match of \""
                         + site.pattern() + "\" - the site has moved");
             }
@@ -74,22 +92,21 @@ public final class SetVersion {
         }
         for (Map.Entry<String, String> text : texts.entrySet()) {
             try {
-                Files.writeString(Tools.repo().resolve(text.getKey()),
-                        text.getValue());
+                Files.writeString(repo.resolve(text.getKey()), text.getValue());
             } catch (IOException e) {
-                throw Tools.fail("setversion: " + text.getKey() + ": "
-                        + e.getMessage());
+                throw new IllegalArgumentException("setversion: " + text.getKey()
+                        + ": " + e.getMessage());
             }
             System.out.println(text.getKey() + ": version " + name);
         }
     }
 
-    private static String read(String file) {
-        Path path = Tools.repo().resolve(file);
+    private static String read(Path path) {
         try {
             return Files.readString(path);
         } catch (IOException e) {
-            throw Tools.fail("setversion: " + path + ": " + e.getMessage());
+            throw new IllegalArgumentException("setversion: " + path + ": "
+                    + e.getMessage());
         }
     }
 }

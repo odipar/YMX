@@ -240,9 +240,10 @@ final class SpecConsistencyTest {
                 "R13's $FF must pass through unmasked - the do-not-write marker");
     }
 
-    /** Every version mention against {@link YmxFormat#VERSION} - the same
-     * sites {@code ymx/setversion.sh} rewrites, read back so a bump that
-     * misses one fails by name. */
+    /** Every version mention against {@link YmxFormat#VERSION}: SPEC's
+     * three and the C# constant, read back so a bump that misses one
+     * fails by name. The 68k equate, {@code ymx/setversion.sh}'s sixth
+     * site, is bound with the header table above. */
     @Test
     void everyVersionMentionIsTheConstant() throws IOException {
         String said = flat();
