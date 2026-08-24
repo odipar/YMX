@@ -3,6 +3,7 @@ package org.ymr;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.function.IntPredicate;
 import org.jspecify.annotations.Nullable;
 import org.ymx.EffectScript;
@@ -53,7 +54,7 @@ public final class Ymr {
             Tune converted = YmrEffects.convert(dump, stem(args[1]));
             EffectScript.Result script =
                     EffectScript.compile(converted, YmrEffects.TIMERS);
-            System.out.printf("%d frames%n", script.frames());
+            System.out.printf(Locale.ROOT, "%d frames%n", script.frames());
             for (int f = 0; f < script.frames(); f++) {
                 if (script.m()[f] == 0 && script.r7force()[f] == 0) {
                     continue;
@@ -66,7 +67,7 @@ public final class Ymr {
                             script.actions()[c][f] & 0xFF, c,
                             script.counts()[c][f] & 0xFF));
                 }
-                System.out.printf("%s R7|=%02X%n", line, script.r7force()[f] & 0xFF);
+                System.out.printf(Locale.ROOT, "%s R7|=%02X%n", line, script.r7force()[f] & 0xFF);
             }
             converted.notes().forEach(n -> System.out.println("note: " + n));
             script.notes().forEach(n -> System.out.println("note: " + n));
@@ -230,7 +231,7 @@ public final class Ymr {
                         + " of " + dump.frameCount());
             }
             tune = trim(tune, start, end);
-            System.out.printf("Trimmed to frames %d-%d: %d frames%n",
+            System.out.printf(Locale.ROOT, "Trimmed to frames %d-%d: %d frames%n",
                     start, end - 1, end - start);
         }
 
@@ -321,7 +322,7 @@ public final class Ymr {
         int loopFrame = tune.loopFrame() >= start && tune.loopFrame() < end
                 ? tune.loopFrame() - start : 0;
         if (tune.loopFrame() != 0 && loopFrame == 0) {
-            System.out.printf("Frame %d, which the song starts over from, is outside"
+            System.out.printf(Locale.ROOT, "Frame %d, which the song starts over from, is outside"
                     + " the kept window: the excerpt starts over from its own first"
                     + " frame%n", tune.loopFrame());
         }
@@ -347,7 +348,7 @@ public final class Ymr {
         Tune padded = Tune.padToUnit(tune, unit, safeToDuplicate(tune));
         if (padded != null && padded != tune) {
             int added = padded.frames() - tune.frames();
-            System.out.printf("Padded %d frame%s (duplicates of safe frames) so the "
+            System.out.printf(Locale.ROOT, "Padded %d frame%s (duplicates of safe frames) so the "
                     + "length is whole %d-byte units%n", added, added == 1 ? "" : "s",
                     unit);
         }
@@ -396,7 +397,7 @@ public final class Ymr {
     // ------------------------------------------------------------ the report
 
     private static void report(Tune tune, YmxEncoder.Result result) {
-        System.out.printf("%s: %s (a .ymr carries no title, so this is the file's own)%n",
+        System.out.printf(Locale.ROOT, "%s: %s (a .ymr carries no title, so this is the file's own)%n",
                 YmrReader.MAGIC, tune.name().isBlank() ? "(untitled)" : tune.name());
         System.out.println("Timer A drives voice A on channel 0, Timer B voice B on "
                 + "channel 1, Timer D voice C on channel 2");
@@ -405,7 +406,7 @@ public final class Ymr {
             for (byte[] sample : tune.samples()) {
                 bytes += sample.length + 1;
             }
-            System.out.printf("%d sample%s, %d bytes%n", tune.samples().length,
+            System.out.printf(Locale.ROOT, "%d sample%s, %d bytes%n", tune.samples().length,
                     tune.samples().length == 1 ? "" : "s", bytes);
         }
         for (String note : tune.notes()) {
@@ -414,7 +415,7 @@ public final class Ymr {
 
         // What was packed: one byte per frame per stream, script included.
         int raw = result.script().frames() * YmxFormat.STREAMS;
-        System.out.printf("%d frames at %d Hz (%d:%02d), %d rings of %d bytes,"
+        System.out.printf(Locale.ROOT, "%d frames at %d Hz (%d:%02d), %d rings of %d bytes,"
                         + " %d per call%n", tune.frames(), tune.frameRate(),
                 tune.frames() / tune.frameRate() / 60,
                 tune.frames() / tune.frameRate() % 60,
@@ -429,11 +430,13 @@ public final class Ymr {
             String name = stream.register() < YmxFormat.REGISTER_STREAMS
                     ? String.format("R%-2d", stream.register())
                     : scriptNames[stream.register() - YmxFormat.REGISTER_STREAMS] + " ";
-            System.out.printf("  %s %6d -> %6d bytes (%5.1f%%)%n", name,
-                    stream.frames(),
-                    stream.packedSize(), 100.0 * stream.packedSize() / stream.frames());
+            System.out.printf(Locale.ROOT, "  %s %6d -> %6d bytes (%5.1f%%)%s%n", name,
+                    stream.frames(), stream.packedSize(),
+                    100.0 * stream.packedSize() / stream.frames(),
+                    stream.loopSize() == 0 ? "" : String.format("  %6d + %d",
+                            stream.firstSize(), stream.loopSize()));
         }
-        System.out.printf("Packed %d register bytes into %d (%.1f%%), file %d bytes%n",
+        System.out.printf(Locale.ROOT, "Packed %d register bytes into %d (%.1f%%), file %d bytes%n",
                 raw, result.packedSize(), 100.0 * result.packedSize() / raw,
                 result.file().length);
         int flags = ((result.file()[YmxFormat.OFFSET_FLAGS] & 0xFF) << 8)
@@ -441,7 +444,7 @@ public final class Ymr {
         // The chunk is a slot count: one stream refilled per call, so it has
         // to cover the streams this tune DECODES, not all the format defines.
         int live = YmxFormat.liveStreams(flags);
-        System.out.printf("Player needs %d bytes of ring plus its state, and"
+        System.out.printf(Locale.ROOT, "Player needs %d bytes of ring plus its state, and"
                         + " decodes %d of the %d streams - one refill a call,"
                         + " so C=%d covers them with %d slots idle%n",
                 YmxFormat.STREAMS * result.ringSize(), live, YmxFormat.STREAMS,
@@ -454,7 +457,7 @@ public final class Ymr {
             // A literal run, the one operation ZX1 cannot split. Only a tune
             // longer than 65535 frames with a register that never repeats can
             // reach this, and the 68000 decoder would mis-decode it.
-            System.out.printf("Warning: longest operation is %d bytes, over the 65535"
+            System.out.printf(Locale.ROOT, "Warning: longest operation is %d bytes, over the 65535"
                     + " the 68000 decoder can represent: do not play this file%n",
                     result.longestOp());
         }

@@ -23,7 +23,12 @@ namespace Ymx
     {
         /// <summary>What packing one stream's vector produced.</summary>
         public sealed record Stream(int Register, int Frames, int PackedSize,
-                int LongestOp);
+                int LongestOp, int LoopSize)
+        {
+            /// <summary>The bytes of the section covering the frames before
+            /// the loop frame: the whole of a stream that is not cut.</summary>
+            public int FirstSize => PackedSize - LoopSize;
+        }
 
         /// <summary>The finished file plus the per-stream numbers the CLI
         /// reports; Tune is the one actually packed, the padded one where the
@@ -254,11 +259,13 @@ namespace Ymx
         {
             if (second == null)
             {
-                return new Stream(stream, frames, first.Bytes.Length, first.LongestOp);
+                return new Stream(stream, frames, first.Bytes.Length,
+                        first.LongestOp, 0);
             }
             return new Stream(stream, frames,
                     first.Bytes.Length + second.Bytes.Length,
-                    Math.Max(first.LongestOp, second.LongestOp));
+                    Math.Max(first.LongestOp, second.LongestOp),
+                    second.Bytes.Length);
         }
 
         /// <summary>One stream's values for frames [from, to).</summary>

@@ -47,7 +47,15 @@ public final class YmxEncoder {
     /** What packing one stream's vector produced; the first fourteen stream
      * indices are registers, then the script streams in file order - M, X,
      * T, and each channel's A and P. */
-    public record Stream(int register, int frames, int packedSize, int longestOp) {}
+    public record Stream(int register, int frames, int packedSize, int longestOp,
+                         int loopSize) {
+
+        /** The bytes of the section covering the frames before the loop
+         * frame: the whole of a stream that is not cut. */
+        public int firstSize() {
+            return packedSize - loopSize;
+        }
+    }
 
     /** The finished file plus the per-stream numbers the CLI reports; the
      * tune is the one that was actually packed, the padded one where the
@@ -295,11 +303,13 @@ public final class YmxEncoder {
     private static Stream measure(int stream, int frames, Section first,
                                   @org.jspecify.annotations.Nullable Section second) {
         if (second == null) {
-            return new Stream(stream, frames, first.bytes().length, first.longestOp());
+            return new Stream(stream, frames, first.bytes().length,
+                    first.longestOp(), 0);
         }
         return new Stream(stream, frames,
                 first.bytes().length + second.bytes().length,
-                Math.max(first.longestOp(), second.longestOp()));
+                Math.max(first.longestOp(), second.longestOp()),
+                second.bytes().length);
     }
 
     private static byte[] build(Tune tune, int ringSize, int chunk, int frames,
