@@ -239,6 +239,11 @@ public final class YmxFormat {
     /** Default ring size: the size the timings in the README are quoted for. */
     public static final int DEFAULT_RING_SIZE = 960;
 
+    /** The largest ring the format allows: the player reads stream {@code k}'s
+     * ring through an assembled-in displacement of {@code k*N}, and 13*N must
+     * fit a signed word. */
+    public static final int MAX_RING_SIZE = 2520;
+
     /**
      * Default chunk size, and the group size the round-robin player is built
      * around: one refill per VBL covers the 21 streams a YM tune decodes
@@ -296,8 +301,9 @@ public final class YmxFormat {
         if (ringSize % chunk != 0) {
             return "ring " + ringSize + " is not a multiple of chunk " + chunk;
         }
-        if (ringSize > 2520) {
-            return "ring " + ringSize + " exceeds 2520: the player reads register"
+        if (ringSize > MAX_RING_SIZE) {
+            return "ring " + ringSize + " exceeds " + MAX_RING_SIZE
+                    + ": the player reads register"
                     + " k's ring through an assembled-in displacement of k*N,"
                     + " and 13*N must fit a signed word";
         }

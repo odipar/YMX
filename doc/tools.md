@@ -40,13 +40,14 @@ arguments at all - and this document is the same information in one place.
 Reads a YM5!/YM6! register dump - LHA-archived or unpacked, the reader
 tells them apart - and writes a `.ymx`.
 
-    ymx [-f] [-o] [-nN] [-cC] [-kK] input.ym [output.ymx]
+    ymx [-f] [-o] [-lF] [-nN] [-cC] [-kK] input.ym [output.ymx]
     ymx [options] one.ym two.ym more.ym output-dir/
 
 | flag | meaning |
 |---|---|
 | `-f` | overwrite the output file |
 | `-o` | play once: stop at the end instead of starting over |
+| `-lF` | start over from frame F rather than from the frame the header gives; `-l0` from the beginning. Where the wrap cannot enter F the packer takes the next frame it can - `ym/CONVERSION.md` states how far it looks |
 | `-nN` | ring size per stream, bytes (default 960) |
 | `-cC` | values decoded per call, the round-robin group size (default 24) |
 | `-kK` | ST4 unit size 1, 2 or 4 (default 2); an odd tune length is padded with safe duplicate frames |
@@ -71,12 +72,12 @@ no rate of its own), no `-timers` (the timer-to-voice binding is
 normative), no `-sidresume` (a YM argument) and no `-meta` (a `.YMR`
 carries no metadata).
 
-    ymr [-f] [-o] [-nN] [-cC] [-kK] input.ymr [output.ymx]
+    ymr [-f] [-o] [-lF] [-nN] [-cC] [-kK] input.ymr [output.ymx]
     ymr [options] one.ymr two.ymr more.ymr output-dir/
 
 | flag | meaning |
 |---|---|
-| `-f` `-o` `-nN` `-cC` `-kK` | as the YM packer's |
+| `-f` `-o` `-lF` `-nN` `-cC` `-kK` | as the YM packer's |
 | `-minM` `-secS` `-startframeF` `-endframeF` `-framesN` | the trim window, as the YM packer's |
 | `-script` | dump the compiled effect script instead of packing |
 

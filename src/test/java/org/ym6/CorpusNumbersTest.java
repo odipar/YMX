@@ -16,7 +16,8 @@ import org.junit.jupiter.api.Test;
 import org.ymx.Tune;
 
 /**
- * The corpus figures {@code doc/terminology.md} quotes, taken again.
+ * The corpus figures {@code doc/terminology.md} quotes, taken again, and the
+ * packer's own numbers that {@code ym/CONVERSION.md} quotes beside them.
  *
  * <p>Every one of them is a measurement over the YM collection, and a
  * measurement in prose goes stale the first time the collection or the reader
@@ -98,6 +99,21 @@ final class CorpusNumbersTest {
                 readable.stream().filter(t -> t.voicesOnEnvelopeAtOnce() >= 2).count(),
                 "tunes with two voices on the envelope at once");
         assertEquals(envelope[1], readable.size(), "readable files, as the envelope line has it");
+    }
+
+    /** The one figure here that is not a measurement over the collection: how
+     * far past its source's loop frame the packer looks for one the wrap can
+     * enter. The document states it in seconds, the packer holds it in frames,
+     * and a tune's own frame rate is what turns one into the other. */
+    @Test
+    void theLoopSearchBudgetIsWhatTheConversionDocSaysItIs() throws IOException {
+        String said = String.join(" ", Files.readString(CONVERSION).split("\\s+"));
+        int[] budget = numbers(said, "up to (\\d+) second later",
+                "how far the packer looks past the header's loop frame");
+        for (int rate : new int[] {25, 50, 60, 200}) {
+            assertEquals(budget[0] * rate, org.ymx.LoopFrame.budget(rate),
+                    "the budget at " + rate + " frames a second");
+        }
     }
 
     @Test

@@ -56,7 +56,9 @@ the host's.
 | A drum number with no sample behind it | dropped to idle | yes |
 | A drum above the rate ceiling | bandwidth only: the sample is resampled and every trigger's divisor scaled by the same ratio | yes |
 | A tune whose length is not a whole unit | one duplicated safe frame, inaudible | yes |
-| A header that loops from a frame other than 0 | the tune starts over from frame 0, so its opening is heard on every pass | yes |
+| A loop frame the wrap cannot enter | the repeat starts at the next frame it can | yes |
+| A loop frame further from the end than a ring holds | the rings grow to hold the frames between | yes |
+| A loop frame no ring the format allows can hold | the tune starts over from frame 0, so its opening is heard on every pass | yes |
 | The SID gap model | a choice the file cannot record - see below | no |
 
 The four drop counters are counts of YM effects the front end normalised
@@ -90,13 +92,32 @@ not lossy.
   state is held one inaudible tick longer. Only where no safe frame exists
   near the end does the packer fall back to `-k1`, and it says so.
 
-* **A tune starts over from its first frame.** A YM header gives the frame
-  its own player went back to, and 99 of the corpus's 543 readable files
-  give one other than 0 - on those, the opening that played once under the
-  header is 46% of the tune on average, and it is heard on every pass here.
-  The header has carried a field for that frame since format version 0.5,
-  held at 0 while the wrap that reads it is built (SPEC.md 9.3). Each
-  conversion reports the frame its own header gave.
+* **A tune starts over from the frame its header gives.** A YM header gives
+  the frame its own player went back to, and 99 of the corpus's 543 readable
+  files give one other than 0 - on those, the opening that played once under
+  the header is 46% of the tune on average. The file carries that frame as
+  `L` and the player goes back to it, on two conditions.
+
+  The first is the state at that frame. Every claimed timer is stopped and
+  every skip bit cleared at the end of a pass, so frame `L` is entered with
+  nothing carried in, and a frame that reads state an earlier frame set plays
+  differently on the second pass than on the first. Frame `L` is clear of
+  that when three things hold: every timer stream running there starts there,
+  every skip bit set there is set by that frame's own `M`, and no voice is on
+  the envelope generator before the next frame that writes R13. Where the
+  header's frame fails one of them, the packer takes the next frame that
+  holds all three, up to 1 second later.
+
+  The second is the ring. The wrap moves the read position in every ring back
+  by the length of a pass, which reaches only as far as a ring holds, so the
+  frames from `L` to the end have to fit one. Where they do not, the rings
+  grow to the smallest size that holds them, which costs workspace and no
+  file bytes. Where the largest ring the format allows still will not hold
+  them, the file carries 0 and the tune starts over from its first frame, as
+  every file before format version 0.5 did.
+
+  Each conversion says what it did with the frame. `-lF` gives a frame of its
+  own, and `-l0` starts the tune over from the beginning.
 
 * **Samples never loop.** A YM file has no field for a repeating digidrum,
   so every sample crosses marked one-shot. This costs nothing -

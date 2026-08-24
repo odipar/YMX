@@ -15,10 +15,14 @@ namespace Ymx
     /// in bits 5-4, the prescaler index in bits 2-0; bit 3 is a front end's
     /// trigger bit. Shapes is the envelope shape a retrigger stream would
     /// restart on each frame; Samples and SampleLoops are the PCM streams'
-    /// sources and where each goes back to.</para>
+    /// sources and where each goes back to. Loops is what the source says the
+    /// end of the tune does and LoopFrame the frame it starts over from, 0
+    /// where the source gives none; whether the frame survives into the file
+    /// is the packer's answer - see LoopFrame.</para>
     /// </summary>
     public sealed record Tune(int Frames, int FrameRate, long MasterClock,
-            bool Loops, byte[][] Registers, byte[][] Codes, byte[][] Counts,
+            bool Loops, int LoopFrame, byte[][] Registers, byte[][] Codes,
+            byte[][] Counts,
             byte[] Shapes, byte[][] Samples, int[] SampleLoops,
             EffectScript.Semantics Semantics,
             string Name, string Author, string Comment, IReadOnlyList<string> Notes)
@@ -28,6 +32,13 @@ namespace Ymx
         public Tune Under(EffectScript.Semantics semantics)
         {
             return this with { Semantics = semantics };
+        }
+
+        /// <summary>The same tune starting over from another frame: how a CLI
+        /// replaces the frame the source gives.</summary>
+        public Tune StartingOverAt(int frame)
+        {
+            return this with { LoopFrame = frame };
         }
 
         public const int KindToggle = 0x00;
@@ -57,7 +68,8 @@ namespace Ymx
         /// <summary>Builds a tune, widening the timer streams to the format's
         /// four channels and validating what the encoder relies on.</summary>
         public static Tune Of(int frames, int frameRate, long masterClock,
-                bool loops, byte[][] registers, byte[][] codes, byte[][] counts,
+                bool loops, int loopFrame, byte[][] registers, byte[][] codes,
+                byte[][] counts,
                 byte[] shapes, byte[][] samples, int[] sampleLoops,
                 EffectScript.Semantics semantics, string name, string author,
                 string comment, IReadOnlyList<string> notes)
@@ -75,6 +87,12 @@ namespace Ymx
             {
                 throw new ArgumentException("a tune carries one envelope shape a"
                         + " frame, not " + shapes.Length + " for " + frames);
+            }
+            if (loopFrame < 0 || loopFrame >= frames)
+            {
+                throw new ArgumentException("a tune of " + frames + " frames"
+                        + " cannot start over at frame " + loopFrame + "; a source"
+                        + " that gives no frame gives 0");
             }
             // A code names a kind in bits 7-6 and a voice PLUS ONE in bits
             // 5-4, so zero voice bits mean the channel is idle and the whole
@@ -111,16 +129,19 @@ namespace Ymx
                             + YmxFormat.SampleOneShot);
                 }
             }
-            return new Tune(frames, frameRate, masterClock, loops, registers,
-                    codes, counts, shapes, samples, sampleLoops, semantics,
-                    name, author, comment, new List<string>(notes));
+            return new Tune(frames, frameRate, masterClock, loops, loopFrame,
+                    registers, codes, counts, shapes, samples, sampleLoops,
+                    semantics, name, author, comment, new List<string>(notes));
         }
 
         /// <summary>Pads the tune so its length is a whole number of units,
         /// by duplicating a frame the front end says is safe to duplicate -
         /// every stream stretched at the same frame, since a frame is a
-        /// column across all of them. Returns the tune itself when the
-        /// length fits, or null when no safe frame exists in the window.</summary>
+        /// column across all of them. The loop frame moves with the frame it
+        /// points at: the duplicates go in after atEnd, so a loop frame past
+        /// that one sits endPad frames further along. Returns the tune itself
+        /// when the length fits, or null when no safe frame exists in the
+        /// window.</summary>
         public static Tune? PadToUnit(Tune tune, int unit,
                 Func<int, bool> safeToDuplicate)
         {
@@ -138,7 +159,8 @@ namespace Ymx
             var padding = new Padding(tune.Frames, atEnd, endPad,
                     tune.Frames + endPad);
             return new Tune(padding.Total, tune.FrameRate, tune.MasterClock,
-                    tune.Loops, padding.Stretch(tune.Registers),
+                    tune.Loops, padding.Rebase(tune.LoopFrame),
+                    padding.Stretch(tune.Registers),
                     padding.Stretch(tune.Codes), padding.Stretch(tune.Counts),
                     padding.Stretch(tune.Shapes), tune.Samples, tune.SampleLoops,
                     tune.Semantics, tune.Name, tune.Author, tune.Comment,
@@ -162,6 +184,13 @@ namespace Ymx
         /// applied to every stream.</summary>
         private sealed record Padding(int Frames, int AtEnd, int EndPad, int Total)
         {
+            /// <summary>Where a frame of the unpadded tune sits in the padded
+            /// one.</summary>
+            internal int Rebase(int frame)
+            {
+                return frame <= AtEnd ? frame : frame + EndPad;
+            }
+
             internal byte[] Stretch(byte[] values)
             {
                 return Stretch(new[] {values})[0];

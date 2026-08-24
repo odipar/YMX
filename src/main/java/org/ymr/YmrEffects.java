@@ -252,7 +252,11 @@ public final class YmrEffects {
 
         // A .YMR carries no metadata, so the author and the comment
         // come out empty and the caller's file stem is the only name there is.
+        // A header that gives no loop frame says so with -1, and a song that
+        // does not start over has no frame to give: both cross as 0.
+        int loopFrame = source.loops() ? source.loopFrame() : 0;
         return new Tune(frames, source.frameRate(), source.ymClock(), source.loops(),
+                loopFrame,
                 registers, codes, counts, shapes(), levelsOf(samples),
                 loopsOf(samples), SEMANTICS,
                 name, "", "", notes);

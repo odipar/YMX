@@ -27,10 +27,12 @@ import org.st4.Units;
  * time, which keeps the per-VBL cost flat.
  *
  * <p>A tune is one set of sections, whatever it does at the end. A stream can
- * only be restarted from its beginning, so a tune that repeats plays its
- * frames again from frame 0: the player re-inits every stream and silences
- * every effect at the boundary. Nothing is packed twice and nothing is packed
- * against frames the second pass cannot reach.
+ * only be restarted from its beginning, so a tune that repeats reaches its loop
+ * frame again by moving the read position in every ring back one pass: the
+ * player silences every effect at the boundary and plays on from the bytes
+ * already there. Which frame that is, and whether it can be kept at all, is
+ * {@link LoopFrame}'s answer; the ring size the plan comes back with is the one
+ * the file carries.
  *
  * <p>Each section is packed as {@code st4} would with
  * {@code -k<unit> -m<N/unit> -l65535}: offsets never reach further back than
@@ -48,13 +50,33 @@ public final class YmxEncoder {
 
     /** The finished file plus the per-stream numbers the CLI reports; the
      * tune is the one that was actually packed, the padded one where the
-     * length needed padding. */
+     * length needed padding, {@code ringSize} the one the file carries, and
+     * {@code loopFrame} the {@code L} it holds. {@code notes} is what the loop
+     * frame moved or cost, for the CLI to report. */
     public record Result(byte[] file, List<Stream> streams, int ringSize, int chunk,
-                         boolean loops, int unit, Tune tune,
-                         EffectScript.Result script) {
+                         boolean loops, int unit, int loopFrame, Tune tune,
+                         EffectScript.Result script, List<String> notes) {
+
+        public Result {
+            notes = List.copyOf(notes);
+        }
 
         public int packedSize() {
             return streams.stream().mapToInt(Stream::packedSize).sum();
+        }
+
+        /** What the end of the tune does, and the frame it goes back to -
+         * one sentence, so both CLIs report it in the same words. */
+        public String startingOver() {
+            if (!loops) {
+                return "Plays once, then stops";
+            }
+            if (loopFrame == 0) {
+                return "Plays through, then starts over";
+            }
+            return String.format("Plays through, then starts over from frame %d,"
+                    + " replaying %d of its %d frames", loopFrame,
+                    tune.frames() - loopFrame, tune.frames());
         }
 
         /** The longest operation in any stream; over 65535 the file is
@@ -134,11 +156,6 @@ public final class YmxEncoder {
                     + " its length must be a multiple of " + unit);
         }
 
-        // A back-reference may never reach out of the ring the player decodes
-        // through - N bytes is N/unit units - and the format's own ceiling
-        // still applies above that.
-        int offsetLimit = Math.min(ringSize / unit, St4Format.maxOffsetUnits(unit));
-
         // Every stream's vector: the registers with R7 carrying the baked
         // mixer force, then the script's own five streams. Bytes a stream does
         // not consume repeat their predecessor - the event optimizer packs a
@@ -150,6 +167,18 @@ public final class YmxEncoder {
         if (!problem.isEmpty()) {
             throw new IllegalArgumentException(problem);
         }
+
+        // The loop frame comes before the packing rather than after it: a body
+        // that needs a bigger ring gets one, and a bigger ring lets a
+        // back-reference reach further, so the sections are packed against the
+        // ring the file ends up carrying.
+        LoopFrame.Plan plan = LoopFrame.resolve(tune, script, loops, ringSize, chunk);
+        ringSize = plan.ringSize();
+
+        // A back-reference may never reach out of the ring the player decodes
+        // through - N bytes is N/unit units - and the format's own ceiling
+        // still applies above that.
+        int offsetLimit = Math.min(ringSize / unit, St4Format.maxOffsetUnits(unit));
         int frames = script.frames();
         byte[][] vectors = new byte[YmxFormat.STREAMS][];
         for (int register = 0; register < YmxFormat.REGISTER_STREAMS; register++) {
@@ -181,10 +210,10 @@ public final class YmxEncoder {
                     vectors[stream], offsetLimit, unit);
         }
 
-        byte[] file = build(tune, ringSize, chunk, frames, loops, sections,
-                tune.samples(), channels);
+        byte[] file = build(tune, ringSize, chunk, frames, loops, plan.frame(),
+                sections, tune.samples(), channels);
         return new Result(file, List.copyOf(streams), ringSize, chunk, loops, unit,
-                tune, script);
+                plan.frame(), tune, script, plan.notes());
     }
 
     /**
@@ -249,7 +278,7 @@ public final class YmxEncoder {
     }
 
     private static byte[] build(Tune tune, int ringSize, int chunk, int frames,
-                                boolean loops, Section[] sections,
+                                boolean loops, int loopFrame, Section[] sections,
                                 byte[][] samples, int channels) {
         // Containers carry alignment rules of their own - stream A and D
         // are read a word at a time - so each is placed on a long boundary. A
@@ -284,10 +313,10 @@ public final class YmxEncoder {
         putLong(file, YmxFormat.OFFSET_MASTER_CLOCK, tune.masterClock());
         putLong(file, YmxFormat.OFFSET_SAMPLE_TABLE, sampleTable);
         putWord(file, YmxFormat.OFFSET_SAMPLE_COUNT, samples.length);
-        // L is 0: a tune that starts over goes back to the beginning, and a
-        // tune that plays once through has no loop frame. The loop table
-        // offset is 0, which says the file carries no such table.
-        putLong(file, YmxFormat.OFFSET_LOOP_FRAME, 0);
+        // L, the frame the tune starts over from: 0 where it plays once
+        // through, and 0 where the packer could not keep the source's own. The
+        // loop table offset is 0, which says the file carries no such table.
+        putLong(file, YmxFormat.OFFSET_LOOP_FRAME, loopFrame);
         putLong(file, YmxFormat.OFFSET_LOOP_TABLE, 0);
 
         place(file, YmxFormat.OFFSET_SECTION_TABLE, sections, YmxFormat.HEADER_SIZE);

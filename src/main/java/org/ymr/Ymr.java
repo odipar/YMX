@@ -85,6 +85,7 @@ public final class Ymr {
         int startFrame = -1;
         int endFrame = -1;
         int frameCount = -1;
+        int loopFrame = -1;                     // -1 until -lF: the song's own
         int i = 0;
         for (; i < args.length && args[i].startsWith("-"); i++) {
             switch (args[i]) {
@@ -107,6 +108,8 @@ public final class Ymr {
                         chunk = parseNumber(args[i].substring(2));
                     } else if (args[i].startsWith("-k")) {
                         unit = parseNumber(args[i].substring(2));
+                    } else if (args[i].startsWith("-l")) {
+                        loopFrame = parseNumber(args[i].substring(2), true);
                     } else {
                         throw error("Invalid parameter " + args[i]);
                     }
@@ -130,7 +133,7 @@ public final class Ymr {
             for (int input = i; input < args.length - 1; input++) {
                 packOne(args[input], dir.resolve(stem(args[input]) + ".ymx").toString(),
                         ringSize, chunk, unit, playOnce, forcedMode,
-                        0, 0, -1, -1, -1);
+                        0, 0, -1, -1, -1, loopFrame);
             }
             return;
         }
@@ -142,10 +145,14 @@ public final class Ymr {
             outputName = args[i + 1];
         } else {
             usage("""
-                    Usage: ymr [-f] [-o] [-nN] [-cC] [-kK] input.ymr [output.ymx]
+                    Usage: ymr [-f] [-o] [-lF] [-nN] [-cC] [-kK] input.ymr [output.ymx]
                            ymr [options] one.ymr two.ymr more.ymr output-dir/
                       -f      Force overwrite of output file
                       -o      Play once: stop at the end instead of starting over
+                      -lF     Start over from frame F rather than from the
+                              frame the header gives; -l0 starts over from the
+                              beginning. Where the wrap cannot enter F the
+                              packer takes the next frame it can and says so
                       -nN     Ring size per stream, in bytes (default 960)
                       -cC     Values decoded per call, and the round-robin group
                               size (default 24; N mod C = 0, and C at least the
@@ -175,7 +182,8 @@ public final class Ymr {
             return;
         }
         packOne(args[i], outputName, ringSize, chunk, unit, playOnce,
-                forcedMode, startMin, startSec, startFrame, endFrame, frameCount);
+                forcedMode, startMin, startSec, startFrame, endFrame, frameCount,
+                loopFrame);
     }
 
     /** The whole pipeline for one tune: read, convert, trim, pad, pack, write,
@@ -183,7 +191,8 @@ public final class Ymr {
     private static void packOne(String inputName, String outputName, int ringSize,
                                 int chunk, int unit, boolean playOnce,
                                 boolean forcedMode, int startMin, int startSec,
-                                int startFrame, int endFrame, int frameCount) {
+                                int startFrame, int endFrame, int frameCount,
+                                int loopFrame) {
         // The floor only: how many streams a tune decodes depends on the
         // channels it names, which the encoder derives when it compiles the
         // script and checks again there.
@@ -227,6 +236,18 @@ public final class Ymr {
 
         // What the song says the end does is the default; -o overrides it.
         boolean startsOver = tune.loops() && !playOnce;
+
+        // -lF says where the tune starts over, in the frames of the tune being
+        // packed: a trim has already moved what F counts from. The packer
+        // answers for the frame either way, whether the header gave it or the
+        // command line did.
+        if (loopFrame >= 0) {
+            if (loopFrame >= tune.frames()) {
+                throw error("-l" + loopFrame + " is past the tune's "
+                        + tune.frames() + " frames");
+            }
+            tune = tune.startingOverAt(loopFrame);
+        }
 
         // The default unit is 2, measured a few percent cheaper per frame for
         // little ratio. A tune of odd length is PADDED to the shape with
@@ -290,9 +311,22 @@ public final class Ymr {
      * against the wrong registers. Everything else about a tune - its name, its
      * rate, its samples, the notes the conversion left - is untouched by
      * shortening it.
+     *
+     * <p>The loop frame is a frame number, so it rebases on the first kept
+     * frame: a window from {@code start} turns frame {@code L} into
+     * {@code L - start}. A loop frame outside the window is no longer a frame
+     * of this tune, and the excerpt starts over from its own first frame.
      */
     private static Tune trim(Tune tune, int start, int end) {
+        int loopFrame = tune.loopFrame() >= start && tune.loopFrame() < end
+                ? tune.loopFrame() - start : 0;
+        if (tune.loopFrame() != 0 && loopFrame == 0) {
+            System.out.printf("Frame %d, which the song starts over from, is outside"
+                    + " the kept window: the excerpt starts over from its own first"
+                    + " frame%n", tune.loopFrame());
+        }
         return new Tune(end - start, tune.frameRate(), tune.masterClock(), tune.loops(),
+                loopFrame,
                 slice(tune.registers(), start, end), slice(tune.codes(), start, end),
                 slice(tune.counts(), start, end),
                 java.util.Arrays.copyOfRange(tune.shapes(), start, end),
@@ -385,9 +419,10 @@ public final class Ymr {
                 tune.frames() / tune.frameRate() / 60,
                 tune.frames() / tune.frameRate() % 60,
                 YmxFormat.STREAMS, result.ringSize(), result.chunk());
-        System.out.println(result.loops()
-                ? "Plays through, then starts over"
-                : "Plays once, then stops");
+        System.out.println(result.startingOver());
+        for (String note : result.notes()) {
+            System.out.println(note);
+        }
         String[] scriptNames = {"M ", "X ", "T ", "A0", "P0", "A1", "P1",
                                 "A2", "P2", "A3", "P3"};
         for (YmxEncoder.Stream stream : result.streams()) {

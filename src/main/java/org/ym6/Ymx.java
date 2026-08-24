@@ -87,6 +87,7 @@ public final class Ymx {
         int startFrame = -1;
         int endFrame = -1;
         int frameCount = -1;
+        int loopFrame = -1;                     // -1 until -lF: the header's own
         int drumHz = YmEffects.MAX_TIMER_HZ;
         int timerMap = YmxFormat.DEFAULT_TIMERS;
         int i = 0;
@@ -116,6 +117,8 @@ public final class Ymx {
                         chunk = parseNumber(args[i].substring(2));
                     } else if (args[i].startsWith("-k")) {
                         unit = parseNumber(args[i].substring(2));
+                    } else if (args[i].startsWith("-l")) {
+                        loopFrame = parseNumber(args[i].substring(2), true);
                     } else {
                         throw error("Invalid parameter " + args[i]);
                     }
@@ -141,7 +144,7 @@ public final class Ymx {
                         .replaceAll("(?i)\\.ym$", "");
                 packOne(args[input], dir.resolve(stem + ".ymx").toString(),
                         ringSize, chunk, unit, playOnce, forcedMode,
-                        drumHz, sidResume, timerMap, 0, 0, -1, -1, -1);
+                        drumHz, sidResume, timerMap, 0, 0, -1, -1, -1, loopFrame);
             }
             return;
         }
@@ -153,10 +156,14 @@ public final class Ymx {
             outputName = args[i + 1];
         } else {
             usage("""
-                    Usage: YMX [-f] [-o] [-nN] [-cC] [-kK] input.ym [output.ymx]
+                    Usage: YMX [-f] [-o] [-lF] [-nN] [-cC] [-kK] input.ym [output.ymx]
                            ymx [options] one.ym two.ym more.ym output-dir/
                       -f      Force overwrite of output file
                       -o      Play once: stop at the end instead of starting over
+                      -lF     Start over from frame F rather than from the
+                              frame the header gives; -l0 starts over from the
+                              beginning. Where the wrap cannot enter F the
+                              packer takes the next frame it can and says so
                       -nN     Ring size per stream, in bytes (default 960)
                       -cC     Values decoded per call, and the round-robin group
                               size (default 24; N mod C = 0, and C at
@@ -200,7 +207,7 @@ public final class Ymx {
         }
         packOne(args[i], outputName, ringSize, chunk, unit, playOnce,
                 forcedMode, drumHz, sidResume, timerMap, startMin, startSec, startFrame,
-                endFrame, frameCount);
+                endFrame, frameCount, loopFrame);
     }
 
     /** The whole pipeline for one tune: read, trim, pad, pack, write, report. */
@@ -254,7 +261,7 @@ public final class Ymx {
                                 int chunk, int unit, boolean playOnce,
                                 boolean forcedMode, int drumHz, boolean sidResume,
                                 int timerMap, int startMin, int startSec, int startFrame,
-                                int endFrame, int frameCount) {
+                                int endFrame, int frameCount, int loopFrame) {
         // The floor only: how many streams a tune decodes depends on the
         // channels it names, which the encoder derives when it compiles the
         // script and checks again there.
@@ -304,10 +311,18 @@ public final class Ymx {
             for (int r = 0; r < cut.length; r++) {
                 cut[r] = java.util.Arrays.copyOfRange(song.registers()[r], start, end);
             }
-            // The excerpt starts over from its own first frame, whatever
-            // the whole tune named.
+            // The loop frame is a frame number, so it rebases on the first kept
+            // frame; one outside the window is no longer a frame of this tune,
+            // and the excerpt starts over from its own first frame.
+            long kept = song.loopFrame() >= start && song.loopFrame() < end
+                    ? song.loopFrame() - start : 0;
+            if (song.loopFrame() != 0 && kept == 0) {
+                System.out.printf("Frame %d, which the header loops from, is outside"
+                        + " the kept window: the excerpt starts over from its own"
+                        + " first frame%n", song.loopFrame());
+            }
             song = new Ym6Reader.Song(song.format(), end - start, song.playerHz(),
-                    song.masterClock(), 0, song.interleaved(), song.attributes(),
+                    song.masterClock(), kept, song.interleaved(), song.attributes(),
                     song.drums(), song.name(), song.author(), song.comment(), cut);
             System.out.printf("Trimmed to frames %d-%d: %d frames%n",
                     start, end - 1, end - start);
@@ -327,6 +342,17 @@ public final class Ymx {
         // -o overrides what the header says the end of the tune does.
         if (sidResume) {
             tune = tune.under(tune.semantics().resuming());
+        }
+        // -lF says where the tune starts over, in the frames of the tune being
+        // packed: a trim has already moved what F counts from. The packer
+        // answers for the frame either way, whether the header gave it or the
+        // command line did.
+        if (loopFrame >= 0) {
+            if (loopFrame >= tune.frames()) {
+                throw error("-l" + loopFrame + " is past the tune's "
+                        + tune.frames() + " frames");
+            }
+            tune = tune.startingOverAt(loopFrame);
         }
 
         // A YM header always names a loop frame and its players always went
@@ -466,9 +492,10 @@ public final class Ymx {
                 tune.frames() / tune.frameRate() / 60,
                 tune.frames() / tune.frameRate() % 60,
                 YmxFormat.STREAMS, result.ringSize(), result.chunk());
-        System.out.println(result.loops()
-                ? "Plays through, then starts over"
-                : "Plays once, then stops");
+        System.out.println(result.startingOver());
+        for (String note : result.notes()) {
+            System.out.println(note);
+        }
         String[] effectNames = {"M ", "X ", "T ", "A0", "P0", "A1", "P1",
                                 "A2", "P2", "A3", "P3"};
         for (YmxEncoder.Stream stream : result.streams()) {

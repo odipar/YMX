@@ -53,17 +53,37 @@ final class PlayerTests {
         return envelopeWritten;
     }
 
-    /** Plays a whole tune (and {@code passes} times more) and checks it. */
+    /** Plays a whole tune (and {@code passes} passes more) and checks it. */
     static String runShape(int frames, int ring, int chunk, String label,
             boolean loops, int passes, int unit) {
-        byte[][] source = GenYm.registers(frames);
-        byte[] packed = Rig.pack(GenYm.ym6File(frames, source), ring, chunk,
-                loops, unit);
-        int played = loops ? frames * (1 + passes) : frames;
-        List<GenYm.ChipState> expected = GenYm.chipStates(frames, source, loops,
-                played);
+        return runShape(frames, ring, chunk, label, loops, passes, unit, 0);
+    }
 
-        Player player = new Player(packed, Rig.workspaceSize(ring), unit);
+    /**
+     * The same, for a tune whose header sends its own player back to
+     * {@code loopFrame}. A pass after the first is the frames from there on,
+     * so the played length counts the whole tune once and a body each time
+     * after that.
+     *
+     * <p>The ring the workspace is sized for is the packed file's own: a body
+     * that does not fit the ring asked for is packed with a bigger one, and
+     * the player reads N out of the header either way.
+     */
+    static String runShape(int frames, int ring, int chunk, String label,
+            boolean loops, int passes, int unit, int loopFrame) {
+        byte[][] source = GenYm.registers(frames);
+        byte[] packed = Rig.pack(GenYm.ym6File(frames, loopFrame, source), ring,
+                chunk, loops, unit);
+        int carried = header(packed, YMX_LOOP_FRAME, 4);
+        if (carried != (loops ? loopFrame : 0)) {
+            return label + ": the file carries L=" + carried + ", not " + loopFrame;
+        }
+        int played = loops ? frames + passes * (frames - carried) : frames;
+        List<GenYm.ChipState> expected = GenYm.chipStates(frames, source, loops,
+                carried, played);
+
+        Player player = new Player(packed, Rig.workspaceSize(header(packed,
+                YMX_RING_SIZE, 2)), unit);
         if (player.init() != 0) {
             return label + ": YMX_init rejected the file";
         }
@@ -92,11 +112,11 @@ final class PlayerTests {
             }
             position++;
             // d0 = 1 means "that frame ended the tune, the next one is frame
-            // 0 again". A tune that plays once never reports it: it reports
+            // L again". A tune that plays once never reports it: it reports
             // -1 on the call after its last frame instead.
             boolean wrapped = position >= frames && loops;
             if (wrapped) {
-                position = 0;
+                position = carried;
             }
             if (frame.result() != (wrapped ? 1 : 0)) {
                 return label + ": frame " + index + " returned " + frame.result()
@@ -124,6 +144,19 @@ final class PlayerTests {
             }
         }
         return "";
+    }
+
+    /** Header offsets the battery reads back out of a packed file. */
+    static final int YMX_RING_SIZE = 16;
+    static final int YMX_LOOP_FRAME = 30;
+
+    /** One big-endian header field of a packed file. */
+    static int header(byte[] packed, int at, int size) {
+        int value = 0;
+        for (int byteAt = 0; byteAt < size; byteAt++) {
+            value = (value << 8) | (packed[at + byteAt] & 0xFF);
+        }
+        return value;
     }
 
     /** The sample table's offset, straight from the packed file's header. */
@@ -902,7 +935,9 @@ final class PlayerTests {
 
     /** The whole battery, one status line per check. */
     static int battery(boolean quick) throws IOException {
-        // frames, ring, chunk, starts over, extra passes, unit
+        // frames, ring, chunk, label, starts over, extra passes, unit, and
+        // where the header sends its player back to - left off where that is
+        // frame 0, which is every shape but the four that name one
         List<Object[]> shapes = new ArrayList<>(List.of(
                 new Object[] {600, 960, 24, "default 960/24", true, 1, 1},
                 new Object[] {600, 960, 24, "plays once", false, 0, 1},
@@ -923,7 +958,15 @@ final class PlayerTests {
                 // a different build for each.
                 new Object[] {600, 960, 24, "unit 2", true, 2, 2},
                 new Object[] {600, 960, 24, "unit 2, plays once", false, 0, 2},
-                new Object[] {600, 960, 24, "unit 4", true, 1, 4}));
+                new Object[] {600, 960, 24, "unit 4", true, 1, 4},
+                // A header that loops from a frame other than 0: the file
+                // carries L, and the player rewinds by O - L at the wrap
+                // rather than starting the tune again.
+                new Object[] {600, 960, 24, "loops from frame 200", true, 2, 1, 200},
+                new Object[] {600, 960, 24, "loops from frame 599", true, 3, 1, 599},
+                new Object[] {600, 240, 24, "a body past the ring", true, 2, 1, 100},
+                new Object[] {600, 960, 24, "loops from frame 200, unit 2",
+                    true, 2, 2, 200}));
         if (!quick) {
             shapes.add(new Object[] {4000, 960, 24, "four thousand frames",
                     true, 1, 1});
@@ -939,9 +982,10 @@ final class PlayerTests {
         for (Object[] shape : shapes) {
             String label = (String) shape[3];
             boolean loops = (Boolean) shape[4];
+            int loopFrame = shape.length > 7 ? (Integer) shape[7] : 0;
             String problem = runShape((Integer) shape[0], (Integer) shape[1],
                     (Integer) shape[2], label, loops, (Integer) shape[5],
-                    (Integer) shape[6]);
+                    (Integer) shape[6], loopFrame);
             if (!problem.isEmpty()) {
                 System.out.println("FAIL " + problem);
                 failures++;

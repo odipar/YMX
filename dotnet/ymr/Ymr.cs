@@ -72,6 +72,7 @@ namespace Ymr
             int startFrame = -1;
             int endFrame = -1;
             int frameCount = -1;
+            int loopFrame = -1;             // -1 until -lF: the song's own
             int i = 0;
             for (; i < args.Length && args[i].StartsWith('-'); i++)
             {
@@ -116,6 +117,10 @@ namespace Ymr
                         {
                             unit = ParseNumber(args[i][2..]);
                         }
+                        else if (args[i].StartsWith("-l"))
+                        {
+                            loopFrame = ParseNumber(args[i][2..], true);
+                        }
                         else
                         {
                             throw Error("Invalid parameter " + args[i]);
@@ -142,7 +147,7 @@ namespace Ymr
                     PackOne(args[input],
                             Path.Combine(dir, Stem(args[input]) + ".ymx"),
                             ringSize, chunk, unit, playOnce, forcedMode,
-                            0, 0, -1, -1, -1);
+                            0, 0, -1, -1, -1, loopFrame);
                 }
                 return;
             }
@@ -163,7 +168,7 @@ namespace Ymr
             }
             PackOne(args[i], outputName, ringSize, chunk, unit, playOnce,
                     forcedMode, startMin, startSec, startFrame, endFrame,
-                    frameCount);
+                    frameCount, loopFrame);
         }
 
         /// <summary>The whole pipeline for one tune: read, convert, trim,
@@ -171,7 +176,7 @@ namespace Ymr
         private static void PackOne(string inputName, string outputName,
                 int ringSize, int chunk, int unit, bool playOnce, bool forcedMode,
                 int startMin, int startSec, int startFrame, int endFrame,
-                int frameCount)
+                int frameCount, int loopFrame)
         {
             string problem = YmxFormat.CheckShape(ringSize, chunk,
                     Math.Max(unit, 1), YmxFormat.StreamA0);
@@ -216,6 +221,20 @@ namespace Ymr
 
             // What the song says the end does is the default; -o overrides.
             bool startsOver = tune.Loops && !playOnce;
+
+            // -lF says where the tune starts over, in the frames of the tune
+            // being packed: a trim has already moved what F counts from. The
+            // packer answers for the frame either way, whether the header gave
+            // it or the command line did.
+            if (loopFrame >= 0)
+            {
+                if (loopFrame >= tune.Frames)
+                {
+                    throw Error("-l" + loopFrame + " is past the tune's "
+                            + tune.Frames + " frames");
+                }
+                tune = tune.StartingOverAt(loopFrame);
+            }
 
             if (unit == 0 && chunk % 2 == 0)
             {
@@ -277,11 +296,22 @@ namespace Ymr
 
         // ---------------------------------------------- shaping the tune
 
-        /// <summary>The kept window of every timeline at once.</summary>
+        /// <summary>The kept window of every timeline at once. The loop frame
+        /// is a frame number, so it rebases on the first kept frame; one
+        /// outside the window is no longer a frame of this tune, and the
+        /// excerpt starts over from its own first frame.</summary>
         private static Tune Trim(Tune tune, int start, int end)
         {
+            int loopFrame = tune.LoopFrame >= start && tune.LoopFrame < end
+                    ? tune.LoopFrame - start : 0;
+            if (tune.LoopFrame != 0 && loopFrame == 0)
+            {
+                Console.WriteLine($"Frame {tune.LoopFrame}, which the song starts"
+                        + " over from, is outside the kept window: the excerpt"
+                        + " starts over from its own first frame");
+            }
             return Tune.Of(end - start, tune.FrameRate, tune.MasterClock,
-                    tune.Loops, Slice(tune.Registers, start, end),
+                    tune.Loops, loopFrame, Slice(tune.Registers, start, end),
                     Slice(tune.Codes, start, end), Slice(tune.Counts, start, end),
                     tune.Shapes[start..end], tune.Samples, tune.SampleLoops,
                     tune.Semantics, tune.Name, tune.Author, tune.Comment,
@@ -372,9 +402,11 @@ namespace Ymr
                     tune.Frames / tune.FrameRate / 60,
                     tune.Frames / tune.FrameRate % 60,
                     YmxFormat.Streams, result.RingSize, result.Chunk));
-            Console.WriteLine(result.Loops
-                    ? "Plays through, then starts over"
-                    : "Plays once, then stops");
+            Console.WriteLine(result.StartingOver());
+            foreach (string note in result.Notes)
+            {
+                Console.WriteLine(note);
+            }
             string[] scriptNames = {"M ", "X ", "T ", "A0", "P0", "A1", "P1",
                                     "A2", "P2", "A3", "P3"};
             foreach (YmxEncoder.Stream stream in result.Streams)
@@ -452,10 +484,14 @@ namespace Ymr
         private static void Usage()
         {
             Console.Error.WriteLine(string.Join("\n", new[] {
-                "Usage: ymr [-f] [-o] [-nN] [-cC] [-kK] input.ymr [output.ymx]",
+                "Usage: ymr [-f] [-o] [-lF] [-nN] [-cC] [-kK] input.ymr [output.ymx]",
                 "       ymr [options] one.ymr two.ymr more.ymr output-dir/",
                 "  -f      Force overwrite of output file",
                 "  -o      Play once: stop at the end instead of starting over",
+                "  -lF     Start over from frame F rather than from the frame",
+                "          the header gives; -l0 starts over from the",
+                "          beginning. Where the wrap cannot enter F the packer",
+                "          takes the next frame it can and says so",
                 "  -nN     Ring size per stream, in bytes (default 960)",
                 "  -cC     Values decoded per call, and the round-robin group",
                 "          size (default 24; N mod C = 0, and C at least the",

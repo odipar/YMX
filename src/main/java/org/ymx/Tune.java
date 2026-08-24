@@ -57,12 +57,16 @@ import org.jspecify.annotations.Nullable;
  * stopping and cannot be read out of the codes - see
  * {@link EffectScript.Semantics}. {@code loops} is what the SOURCE says the
  * end of the tune does - start over, or stop - and is a default a CLI may
- * override. {@code name}, {@code author} and
+ * override; {@code loopFrame} is the frame it starts over from, 0 where the
+ * source gives none, and a default the same way. Whether the frame survives
+ * into the file is the packer's answer, not this record's - see
+ * {@link LoopFrame}. {@code name}, {@code author} and
  * {@code comment} are what a report and the SNDH tags need, empty where a
  * format carries no such thing, and {@code notes} is what the front end had
  * to change on the way here, in the order it found it.
  */
 public record Tune(int frames, int frameRate, long masterClock, boolean loops,
+                   int loopFrame,
                    byte[][] registers, byte[][] codes, byte[][] counts,
                    byte[] shapes, byte[][] samples, int[] sampleLoops,
                    EffectScript.Semantics semantics,
@@ -76,7 +80,18 @@ public record Tune(int frames, int frameRate, long masterClock, boolean loops,
      * this is how it says so without every layer between carrying a flag.
      */
     public Tune under(EffectScript.Semantics semantics) {
-        return new Tune(frames, frameRate, masterClock, loops, registers,
+        return new Tune(frames, frameRate, masterClock, loops, loopFrame, registers,
+                codes, counts, shapes, samples, sampleLoops, semantics, name,
+                author, comment, notes);
+    }
+
+    /**
+     * The same tune starting over from another frame. A source gives one and a
+     * CLI may give another; this is how the second replaces the first without
+     * every layer between carrying a flag.
+     */
+    public Tune startingOverAt(int frame) {
+        return new Tune(frames, frameRate, masterClock, loops, frame, registers,
                 codes, counts, shapes, samples, sampleLoops, semantics, name,
                 author, comment, notes);
     }
@@ -130,6 +145,11 @@ public record Tune(int frames, int frameRate, long masterClock, boolean loops,
             throw new IllegalArgumentException("a tune carries one envelope shape a"
                     + " frame, not " + shapes.length + " for " + frames);
         }
+        if (loopFrame < 0 || loopFrame >= frames) {
+            throw new IllegalArgumentException("a tune of " + frames + " frames"
+                    + " cannot start over at frame " + loopFrame + "; a source"
+                    + " that gives no frame gives 0");
+        }
         // A code names a kind in bits 7-6 and a voice PLUS ONE in bits 5-4, so
         // zero voice bits mean the channel is idle and the whole byte must be
         // 0. A code with a kind and no voice would compile to an action byte
@@ -180,6 +200,10 @@ public record Tune(int frames, int frameRate, long masterClock, boolean loops,
      * them and padding the registers alone would silently desynchronise the
      * timer streams from them.
      *
+     * <p>The loop frame moves with the frame it points at: the duplicates go
+     * in after {@code atEnd}, so a loop frame past that one sits {@code endPad}
+     * frames further along and one at or before it stays where it is.
+     *
      * <p>Returns the tune itself when the length already fits, a padded tune
      * otherwise, or {@code null} when no safe frame exists within
      * {@value #PAD_SEARCH} frames of the end - which leaves the caller to drop
@@ -199,6 +223,7 @@ public record Tune(int frames, int frameRate, long masterClock, boolean loops,
         Padding padding = new Padding(tune.frames, atEnd, endPad,
                 tune.frames + endPad);
         return new Tune(padding.total, tune.frameRate, tune.masterClock, tune.loops,
+                padding.rebase(tune.loopFrame),
                 padding.stretch(tune.registers), padding.stretch(tune.codes),
                 padding.stretch(tune.counts), padding.stretch(tune.shapes),
                 tune.samples, tune.sampleLoops, tune.semantics,
@@ -220,6 +245,11 @@ public record Tune(int frames, int frameRate, long masterClock, boolean loops,
     /** Which two frames are duplicated and how often - one plan, applied to
      * every stream, the only way they stay one timeline. */
     private record Padding(int frames, int atEnd, int endPad, int total) {
+
+        /** Where a frame of the unpadded tune sits in the padded one. */
+        int rebase(int frame) {
+            return frame <= atEnd ? frame : frame + endPad;
+        }
 
         /** One stream, duplicated frame for frame with the rest of them:
          * a shape that did not follow its registers would arm a buzzer on

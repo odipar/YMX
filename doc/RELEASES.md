@@ -20,12 +20,20 @@ at 0.4 has to be repacked from its `.ym` or `.ymr` source.
   offset 30 is `L`, the frame a tune that starts over goes back to; the
   long at 34 is the offset of a loop table. The section table follows
   at 38.
-- Both new fields carry 0: the loop frame is the beginning, and no file
-  carries a loop table. A repacked tune plays as it did at 0.4.
+- The loop table offset carries 0: no file carries a loop table.
+- `L` carries the frame the source starts over from, where the packer can
+  keep it: the frame has to be one the wrap can enter with the timers
+  stopped and the skips cleared, and the frames from it to the end have to
+  fit a ring. Where the frame cannot be entered the packer takes the next
+  one that can, and where the body does not fit it raises `N` until it
+  does. Where neither holds, `L` carries 0 and the tune starts over from
+  its first frame, as it did at 0.4. Each conversion says which.
 - A tune whose pass fits a ring - `O - L` at most `N` - is decoded once.
   The refills stop at `O` values, and the wrap moves the read position
   back `O - L` bytes in every ring, so a second pass decodes nothing.
   The values written to the sound chip are the same either way.
+- Raising `N` costs workspace and no file bytes, and a bigger ring lets a
+  back-reference reach further.
 - The workspace before the rings is four bytes larger: 1,650 bytes, plus
   25 `N` for the rings.
 

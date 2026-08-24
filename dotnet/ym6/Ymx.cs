@@ -69,6 +69,7 @@ namespace Ym6
             int startFrame = -1;
             int endFrame = -1;
             int frameCount = -1;
+            int loopFrame = -1;             // -1 until -lF: the header's own
             int drumHz = YmEffects.MaxTimerHz;
             int timerMap = YmxFormat.DefaultTimers;
             int i = 0;
@@ -126,6 +127,10 @@ namespace Ym6
                         {
                             unit = ParseNumber(args[i][2..]);
                         }
+                        else if (args[i].StartsWith("-l"))
+                        {
+                            loopFrame = ParseNumber(args[i][2..], true);
+                        }
                         else
                         {
                             throw Error("Invalid parameter " + args[i]);
@@ -155,7 +160,8 @@ namespace Ym6
                             Path.GetFileName(args[input]), "(?i)\\.ym$", "");
                     PackOne(args[input], Path.Combine(dir, stem + ".ymx"),
                             ringSize, chunk, unit, playOnce, forcedMode,
-                            drumHz, sidResume, timerMap, 0, 0, -1, -1, -1);
+                            drumHz, sidResume, timerMap, 0, 0, -1, -1, -1,
+                            loopFrame);
                 }
                 return;
             }
@@ -176,7 +182,7 @@ namespace Ym6
             }
             PackOne(args[i], outputName, ringSize, chunk, unit, playOnce,
                     forcedMode, drumHz, sidResume, timerMap, startMin, startSec,
-                    startFrame, endFrame, frameCount);
+                    startFrame, endFrame, frameCount, loopFrame);
         }
 
         private static Ym6Reader.Song ReadSong(string path)
@@ -246,7 +252,8 @@ namespace Ym6
         private static void PackOne(string inputName, string outputName,
                 int ringSize, int chunk, int unit, bool playOnce, bool forcedMode,
                 int drumHz, bool sidResume, int timerMap, int startMin,
-                int startSec, int startFrame, int endFrame, int frameCount)
+                int startSec, int startFrame, int endFrame, int frameCount,
+                int loopFrame)
         {
             string problem = YmxFormat.CheckShape(ringSize, chunk,
                     Math.Max(unit, 1), YmxFormat.StreamA0);
@@ -305,9 +312,20 @@ namespace Ym6
                 {
                     cut[r] = song.Registers[r][start..end];
                 }
-                // The excerpt starts over from its own first frame.
+                // The loop frame is a frame number, so it rebases on the
+                // first kept frame; one outside the window is no longer a
+                // frame of this tune, and the excerpt starts over from its
+                // own first frame.
+                long kept = song.LoopFrame >= start && song.LoopFrame < end
+                        ? song.LoopFrame - start : 0;
+                if (song.LoopFrame != 0 && kept == 0)
+                {
+                    Console.WriteLine($"Frame {song.LoopFrame}, which the header"
+                            + " loops from, is outside the kept window: the"
+                            + " excerpt starts over from its own first frame");
+                }
                 song = new Ym6Reader.Song(song.Format, end - start, song.PlayerHz,
-                        song.MasterClock, 0, song.Interleaved, song.Attributes,
+                        song.MasterClock, kept, song.Interleaved, song.Attributes,
                         song.Drums, song.Name, song.Author, song.Comment, cut);
                 Console.WriteLine($"Trimmed to frames {start}-{end - 1}:"
                         + $" {end - start} frames");
@@ -323,6 +341,19 @@ namespace Ym6
             if (sidResume)
             {
                 tune = tune.Under(tune.Semantics.Resuming());
+            }
+            // -lF says where the tune starts over, in the frames of the tune
+            // being packed: a trim has already moved what F counts from. The
+            // packer answers for the frame either way, whether the header gave
+            // it or the command line did.
+            if (loopFrame >= 0)
+            {
+                if (loopFrame >= tune.Frames)
+                {
+                    throw Error("-l" + loopFrame + " is past the tune's "
+                            + tune.Frames + " frames");
+                }
+                tune = tune.StartingOverAt(loopFrame);
             }
 
             // A YM header always names a loop frame and its players always
@@ -472,9 +503,11 @@ namespace Ym6
                     tune.Frames / tune.FrameRate / 60,
                     tune.Frames / tune.FrameRate % 60,
                     YmxFormat.Streams, result.RingSize, result.Chunk));
-            Console.WriteLine(result.Loops
-                    ? "Plays through, then starts over"
-                    : "Plays once, then stops");
+            Console.WriteLine(result.StartingOver());
+            foreach (string note in result.Notes)
+            {
+                Console.WriteLine(note);
+            }
             string[] effectNames = {"M ", "X ", "T ", "A0", "P0", "A1", "P1",
                                     "A2", "P2", "A3", "P3"};
             foreach (YmxEncoder.Stream stream in result.Streams)
@@ -525,10 +558,14 @@ namespace Ym6
         private static void Usage()
         {
             Console.Error.WriteLine(string.Join("\n", new[] {
-                "Usage: YMX [-f] [-o] [-nN] [-cC] [-kK] input.ym [output.ymx]",
+                "Usage: YMX [-f] [-o] [-lF] [-nN] [-cC] [-kK] input.ym [output.ymx]",
                 "       ymx [options] one.ym two.ym more.ym output-dir/",
                 "  -f      Force overwrite of output file",
                 "  -o      Play once: stop at the end instead of starting over",
+                "  -lF     Start over from frame F rather than from the frame",
+                "          the header gives; -l0 starts over from the",
+                "          beginning. Where the wrap cannot enter F the packer",
+                "          takes the next frame it can and says so",
                 "  -nN     Ring size per stream, in bytes (default 960)",
                 "  -cC     Values decoded per call, and the round-robin group",
                 "          size (default 24; N mod C = 0, and C at",

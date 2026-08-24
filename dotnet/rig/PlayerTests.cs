@@ -43,18 +43,38 @@ namespace Rig
             return envelopeWritten;
         }
 
-        /// <summary>Plays a whole tune (and passes times more) and checks it.</summary>
+        /// <summary>Plays a whole tune (and passes passes more) and checks
+        /// it.</summary>
         public static string RunShape(int frames, int ring, int chunk,
                 string label, bool loops, int passes, int unit)
         {
-            byte[][] source = GenYm.Registers(frames);
-            byte[] packed = Rig.Pack(GenYm.Ym6File(frames, source), ring, chunk,
-                    loops, unit);
-            int played = loops ? frames * (1 + passes) : frames;
-            List<GenYm.ChipState> expected = GenYm.ChipStates(frames, source,
-                    loops, played);
+            return RunShape(frames, ring, chunk, label, loops, passes, unit, 0);
+        }
 
-            var player = new Player(packed, Rig.WorkspaceSize(ring), unit);
+        /// <summary>The same, for a tune whose header sends its own player back
+        /// to loopFrame. A pass after the first is the frames from there on, so
+        /// the played length counts the whole tune once and a body each time
+        /// after that. The ring the workspace is sized for is the packed file's
+        /// own: a body that does not fit the ring asked for is packed with a
+        /// bigger one.</summary>
+        public static string RunShape(int frames, int ring, int chunk,
+                string label, bool loops, int passes, int unit, int loopFrame)
+        {
+            byte[][] source = GenYm.Registers(frames);
+            byte[] packed = Rig.Pack(GenYm.Ym6File(frames, loopFrame, source),
+                    ring, chunk, loops, unit);
+            int carried = Header(packed, YmxLoopFrame, 4);
+            if (carried != (loops ? loopFrame : 0))
+            {
+                return label + ": the file carries L=" + carried + ", not "
+                        + loopFrame;
+            }
+            int played = loops ? frames + passes * (frames - carried) : frames;
+            List<GenYm.ChipState> expected = GenYm.ChipStates(frames, source,
+                    loops, carried, played);
+
+            var player = new Player(packed, Rig.WorkspaceSize(
+                    Header(packed, YmxRingSize, 2)), unit);
             if (player.Init() != 0)
             {
                 return label + ": YMX_init rejected the file";
@@ -91,12 +111,12 @@ namespace Rig
                 }
                 position++;
                 // d0 = 1 means "that frame ended the tune, the next one is
-                // frame 0 again". A tune that plays once never reports it:
+                // frame L again". A tune that plays once never reports it:
                 // it reports -1 on the call after its last frame instead.
                 bool wrapped = position >= frames && loops;
                 if (wrapped)
                 {
-                    position = 0;
+                    position = carried;
                 }
                 if (frame.Result != (wrapped ? 1 : 0))
                 {
@@ -143,6 +163,22 @@ namespace Rig
                 }
             }
             return true;
+        }
+
+        /// <summary>Header offsets the battery reads back out of a packed
+        /// file.</summary>
+        public const int YmxRingSize = 16;
+        public const int YmxLoopFrame = 30;
+
+        /// <summary>One big-endian header field of a packed file.</summary>
+        public static int Header(byte[] packed, int at, int size)
+        {
+            int value = 0;
+            for (int byteAt = 0; byteAt < size; byteAt++)
+            {
+                value = (value << 8) | packed[at + byteAt];
+            }
+            return value;
         }
 
         /// <summary>The sample table's offset, straight from the packed
@@ -1083,6 +1119,9 @@ namespace Rig
         /// <summary>The whole battery, one status line per check.</summary>
         public static int Battery(bool quick)
         {
+            // frames, ring, chunk, label, starts over, extra passes, unit, and
+            // where the header sends its player back to - left off where that
+            // is frame 0, which is every shape but the four that name one
             var shapes = new List<object[]>
             {
                 new object[] {600, 960, 24, "default 960/24", true, 1, 1},
@@ -1104,6 +1143,14 @@ namespace Rig
                 new object[] {600, 960, 24, "unit 2", true, 2, 2},
                 new object[] {600, 960, 24, "unit 2, plays once", false, 0, 2},
                 new object[] {600, 960, 24, "unit 4", true, 1, 4},
+                // A header that loops from a frame other than 0: the file
+                // carries L, and the player rewinds by O - L at the wrap
+                // rather than starting the tune again.
+                new object[] {600, 960, 24, "loops from frame 200", true, 2, 1, 200},
+                new object[] {600, 960, 24, "loops from frame 599", true, 3, 1, 599},
+                new object[] {600, 240, 24, "a body past the ring", true, 2, 1, 100},
+                new object[] {600, 960, 24, "loops from frame 200, unit 2",
+                    true, 2, 2, 200},
             };
             if (!quick)
             {
@@ -1122,9 +1169,10 @@ namespace Rig
             {
                 string label = (string) shape[3];
                 bool loops = (bool) shape[4];
+                int loopFrame = shape.Length > 7 ? (int) shape[7] : 0;
                 string problem = RunShape((int) shape[0], (int) shape[1],
                         (int) shape[2], label, loops, (int) shape[5],
-                        (int) shape[6]);
+                        (int) shape[6], loopFrame);
                 if (problem.Length != 0)
                 {
                     Console.WriteLine("FAIL " + problem);
