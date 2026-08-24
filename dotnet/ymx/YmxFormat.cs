@@ -17,10 +17,12 @@ namespace Ymx
 
         /// <summary>The only version this release writes or reads: the
         /// major in the high byte, the minor in the low, so versions order
-        /// numerically - 0.4 is $0004, a later 1.0 is $0100.</summary>
+        /// numerically - $0004, version 0.4, sorts before $0100, version
+        /// 1.0.</summary>
         public const int Version = 0x0004;
 
-        /// <summary>A version word as prose: Version reads "0.4".</summary>
+        /// <summary>A version word as prose: VersionName(0x0102) reads
+        /// "1.2".</summary>
         public static string VersionName(int word)
         {
             return (word >> 8) + "." + (word & 0xFF);
