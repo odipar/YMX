@@ -180,20 +180,21 @@ public final class YmEffects {
      * frame streams itself on the way into the file.
      */
     public static Tune tune(Ym6Reader.Song song, Extraction fx) {
-        // A YM header always names a loop frame, and its players always went
+        // A YM header always gives a loop frame, and its players always went
         // round; a listener who wants one pass says so at the command line.
-        // Where the header names a frame other than 0, the tune goes round to
-        // 0 instead and its opening is heard on every pass - the one thing
-        // about a YM tune's shape this conversion does not keep.
+        // The frame crosses as the source gives it, and the packer answers for
+        // it: a frame at or past the end is no frame, so it comes across as 0.
         java.util.List<String> notes = fx.notes();
-        if (song.loopFrame() > 0 && song.loopFrame() < song.frames()) {
+        long given = song.loopFrame();
+        int loopFrame = given > 0 && given < song.frames() ? (int) given : 0;
+        if (given >= song.frames()) {
             notes = new java.util.ArrayList<>(notes);
-            notes.add(String.format("The YM header loops from frame %d of %d;"
-                    + " the tune starts over from frame 0 instead, so its"
-                    + " first %d frames are heard on every pass",
-                    song.loopFrame(), song.frames(), song.loopFrame()));
+            notes.add(String.format("The YM header loops from frame %d, which is past"
+                    + " the %d the file holds; the tune starts over from frame 0",
+                    given, song.frames()));
         }
         return new Tune(song.frames(), song.playerHz(), song.masterClock(), true,
+                loopFrame,
                 java.util.Arrays.copyOf(song.registers(), YmxFormat.REGISTER_STREAMS),
                 fx.codes(), fx.counts(), shapes(song, fx), fx.samples(),
                 oneShot(fx.samples().length), EffectScript.Semantics.YM,

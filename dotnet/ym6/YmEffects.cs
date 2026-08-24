@@ -77,22 +77,25 @@ namespace Ym6
         /// masks the frame streams itself.</summary>
         public static Tune BuildTune(Ym6Reader.Song song, Extraction fx)
         {
-            // A YM header always names a loop frame, and its players always
-            // went round. Where the header names a frame other than 0, the
-            // tune goes round to 0 instead.
+            // A YM header always gives a loop frame, and its players always
+            // went round. The frame crosses as the source gives it, and the
+            // packer answers for it: a frame at or past the end is no frame,
+            // so it comes across as 0.
             IReadOnlyList<string> notes = fx.Notes;
-            if (song.LoopFrame > 0 && song.LoopFrame < song.Frames)
+            long given = song.LoopFrame;
+            int loopFrame = given > 0 && given < song.Frames ? (int) given : 0;
+            if (given >= song.Frames)
             {
                 var noted = new List<string>(notes);
-                noted.Add(string.Format("The YM header loops from frame {0} of"
-                        + " {1}; the tune starts over from frame 0 instead, so"
-                        + " its first {2} frames are heard on every pass",
-                        song.LoopFrame, song.Frames, song.LoopFrame));
+                noted.Add(string.Format("The YM header loops from frame {0}, which"
+                        + " is past the {1} the file holds; the tune starts over"
+                        + " from frame 0", given, song.Frames));
                 notes = noted;
             }
             byte[][] registers = new byte[YmxFormat.RegisterStreams][];
             Array.Copy(song.Registers, registers, YmxFormat.RegisterStreams);
             return Tune.Of(song.Frames, song.PlayerHz, song.MasterClock, true,
+                    loopFrame,
                     registers, fx.Codes, fx.Counts, Shapes(song, fx), fx.Samples,
                     OneShot(fx.Samples.Length), EffectScript.Semantics.Ym,
                     song.Name, song.Author, song.Comment, notes);

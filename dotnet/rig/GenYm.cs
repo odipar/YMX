@@ -102,9 +102,10 @@ namespace Rig
         }
 
         /// <summary>Which frame of the tune each played frame shows: a tune
-        /// that starts over runs 0..O-1 again and again, one that plays once
-        /// stops at O-1.</summary>
-        public static int[] FrameOrder(int frames, bool loops, int count)
+        /// that starts over runs 0..O-1 once and then L..O-1 again and again,
+        /// one that plays once stops at O-1.</summary>
+        public static int[] FrameOrder(int frames, int loopFrame, bool loops,
+                int count)
         {
             var order = new List<int>();
             int frame = 0;
@@ -118,7 +119,7 @@ namespace Rig
                     {
                         break;
                     }
-                    frame = 0;
+                    frame = loopFrame;
                 }
             }
             return order.ToArray();
@@ -132,12 +133,12 @@ namespace Rig
         /// player may skip a register whose value has not changed, so state,
         /// not the write sequence, has to match.</summary>
         public static List<ChipState> ChipStates(int frames, byte[][] source,
-                bool loops, int count)
+                bool loops, int loopFrame, int count)
         {
             int[][] vectors = Masked(frames, source);
             int[] state = new int[PlayRegisters];
             var history = new List<ChipState>();
-            foreach (int frame in FrameOrder(frames, loops, count))
+            foreach (int frame in FrameOrder(frames, loopFrame, loops, count))
             {
                 bool envelopeWritten = false;
                 for (int register = 0; register < PlayRegisters; register++)
@@ -168,6 +169,15 @@ namespace Rig
         public static byte[] Ym6File(int frames, byte[][] source,
                 params byte[][] drums)
         {
+            return Ym6File(frames, 0, source, drums);
+        }
+
+        /// <summary>The same, with the frame the header sends its own player
+        /// back to - what the packer answers for when it decides the file's
+        /// L.</summary>
+        public static byte[] Ym6File(int frames, int loopFrame, byte[][] source,
+                params byte[][] drums)
+        {
             var file = new MemoryStream();
             file.Write(Encoding.ASCII.GetBytes("YM6!LeOnArD!"));
             WriteLong(file, frames);
@@ -175,7 +185,7 @@ namespace Rig
             WriteWord(file, drums.Length);      // digidrums
             WriteLong(file, 2000000);           // master clock
             WriteWord(file, 50);                // player rate
-            WriteLong(file, 0);                 // loop frame
+            WriteLong(file, loopFrame);         // loop frame
             WriteWord(file, 0);                 // additional data size
             foreach (byte[] drum in drums)
             {

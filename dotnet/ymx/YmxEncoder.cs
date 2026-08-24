@@ -10,6 +10,11 @@ namespace Ymx
     /// the compiled script streams, and the sample table, each vector packed
     /// as its own embedded ST4 container - or stored plain where the values
     /// are smaller than a container.
+    ///
+    /// <para>A tune that repeats reaches its loop frame again by moving the read
+    /// position in every ring back one pass. Which frame that is, and whether it
+    /// can be kept at all, is LoopFrame's answer; the ring size the plan comes
+    /// back with is the one the file carries.</para>
     /// </summary>
     public static class YmxEncoder
     {
@@ -19,11 +24,31 @@ namespace Ymx
 
         /// <summary>The finished file plus the per-stream numbers the CLI
         /// reports; Tune is the one actually packed, the padded one where the
-        /// length needed padding.</summary>
+        /// length needed padding, RingSize the one the file carries, and
+        /// LoopFrame the L it holds. Notes is what the loop frame moved or
+        /// cost, for the CLI to report.</summary>
         public sealed record Result(byte[] File, IReadOnlyList<Stream> Streams,
-                int RingSize, int Chunk, bool Loops, int Unit, Tune Tune,
-                EffectScript.Result Script)
+                int RingSize, int Chunk, bool Loops, int Unit, int LoopFrame,
+                Tune Tune, EffectScript.Result Script, IReadOnlyList<string> Notes)
         {
+            /// <summary>What the end of the tune does, and the frame it goes
+            /// back to - one sentence, so both CLIs report it in the same
+            /// words.</summary>
+            public string StartingOver()
+            {
+                if (!Loops)
+                {
+                    return "Plays once, then stops";
+                }
+                if (LoopFrame == 0)
+                {
+                    return "Plays through, then starts over";
+                }
+                return string.Format("Plays through, then starts over from frame {0},"
+                        + " replaying {1} of its {2} frames", LoopFrame,
+                        Tune.Frames - LoopFrame, Tune.Frames);
+            }
+
             public int PackedSize()
             {
                 int total = 0;
@@ -76,11 +101,6 @@ namespace Ymx
                         + " its length must be a multiple of " + unit);
             }
 
-            // A back-reference may never reach out of the ring the player
-            // decodes through, and the format's own ceiling applies above.
-            int offsetLimit = Math.Min(ringSize / unit,
-                    St4Format.MaxOffsetUnits(unit));
-
             EffectScript.Result script = EffectScript.Compile(tune, timerMap);
             int channels = ChannelsUsed(script);
             problem = YmxFormat.CheckShape(ringSize, chunk, unit,
@@ -89,6 +109,19 @@ namespace Ymx
             {
                 throw new ArgumentException(problem);
             }
+
+            // The loop frame comes before the packing rather than after it: a
+            // body that needs a bigger ring gets one, and a bigger ring lets a
+            // back-reference reach further, so the sections are packed against
+            // the ring the file ends up carrying.
+            LoopFrame.Plan plan = LoopFrame.Resolve(tune, script, loops, ringSize,
+                    chunk);
+            ringSize = plan.RingSize;
+
+            // A back-reference may never reach out of the ring the player
+            // decodes through, and the format's own ceiling applies above.
+            int offsetLimit = Math.Min(ringSize / unit,
+                    St4Format.MaxOffsetUnits(unit));
             int frames = script.Frames;
             byte[][] vectors = new byte[YmxFormat.Streams][];
             for (int register = 0; register < YmxFormat.RegisterStreams; register++)
@@ -125,10 +158,10 @@ namespace Ymx
                         vectors[stream], offsetLimit, unit);
             }
 
-            byte[] file = Build(tune, ringSize, chunk, frames, loops, sections,
-                    tune.Samples, channels);
+            byte[] file = Build(tune, ringSize, chunk, frames, loops, plan.Frame,
+                    sections, tune.Samples, channels);
             return new Result(file, streams, ringSize, chunk, loops, unit,
-                    tune, script);
+                    plan.Frame, tune, script, plan.Notes);
         }
 
         /// <summary>A stream byte is meaningful only on frames its master
@@ -194,7 +227,8 @@ namespace Ymx
         }
 
         private static byte[] Build(Tune tune, int ringSize, int chunk, int frames,
-                bool loops, Section[] sections, byte[][] samples, int channels)
+                bool loops, int loopFrame, Section[] sections, byte[][] samples,
+                int channels)
         {
             // Each section is placed on a long boundary: containers carry
             // alignment rules of their own, and a stored section takes the
@@ -229,10 +263,11 @@ namespace Ymx
             PutLong(file, YmxFormat.OffsetMasterClock, tune.MasterClock);
             PutLong(file, YmxFormat.OffsetSampleTable, sampleTable);
             PutWord(file, YmxFormat.OffsetSampleCount, samples.Length);
-            // L is 0: a tune that starts over goes back to the beginning,
-            // and a tune that plays once through has no loop frame. The loop
-            // table offset is 0, which says the file carries no such table.
-            PutLong(file, YmxFormat.OffsetLoopFrame, 0);
+            // L, the frame the tune starts over from: 0 where it plays once
+            // through, and 0 where the packer could not keep the source's own.
+            // The loop table offset is 0, which says the file carries no such
+            // table.
+            PutLong(file, YmxFormat.OffsetLoopFrame, loopFrame);
             PutLong(file, YmxFormat.OffsetLoopTable, 0);
 
             Place(file, YmxFormat.OffsetSectionTable, sections, YmxFormat.HeaderSize);

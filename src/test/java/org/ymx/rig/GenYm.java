@@ -86,8 +86,9 @@ final class GenYm {
     }
 
     /** Which frame of the tune each played frame shows: a tune that starts
-     * over runs 0..O-1 again and again, one that plays once stops at O-1. */
-    static int[] frameOrder(int frames, boolean loops, int count) {
+     * over runs 0..O-1 once and then L..O-1 again and again, one that plays
+     * once stops at O-1. */
+    static int[] frameOrder(int frames, int loopFrame, boolean loops, int count) {
         List<Integer> order = new ArrayList<>();
         int frame = 0;
         for (int i = 0; i < count; i++) {
@@ -97,7 +98,7 @@ final class GenYm {
                 if (!loops) {
                     break;
                 }
-                frame = 0;
+                frame = loopFrame;
             }
         }
         return order.stream().mapToInt(Integer::intValue).toArray();
@@ -112,11 +113,11 @@ final class GenYm {
      * skip a register whose value has not changed - the chip cannot tell -
      * so state, not the write sequence, has to match. */
     static List<ChipState> chipStates(int frames, byte[][] source, boolean loops,
-            int count) {
+            int loopFrame, int count) {
         int[][] vectors = masked(frames, source);
         int[] state = new int[PLAY_REGISTERS];
         List<ChipState> history = new ArrayList<>();
-        for (int frame : frameOrder(frames, loops, count)) {
+        for (int frame : frameOrder(frames, loopFrame, loops, count)) {
             boolean envelopeWritten = false;
             for (int register = 0; register < PLAY_REGISTERS; register++) {
                 int value = vectors[register][frame];
@@ -140,6 +141,13 @@ final class GenYm {
      * The drums are 8-bit digidrum samples, stored the way a YM6 file
      * stores them. */
     static byte[] ym6File(int frames, byte[][] source, byte[]... drums) {
+        return ym6File(frames, 0, source, drums);
+    }
+
+    /** The same, with the frame the header sends its own player back to -
+     * what the packer answers for when it decides the file's L. */
+    static byte[] ym6File(int frames, int loopFrame, byte[][] source,
+            byte[]... drums) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         out.writeBytes("YM6!LeOnArD!".getBytes(StandardCharsets.US_ASCII));
         writeLong(out, frames);
@@ -147,7 +155,7 @@ final class GenYm {
         writeWord(out, drums.length);               // digidrums
         writeLong(out, 2000000);                    // master clock
         writeWord(out, 50);                         // player rate
-        writeLong(out, 0);                          // loop frame
+        writeLong(out, loopFrame);                  // loop frame
         writeWord(out, 0);                          // additional data size
         for (byte[] drum : drums) {
             writeLong(out, drum.length);

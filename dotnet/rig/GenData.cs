@@ -50,13 +50,13 @@ namespace Rig
             Rig.Run(command);
 
             int played = Frames + Extra;
-            long checksum = ChipChecksum(GenYm.ChipStates(Frames, source, true,
+            long checksum = ChipChecksum(GenYm.ChipStates(Frames, source, true, 0,
                     played));
             // The player reports a wrap on the frame that ends the tune, so
             // count the times the last frame is played, not the times frame
             // 0 is.
             int wraps = 0;
-            foreach (int frame in GenYm.FrameOrder(Frames, true, played))
+            foreach (int frame in GenYm.FrameOrder(Frames, 0, true, played))
             {
                 if (frame == Frames - 1)
                 {

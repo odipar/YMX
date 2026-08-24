@@ -170,6 +170,11 @@ namespace Ymx
         /// <summary>Default ring size: what the README's timings are quoted for.</summary>
         public const int DefaultRingSize = 960;
 
+        /// <summary>The largest ring the format allows: the player reads
+        /// stream k's ring through an assembled-in displacement of k*N, and
+        /// 13*N must fit a signed word.</summary>
+        public const int MaxRingSize = 2520;
+
         /// <summary>Default chunk size, the round-robin player's group size.</summary>
         public const int DefaultChunk = 24;
 
@@ -213,9 +218,10 @@ namespace Ymx
             {
                 return "ring " + ringSize + " is not a multiple of chunk " + chunk;
             }
-            if (ringSize > 2520)
+            if (ringSize > MaxRingSize)
             {
-                return "ring " + ringSize + " exceeds 2520: the player reads"
+                return "ring " + ringSize + " exceeds " + MaxRingSize
+                        + ": the player reads"
                         + " register k's ring through an assembled-in displacement"
                         + " of k*N, and 13*N must fit a signed word";
             }
@@ -235,6 +241,14 @@ namespace Ymx
 
         /// <summary>Register 13, the envelope shape.</summary>
         public const int EnvelopeShape = 13;
+
+        /// <summary>Register 8, voice A's volume; voices B and C follow
+        /// it.</summary>
+        public const int VolumeA = 8;
+
+        /// <summary>Bit 4 of a volume register: the voice takes its level
+        /// from the envelope generator.</summary>
+        public const int EnvelopeMode = 0x10;
 
         private static readonly int[] Masks = {
             0xFF, 0x0F, 0xFF, 0x0F, 0xFF, 0x0F, 0x1F,

@@ -94,8 +94,11 @@ namespace Ymr
             }
             ReportChannels();
 
+            // A header that gives no loop frame says so with -1, and a song
+            // that does not start over has no frame to give: both cross as 0.
+            int loopFrame = source.Loops() ? source.LoopFrame : 0;
             return Tune.Of(frames, source.FrameRate, source.YmClock,
-                    source.Loops(), registers, codes, counts, Shapes(),
+                    source.Loops(), loopFrame, registers, codes, counts, Shapes(),
                     LevelsOf(samples), LoopsOf(samples), Semantics,
                     name, "", "", notes);
         }

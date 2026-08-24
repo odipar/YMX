@@ -50,11 +50,11 @@ final class GenData {
                 tune.toString(), packed.toString()));
 
         int played = FRAMES + EXTRA;
-        long checksum = chipChecksum(GenYm.chipStates(FRAMES, source, true, played));
+        long checksum = chipChecksum(GenYm.chipStates(FRAMES, source, true, 0, played));
         // The player reports a wrap on the frame that ends the tune, so
         // count the times the last frame is played, not the times frame 0 is.
         int wraps = 0;
-        for (int frame : GenYm.frameOrder(FRAMES, true, played)) {
+        for (int frame : GenYm.frameOrder(FRAMES, 0, true, played)) {
             if (frame == FRAMES - 1) {
                 wraps++;
             }

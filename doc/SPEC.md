@@ -66,7 +66,7 @@ source formats and their tools use:
 | 20 | 4 | the YM2149's master clock in Hz - informational; **2000000** for an ST tune, 0 with no source clock |
 | 24 | 4 | byte offset of the sample table; 0 when there are none |
 | 28 | 2 | sample count |
-| 30 | 4 | `L`, the frame a tune that starts over goes back to. This version starts over at frame 0, so every file carries 0 (§9.3) |
+| 30 | 4 | `L`, the frame a tune that starts over goes back to (§8), within the bounds §9.3 gives it; 0 where the tune plays once through |
 | 34 | 4 | byte offset of the loop table; 0 when there is none |
 | 38 | 4·S | byte offset of each **section**, covering frames `[0, O)` |
 
@@ -81,7 +81,7 @@ four.
 
 | bit | meaning |
 |---:|---|
-| 0 | the tune starts over at frame 0 instead of ending |
+| 0 | the tune starts over at frame `L` instead of ending |
 | 1 | the tune uses timer channel 0 |
 | 2 | timer channel 1 |
 | 3 | timer channel 2 |
@@ -564,9 +564,10 @@ frame write is therefore optional.
 
 ## 8. Starting over
 
-A tune with flag bit 0 set plays its frames again from frame `L`, which
-is 0 at this version (§9.3), so one pass is `O - L` frames. A wrap takes
-one of two forms, and `O - L` against `N` selects which.
+A tune with flag bit 0 set plays its frames again from frame `L`, so one
+pass is `O - L` frames and the first pass is the only one that plays the
+frames before `L`. A wrap takes one of two forms, and `O - L` against `N`
+selects which.
 
 Where `O - L` is larger than `N`, the streams are decoded again. A packed
 stream restarts only from its beginning, so a section that runs out
@@ -627,7 +628,7 @@ a value. Those operations, in full:
 | a sample byte with bit 7 set | it is written to the volume register as a level, and the sample ends there |
 | loop point `$FFFF` | on the marker, 13 is written to the volume register and the timer is stopped. Any other value: the read position becomes that offset into the sample and the ticks continue |
 | the frame's order | skip bits, then the fourteen register writes, then the frame's actions in channel order, then one refill |
-| the frame after the last, flag bit 0 set | every claimed timer is stopped, its vector parked, its interrupt enabled with nothing pending, and every skip bit cleared, before frame 0 is played again |
+| the frame after the last, flag bit 0 set | every claimed timer is stopped, its vector parked, its interrupt enabled with nothing pending, and every skip bit cleared, before frame `L` is played again |
 | refill turn | on frame `f`, stream `f` modulo `C` is decoded `C` values further |
 | a section running out mid-refill | decoding continues from the start of that same section, into the same ring |
 
@@ -640,8 +641,9 @@ The shape:
 
 - `O` is at least 1; `N` and `C` are within §1.3. At a unit size above 1,
   `O` and `C` are multiples of the unit size.
-- `L` and the loop table offset are 0. This version starts over at frame
-  0 (§8), and no player reads a loop table.
+- The loop table offset is 0: no player reads a loop table. Where `L` is
+  not 0, `L` is less than `O` and `O` - `L` is at most `N`, so a wrap
+  reaches back one pass into the rings and no further (§8).
 - All twenty-five sections are present, and each decodes to exactly `O`
   values of one byte. No back-reference exceeds `N` bytes and no operation
   exceeds 65535 units (§1.4).

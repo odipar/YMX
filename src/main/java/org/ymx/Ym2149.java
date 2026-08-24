@@ -28,6 +28,13 @@ public final class Ym2149 {
     /** Register 13, the envelope shape. */
     public static final int ENVELOPE_SHAPE = 13;
 
+    /** Register 8, voice A's volume; voices B and C follow it. */
+    public static final int VOLUME_A = 8;
+
+    /** Bit 4 of a volume register: the voice takes its level from the
+     * envelope generator rather than from the register's own four bits. */
+    public static final int ENVELOPE_MODE = 0x10;
+
     /**
      * Bits each register keeps: 8-bit fine tone, 4-bit coarse tone, 5-bit noise
      * period, 6-bit mixer, 4-bit volume plus the envelope-mode bit, and the
