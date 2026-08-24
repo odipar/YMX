@@ -188,10 +188,10 @@ namespace Rig
             ulong sidOn = Rig.Code + (ulong) player.Symbol("ymx_toggle_a_on");
             ulong sidOff = Rig.Code + (ulong) player.Symbol("ymx_toggle_a_off");
 
-            // A burst write is twelve bytes and ends in the movep that sends
+            // A burst write is ten bytes and ends in the movep that sends
             // it; a skip replaces that instruction with two nops.
-            const int writeSize = 12;
-            const int writeMovep = 8;
+            const int writeSize = 10;
+            const int writeMovep = 6;
             long movepOpcode = player.Uc.Value(
                     Rig.Code + (ulong) player.Symbol("ymx_movep"), 2);
 

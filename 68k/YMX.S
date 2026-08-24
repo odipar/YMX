@@ -170,23 +170,14 @@
 ;      of it. A host needing the machine back afterwards saves, around
 ;      init..stop, exactly what the player touches: the vectors $134 and
 ;      $110, TACR, TADR, TDDR, TCDCR's low (Timer D) nibble, bit 5 of IERA
-;      and IMRA, bit 4 of IERB and IMRB - and, built with YMX_SUPER_HOST,
-;      the USP, which the PCM tick parks a0 in. A demo that has already
-;      taken the machine over saves nothing. YMX_player.S is the
-;      worked example of doing that
+;      and IMRA, bit 4 of IERB and IMRB. A demo that has already taken the
+;      machine over saves nothing. YMX_player.S is the worked example of
+;      doing that
 ; -----------------------------------------------------------------------------
 
-; A host that never runs user-mode code while the player is live - a demo under
-; its own takeover, say - may define YMX_SUPER_HOST equ 1 before including this
-; file: the PCM tick of the channel on Timer D then parks a0 in the then-unused
-; USP (4 cycles each way instead of 12 through the stack). Every other
-; channel's always uses the stack, because Timer A and Timer B both nest into
-; Timer D's parked windows and must never overwrite one - Timer D is last in
-; MFP priority, so nothing nests into it. The park restores a0 but not the USP:
-; a host that ever returns to user mode must save its USP before YMX_init and
-; restore it after YMX_stop, with the rest of the machine state assumption 5
-; lists. Default off, because a program that hooks the VBL from user mode has a
-; live USP at every tick.
+; YMX_SUPER_HOST is accepted and changes nothing: the PCM tick no longer
+; borrows a0, so there is no USP park for the flag to choose. Build lines
+; that define it still assemble.
         .if ^^defined YMX_SUPER_HOST
         .else
 YMX_SUPER_HOST  equ     0
@@ -241,11 +232,11 @@ YMX_STREAMS     equ     25              ; R0..R13, then the compiled effect
                                         ; like any register
 YMX_CHAN0       equ     17              ; stream index of channel 0's action
                                         ; byte: R0..R13, then M, X and T
-YMX_WRITE_READ  equ     6               ; inside a YMX_WRITE: the ring read's
+YMX_WRITE_READ  equ     4               ; inside a YMX_WRITE: the ring read's
                                         ; displacement, patched at init
-YMX_WRITE_MOVEP equ     8               ; and the movep, which a skip swaps
+YMX_WRITE_MOVEP equ     6               ; and the movep, which a skip swaps
                                         ; for two nops
-YMX_WRITE_SIZE  equ     12              ; the whole write
+YMX_WRITE_SIZE  equ     10              ; the whole write
 YMX_STATE_SIZE  equ     64              ; per stream, so the index is a shift
                                         ; both ways: *64 in, /16 back to *4
 
@@ -261,7 +252,8 @@ YMX_TOTAL       equ     24              ; long  O, the tune length in frames
 YMX_N           equ     28              ; word  ring size N
 YMX_C           equ     30              ; word  values per call C
 YMX_SLOT        equ     32              ; word  refill turn, 0..C-1
-YMX_INDEX       equ     34              ; word  stream index, during init only
+                                        ; 34: an unused word holds the
+                                        ; offsets below where they were
 YMX_LOOPS       equ     36              ; word  nonzero when the tune starts over
 YMX_EFXOFF      equ     38              ; long  14*N: the cursor's ring to M's
 YMX_TMAP        equ     42              ; word  the channel-to-timer map in
@@ -369,9 +361,10 @@ YMX_ENVELOPE    equ     13
 ; -----------------------------------------------------------------------------
 ; YMX_WRITE: send one register's value from its ring to the sound chip.
 ;
-; Three moves, with the register number assembled in as an immediate: the
-; select byte goes to d1's high half, the ring byte to its low half, and one
-; movep.w sends both. Nothing is tested and nothing is counted. Register k's
+; Three moves: d2 steps the select in d1's high half - R0's moveq #0 is
+; written out at ymx_wA and every later write adds d2's $0100 - the ring
+; byte goes to d1's low half, and one movep.w sends both. Nothing is
+; tested and nothing is counted. Register k's
 ; ring byte sits k*N above the cursor, and N is known at init: the
 ; displacement is patched into the instruction there, once, so the burst
 ; never steps a pointer. The $7FFF placeholder is
@@ -383,8 +376,8 @@ YMX_ENVELOPE    equ     13
 ; sound-chip access on an ST costs about 1.5 cycles more than a RAM one, so the
 ; compare that would save the write costs about as much as the write.
 ; -----------------------------------------------------------------------------
-        .macro YMX_WRITE number
-        move.w  #\number<<8,d1          ; the select byte, in the high half
+        .macro YMX_WRITE
+        add.w   d2,d1                   ; the next select, in the high half
         move.b  $7FFF(a1),d1            ; the value - SMC: k*N, set at init
         movep.w d1,0(a2)                ; select and write in ONE instruction,
         .endm                           ; so no tick can land between them
@@ -438,27 +431,25 @@ YMX_init:
 .first_group:
         move.l  d1,YMX_NEXT(a3)         ; values decoded once init is done
 
-        clr.w   YMX_INDEX(a3)           ; the loop counter lives here: every
-.stream:                                ; register is state during the calls
-        move.w  YMX_INDEX(a3),d0
+        movem.l d6-d7/a6,-(sp)          ; the three registers a decoder call
+        moveq   #0,d6                   ; leaves alone: d6 = N, d7 = the
+        move.w  YMX_N(a3),d6            ; stream index, a6 = its ring - the
+        moveq   #0,d7                   ; rings are consecutive, so a6 walks
+        movea.l YMX_RINGS(a3),a6        ; them N at a time
+.stream:
+        move.w  d7,d0
         lsl.w   #6,d0                   ; * YMX_STATE_SIZE
         lea     YMX_STATE(a3,d0.w),a2
-        moveq   #0,d3
-        move.w  YMX_N(a3),d3
-        move.w  YMX_INDEX(a3),d0
-        mulu.w  d3,d0                   ; this stream's ring is the k'th
-        movea.l YMX_RINGS(a3),a1
-        adda.l  d0,a1
-        move.l  a1,YS_START(a2)
+        movea.l a6,a1                   ; this stream's ring - ymx_open's
+        move.l  a1,YS_START(a2)         ; ST4_init packs -ring.low from a1
         move.l  a1,YS_WRITE(a2)
-        move.l  a1,d0
-        add.l   d3,d0
-        move.l  d0,YS_END(a2)
+        adda.l  d6,a6                   ; the next stream's ring
+        move.l  a6,YS_END(a2)
 
 ; One section per stream, covering every frame of the tune.
         move.l  YMX_TOTAL(a3),YS_LEFT(a2)   ; values before this stream runs out
 
-        move.w  YMX_INDEX(a3),d0
+        move.w  d7,d0
         lsl.w   #2,d0                   ; the table holds long offsets
         add.w   #YH_SECTIONS,d0
         movea.l YMX_FILE(a3),a0
@@ -474,7 +465,7 @@ YMX_init:
 .container:
         adda.l  d0,a0                   ; the section's ST4 container
         cmp.l   #ST4_SIGNATURE,(a0)     ; magic, version and unit in one compare:
-        bne     .rejected               ; a tune packed for another unit size
+        bne     .stream_rejected        ; a tune packed for another unit size
 
 ; Open the container. The state block goes to the stack; ST4_init clobbers
 ; a3, so the workspace pointer does too.
@@ -493,13 +484,14 @@ YMX_init:
         move.l  d2,YS_D2(a1)
 .opened:
 
-        move.w  YMX_INDEX(a3),d0        ; and its first group
+        move.w  d7,d0                   ; and its first group
         lsl.w   #6,d0
-        move.w  YMX_NEXT+2(a3),d3       ; C, or fewer: both fit a word
+        move.l  YMX_NEXT(a3),d3         ; C, or fewer
         bsr     YMX_fill
-        addq.w  #1,YMX_INDEX(a3)
-        cmp.w   #YMX_STREAMS,YMX_INDEX(a3)
+        addq.w  #1,d7
+        cmp.w   #YMX_STREAMS,d7
         bne     .stream
+        movem.l (sp)+,d6-d7/a6
 
 ; The cursor reaches the script rings by fixed hops: 14*N to M, computed
 ; once, and the three parameter offsets (8+voice)*N the handlers read the
@@ -573,6 +565,10 @@ YMX_init:
         dbra    d0,.wpatchB
         lea     ymx_w13+2(pc),a0
         move.w  d1,(a0)
+        move.w  d2,d1
+        add.w   d1,d1                   ; 2N: ring T's byte, read off ring M
+        lea     ymx_wT+2(pc),a0
+        move.w  d1,(a0)
         bsr     ymx_link                ; no skips, handlers linked
 
 ; Read the map before claiming anything: stream T's first byte says which
@@ -641,12 +637,14 @@ YMX_init:
 
         moveq   #0,d0
         rts
+.stream_rejected:
+        movem.l (sp)+,d6-d7/a6          ; the stream loop's saved registers
 .rejected:
         moveq   #-1,d0
         rts
 
 ; -----------------------------------------------------------------------------
-; YMX_fill: d0.w = stream index * YMX_STATE_SIZE, d3.w = values needed.
+; YMX_fill: d0.w = stream index * YMX_STATE_SIZE, d3.l = values needed.
 ; Produces exactly that many values for one register, opening its section
 ; again - and again - as often as it takes. Straddling matters even for one
 ; group: nothing says the end of the tune falls on a group boundary.
@@ -656,8 +654,7 @@ YMX_fill:
         lea     YMX_STATE(a3,d0.w),a2   ; call, which its own state needs
         movea.l a3,a6                   ; ST4 clobbers a3: a6 keeps the workspace
         move.l  a2,d6
-        moveq   #0,d7
-        move.w  d3,d7                   ; values still needed
+        move.l  d3,d7                   ; values still needed
 .piece:
         move.l  YS_LEFT(a2),d0
         bne.s   .section
@@ -752,7 +749,6 @@ ymx_reopen:
         movea.l YMX_FILE(a3),a0
         move.l  0(a0,d0.w),d0
         beq.s   .done                   ; this stream has no section
-        tst.l   d0
         bpl.s   .container              ; the offset's top bit: stored values
         bclr    #31,d0
         adda.l  d0,a0
@@ -780,7 +776,8 @@ ymx_reopen:
         rts
 
 ; -----------------------------------------------------------------------------
-; ymx_open: a0 = an ST4 container. Points the four stream registers at its
+; ymx_open: a0 = an ST4 container, a1 = the stream's ring, which ST4_init
+; packs -ring.low from. Points the four stream registers at its
 ; streams - A begins where the header ends, B, C and D sit at the recorded
 ; header-relative offsets, exactly as ST4.S documents - and tail-calls
 ; ST4_init: its rts returns to ymx_open's caller with the decoder registers
@@ -860,9 +857,12 @@ YMX_play:
         beq.s   .burst                  ; bits 7-5 hold it
         lsr.b   #5,d0
         bsr     ymx_skips
+        move.b  (a0),d0                 ; the master byte again
 .burst:
         movea.l YMX_CURSOR(a3),a1       ; the cursor: every register's ring
-        lea     YMX_PSG,a2              ; byte is a patched k*N above it
+        lea     YMX_PSG.w,a2            ; byte is a patched k*N above it
+        move.w  #$0100,d2               ; the select step - loaded after
+                                        ; ymx_skips, which clobbers d2
 
 ; Selecting a register and writing it are two bus cycles, and an interrupt
 ; between them would send the value to whatever register the interrupt
@@ -884,13 +884,16 @@ YMX_play:
         ori.w   #$0700,sr               ; for hearing what the mask costs
         .endif
 ymx_wA:
-        YMX_WRITE 0                     ; channel A period, fine and coarse
-        YMX_WRITE 1
-        YMX_WRITE 2                     ; channel B
-        YMX_WRITE 3
-        YMX_WRITE 4                     ; channel C
-        YMX_WRITE 5
-        YMX_WRITE 6                     ; noise period
+        moveq   #0,d1                   ; R0: channel A period, fine - the
+        move.b  $7FFF(a1),d1            ; value - SMC: k*N, set at init
+        movep.w d1,0(a2)                ; select and write in ONE instruction,
+                                        ; so no tick can land between them
+        YMX_WRITE                       ; R1: channel A period, coarse
+        YMX_WRITE                       ; R2: channel B
+        YMX_WRITE                       ; R3
+        YMX_WRITE                       ; R4: channel C
+        YMX_WRITE                       ; R5
+        YMX_WRITE                       ; R6: noise period
 
 ; R7 sits HERE ON PURPOSE, between the periods and the volumes, and moving
 ; it to either end of the run - which would let R0..R6 and R8..R12 fold
@@ -903,20 +906,20 @@ ymx_wA:
 ; and the same class of artefact cost a day and a half on Trapped in China.
 ; Nothing automated would catch it: the harness reads registers at the end
 ; of a frame, and the rig compares each frame's writes as a set.
-        move.w  #YMX_MIXER<<8,d1        ; R7 also carries the ST's I/O port
+        add.w   d2,d1                   ; R7 also carries the ST's I/O port
 ymx_w7:
         move.b  $7FFF(a1),d1            ; directions, which port A needs kept
         or.b    #YMX_PORTS,d1           ; as outputs for the floppy select
         movep.w d1,0(a2)                ; one instruction, like every write
 
 ymx_wB:
-        YMX_WRITE 8                     ; the three volumes
-        YMX_WRITE 9
-        YMX_WRITE 10
-        YMX_WRITE 11                    ; envelope period
-        YMX_WRITE 12
+        YMX_WRITE                       ; R8: the three volumes
+        YMX_WRITE                       ; R9
+        YMX_WRITE                       ; R10
+        YMX_WRITE                       ; R11: envelope period
+        YMX_WRITE                       ; R12
 
-        move.w  #YMX_ENVELOPE<<8,d1     ; the select, above the shape byte
+        add.w   d2,d1                   ; R13's select, above the shape byte
 ymx_w13:
         move.b  $7FFF(a1),d1            ; R13 restarts the envelope whenever it
         cmp.b   #YMX_NO_ENV,d1          ; is written, so $FF means leave it be
@@ -933,21 +936,20 @@ ymx_w13:
 ; places and compare nothing. a0 still points at ring M.
 ; The map first, if it moved. Stream T is one byte a frame and almost
 ; always the same one, so a tune that never re-assigns pays a compare.
-        moveq   #0,d3
-        move.w  YMX_N(a3),d3            ; d3 survives ymx_act; d0 does not
-        movea.l a0,a1
-        adda.l  d3,a1
-        adda.l  d3,a1                   ; ring T = M + 2N
-        moveq   #0,d0
-        move.b  (a1),d0
-        cmp.w   YMX_TMAP(a3),d0
+ymx_wT:
+        move.b  $7FFF(a0),d1            ; ring T = M + 2N - SMC: set at init
+        cmp.b   YMX_TMAP+1(a3),d1
         beq.s   .map_ready
-        move.w  d0,YMX_TMAP(a3)
-        bsr     ymx_assign              ; leaves a0 and d3 alone
+        moveq   #0,d0
+        move.b  d1,d0
+        move.b  d1,YMX_TMAP+1(a3)
+        bsr     ymx_assign              ; leaves a0 alone
+        move.b  (a0),d0                 ; the master byte again
 .map_ready:
-        move.b  (a0),d0
         andi.b  #(1<<YMX_CHANNELS)-1,d0 ; the channels' bits; skips are done
         beq.s   .effects_done
+        moveq   #0,d3
+        move.w  YMX_N(a3),d3            ; d3 survives ymx_act; d0 does not
         YMX_ACT _0,0,3,.channel0,.channel1
         YMX_ACT _1,1,5,.channel1,.channel2
         YMX_ACT _2,2,7,.channel2,.channel3
@@ -1050,7 +1052,7 @@ YMX_stop:
 ; The silence stays inside the mask: selecting a register and writing it are
 ; two bus cycles, and a host's system interrupts - about to be restored - use
 ; the chip too.
-        lea     YMX_PSG,a0
+        lea     YMX_PSG.w,a0
         moveq   #8,d0                   ; R8, R9, R10 are the voice volumes
 .silence:
         move.b  d0,(a0)
@@ -1152,7 +1154,8 @@ ymx_parmoff:
 ; state, software end-of-interrupt as TOS runs the MFP - written as an
 ; immediate byte, since the in-service registers ignore written ones. All
 ; MFP interrupts arrive at 68000 level 6, so these never nest, and every
-; patched operand is addressed pc-relatively so the player stays loadable
+; patched operand is addressed pc-relatively or through an address ymx_link
+; patches at init, so the player stays loadable
 ; anywhere - which also means it must run from RAM, where a demo lives.
 ;
 ; The timers' handlers are the same text four times, and MUST stay
@@ -1169,15 +1172,14 @@ ymx_parmoff:
 ; nesting is strictly one-way: a higher-priority timer interrupts a lower
 ; one's handler, never the reverse (SEI mode admits only higher MFP
 ; priorities while an in-service bit is set), and nothing of the player's
-; sits above Timer A. That direction is why the USP park belongs to
-; Timer D's PCM tick alone - it is the one nothing else waits behind, so
-; nothing can nest into its parked window. Every other channel's tick
-; uses the stack, so a parked USP survives. The drop must never come before
-; the handler's LAST chip write: a nested tick re-selects the PSG.
+; sits above Timer A. The drop must never come before the handler's LAST
+; chip write: a nested tick re-selects the PSG.
 ;
 ; The patch offsets are load-bearing (all fixed ones shift by PERF_PAD when
 ; the raster monitor's color prologue sits at each block's top):
-;   pcm:      select immediate at +3, sample address at +8
+;   pcm:      select immediate at +3, sample address at +8; the step and the
+;          end path reach it through addresses ymx_link patches, at the
+;          ISR_PCM_STEP and ISR_PCM_END fields
 ;   toggle:   select at +2 and volume at +4 inside the imm long; the partner's
 ;          whole vector at +14, past the IPL drop, patched by ymx_link
 ;   retrigger: the shape at +4
@@ -1189,9 +1191,8 @@ ymx_parmoff:
 ; number takes a leading underscore - and the timer arrives
 ; as arguments: \eoi and \eoir the end-of-interrupt value and register,
 ; \tctrl the timer's control register, \vec its vector. \colour is the
-; monitor's band and \park is 1 on the channel allowed to park a0 in the
-; USP. rmac's \~ gives each expansion its own local labels.
-        .macro YMX_TICKS chan, colour, eoi, eoir, tctrl, keep, vec, park
+; monitor's band. rmac's \~ gives each expansion its own local labels.
+        .macro YMX_TICKS chan, colour, eoi, eoir, tctrl, keep, vec
 
 ; One PCM tick: the sample byte goes straight to the voice's volume register.
 ; The byte after the last has bit 7 set, so the same move answers "done": park
@@ -1205,46 +1206,34 @@ ymx_pcm\{chan}:
         move.b  $12345678,$FFFF8802.w   ; SMC PERF_PAD+8: the next sample
         bmi.s   .ended\~
         move.w  #$2500,sr               ; pair done: the other timer may stack
-        .if \park*YMX_SUPER_HOST        ; only the channel that cannot nest
-        move    a0,usp                  ; into a parked window may use the USP
-        .else
-        move.l  a0,-(sp)
-        .endif
-        lea     ymx_pcm\{chan}+8+PERF_PAD(pc),a0
-        addq.l  #1,(a0)                 ; step the operand itself
+        addq.l  #1,($12345678).l        ; SMC ISR_PCM_STEP: the operand's
+                                        ; own address, patched by ymx_link
         .if YMX_PERF
+        move.l  a0,-(sp)
         lea     ymx_perf_acc(pc),a0
         add.w   #21,(a0)                ; ~a PCM tick, in 10-cycle quanta
-        .endif
-        .if \park*YMX_SUPER_HOST
-        move    usp,a0
-        .else
         movea.l (sp)+,a0
-        .endif
-        .if YMX_PERF
         move.w  (sp)+,$FFFF8240.w
         .endif
         move.b  #\eoi,\eoir.w
         rte
 .ended\~:                               ; a looping stream goes back instead
-        move.l  a0,-(sp)                ; of stopping. Everything here is off
-        lea     ymx_pcm\{chan}+ISR_PCM_PTR(pc),a0   ; the SMC operand, and
-        tst.l   ISR_PCM_LOOP-ISR_PCM_PTR(a0)        ; the loop pointer beside
-        beq.s   .stop\~                              ; it: this player is
-        move.l  ISR_PCM_LOOP-ISR_PCM_PTR(a0),(a0)   ; position independent,
-        .if YMX_PERF                    ; so neither may be addressed absolutely
+ymx_pcmend\{chan}:                       ; of stopping
+        tst.l   ($12345678).l           ; SMC ISR_PCM_ENDT: the loop cell -
+        beq.s   .stop\~                  ; zero marks a one-shot stream
+        move.l  ($12345678).l,($12345678).l ; SMC ISR_PCM_ENDR, ISR_PCM_ENDW:
+                                        ; the loop cell into the operand
+        .if YMX_PERF
+        move.l  a0,-(sp)
         lea     ymx_perf_acc(pc),a0
         add.w   #23,(a0)
-        .endif
         movea.l (sp)+,a0
-        .if YMX_PERF
         move.w  (sp)+,$FFFF8240.w
         .endif
         bra.s   ymx_park\{chan}          ; the end tick has already written the
                                         ; marker as a level - one sample of
                                         ; silence at the seam, and no other
 .stop\~:
-        movea.l (sp)+,a0
         move.b  #$D,$FFFF8802.w         ; middle volume: no click
         andi.b  #\keep,\tctrl.w         ; the sample ran out: stop the timer -
         .if YMX_PERF                    ; the script compiled this frame in
@@ -1325,13 +1314,12 @@ ymx_retrigger\{chan}:
 
 ; One block per timer, in MFP priority order: the A bank is served before
 ; the B bank, so it runs Timer A, Timer B, Timer C, Timer D. Timer D is
-; last, which makes it the one nothing can nest into and so the only one
-; that may park a0 in the USP - whichever channel happens to be on it.
-;                 timer colour  eoi  in-service  control    keep  vector park
-        YMX_TICKS _a,    $070,   $DF, $FFFFFA0F, $FFFFFA19,  $F0,  $134,  0
-        YMX_TICKS _b,    $700,   $FE, $FFFFFA0F, $FFFFFA1B,  $F0,  $120,  0
-        YMX_TICKS _c,    $077,   $DF, $FFFFFA11, $FFFFFA1D,  $0F,  $114,  0
-        YMX_TICKS _d,    $007,   $EF, $FFFFFA11, $FFFFFA1D,  $F0,  $110,  1
+; last, which makes it the one nothing can nest into.
+;                 timer colour  eoi  in-service  control    keep  vector
+        YMX_TICKS _a,    $070,   $DF, $FFFFFA0F, $FFFFFA19,  $F0,  $134
+        YMX_TICKS _b,    $700,   $FE, $FFFFFA0F, $FFFFFA1B,  $F0,  $120
+        YMX_TICKS _c,    $077,   $DF, $FFFFFA11, $FFFFFA1D,  $0F,  $114
+        YMX_TICKS _d,    $007,   $EF, $FFFFFA11, $FFFFFA1D,  $F0,  $110
 
 YMX_BLOCK       equ     ymx_pcm_b-ymx_pcm_a   ; the blocks are congruent, so
                                         ; one stride walks them
@@ -1357,6 +1345,10 @@ ISR_TOGGLE_OFF_NEXT equ     ISR_TOGGLE_OFF+PERF_PAD+14
 ISR_RETRIGGER        equ     ymx_retrigger_a-ymx_pcm_a
 ISR_PARK             equ     ymx_park_a-ymx_pcm_a
 ISR_RETRIGGER_SHAPE  equ     ISR_RETRIGGER+PERF_PAD+4
+ISR_PCM_STEP   equ     PERF_PAD+22
+ISR_PCM_ENDT   equ     (ymx_pcmend_a-ymx_pcm_a)+2
+ISR_PCM_ENDR   equ     (ymx_pcmend_a-ymx_pcm_a)+10
+ISR_PCM_ENDW   equ     (ymx_pcmend_a-ymx_pcm_a)+14
 
 ; -----------------------------------------------------------------------------
 ; ymx_link, from YMX_init: the run-time addresses that exist only once the
@@ -1377,6 +1369,12 @@ ymx_link:
         move.l  a0,ISR_TOGGLE_ON_NEXT(a2)   ; as a whole vector
         lea     ISR_TOGGLE_ON(a2),a0
         move.l  a0,ISR_TOGGLE_OFF_NEXT(a2)
+        lea     ISR_PCM_PTR(a2),a0          ; the PCM tick steps its operand
+        move.l  a0,ISR_PCM_STEP(a2)         ; through this patched address
+        move.l  a0,ISR_PCM_ENDW(a2)         ; and the loop rewinds it
+        lea     ISR_PCM_LOOP(a2),a0
+        move.l  a0,ISR_PCM_ENDT(a2)
+        move.l  a0,ISR_PCM_ENDR(a2)
         lea     CH_ROW(a1),a1
         lea     YMX_BLOCK(a2),a2
         dbra    d1,.timer
@@ -1399,23 +1397,21 @@ ymx_assign:
 .channel:
         move.w  d0,d1
         and.w   #3,d1                   ; this channel's two bits
-        mulu    #CH_ROW,d1              ; rare enough to pay for a multiply
+        move.b  .rowoff(pc,d1.w),d1     ; the two bits become a row offset
         lea     ymx_timers(pc),a2
         adda.w  d1,a2
-        move.l  (a2)+,d1                ; the row, eighteen bytes of it
-        move.l  d1,(a1)+
-        move.l  (a2)+,d1
-        move.l  d1,(a1)+
-        move.l  (a2)+,d1
-        move.l  d1,(a1)+
-        move.l  (a2)+,d1
-        move.l  d1,(a1)+
-        move.w  (a2),d1
-        move.w  d1,(a1)+                ; a1 now stands on CH_CLAIMED, which
-        lea     CH_SIZE-CH_ROW(a1),a1   ; is the channel's and stays put
+        move.l  (a2)+,(a1)+             ; the row, eighteen bytes of it
+        move.l  (a2)+,(a1)+
+        move.l  (a2)+,(a1)+
+        move.l  (a2)+,(a1)+
+        move.w  (a2),(a1)+              ; a1 now stands on CH_CLAIMED, which
+        addq.l  #CH_SIZE-CH_ROW,a1      ; is the channel's and stays put
         lsr.w   #2,d0                   ; the next channel's bits
         dbra    d2,.channel
         rts
+.rowoff:
+        dc.b    0,CH_ROW,CH_ROW*2,CH_ROW*3
+        even
 
 ; -----------------------------------------------------------------------------
 ; The action handlers: the script's opcodes, one straight line each. The
@@ -1454,19 +1450,17 @@ ymx_opcodes:
 ; and different formats file it in different places, so it is not looked
 ; for: the packer resolved it and X carries it, high nibble. The
 ; player is therefore independent of where a tune came from.
-; in: a0 = ring M, d3.l = N; out: d1 = the shape, 0..15. Clobbers a1.
+; in: a0 = ring M, d3.l = N; out: d1 = the shape, 0..15.
 ymx_shape:
-        movea.l a0,a1
-        adda.l  d3,a1                   ; ring X, one stream above M
-        move.b  (a1),d1
+        move.b  0(a0,d3.l),d1           ; ring X, one stream above M
         lsr.b   #4,d1
         rts
 
 ; in: d0 = the action byte; out: a1 = the byte, d5 = voice*4. Clobbers d1.
 ymx_voice:
-        move.w  d0,d5
-        lsr.w   #1,d5
-        and.w   #$0C,d5                 ; voice * 4
+        moveq   #$18,d5
+        and.b   d0,d5
+        lsr.w   #1,d5                   ; voice * 4
         lea     ymx_parmoff(pc),a1
         move.l  0(a1,d5.w),d1
         movea.l YMX_CURSOR(a3),a1
@@ -1489,10 +1483,8 @@ ymx_release:                               ; STOP: low bit clear = stop the
 ymx_resume:                             ; unmask; reload the count if it
         btst    #0,d0                   ; moved, retrack the volume if it
         beq.s   .kept                   ; moved - the phase ran on through
-        movea.l a4,a1                   ; the gap, exactly as a masked
-        adda.l  d3,a1                   ; hardware timer does
-        move.b  (a1),d1
-        movea.w CH_DATA(a5),a2
+        move.b  0(a4,d3.l),d1           ; the gap, exactly as a masked
+        movea.w CH_DATA(a5),a2          ; hardware timer does
         move.b  d1,(a2)                 ; a running timer loads a changed
 .kept:                                  ; count at its next reload
         btst    #1,d0
@@ -1511,9 +1503,7 @@ ymx_resume:                             ; unmask; reload the count if it
 ymx_hold:                               ; flags: 1 = reload the count, 2 =
         btst    #0,d0                   ; track the toggle volume, 4 =
         beq.s   .tracks                 ; track the retrigger shape - only
-        movea.l a4,a1                   ; where the value changed
-        adda.l  d3,a1
-        move.b  (a1),d1
+        move.b  0(a4,d3.l),d1           ; where the value changed
         movea.w CH_DATA(a5),a2
         move.b  d1,(a2)                 ; a running timer loads a changed
 .tracks:                                ; count at its next reload
@@ -1542,14 +1532,12 @@ ymx_toggle_start:                          ; a fresh square restarts at phase
         addq.w  #8,d1                   ; here: a held or masked square's
         move.b  d1,ISR_TOGGLE_ON_SEL(a2)    ; phase free-runs
         move.b  d1,ISR_TOGGLE_OFF_SEL(a2)
-        lea     YMX_PSG,a1
         move.w  sr,-(sp)                ; select and write are two bus
         ori.w   #$0700,sr               ; cycles: no tick in between
-        move.b  d1,(a1)
-        clr.b   2(a1)                   ; the silent first half
+        move.b  d1,(YMX_PSG).w
+        clr.b   (YMX_PSG+2).w           ; the silent first half
         move.w  (sp)+,sr
-        bsr     ymx_voice
-        move.b  (a1),d1
+        move.b  (a1),d1                 ; a1 still holds the voice's byte
         and.w   #15,d1
         move.b  d1,ISR_TOGGLE_VOL(a2)
         lea     ISR_TOGGLE_ON(a2),a1
@@ -1558,9 +1546,9 @@ ymx_toggle_start:                          ; a fresh square restarts at phase
 
 ymx_retune:                         ; the vector is NEVER touched: the
         move.b  d0,d1                   ; square's phase persists through every
-        and.b   #$18,d1                 ; retune, and through a resume after
-        cmp.b   #$18,d1                 ; a PCM stream took the voice.
-        beq     ymx_live                ; voice 3 is no voice: see below
+        not.b   d1                      ; retune, and through a resume after
+        and.b   #$18,d1                 ; a PCM stream took the voice.
+        beq.s   ymx_live                ; voice 3 is no voice: see below
         bsr     ymx_voice
         move.b  (a1),d1
         and.w   #15,d1
@@ -1576,20 +1564,18 @@ ymx_retune:                         ; the vector is NEVER touched: the
 ; to no voice, so no parameter is repatched - the packer only picks this
 ; encoding on a frame where the parameter byte stood still.
 ymx_live:
-        movea.l a4,a1
-        adda.l  d3,a1
-        move.b  (a1),d2                 ; the count
+        move.b  0(a4,d3.l),d2           ; the count
         and.b   #7,d0
         move.w  CH_SHIFT(a5),d1         ; Timer C's nibble is the high one
         lsl.b   d1,d0
         movea.w CH_CTRL(a5),a1
+        movea.w CH_DATA(a5),a2
+        move.w  CH_KEEP(a5),d1
         move.w  sr,-(sp)
         ori.w   #$0700,sr
-        move.w  CH_KEEP(a5),d1
         and.b   (a1),d1                 ; our nibble out, the other's kept
         or.b    d0,d1
         move.b  d1,(a1)                 ; ONE write: never a stopped timer
-        movea.w CH_DATA(a5),a2
         move.b  d2,(a2)
         move.w  (sp)+,sr
         movea.w CH_IER(a5),a1           ; and enabled, whatever a mask left
@@ -1606,9 +1592,9 @@ ymx_retrigger_start:
         bra     ymx_program
 
 ymx_pcm_preempt:                        ; arbitration, compiled: the stopped
-        movea.l a0,a1                   ; timers go FIRST, then the sample
-        adda.l  d3,a1                   ; arms its own - the reference order.
-        move.b  (a1),d2                 ; A channel has no fixed voice, so
+        move.b  0(a0,d3.l),d2           ; timers go FIRST, then the sample
+                                        ; arms its own - the reference order.
+                                        ; A channel has no fixed voice, so
                                         ; ring X - one stream above M - gives
                                         ; what to stop, a bit per channel
         lea     ymx_desc_0(pc),a1
@@ -1629,10 +1615,8 @@ ymx_pcm:
         lsl.w   #3,d1                   ; a PAIR each: the sample's
         movea.l CH_ISR(a5),a2           ; address, then where it loops back to
         lea     ymx_samples(pc),a1
-        move.l  0(a1,d1.w),d2           ; both resolved at init, so a trigger
-        move.l  d2,ISR_PCM_PTR(a2)      ; is two indexed loads and no test
-        move.l  4(a1,d1.w),d2
-        move.l  d2,ISR_PCM_LOOP(a2)
+        move.l  0(a1,d1.w),ISR_PCM_PTR(a2)  ; both resolved at init, so a
+        move.l  4(a1,d1.w),ISR_PCM_LOOP(a2) ; trigger is two moves and no test
         move.w  d5,d1
         lsr.w   #2,d1
         addq.w  #8,d1
@@ -1647,13 +1631,14 @@ ymx_pcm:
 ;     a4 = the action ring byte (the count is one ring above).
 ; clobbers d0-d2 and a1-a2; d3-d5 and a3-a5 stand.
 ymx_program:
-        movea.l a4,a1
-        adda.l  d3,a1
-        move.b  (a1),d2                 ; the count
+        move.b  0(a4,d3.l),d2           ; the count
+        and.b   #7,d0
+        move.w  CH_SHIFT(a5),d1         ; Timer C's nibble is the high one
+        lsl.b   d1,d0
         movea.w CH_CTRL(a5),a1
+        move.w  CH_KEEP(a5),d1
         move.w  sr,-(sp)
         ori.w   #$0700,sr
-        move.w  CH_KEEP(a5),d1
         and.b   d1,(a1)                 ; stop, keeping the other nibble
         tst.l   d4
         beq.s   .keep
@@ -1662,9 +1647,6 @@ ymx_program:
 .keep:
         movea.w CH_DATA(a5),a2
         move.b  d2,(a2)                 ; count
-        and.b   #7,d0
-        move.w  CH_SHIFT(a5),d1         ; Timer C's nibble is the high one
-        lsl.b   d1,d0
         or.b    d0,(a1)                 ; run
         move.w  (sp)+,sr
         movea.w CH_IER(a5),a1           ; and enabled, whatever a mask

@@ -962,7 +962,7 @@ final class PlayerTests {
             boolean superHost = flags[0];
             boolean perf = flags[1];
             String problem = Effects.runEffects(superHost, perf);
-            String build = superHost ? "USP a0" : perf ? "PERF build" : "";
+            String build = superHost ? "SUPER_HOST" : perf ? "PERF build" : "";
             if (!problem.isEmpty()) {
                 System.out.println("FAIL "
                         + (build.isEmpty() ? problem : build + ": " + problem));

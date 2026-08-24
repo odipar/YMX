@@ -1150,7 +1150,7 @@ namespace Rig
                 bool superHost = flags[0];
                 bool perf = flags[1];
                 string problem = Effects.RunEffects(superHost, perf);
-                string build = superHost ? "USP a0" : perf ? "PERF build" : "";
+                string build = superHost ? "SUPER_HOST" : perf ? "PERF build" : "";
                 if (problem.Length != 0)
                 {
                     Console.WriteLine("FAIL " + (build.Length == 0 ? problem

@@ -156,11 +156,11 @@ final class Effects {
         long sidOn = Rig.CODE + player.symbol("ymx_toggle_a_on");
         long sidOff = Rig.CODE + player.symbol("ymx_toggle_a_off");
 
-        // A burst write is twelve bytes and ends in the movep that sends it;
+        // A burst write is ten bytes and ends in the movep that sends it;
         // a skip replaces that instruction with two nops, so the state reads
         // as the opcode itself against $4E71.
-        int writeSize = 12;
-        int writeMovep = 8;
+        int writeSize = 10;
+        int writeMovep = 6;
         long movepOpcode = player.uc.value(Rig.CODE + player.symbol("ymx_movep"), 2);
 
         long enableA = 0xFFFFFA07L;

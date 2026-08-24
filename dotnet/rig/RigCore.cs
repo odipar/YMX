@@ -47,9 +47,11 @@ namespace Rig
         private static readonly Dictionary<string, Build> Assembled = new();
 
         /// <summary>YMX.S plus the decoder, built for one unit size, as one
-        /// flat blob. superHost builds the YMX_SUPER_HOST variant; perf
-        /// builds the raster monitor in. YMX_NOMASK in the environment runs
-        /// the whole rig against the unmasked-frame-write build.</summary>
+        /// flat blob. superHost builds the YMX_SUPER_HOST variant, which
+        /// this player assembles identically - the build proves the flag is
+        /// harmless. perf builds the raster monitor in. YMX_NOMASK in the
+        /// environment runs the whole rig against the unmasked-frame-write
+        /// build.</summary>
         public static Build Assemble(int unit, bool superHost, bool perf)
         {
             string tag = unit + (superHost ? "u" : "") + (perf ? "p" : "");

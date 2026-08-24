@@ -57,8 +57,10 @@ final class Rig {
 
     /**
      * YMX.S plus the decoder, built for one unit size, as one flat blob.
-     * superHost builds the YMX_SUPER_HOST variant: the PCM tick parks a0 in
-     * the USP instead of the stack. perf builds the raster monitor in.
+     * superHost builds the YMX_SUPER_HOST variant, which this player
+     * assembles identically - the PCM tick no longer borrows a0 - and the
+     * build stays in the battery to prove the flag is harmless. perf
+     * builds the raster monitor in.
      * YMX_NOMASK in the environment runs the whole rig against the variant
      * whose frame write is unmasked, the tools' -nomask.
      */
