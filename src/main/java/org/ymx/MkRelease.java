@@ -120,14 +120,16 @@ public final class MkRelease {
         }
     }
 
-    /** The GitHub release tagged by format version, its assets replaced
-     * and its notes rewritten, so the commit they name is the one the
-     * assets were assembled at. */
+    /** The GitHub release tagged by the release version, its assets
+     * replaced and its notes rewritten, so the commit they name is the
+     * one the assets were assembled at and the account of what changed
+     * is this release's section of doc/RELEASES.md. */
     private static void publish(Path dir, String commit) {
         String tag = "binaries-v" + YmxFormat.releaseName();
-        String notes = "Prebuilt SNDH cores and the PRG stub, assembled at "
-                + commit + ". doc/BINARIES.md is the combine contract;"
-                + " MANIFEST.txt lists sizes and SHA-256 digests.";
+        String notes = releaseNotes() + "\n\nPrebuilt SNDH cores and the PRG"
+                + " stub, assembled at " + commit + ". doc/BINARIES.md is the"
+                + " combine contract; MANIFEST.txt lists sizes and SHA-256"
+                + " digests.";
         if (Tools.status(Tools.repo(),
                 List.of("gh", "release", "view", tag)) != 0) {
             Tools.run(Tools.repo(), List.of("gh", "release", "create", tag,
@@ -148,6 +150,29 @@ public final class MkRelease {
         upload.add(dir.resolve("MANIFEST.txt").toString());
         Tools.run(Tools.repo(), upload);
         System.out.println("published " + tag);
+    }
+
+    /** This release's section of {@code doc/RELEASES.md}, from its
+     * heading to the next: the account the release page carries. A
+     * release with no section of its own is not published. */
+    static String releaseNotes() {
+        String heading = "## " + YmxFormat.releaseName();
+        String document;
+        try {
+            document = Files.readString(Tools.repo().resolve("doc")
+                    .resolve("RELEASES.md"));
+        } catch (IOException e) {
+            throw Tools.fail("mkrelease: doc/RELEASES.md: " + e.getMessage());
+        }
+        int start = document.indexOf(heading + "\n");
+        if (start < 0) {
+            throw Tools.fail("mkrelease: doc/RELEASES.md carries no \""
+                    + heading + "\" section - write what this release"
+                    + " changes before publishing it");
+        }
+        int next = document.indexOf("\n## ", start + heading.length());
+        return document.substring(start + heading.length() + 1,
+                next < 0 ? document.length() : next).strip();
     }
 
     /** One manifest line: name, size, digest, and the given tail columns. */

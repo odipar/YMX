@@ -129,7 +129,9 @@ it for every variant.
 
 Stages every core variant - three unit sizes by the `-perf` and `-nomask`
 flags - plus the stub, verifies each descriptor, and writes MANIFEST.txt
-with sizes and SHA-256 digests.
+with sizes and SHA-256 digests. Publishing reads this release's section
+of `doc/RELEASES.md` and posts it as the release notes, so a release
+with no account of what it changes is not published.
 
     ymx/mkrelease.sh [-publish] [stagedir]
 

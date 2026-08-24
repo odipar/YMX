@@ -24,6 +24,18 @@ final class MkReleaseTest {
                 "ymxsndh-k4-perf-nomask" + Tools.binarySuffix() + ".bin"));
     }
 
+    /** The release being staged has its own account in
+     * {@code doc/RELEASES.md}: the notes a consumer reads. */
+    @Test
+    void thisReleaseHasItsSection() {
+        String notes = MkRelease.releaseNotes();
+        assertTrue(!notes.isEmpty(), "doc/RELEASES.md's section for "
+                + YmxFormat.releaseName() + " is empty");
+        assertTrue(!notes.startsWith("#"), "the section for "
+                + YmxFormat.releaseName() + " reads as another heading: "
+                + notes.lines().findFirst().orElse(""));
+    }
+
     @Test
     void aCoreIsVerifiedAgainstTheVariantItIsNamedFor() {
         MkRelease.Variant plain = new MkRelease.Variant(1, false, false);

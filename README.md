@@ -27,6 +27,7 @@ opcodes and the frame contract. The rest of the documentation is beside it.
 | [doc/tools.md](doc/tools.md) | every tool's usage, flags and environment |
 | [doc/terminology.md](doc/terminology.md) | the vocabulary all of these use |
 | [doc/experiments.md](doc/experiments.md) | ideas measured against the real corpus, and what the measurements said |
+| [doc/RELEASES.md](doc/RELEASES.md) | what changed in each published set of binaries |
 
 ## Test driving one
 

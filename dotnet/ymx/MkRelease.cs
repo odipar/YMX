@@ -130,15 +130,17 @@ namespace Ymx
             }
         }
 
-        /// <summary>The GitHub release tagged by format version, its assets
-        /// replaced and its notes rewritten, so the commit they name is the
-        /// one the assets were assembled at.</summary>
+        /// <summary>The GitHub release tagged by the release version, its
+        /// assets replaced and its notes rewritten, so the commit they name
+        /// is the one the assets were assembled at and the account of what
+        /// changed is this release's section of doc/RELEASES.md.</summary>
         private static void Publish(string dir, string commit)
         {
             string tag = "binaries-v" + YmxFormat.ReleaseName();
-            string notes = "Prebuilt SNDH cores and the PRG stub, assembled"
-                    + " at " + commit + ". doc/BINARIES.md is the combine"
-                    + " contract; MANIFEST.txt lists sizes and SHA-256 digests.";
+            string notes = ReleaseNotes() + "\n\nPrebuilt SNDH cores and the"
+                    + " PRG stub, assembled at " + commit + ". doc/BINARIES.md"
+                    + " is the combine contract; MANIFEST.txt lists sizes and"
+                    + " SHA-256 digests.";
             if (Tools.Status(Tools.Repo(),
                     new List<string> {"gh", "release", "view", tag}) != 0)
             {
@@ -164,6 +166,27 @@ namespace Ymx
             upload.Add(Path.Combine(dir, "MANIFEST.txt"));
             Tools.RunLoudly(Tools.Repo(), upload);
             Console.WriteLine("published " + tag);
+        }
+
+        /// <summary>This release's section of doc/RELEASES.md, from its
+        /// heading to the next: the account the release page carries. A
+        /// release with no section of its own is not published.</summary>
+        public static string ReleaseNotes()
+        {
+            string heading = "## " + YmxFormat.ReleaseName();
+            string document = File.ReadAllText(
+                    Path.Combine(Tools.Repo(), "doc", "RELEASES.md"));
+            int start = document.IndexOf(heading + "\n");
+            if (start < 0)
+            {
+                throw Tools.Fail("mkrelease: doc/RELEASES.md carries no \""
+                        + heading + "\" section - write what this release"
+                        + " changes before publishing it");
+            }
+            int next = document.IndexOf("\n## ", start + heading.Length);
+            return (next < 0 ? document.Substring(start + heading.Length + 1)
+                    : document.Substring(start + heading.Length + 1,
+                            next - start - heading.Length - 1)).Trim();
         }
 
         /// <summary>One manifest line: name, size, digest, and the given
