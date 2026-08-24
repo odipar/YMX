@@ -57,15 +57,12 @@ final class Rig {
 
     /**
      * YMX.S plus the decoder, built for one unit size, as one flat blob.
-     * superHost builds the YMX_SUPER_HOST variant, which this player
-     * assembles identically - the PCM tick no longer borrows a0 - and the
-     * build stays in the battery to prove the flag is harmless. perf
-     * builds the raster monitor in.
+     * perf builds the raster monitor in.
      * YMX_NOMASK in the environment runs the whole rig against the variant
      * whose frame write is unmasked, the tools' -nomask.
      */
-    static Build assemble(int unit, boolean superHost, boolean perf) {
-        String tag = unit + (superHost ? "u" : "") + (perf ? "p" : "");
+    static Build assemble(int unit, boolean perf) {
+        String tag = unit + (perf ? "p" : "");
         Build built = ASSEMBLED.get(tag);
         if (built != null) {
             return built;
@@ -74,7 +71,6 @@ final class Rig {
             Files.createDirectories(SCRATCH);
             Path source = SCRATCH.resolve("link" + tag + ".S");
             Files.writeString(source, "ST4_UNIT    equ     " + unit + "\n"
-                    + (superHost ? "YMX_SUPER_HOST equ  1\n" : "")
                     + (perf ? "YMX_PERF    equ     1\n" : "")
                     + (System.getenv("YMX_NOMASK") != null
                             ? "YMX_MASK_BURST equ  0\n" : "")

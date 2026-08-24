@@ -38,7 +38,7 @@ namespace Rig
         public readonly List<int> Palette = new();  // $FFFF8240 words (perf)
         private readonly List<Write> stray = new();
 
-        public Player(byte[] packed, int workspaceSize, int unit, bool superHost,
+        public Player(byte[] packed, int workspaceSize, int unit,
                 bool perf)
         {
             ulong[][] map = {new[] {Rig.Code, 0x4000UL},
@@ -50,7 +50,7 @@ namespace Rig
             {
                 Uc.Map(region[0], region[1]);
             }
-            Rig.Build build = Rig.Assemble(unit, superHost, perf);
+            Rig.Build build = Rig.Assemble(unit, perf);
             Binary = build.Binary;
             Symbols = build.Symbols;
             Uc.Write(Rig.Code, Binary);
@@ -69,10 +69,10 @@ namespace Rig
         }
 
         public Player(byte[] packed, int workspaceSize)
-                : this(packed, workspaceSize, 1, false, false) { }
+                : this(packed, workspaceSize, 1, false) { }
 
         public Player(byte[] packed, int workspaceSize, int unit)
-                : this(packed, workspaceSize, unit, false, false) { }
+                : this(packed, workspaceSize, unit, false) { }
 
         private void Watch(ulong address, int size, long value)
         {

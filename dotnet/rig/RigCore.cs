@@ -47,14 +47,12 @@ namespace Rig
         private static readonly Dictionary<string, Build> Assembled = new();
 
         /// <summary>YMX.S plus the decoder, built for one unit size, as one
-        /// flat blob. superHost builds the YMX_SUPER_HOST variant, which
-        /// this player assembles identically - the build proves the flag is
-        /// harmless. perf builds the raster monitor in. YMX_NOMASK in the
+        /// flat blob. perf builds the raster monitor in. YMX_NOMASK in the
         /// environment runs the whole rig against the unmasked-frame-write
         /// build.</summary>
-        public static Build Assemble(int unit, bool superHost, bool perf)
+        public static Build Assemble(int unit, bool perf)
         {
-            string tag = unit + (superHost ? "u" : "") + (perf ? "p" : "");
+            string tag = unit + (perf ? "p" : "");
             if (Assembled.TryGetValue(tag, out Build? held))
             {
                 return held;
@@ -62,7 +60,6 @@ namespace Rig
             Directory.CreateDirectory(Scratch);
             string source = Path.Combine(Scratch, "link" + tag + ".S");
             File.WriteAllText(source, "ST4_UNIT    equ     " + unit + "\n"
-                    + (superHost ? "YMX_SUPER_HOST equ  1\n" : "")
                     + (perf ? "YMX_PERF    equ     1\n" : "")
                     + (Environment.GetEnvironmentVariable("YMX_NOMASK") != null
                             ? "YMX_MASK_BURST equ  0\n" : "")

@@ -36,8 +36,7 @@ final class Player {
     final List<Integer> palette = new ArrayList<>(); // $FFFF8240 words (perf)
     private final List<Write> stray = new ArrayList<>();
 
-    Player(byte[] packed, int workspaceSize, int unit, boolean superHost,
-            boolean perf) {
+    Player(byte[] packed, int workspaceSize, int unit, boolean perf) {
         long[][] map = {{Rig.CODE, 0x4000}, {Rig.FILE, 0x30000},
                 {Rig.WORK, 0x40000}, {Rig.STACK_TOP - 0x8000, 0x8000},
                 {Rig.MAGIC, 0x1000}, {Rig.PSG_PAGE, 0x1000},
@@ -45,7 +44,7 @@ final class Player {
         for (long[] region : map) {
             uc.map(region[0], region[1]);
         }
-        Rig.Build build = Rig.assemble(unit, superHost, perf);
+        Rig.Build build = Rig.assemble(unit, perf);
         binary = build.binary();
         symbols = build.symbols();
         uc.write(Rig.CODE, binary);
@@ -63,11 +62,11 @@ final class Player {
     }
 
     Player(byte[] packed, int workspaceSize) {
-        this(packed, workspaceSize, 1, false, false);
+        this(packed, workspaceSize, 1, false);
     }
 
     Player(byte[] packed, int workspaceSize, int unit) {
-        this(packed, workspaceSize, unit, false, false);
+        this(packed, workspaceSize, unit, false);
     }
 
     private void watch(long address, int size, long value) {

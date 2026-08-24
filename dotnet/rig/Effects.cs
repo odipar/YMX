@@ -58,7 +58,7 @@ namespace Rig
             return map.TryGetValue(register, out int value) ? value : -1;
         }
 
-        public static string RunEffects(bool superHost, bool perf)
+        public static string RunEffects(bool perf)
         {
             int frames = 72;
             byte[][] values = PlayerTests.NewValues(frames);
@@ -130,8 +130,7 @@ namespace Rig
 
             byte[] packed = Rig.Pack(GenYm.Ym6File(frames, values, drum0, drum1),
                     960, 24, true, 1);
-            var player = new Player(packed, Rig.WorkspaceSize(960), 1,
-                    superHost, perf);
+            var player = new Player(packed, Rig.WorkspaceSize(960), 1, perf);
             if (player.Init() != 0)
             {
                 return "effects: YMX_init rejected the file";
@@ -595,8 +594,7 @@ namespace Rig
             // Claiming is per timer channel, and a second YMX_init must hand
             // back what the first one took.
             byte[] quiet = GenYm.Ym6File(40, PlayerTests.NewValues(40));
-            var reused = new Player(packed, Rig.WorkspaceSize(960), 1,
-                    superHost, perf);
+            var reused = new Player(packed, Rig.WorkspaceSize(960), 1, perf);
             if (reused.Init() != 0)
             {
                 return "effects: init rejected the two-channel pack";
@@ -636,7 +634,7 @@ namespace Rig
             // counting-on timer, and the reload-only comeback.
             var resumed = new Player(Rig.Pack(
                     GenYm.Ym6File(frames, values, drum0, drum1), 960, 24, true, 1,
-                    "-sidresume"), Rig.WorkspaceSize(960), 1, superHost, perf);
+                    "-sidresume"), Rig.WorkspaceSize(960), 1, perf);
             if (resumed.Init() != 0)
             {
                 return "effects: init rejected the -sidresume pack";

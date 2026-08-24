@@ -272,7 +272,7 @@ final class PlayerTests {
                 16, new byte[] {0}),                // sample 0
                 0, new Rig.SampleBlock(new byte[] {1, 2, 3, 4}, true, 1));
         Player player = new Player(Rig.packYmr(image, 960, 24),
-                Rig.workspaceSize(960), 1, false, perf);
+                Rig.workspaceSize(960), 1, perf);
         if (player.init() != 0) {
             return "sample loop: YMX_init rejected the tune";
         }
@@ -687,7 +687,7 @@ final class PlayerTests {
                     + " them out of";
         }
         int unit = Integer.parseInt(playerSaid.group(2));
-        Rig.Build build = Rig.assemble(unit, false, false);
+        Rig.Build build = Rig.assemble(unit, false);
         int player = Rig.symbol(build.symbols(), "ST4_init");
         int wrap = build.binary().length - player;
         long saidPlayer = number(playerSaid.group(1));
@@ -957,12 +957,9 @@ final class PlayerTests {
         failures += report(runConversionNumbers(),
                 "the conversion numbers   (ymr/CONVERSION.md, re-measured)");
 
-        boolean[][] builds = {{false, false}, {true, false}, {false, true}};
-        for (boolean[] flags : builds) {
-            boolean superHost = flags[0];
-            boolean perf = flags[1];
-            String problem = Effects.runEffects(superHost, perf);
-            String build = superHost ? "SUPER_HOST" : perf ? "PERF build" : "";
+        for (boolean perf : new boolean[] {false, true}) {
+            String problem = Effects.runEffects(perf);
+            String build = perf ? "PERF build" : "";
             if (!problem.isEmpty()) {
                 System.out.println("FAIL "
                         + (build.isEmpty() ? problem : build + ": " + problem));

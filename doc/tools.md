@@ -199,7 +199,7 @@ and libunicorn; `ymx/test/run.sh` needs rmac and Hatari with a TOS image.
 
 The whole emulator battery: tune shapes, the SNDH container, the retrigger
 shape, the sample loop, the loop-point resolve, the live retune, the
-measured README and conversion numbers, and the effect stage in three
+measured README and conversion numbers, and the effect stage in two
 builds.
 
     ymx/test/rig.sh [--quick]

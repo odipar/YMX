@@ -303,7 +303,7 @@ namespace Rig
                 [16] = new byte[] {0},              // sample 0
             }, 0, new Rig.SampleBlock(new byte[] {1, 2, 3, 4}, true, 1));
             var player = new Player(Rig.PackYmr(image, 960, 24),
-                    Rig.WorkspaceSize(960), 1, false, perf);
+                    Rig.WorkspaceSize(960), 1, perf);
             if (player.Init() != 0)
             {
                 return "sample loop: YMX_init rejected the tune";
@@ -764,7 +764,7 @@ namespace Rig
                         + " them out of";
             }
             int unit = int.Parse(playerSaid.Groups[2].Value);
-            Rig.Build build = Rig.Assemble(unit, false, false);
+            Rig.Build build = Rig.Assemble(unit, false);
             int player = Rig.Symbol(build.Symbols, "ST4_init");
             int wrap = build.Binary.Length - player;
             long saidPlayer = Number(playerSaid.Groups[1].Value);
@@ -1143,14 +1143,10 @@ namespace Rig
             failures += Report(RunConversionNumbers(),
                     "the conversion numbers   (ymr/CONVERSION.md, re-measured)");
 
-            bool[][] builds = {new[] {false, false}, new[] {true, false},
-                    new[] {false, true}};
-            foreach (bool[] flags in builds)
+            foreach (bool perf in new[] {false, true})
             {
-                bool superHost = flags[0];
-                bool perf = flags[1];
-                string problem = Effects.RunEffects(superHost, perf);
-                string build = superHost ? "SUPER_HOST" : perf ? "PERF build" : "";
+                string problem = Effects.RunEffects(perf);
+                string build = perf ? "PERF build" : "";
                 if (problem.Length != 0)
                 {
                     Console.WriteLine("FAIL " + (build.Length == 0 ? problem
