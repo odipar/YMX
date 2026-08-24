@@ -535,11 +535,11 @@ YMX_init:
         move.l  (a2),d1
         add.l   a0,d1                   ; file base + entry offset
         move.l  d1,(a1)+                ; the sample's own address, then where
-        move.w  6(a2),d2                ; a stream that runs out goes back to -
-        cmp.w   #YMX_ONE_SHOT,d2        ; resolved here so the tick that meets
-        beq.s   .one_shot               ; the end has one long to load and no
-        ext.l   d2                      ; arithmetic to do
-        add.l   d1,d2
+        moveq   #0,d2                   ; a stream that runs out goes back to -
+        move.w  6(a2),d2                ; resolved here so the tick that meets
+        cmp.w   #YMX_ONE_SHOT,d2        ; the end has one long to load and no
+        beq.s   .one_shot               ; arithmetic to do. The loop word is
+        add.l   d1,d2                   ; unsigned: $8000..$FFFE are points too
         move.l  d2,(a1)+
         bra.s   .next_drum
 .one_shot:

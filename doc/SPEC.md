@@ -26,8 +26,9 @@ repository, renumbered; the layout has changed since, and this document
 defines the current layout. No older YMX version exists to stay compatible
 with.
 
-**Vocabulary.** Defined in [terminology.md](terminology.md). The five terms
-used most:
+**Vocabulary.** The five terms used most, defined here;
+[terminology.md](terminology.md) maps this vocabulary to the names the
+source formats and their tools use:
 
 | word | meaning |
 |---|---|
@@ -45,7 +46,7 @@ used most:
 +--------------------------------+
 | header, 30 bytes fixed         |
 | section table, 4 x S           |
-| packed sections, in stream order
+| sections, located by offset    |
 | sample table + sample bytes    |
 +--------------------------------+
 ```
@@ -62,7 +63,7 @@ used most:
 | 14 | 2 | `S`, the stream count — always **25**, see §1.5 |
 | 16 | 2 | `N`, the ring size in bytes |
 | 18 | 2 | `C`, values decoded per call |
-| 20 | 4 | the YM2149's master clock in Hz (informational) |
+| 20 | 4 | the YM2149's master clock in Hz — informational; **2000000** for an ST tune, 0 with no source clock |
 | 24 | 4 | byte offset of the sample table; 0 when there are none |
 | 28 | 2 | sample count |
 | 30 | 4·S | byte offset of each **section**, covering frames `[0, O)` |
@@ -70,7 +71,9 @@ used most:
 With `S` fixed at 25 the header is **130 bytes**. Everything after it is
 body: the sections (§1.4), then the sample table (§6). Content in the body
 is located only by offset — a section by its table entry, the sample table
-by the offset at byte 24.
+by the offset at byte 24. Every offset counts from the file's first byte,
+the magic at offset 0, and a **long boundary** is an offset divisible by
+four.
 
 ### 1.2 Flags
 
@@ -110,13 +113,17 @@ idle.
 ### 1.4 The sections
 
 Each section is a complete ST4 container — signature, twenty-byte header,
-four streams — as defined by the [ST4](https://github.com/odipar/ST4)
-format. Every section begins on a long boundary; parts of a container are
-read a word at a time. Two container parameters are fixed by this format:
-no back-reference exceeds `N` bytes (§1.3), and no operation exceeds 65535
-units. Every section in a file is packed at one **unit size** — 1, 2 or 4
-bytes, recorded in the section's ST4 signature, not in the YMX header. A
-player must reject a container packed at a unit size other than the one it
+four streams. The container layout is defined by the
+[ST4](https://github.com/odipar/ST4) repository's specification, the
+normative companion of this document for packed sections; a writer with no
+ST4 compressor stores every section instead (below) and emits no
+container. Every section begins on a long boundary, so a player may read
+a container's header a long at a time. Two container parameters are fixed
+by this format: no back-reference exceeds `N` bytes (§1.3), and no
+operation exceeds 65535 units. Every section in a file is packed at one
+**unit size** — 1, 2 or 4 bytes, recorded with the ST4 format version in
+the section's signature, not in the YMX header. A player must reject a
+container packed at a unit size, or an ST4 version, other than the one it
 was built for (§9.1).
 
 A section may instead be **stored**: the bytes at its offset are the
@@ -129,7 +136,9 @@ only stored sections plays on any build.
 
 Each stream is packed as one section covering `[0, O)`. `O` is at least 1
 and all twenty-five table entries are nonzero. Section order in the file
-is not significant; a section is located only by its offset. When a tune
+is not significant; a section is located only by its offset. Bytes
+between one part and the next long boundary are padding: nothing reads
+them, and their value is free. When a tune
 with flag bit 0 set reaches the end of a section, the player reopens the
 section from its start (§8).
 
@@ -176,8 +185,9 @@ are script data whose bytes never reach a chip register.
 **Read schedule.** M, T and the fourteen register streams are read every
 frame. Every other stream byte is read only as specified: an A byte on a
 frame whose M bit marks the channel, a P or X byte where the verb reads
-one (§3). On other frames the byte's value is unspecified; a writer
-repeats the previous byte, which compresses to nothing.
+one (§3). On other frames the byte's value is unspecified: any byte is
+valid there — a stream's bytes before its first read included — and
+repeating the previous byte compresses to nothing.
 
 **Register masks.** A register value contains only the bits in the table
 below; a writer writes the remaining bits as zero (§9.3), and a player
@@ -220,7 +230,9 @@ write R13. R13 is four bits wide, every genuine shape is `$00`-`$0F`, and
 | 2 | timer channel 2 acts |
 | 3 | timer channel 3 acts |
 | 4 | bits 7-5 are meaningful this frame — apply them |
-| 7-5 | one bit per voice A, B, C — a set bit **skips** that voice |
+| 5 | a set bit **skips** voice A |
+| 6 | voice B |
+| 7 | voice C |
 
 Channels marked in one frame act in channel order, 0 first (§7).
 
@@ -252,7 +264,7 @@ A shape is not a voice's — any number of voices may follow the one
 generator — and its storage location differs by source format; the writer
 resolves it into X. The format has no flag, shadow or priming for the
 shape: a tune that arms a retrigger stream before any shape is set
-carries the source's default (`0` for a YM dump).
+carries the shape the writer chooses for the tune's start.
 
 ### 2.3 T — the channel-to-timer map
 
@@ -269,11 +281,13 @@ Channel 0 in bits 1-0, channel 1 in bits 3-2, and so on.
 
 Frame 0's byte defines the map at claim time: for each flagged channel
 (§1.2) a player claims the timer named by the channel's two bits, and
-flagged channels name distinct timers. The byte is read every frame; a changed byte takes effect before
-that frame's actions (§7). A map change stops no timer, so a writer
-changes the entry only of a channel with nothing running, and only to a
-timer claimed at frame 0. A tune that never re-assigns repeats the byte,
-which compresses to nothing.
+flagged channels name distinct timers. The byte is read every frame; a
+changed byte takes effect before that frame's actions (§7). A map change
+stops no timer, so a writer changes the entry only of a channel with
+nothing running, and only to a timer claimed at frame 0. A tune that
+never re-assigns repeats the byte, which compresses to nothing. With no
+channel flagged the byte binds nothing: a writer emits one byte,
+conventionally 0, and repeats it.
 
 Timer C is the Atari ST's 200 Hz system clock: a tune using it stops that
 clock, and cannot be driven from a Timer C interrupt.
@@ -305,9 +319,9 @@ clock, and cannot be driven from a Timer C interrupt.
 
 | # | verb | operation |
 |---:|---|---|
-| 0 | `RESUME` | unmask a masked toggle stream. Flags: 1 = reload the count, 2 = reload the volume. Phase continued through the gap |
+| 0 | `RESUME` | re-enable a released toggle stream's interrupt. Flags: 1 = reload the count, 2 = reload the volume. Phase continued through the gap |
 | 1 | `HOLD` | update a running stream. Flags: 1 = reload the count from P, 2 = reload the toggle stream's volume, 4 = reload the retrigger stream's shape. Emitted only on frames where a value changed |
-| 2 | `RELEASE` | stop this channel's timer. Bit 0 set: mask the interrupt instead, leaving the timer counting |
+| 2 | `RELEASE` | stop this channel's timer. Bit 0 set: disable the interrupt instead, leaving the timer counting |
 | 3 | `START_TOGGLE` | start a toggle stream: select, volume, vector := the loud half, then a full program |
 | 4 | `RETUNE` | a new rate for a running stream, keeping its place in the cycle. See §3.1 |
 | 5 | `START_RETRIGGER` | start a retrigger stream: shape, vector := the retrigger tick, then a full program |
@@ -349,6 +363,13 @@ retrigger stream's shape — did not change. Where the parameter changed on
 the same frame, the ordinary form is required, and the period in flight
 is truncated.
 
+Either form continues the code held on its channel: same kind, same
+voice, a changed rate. A changed kind or voice re-enters through the
+kind's start verb. The ordinary form over a running PCM stream leaves the
+sample playing from its current position at the new rate — the vector
+stays installed, and the voice's byte it reads repatches the toggle
+volume, which the next `START_TOGGLE` repatches again.
+
 ### 3.2 Where a stream's parameter comes from
 
 A toggle stream's volume and a PCM stream's sample number are read from
@@ -366,10 +387,26 @@ writes the level.
 
 Phase is retained only across a held code and its retunes.
 
-`RESUME` implements the alternative gap model: a release masks the timer
-interrupt, the timer keeps counting, and a re-arrival resumes the toggle
-stream at its current phase. The model in use is not recoverable from a
-YM file and is fixed at pack time.
+`RESUME` implements the alternative gap model: a release disables the
+timer's interrupt, the timer keeps counting, and a re-arrival resumes the
+toggle stream at its current phase. A tick that fell due while disabled
+is not delivered. The model in use is the writer's choice, fixed at pack
+time.
+
+`RESUME` is emitted only where the gap was a disabling release and the
+arriving code continues the same stream — same voice, same prescaler; the
+verb's low bits are flags, so it carries no rate. A prescaler changed
+across the gap re-enters through the voice-addressed `RETUNE`, whose
+program ends with the interrupt enabled (§9.2).
+
+Which `RELEASE` a writer emits: a retrigger stream's release stops its
+timer; a toggle stream's release stops under the default model and
+disables under the resume model; a sample that reaches its end marker
+takes no `RELEASE` — the marker ends it; a source that ends a sample
+early takes a stopping `RELEASE`, emitted only while the sample still
+plays. On a frame whose `RELEASE` stops a sample, the voice rejoins in
+that same frame's write, which precedes the stop (§7): a tick between
+the two writes one more sample byte over the returned volume.
 
 ---
 
@@ -381,13 +418,14 @@ The four **kinds** of timer stream:
 |---:|---|---|
 | `00` | **toggle stream** | a square wave made by flipping a voice's volume between a level and zero — a "SID voice" |
 | `01` | **PCM stream** | a stored sample played out through a voice's volume register — a "digidrum" |
-| `10` | **wave stream** | a table read out the same way. Never seen in a dump; reserved |
+| `10` | **wave stream** | a table read out the same way. Reserved: a version-1 writer does not emit it |
 | `11` | **retrigger stream** | R13 rewritten at the timer's rate, restarting the envelope — a "sync-buzzer" |
 
 The **code byte** does not appear in the file. It is the intermediate a
 writer compiles the script from, one byte per channel per frame, specified
 so that writers reading different source formats compile the same codes to
-the same script:
+the same script — §3.1 and §3.3 state which verb a code's arrival, change
+or departure selects:
 
 ```
   7 6     5 4      3      2 1 0
@@ -404,7 +442,9 @@ the same script:
   trigger, so two triggers of one sample at one rate are two different
   bytes and the compiled script starts the sample twice. A source with no
   such signal leaves it zero, and every change of a code is then a
-  trigger.
+  trigger. Whether a PCM code held unchanged restarts its sample on the
+  frames it repeats, or plays it once, is fixed at pack time, like the
+  gap model of §3.3.
 - **prescaler** — the MFP prescaler index, which the count byte completes.
 
 ---
@@ -442,7 +482,7 @@ At the header's sample-table offset — a long boundary — `count` entries of
 | offset | size | field |
 |---:|---:|---|
 | 0 | 4 | byte offset of the sample's first byte |
-| 4 | 2 | length in bytes |
+| 4 | 2 | the count of level bytes — the end marker is at this offset in the sample |
 | 6 | 2 | loop point, or `$FFFF` for one-shot |
 
 Sample bytes are volume levels 0-15, followed by one **end marker**,
@@ -450,16 +490,32 @@ Sample bytes are volume levels 0-15, followed by one **end marker**,
 pointer, and ends the sample on a byte with bit 7 set; nothing is counted
 or compared per tick. The marker has been written as a level by the time
 it is tested, and `$80`'s level bits are zero, so the marker plays as one
-tick of silence.
+tick of silence at the loop seam.
 
 The **loop point** is a position in the sample, not an address. On the end
 marker, a tick with a loop point other than `$FFFF` sets its pointer to
 that position and continues; the seam costs the marker's one tick of
-silence. A one-shot stops its timer. `0` is a valid loop point — the
-sample repeats whole — so the no-loop value is one no length can reach.
+silence. A one-shot writes 13 — a mid-scale level — to the volume
+register and stops its timer, so the voice holds that level until it
+rejoins the frame write. `0` is a valid loop point — the sample repeats
+whole — so the no-loop value is one no length can reach.
 
 A sample number is read from a voice's five-bit volume register (§3.2), so
 a file may carry at most **32** samples.
+
+**The rejoin frame.** After a one-shot the voice rejoins the frame write
+(§2.1) no earlier than this many frames past the one that starts the
+sample:
+
+```
+frames = ceil(((length + 1) · prescaler[index] · count · rate + 2457600/16) / 2457600)
+```
+
+The ticks are `length + 1` — the marker ticks too — each
+`prescaler[index] · count` cycles of the 2457600 Hz clock; `rate` is the
+tune's frame rate, and the sixteenth of a frame covers the trigger
+running partway into its own frame. A skip lifted earlier puts the frame
+write and a tick on one register.
 
 ---
 
@@ -518,8 +574,9 @@ first pass, so every pass is identical.
 - the version is 1;
 - the stream count is 25 — it is fixed, not a size to adapt to;
 - every section that is a container carries an ST4 signature matching the
-  unit size the player was built for — a tune packed for a different one
-  is rejected, not garbled. A stored section has no signature to check.
+  format version and unit size the player was built for — a tune packed
+  for a different one is rejected, not garbled. A stored section has no
+  signature to check.
 
 Beyond that a player checks nothing — §9.3 lists the unchecked rules — and
 a malformed file is undefined behaviour.
@@ -540,13 +597,13 @@ a value. Those operations, in full:
 | stream T's byte | compared each frame; a changed map is in force before the frame's actions |
 | X bits 7-4 | the value written to R13 when a retrigger stream starts, and when a `HOLD` with flag 4 runs |
 | X bits 3-0 with `START_PCM_PREEMPT` | each marked channel's timer is stopped before this channel's timer is programmed |
-| `RELEASE` bit 0 clear | the timer is stopped. Set: the timer's interrupt is masked and the timer keeps counting |
+| `RELEASE` bit 0 clear | the timer is stopped. Set: the timer's interrupt is disabled and the timer keeps counting; a tick falling due in the gap is dropped |
 | `RETUNE` addressed to voice 3 | the timer is reprogrammed without being stopped, so the count in flight runs to its end |
 | a toggle stream's volume, a PCM stream's sample number | read from the voice's own register stream on the frame the stream starts, and where a verb's flag re-reads them (§3) |
 | `START_TOGGLE` | R8+v is written 0 among that frame's actions, and the first tick, one timer period later, writes the level |
 | programming a timer | four writes in the order stop, vector, count, run, with no tick of that timer between the first and the last, ending with that interrupt enabled and unmasked |
 | a sample byte with bit 7 set | it is written to the volume register as a level, and the sample ends there |
-| loop point `$FFFF` | the timer is stopped at that point. Any other value: the read position becomes that offset into the sample and the ticks continue |
+| loop point `$FFFF` | on the marker, 13 is written to the volume register and the timer is stopped. Any other value: the read position becomes that offset into the sample and the ticks continue |
 | the frame's order | skip bits, then the fourteen register writes, then the frame's actions in channel order, then one refill |
 | the frame after the last, flag bit 0 set | every claimed timer is stopped, its vector parked, its interrupt enabled with nothing pending, and every skip bit cleared, before frame 0 is played again |
 | refill turn | on frame `f`, stream `f` modulo `C` is decoded `C` values further |
@@ -564,9 +621,9 @@ The shape:
 - All twenty-five sections are present, and each decodes to exactly `O`
   values of one byte. No back-reference exceeds `N` bytes and no operation
   exceeds 65535 units (§1.4).
-- The sample table is within §6: at most 32 samples, each shorter than
-  65536 bytes, each terminated by `$80`, each loop point inside its own
-  sample or `$FFFF`, the table on a long boundary.
+- The sample table is within §6: at most 32 samples, the `$80` marker at
+  each sample's length offset, each loop point less than its sample's
+  length or `$FFFF`, the table on a long boundary.
 
 The values:
 
@@ -574,11 +631,13 @@ The values:
   `$FF` on every frame that must not restart the envelope. R7 carries
   bits 5-0, with every generator masked off a voice for as long as a PCM
   stream owns it.
-- On every frame a timer stream owns a voice's volume register — from the
-  frame it starts to the frame the voice rejoins the frame write — M
-  keeps that voice's skip bit set, and the frame that changes any skip
-  bit sets M's bit 4.
-- On a frame that starts a PCM or toggle stream, and on any frame a
+- A voice's skip state is set from the frame a timer stream takes its
+  volume register through the frame before the voice rejoins the frame
+  write — the rejoin frame's M clears it — and every frame that changes
+  any skip bit sets M's bit 4. After a one-shot sample the rejoin is
+  bounded by §6.
+- On a frame that starts a PCM or toggle stream, on a frame whose
+  voice-addressed `RETUNE` retunes a toggle stream, and on any frame a
   verb's flag re-reads the parameter, the voice's register byte carries
   the operand defined in §3.
 
@@ -590,6 +649,15 @@ The actions:
   may be 0, read by the MFP as 256 (§5).
 - `RETUNE` to voice 3 is emitted only where the stream's parameter did
   not change that frame (§3.1).
+- A `RETUNE` keeps the stream's kind and voice; a changed kind or voice
+  re-enters through a start verb (§3.1).
+- `RESUME` is emitted only after a disabling release, for the same
+  stream, voice and prescaler (§3.3).
+- A `HOLD` sets at most one of flags 2 and 4: a channel runs one stream
+  kind.
+- A sample cut off by its own channel's next start never reaches its
+  marker: no tick writes its voice again, and the voice rejoins only
+  where a later frame clears its skip.
 - `START_PCM_PREEMPT`'s X nibble marks exactly the channels with a
   running timer that the trigger silences; with none, `START_PCM` is the
   encoding.

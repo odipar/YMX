@@ -1,6 +1,8 @@
 package org.ymx.rig;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -336,6 +338,87 @@ final class PlayerTests {
             }
         }
         return "";
+    }
+
+    /** The loop word is unsigned - a point of $8000 through $FFFE is legal
+     * in any sample long enough to hold it - and init resolves it to an
+     * absolute address. A sign-extended resolve lands 65536 bytes low, so
+     * the proof is the resolved long against the arithmetic done by hand.
+     * The packers keep samples short, so the file is built here, stored
+     * sections alone. */
+    static String runLoopPointResolve() {
+        int loop = 0x8084;
+        byte[] packed = storedYmx(4, loop + 96, loop);
+        Player player = new Player(packed, Rig.workspaceSize(960));
+        if (player.init() != 0) {
+            return "loop resolve: YMX_init rejected the tune";
+        }
+        long table = drumTable(player);
+        long offset = player.uc.value(player.file + table, 4);
+        long resolved = player.uc.value(
+                Rig.CODE + player.symbol("ymx_samples") + 4, 4);
+        if (resolved != player.file + offset + loop) {
+            return "loop resolve: loop point $" + Integer.toHexString(loop)
+                    + " resolved to $" + Long.toHexString(resolved)
+                    + ", want $" + Long.toHexString(player.file + offset + loop);
+        }
+        return "";
+    }
+
+    /** A .ymx of stored sections, built to SPEC.md's header and table
+     * layout, with one looped sample of the given length. */
+    private static byte[] storedYmx(int frames, int length, int loop) {
+        ByteArrayOutputStream body = new ByteArrayOutputStream();
+        int[] where = new int[Rig.STREAMS];
+        int at = 130;
+        for (int stream = 0; stream < Rig.STREAMS; stream++) {
+            while (at % 4 != 0) {
+                body.write(0);
+                at++;
+            }
+            where[stream] = at;
+            for (int frame = 0; frame < frames; frame++) {
+                body.write(stream == 16 ? 0xE4 : 0);    // T: 0->A 1->B 2->C 3->D
+            }
+            at += frames;
+        }
+        while (at % 4 != 0) {
+            body.write(0);
+            at++;
+        }
+        int table = at;
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.writeBytes("YMX!".getBytes(StandardCharsets.US_ASCII));
+        word(out, 1);                               // version
+        word(out, 1);                               // flags: starts over
+        longWord(out, frames);
+        word(out, 50);
+        word(out, Rig.STREAMS);
+        word(out, 960);                             // ring
+        word(out, 24);                              // chunk
+        longWord(out, 2000000);
+        longWord(out, table);
+        word(out, 1);                               // one sample
+        for (int stream = 0; stream < Rig.STREAMS; stream++) {
+            longWord(out, 0x80000000 | where[stream]);  // bit 31: stored
+        }
+        out.writeBytes(body.toByteArray());
+        longWord(out, table + 8);                   // the sample's offset
+        word(out, length);
+        word(out, loop);
+        out.writeBytes(new byte[length]);           // the levels, then the
+        out.write(0x80);                            // end marker
+        return out.toByteArray();
+    }
+
+    private static void word(ByteArrayOutputStream out, int value) {
+        out.write(value >>> 8);
+        out.write(value);
+    }
+
+    private static void longWord(ByteArrayOutputStream out, int value) {
+        word(out, value >>> 16);
+        word(out, value);
     }
 
     /** A rate pop under a running effect, done without stopping it: the verb
@@ -864,6 +947,8 @@ final class PlayerTests {
             failures += report(runSampleLoop(perf), String.format(
                     "the sample loop%-9s    (back to the loop, not stopped)", build));
         }
+        failures += report(runLoopPointResolve(),
+                "the loop-point resolve   (an unsigned word, $8000 and up)");
         failures += report(runLiveRetune(),
                 "the live retune          (the timer is never stopped)");
         failures += report(runReadmeSizes(),

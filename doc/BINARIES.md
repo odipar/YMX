@@ -4,8 +4,10 @@ How a system without a 68000 assembler builds a playable SNDH file, and a
 runnable TOS program, from binaries this repository assembles once.
 `ymx/mkcores.sh` assembles them into `dist/`; `org.ymx.MkSndh` and
 `org.ymx.MkPrg` are the reference combiners, and any tool that follows this
-document produces the same files. Big-endian throughout; every offset and
-size in bytes.
+document produces files of the same layout, played the same by any SNDH
+host — the tag text (title, composer, converter, subtune names) and the
+workspace size above §1's floor are each combiner's own. Big-endian
+throughout; every offset and size in bytes.
 
 Two kinds of binary:
 
@@ -18,8 +20,10 @@ A `-perf` or `-nomask` suffix marks a core assembled with the raster monitor
 in, or with the frame write unmasked; the flags word below says which, so a
 combiner verifies rather than parses names.
 
-Every variant is published as a GitHub release tagged
-`binaries-v<format version>`, staged by `ymx/mkrelease.sh`: twelve cores -
+Every variant is published at
+[github.com/odipar/YMX/releases](https://github.com/odipar/YMX/releases)
+under the tag `binaries-v<format version>`, staged by `ymx/mkrelease.sh`:
+twelve cores -
 three unit sizes by the four flag combinations - the stub, and a
 `MANIFEST.txt` of sizes and SHA-256 digests with the source commit. A new
 format version is a new release; an unchanged one updates in place.
@@ -45,8 +49,8 @@ format version is a new release; an unchanged one updates in place.
 +----------------------------------------------+
 ```
 
-The inner box is the SNDH file `org.ymx.MkSndh` writes; any SNDH host plays
-it as it stands. `org.ymx.MkPrg` adds the outer box. The assembler produced
+The inner box is the SNDH file of §2 — any SNDH host plays it as it
+stands; §4 adds the outer box. The assembler produced
 only the two named binaries; every other byte is the combiners' or the
 tunes' own.
 
@@ -87,15 +91,17 @@ with different rings and chunks combine into one file.
 
 ## 2. An SNDH file from a core
 
-In order, with every part after the tag block even-aligned and every pad
-byte written 0:
+The result is a raw SNDH v2.2 file; [sndh.atari.org](http://sndh.atari.org/)
+holds that format's own reference, and the recipe here is complete for
+these files. In order, with every part after the tag block even-aligned
+and every pad byte written 0:
 
 1. **The entry triple**, 12 bytes: three `bra.w` instructions
    (`$60 $00`, then a word displacement). Each branches to the same entry
    of the core's own triple, so with the header `H` bytes long — the triple
    plus the tag block, padded even — all three displacements are `H − 2`.
 2. **The tag block**: `'SNDH'`, then the tags, then `'HDNS'`, padded even.
-   The reference combiner writes, in order: `TITL` (NUL-terminated text),
+   A combiner writes, in order: `TITL` (NUL-terminated text),
    `COMM` (when there is a composer), `CONV` (NUL-terminated text naming
    the converter), `'##'` plus two ASCII digits
    of the subtune count plus NUL, `TC` plus the frame rate in ASCII plus
@@ -160,14 +166,16 @@ The whole build for a system with no assembler and no JVM.
    fourth byte of any packed section's ST4 signature (`SPEC.md` §1.4) —
    and for the flags wanted. Verify its descriptor (§1): `'YMXC'`,
    descriptor version 1, the tunes' format version, the unit, the flags.
-3. **Read each tune's header** (`SPEC.md` §1.1): frame count, rate, ring
-   size, and flag bit 0 for the `FRMS` entry. One rate across the set.
-4. **Write the SNDH file** (§2): the tag block first — its length sets
-   the three displacements — then the core with its two offsets patched,
-   the subtune table, the tunes, the workspace.
-5. **Wrap it** (§4): the 28-byte PRG header, the stub with its three
-   fields patched from the SNDH file's own tags, the SNDH file, one zero
-   long.
+3. **Read each tune's header** (`SPEC.md` §1.1; flag bit 0 in §1.2):
+   frame count, rate, ring size, and flag bit 0 for the `FRMS` entry. One
+   rate across the set.
+4. **Write the SNDH file** (§2): lay out the tag block before its entry
+   triple — the block's length sets the three displacements — then write
+   §2's order: the triple, the tag block, the core with its two offsets
+   patched, the subtune table, the tunes, the workspace.
+5. **Wrap it** (§4): the 28-byte PRG header, the stub with its subtune
+   and frame fields patched from the SNDH file's own tags and its flags
+   word set by the combiner (§3), the SNDH file, one zero long.
 
 Step 4 alone gives a file any SNDH host plays; step 5 makes it a program.
 The combiner writes the entry triple, the tag block, the subtune table

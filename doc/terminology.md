@@ -14,7 +14,7 @@ fields. **YM6** spent the spare codes in those fields on two more
 effects. All of it comes from Arnaud Carré's ST-Sound, the reference
 player, which is why the format's names are that player's names - and why
 a file carries `LeOnArD!` as its check string. Distributed `.ym` files
-are usually LHA-compressed. YMX reads YM5 and YM6.
+are usually LHA-compressed. The YM front end reads YM5 and YM6.
 
 YM5 carries digidrum and SID voice; YM6 adds sync buzzer and sinus SID.
 
@@ -253,9 +253,8 @@ YMX writes all fourteen registers every frame, because a write costs
 about what the comparison to avoid it would cost. Two exceptions: the
 envelope shape is left alone where a restart would be wrong, and any
 voice's volume is left out while a timer stream holds it. That is the
-voice's **skip**: `ymx_skips` overwrites the burst's write with two nops,
-so that byte never reaches the chip - though the player can still write
-the register outside the burst, and does. A tracker writes only what
+voice's **skip**: the register is left out of the frame write - though
+the player can still write the register outside the burst, and does. A tracker writes only what
 changed, because its own format records which registers those are. A YM
 file has no such record - a full row every frame, with nothing marking
 what is new.
@@ -361,8 +360,8 @@ voices there and both carry it, which real tunes do - 15 of the corpus's
 **Coupling** makes "derived" exact: what a rate is set against - always
 something else on the same voice, with the ratio as the audible quantity.
 Nothing in the hardware enforces it; it is how the music was
-written, and what the **packer** - the tool that turns a source file, a
-`.ym`, into a YMX file - has to preserve.
+written, and what the **packer** - the tool that turns a source file
+into a YMX file - has to preserve.
 
 | stream | coupled to | why |
 |---|---|---|
@@ -577,7 +576,7 @@ ordinary sense.
 | **verb** | the code's name for an action the script hands the player. Three bits of an action byte, all eight spent |
 | **player** | anything that plays a `.ymx` file; SPEC.md states what one performs and checks |
 | **writer** | anything that emits a `.ymx` file: a packer, or a tracker targeting the format directly. SPEC.md states the rules no player checks |
-| **packer** | the tool that turns a source file, a `.ym`, into a YMX file. One per front end, and one kind of **writer** |
+| **packer** | the tool that turns a source file into a YMX file. One per front end, and one kind of **writer** |
 | **front end** | the pair of classes that reads one source format and stops at a `Tune`. `org.ym6` for YM |
 | **tracker** | the program a composer writes music in, with its own file format |
 | **corpus** | the 544 YM files YMX is tested against; 543 readable |

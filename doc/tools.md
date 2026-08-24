@@ -53,7 +53,7 @@ tells them apart — and writes a `.ymx`.
 | `-startframeF` `-endframeF` `-framesN` | the same window in frames: start, end, or a length cap |
 | `-drumhzH` | the drum rate ceiling (default 25600): a faster drum is resampled to fit, with a warning |
 | `-timersT` | which MFP timer each channel runs on, one letter per channel from 0 up (`-timersBC` puts channel 0 on Timer B); the default is AD |
-| `-sidresume` | the maxYMiser SID gap model: a released SID's timer keeps counting and a re-arrival resumes its phase |
+| `-sidresume` | the resume gap model (SPEC.md §3.3): a released toggle stream's timer keeps counting and a re-arrival resumes its phase — the model tunes written in maxYMiser need |
 | `-meta` | print the header's title, author and frame rate, one per line, and pack nothing |
 | `-script` | dump the compiled effect script instead of packing |
 
