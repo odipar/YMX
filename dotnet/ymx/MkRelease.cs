@@ -93,7 +93,8 @@ namespace Ymx
             MkCores.Stub(dir);
 
             var manifest = new StringBuilder();
-            manifest.Append("YMX player binaries - format version ")
+            manifest.Append("YMX player binaries - release ")
+                    .Append(YmxFormat.ReleaseName()).Append(", format version ")
                     .Append(YmxFormat.VersionName()).Append(", descriptor version 1\n");
             manifest.Append("source commit ").Append(commit).Append('\n');
             manifest.Append("doc/BINARIES.md is the combine contract\n\n");
@@ -120,8 +121,8 @@ namespace Ymx
                 throw Tools.Fail("mkrelease: " + e.Message);
             }
             Console.WriteLine(dir + ": " + (Matrix().Count + 1)
-                    + " binaries and MANIFEST.txt, format version "
-                    + YmxFormat.VersionName());
+                    + " binaries and MANIFEST.txt, release "
+                    + YmxFormat.ReleaseName());
 
             if (publish)
             {
@@ -134,7 +135,7 @@ namespace Ymx
         /// one the assets were assembled at.</summary>
         private static void Publish(string dir, string commit)
         {
-            string tag = "binaries-v" + YmxFormat.VersionName();
+            string tag = "binaries-v" + YmxFormat.ReleaseName();
             string notes = "Prebuilt SNDH cores and the PRG stub, assembled"
                     + " at " + commit + ". doc/BINARIES.md is the combine"
                     + " contract; MANIFEST.txt lists sizes and SHA-256 digests.";
@@ -143,7 +144,8 @@ namespace Ymx
             {
                 Tools.RunLoudly(Tools.Repo(), new List<string> {"gh", "release",
                         "create", tag,
-                        "--title", "YMX player binaries, format " + YmxFormat.VersionName(),
+                        "--title", "YMX player binaries " + YmxFormat.ReleaseName()
+                                + ", format " + YmxFormat.VersionName(),
                         "--notes", notes});
             }
             else

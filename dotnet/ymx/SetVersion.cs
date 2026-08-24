@@ -42,13 +42,19 @@ namespace Ymx
             new Site("doc/SPEC.md",
                     "the version is \\$[0-9A-F]{4} - \\d+\\.\\d+;",
                     "the version is ${0:X4} - {1};"),
+            new Site("src/main/java/org/ymx/YmxFormat.java",
+                    "public static final int PATCH = \\d+;",
+                    "public static final int PATCH = {2};"),
+            new Site("dotnet/ymx/YmxFormat.cs",
+                    "public const int Patch = \\d+;",
+                    "public const int Patch = {2};"),
         };
 
         public static void Main(string[] args)
         {
             if (args.Length != 1)
             {
-                throw Tools.Fail("usage: setversion.sh MAJOR.MINOR");
+                throw Tools.Fail("usage: setversion.sh MAJOR.MINOR[.PATCH]");
             }
             try
             {
@@ -61,21 +67,25 @@ namespace Ymx
         }
 
         /// <summary>Rewrites every site under the repo to the version,
-        /// given as MAJOR.MINOR. Every site is matched before the first
-        /// write, so a refusal leaves every file as it was.</summary>
+        /// given as MAJOR.MINOR[.PATCH] - the patch defaults to 0. Every
+        /// site is matched before the first write, so a refusal leaves
+        /// every file as it was.</summary>
         public static void Set(string repo, string version)
         {
-            if (!Regex.IsMatch(version, "^[0-9]{1,3}\\.[0-9]{1,3}\\z"))
-            {
-                throw new ArgumentException("usage: setversion.sh MAJOR.MINOR");
-            }
-            string[] halves = version.Split('.');
-            int major = int.Parse(halves[0]);
-            int minor = int.Parse(halves[1]);
-            if (major > 255 || minor > 255)
+            if (!Regex.IsMatch(version,
+                    "^[0-9]{1,3}\\.[0-9]{1,3}(\\.[0-9]{1,4})?\\z"))
             {
                 throw new ArgumentException(
-                        "setversion: each half is a byte, 0 to 255");
+                        "usage: setversion.sh MAJOR.MINOR[.PATCH]");
+            }
+            string[] parts = version.Split('.');
+            int major = int.Parse(parts[0]);
+            int minor = int.Parse(parts[1]);
+            int patch = parts.Length > 2 ? int.Parse(parts[2]) : 0;
+            if (major > 255 || minor > 255)
+            {
+                throw new ArgumentException("setversion: each half of the"
+                        + " format version is a byte, 0 to 255");
             }
             int word = (major << 8) | minor;
             string name = major + "." + minor;
@@ -98,7 +108,7 @@ namespace Ymx
                             + site.Pattern + "\" - the site has moved");
                 }
                 texts[site.File] = text.Replace(found[0].Value,
-                        string.Format(site.Template, word, name));
+                        string.Format(site.Template, word, name, patch));
             }
             foreach (string file in order)
             {
@@ -111,7 +121,7 @@ namespace Ymx
                     throw new ArgumentException("setversion: " + file + ": "
                             + e.Message);
                 }
-                Console.WriteLine(file + ": version " + name);
+                Console.WriteLine(file + ": version " + name + "." + patch);
             }
         }
 

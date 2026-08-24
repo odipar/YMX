@@ -75,6 +75,18 @@ public final class YmxFormat {
      * the layout. */
     public static final int VERSION = 0x0004;
 
+    /** The released binaries' patch number: it moves when the binaries
+     * change and the format does not - an optimized player, a fixed
+     * stub. The format version above is the compatibility gate; this
+     * number never reaches the format word. */
+    public static final int PATCH = 1;
+
+    /** The release's version as prose: the format version plus the
+     * patch, "0.4.1". */
+    public static String releaseName() {
+        return versionName() + "." + PATCH;
+    }
+
     /** A version word as prose: {@code versionName(0x0102)} reads "1.2". */
     public static String versionName(int word) {
         return (word >> 8) + "." + (word & 0xFF);

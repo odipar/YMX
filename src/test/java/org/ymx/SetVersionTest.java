@@ -18,7 +18,8 @@ import org.junit.jupiter.api.io.TempDir;
  */
 final class SetVersionTest {
 
-    /** The files the tool rewrites, copied so the repo stays as it is. */
+    /** The files the tool rewrites, copied so the repo stays as it is.
+     * The two YmxFormat files carry a patch site each as well. */
     private static final List<String> FILES = List.of(
             "src/main/java/org/ymx/YmxFormat.java",
             "dotnet/ymx/YmxFormat.cs",
@@ -49,6 +50,23 @@ final class SetVersionTest {
         assertTrue(spec.contains("**$010C**, version 1.12"), "SPEC §1.1's row");
         assertTrue(spec.contains("the version is $010C - 1.12;"),
                 "SPEC §9.1's bullet");
+        assertTrue(Files.readString(scratch.resolve(FILES.get(0)))
+                .contains("PATCH = 0;"), "the Java patch, defaulted");
+        assertTrue(Files.readString(scratch.resolve(FILES.get(1)))
+                .contains("Patch = 0;"), "the C# patch, defaulted");
+    }
+
+    @Test
+    void aPatchIsWrittenWhereTheVersionGivesOne(@TempDir Path scratch)
+            throws IOException {
+        copySites(scratch);
+        SetVersion.set(scratch, "0.4.7");
+        assertTrue(Files.readString(scratch.resolve(FILES.get(0)))
+                .contains("PATCH = 7;"), "the Java patch");
+        assertTrue(Files.readString(scratch.resolve(FILES.get(1)))
+                .contains("Patch = 7;"), "the C# patch");
+        assertTrue(Files.readString(scratch.resolve(FILES.get(2)))
+                .contains("equ     $0004"), "the format version, unmoved");
     }
 
     @Test
@@ -70,8 +88,8 @@ final class SetVersionTest {
 
     @Test
     void theArgumentGateRefusesWhatTheParseCannotRead(@TempDir Path scratch) {
-        for (String bad : new String[] {"1", "1.2.3", "0.4\n", "1234.0",
-                "١.٢", "1. 2", ".4"}) {
+        for (String bad : new String[] {"1", "1.2.3.4", "0.4\n", "1234.0",
+                "١.٢", "1. 2", ".4", "1.2."}) {
             IllegalArgumentException refused = assertThrows(
                     IllegalArgumentException.class,
                     () -> SetVersion.set(scratch, bad), "\"" + bad + "\"");
