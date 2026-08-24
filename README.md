@@ -15,7 +15,7 @@ frame what it means. YMX resolves that at pack time and writes down the
 outcome, so the player compares nothing and every frame costs the same.
 
 [**doc/SPEC.md**](doc/SPEC.md) is the format: the container, the streams, the
-verbs and the frame contract. The rest of the documentation is beside it.
+opcodes and the frame contract. The rest of the documentation is beside it.
 
 | | |
 |---|---|

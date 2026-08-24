@@ -158,7 +158,7 @@ parameter too, is the next paragraph's subject.
 Rate pops are on almost none of these lines, because almost none of them cost
 anything; **Moving a prescaler under a running timer** below has the
 mechanism. Measured: on `ymr/test/deeper.ymr` the compiled
-script carries 3,795 live reloads and 321 live retunes against no verb that
+script carries 3,795 live reloads and 321 live retunes against no opcode that
 stops a timer to change its rate, and `ymr/test/signals.ymr` has 339 live
 retunes and 2 that stop — those 2 being the frames where the effect's
 parameter moved on the same frame as the rate, which is the row.
@@ -203,13 +203,13 @@ parameter moved on the same frame as the rate, which is the row.
   A .YMR rate entry is a prescaler and a counter, only the prescaler is in the
   code byte, and a pop that moves the counter alone therefore leaves the code
   where it was: the script emits a HOLD carrying the reload flag, and
-  `ymx_hold` writes the new count to a timer it never stops — RhYMe's own live
-  reload, verb for verb. A pitch slide is made of these reloads, and they cost
-  nothing. A pop that moves the PRESCALER cannot be encoded that way: it changes
-  the code byte, and every verb that carries a rate goes through
-  `ymx_program`, which stops the timer, loads the count and runs it again —
-  the period in flight truncated, whichever verb it was. So it has an encoding
-  of its own instead. The action byte's
+  `ymx_hold` writes the new count to a timer it never stops — RhYMe's own
+  live reload, opcode for opcode. A pitch slide is made of these reloads,
+  and they cost nothing. A pop that moves the PRESCALER cannot be encoded
+  that way: it changes the code byte, and every opcode that carries a rate
+  goes through `ymx_program`, which stops the timer, loads the count and
+  runs it again — the period in flight truncated, whichever opcode it was.
+  So it has an encoding of its own instead. The action byte's
   voice field addresses three voices in two bits, so 3 is none of them, and
   RETUNE addressed to 3 is the live rate change: `ymx_live` masks the
   timer's nibble out of the control byte it reads back, ORs the new prescaler
@@ -225,7 +225,7 @@ parameter moved on the same frame as the rate, which is the row.
   binds each timer to one — and the conversion applies it on the frame it
   appears. Where the frame returns the voice, it returns it at once: the
   timer is stopped on that frame — by a RELEASE where the song popped 0, by
-  the arriving verb's own `ymx_program` where an RTE took the channel — the
+  the arriving opcode's own `ymx_program` where an RTE took the channel — the
   voice stops being the sample's, and its skip lifts. The player applies a
   frame's skip bits BEFORE the
   register burst and the script's actions after it, so the frame write this
@@ -237,7 +237,7 @@ parameter moved on the same frame as the rate, which is the row.
   action: a tick landing in it writes one more sample byte over the volume
   just written, and that byte stands until the next frame. It is one wrong
   level for most of one frame, against the whole frames of a sample that
-  should not be playing. No ordering of the verbs closes it either: the
+  should not be playing. No ordering of the opcodes closes it either: the
   actions sit after the burst so their varying cost cannot jitter the
   register writes, and the one byte is the cost of that ordering.
 

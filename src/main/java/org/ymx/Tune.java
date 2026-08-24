@@ -134,8 +134,8 @@ public record Tune(int frames, int frameRate, long masterClock, boolean loops,
         // zero voice bits mean the channel is idle and the whole byte must be
         // 0. A code with a kind and no voice would compile to an action byte
         // whose voice field is -1, and a negative voice does not stay in its
-        // three bits: it floods the verb above it and the player would read
-        // the result as another verb entirely. Nothing this repository writes
+        // three bits: it floods the opcode above it and the player would read
+        // the result as another opcode entirely. Nothing this repository writes
         // can produce one - both front ends drop a voiceless code to idle -
         // which is exactly why it is worth rejecting here rather than leaving
         // it to the next front end.

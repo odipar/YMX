@@ -117,7 +117,7 @@ not lossy.
   composer heard their own driver's rendering. The default is the ym2149-rs
   model — a gap restarts at phase zero, silence first — and `-sidresume`
   selects maxYMiser's, where a release only masks the interrupt and the
-  timer keeps counting. Both are ordinary stream verbs the player always
+  timer keeps counting. Both are ordinary stream opcodes the player always
   carries, so the choice is per tune rather than per build.
   [../doc/experiments.md](../doc/experiments.md) has the survey.
 

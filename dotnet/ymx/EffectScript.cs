@@ -8,28 +8,28 @@ namespace Ymx
     /// reference player's per-frame decision logic replayed over the whole
     /// timeline at pack time, emitting prepared actions the player executes
     /// without comparing anything against remembered state. The stream ABI
-    /// and the verb table are org.ymx.EffectScript's, byte for byte; the
+    /// and the opcode table are org.ymx.EffectScript's, byte for byte; the
     /// Java tree carries the full story.
     /// </summary>
     public sealed class EffectScript
     {
-        // The action ABI. Verb 0 is the SID resume - the maxYMiser model.
-        public const int VerbResume = 0;
+        // The action ABI. Opcode 0 is the SID resume - the maxYMiser model.
+        public const int OpcodeResume = 0;
         public const int ResumeReload = 1;
         public const int ResumeVolume = 2;
-        public const int VerbHold = 1 << 5;
-        public const int VerbRelease = 2 << 5;
+        public const int OpcodeHold = 1 << 5;
+        public const int OpcodeRelease = 2 << 5;
         /// <summary>RELEASE flag bit 0: mask instead of stopping.</summary>
         public const int ReleaseMask = 1;
-        public const int VerbStartToggle = 3 << 5;
-        public const int VerbRetune = 4 << 5;
+        public const int OpcodeStartToggle = 3 << 5;
+        public const int OpcodeRetune = 4 << 5;
 
         /// <summary>The action byte's voice field addressing no voice;
         /// RETUNE addressed to it is the live rate change.</summary>
         public const int Voiceless = 3;
-        public const int VerbStartRetrigger = 5 << 5;
-        public const int VerbStartPcm = 6 << 5;
-        public const int VerbStartPcmPreempt = 7 << 5;
+        public const int OpcodeStartRetrigger = 5 << 5;
+        public const int OpcodeStartPcm = 6 << 5;
+        public const int OpcodeStartPcmPreempt = 7 << 5;
         public const int HoldReload = 1;
         public const int HoldVolume = 2;
         public const int HoldShape = 4;
@@ -42,9 +42,9 @@ namespace Ymx
         public const int MSkips = 16;
         public const int MSkipShift = 5;
 
-        public static int Action(int verb, int voice, int low)
+        public static int Action(int opcode, int voice, int low)
         {
-            return verb | (voice << 3) | low;
+            return opcode | (voice << 3) | low;
         }
 
         /// <summary>The decisions the codes cannot make for themselves,
@@ -295,7 +295,7 @@ namespace Ymx
         {
             channel.Tlast = count;
             channel.Prescaler = code & 7;
-            Emit(p, index, Action(VerbRetune, Voiceless, code & 7), count);
+            Emit(p, index, Action(OpcodeRetune, Voiceless, code & 7), count);
         }
 
         /// <summary>Whether a changed PCM code is a rate moving under a
@@ -314,7 +314,7 @@ namespace Ymx
         {
             channel.Tlast = count;
             channel.Prescaler = code & 7;
-            Emit(p, index, Action(VerbRetune, voice, code & 7), count);
+            Emit(p, index, Action(OpcodeRetune, voice, code & 7), count);
         }
 
         /// <summary>.held: a running effect's count reload and parameter
@@ -358,7 +358,7 @@ namespace Ymx
             }
             if (flags != 0)
             {
-                Emit(p, index, Action(VerbHold, voice, flags), count);
+                Emit(p, index, Action(OpcodeHold, voice, flags), count);
             }
         }
 
@@ -379,7 +379,7 @@ namespace Ymx
                 // frame's own write.
                 if (EndOwnPcm(p, index, -1))
                 {
-                    Emit(p, index, Action(VerbRelease, 0, 0), 0);
+                    Emit(p, index, Action(OpcodeRelease, 0, 0), 0);
                 }
                 return;
             }
@@ -390,11 +390,11 @@ namespace Ymx
                 if (tune.Semantics.SidResume)
                 {
                     channel.Masked = true;
-                    Emit(p, index, Action(VerbRelease, 0, ReleaseMask), 0);
+                    Emit(p, index, Action(OpcodeRelease, 0, ReleaseMask), 0);
                     return;
                 }
             }
-            Emit(p, index, Action(VerbRelease, 0, 0), 0);
+            Emit(p, index, Action(OpcodeRelease, 0, 0), 0);
         }
 
         private void Toggle(int p, int index, Channel channel, int code, int count,
@@ -443,7 +443,7 @@ namespace Ymx
                     channel.Vol = value;
                     low |= ResumeVolume;
                 }
-                Emit(p, index, Action(VerbResume, voice, low), count);
+                Emit(p, index, Action(OpcodeResume, voice, low), count);
                 return;
             }
             channel.Tlast = count;
@@ -451,13 +451,13 @@ namespace Ymx
             channel.Prescaler = code & 7;
             if (retune)
             {
-                Emit(p, index, Action(VerbRetune, voice, code & 7), count);
+                Emit(p, index, Action(OpcodeRetune, voice, code & 7), count);
                 return;
             }
             channel.Sel = voice;
             channel.Vec = KindToggle;
             channel.VecVoice = voice;
-            Emit(p, index, Action(VerbStartToggle, voice, code & 7), count);
+            Emit(p, index, Action(OpcodeStartToggle, voice, code & 7), count);
         }
 
         private void Pcm(int p, int index, Channel channel, int code, int count,
@@ -496,7 +496,7 @@ namespace Ymx
                     stops |= MChannel0 << c;
                 }
             }
-            int verb = stops == 0 ? VerbStartPcm : VerbStartPcmPreempt;
+            int opcode = stops == 0 ? OpcodeStartPcm : OpcodeStartPcmPreempt;
             x[p] |= (byte) stops;       // a union: one frame may name several
             Cut(p, index, voice);       // the retrigger's own voice gets a
             channel.Tlast = count;      // fresh window, not a stuck flag
@@ -507,7 +507,7 @@ namespace Ymx
             skips |= 1 << voice;
             drumOwner[voice] = index;
             drumEnd[voice] = p + Duration(p, code, count, voice);
-            Emit(p, index, Action(verb, voice, code & 7), count);
+            Emit(p, index, Action(opcode, voice, code & 7), count);
         }
 
         private void Retrigger(int p, int index, Channel channel, int code,
@@ -526,7 +526,7 @@ namespace Ymx
             channel.Shape = Shape(p);
             channel.Vec = KindRetrigger;
             channel.VecVoice = voice;
-            Emit(p, index, Action(VerbStartRetrigger, voice, code & 7), count);
+            Emit(p, index, Action(OpcodeStartRetrigger, voice, code & 7), count);
         }
 
         /// <summary>Only an old toggle stream's voice rejoins the frame write.</summary>

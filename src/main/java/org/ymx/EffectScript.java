@@ -53,8 +53,8 @@ import java.util.List;
  * stream 16  T   the channel-to-timer map, two bits a channel: 0 = Timer
  *                A, 1 = B, 2 = C, 3 = D. One byte covers all four, and a
  *                tune that never re-assigns repeats it.
- * stream 17  A0  channel 0's action: verb in bits 7-5, voice in bits 4-3,
- * stream 18  P0  bits 2-0 the prescaler (program verbs) or HOLD flags;
+ * stream 17  A0  channel 0's action: opcode in bits 7-5, voice in bits 4-3,
+ * stream 18  P0  bits 2-0 the prescaler (program opcodes) or HOLD flags;
  * stream 19  A1  P carries the MFP timer count for any action that
  * stream 20  P1  programs or reloads. Bytes on frames where a stream is
  * stream 21  A2  not consumed are unspecified; the encoder repeats the
@@ -63,7 +63,7 @@ import java.util.List;
  * stream 24  P3  them leaves streams past what the player decodes.
  * </pre>
  *
- * The verbs:
+ * The opcodes:
  *
  * <pre>
  * 0 RESUME             a masked toggle stream is unmasked: flags
@@ -140,28 +140,28 @@ import java.util.List;
  */
 public final class EffectScript {
 
-    // The action ABI. Verb 0 is the SID resume - the maxYMiser model: a
+    // The action ABI. Opcode 0 is the SID resume - the maxYMiser model: a
     // release only MASKS the timer interrupt (the counter keeps counting,
     // the square's half stays frozen), and coming back is an unmask plus a
     // reload of whatever changed; the phase runs on through the gap.
-    public static final int VERB_RESUME = 0;
+    public static final int OPCODE_RESUME = 0;
     public static final int RESUME_RELOAD = 1;
     public static final int RESUME_VOLUME = 2;
-    public static final int VERB_HOLD = 1 << 5;
-    public static final int VERB_RELEASE = 2 << 5;
+    public static final int OPCODE_HOLD = 1 << 5;
+    public static final int OPCODE_RELEASE = 2 << 5;
     /** RELEASE flag bit 0: mask instead of stopping - a toggle stream let go.
      * A retrigger stream
      * release hard-stops its timer. */
     public static final int RELEASE_MASK = 1;
-    public static final int VERB_START_TOGGLE = 3 << 5;
-    public static final int VERB_RETUNE = 4 << 5;
+    public static final int OPCODE_START_TOGGLE = 3 << 5;
+    public static final int OPCODE_RETUNE = 4 << 5;
 
     /** The action byte's voice field addressing no voice. There are three,
      * so 3 is free, and RETUNE addressed to it is the live rate change. */
     public static final int VOICELESS = 3;
-    public static final int VERB_START_RETRIGGER = 5 << 5;
-    public static final int VERB_START_PCM = 6 << 5;
-    public static final int VERB_START_PCM_PREEMPT = 7 << 5;
+    public static final int OPCODE_START_RETRIGGER = 5 << 5;
+    public static final int OPCODE_START_PCM = 6 << 5;
+    public static final int OPCODE_START_PCM_PREEMPT = 7 << 5;
     public static final int HOLD_RELOAD = 1;
     public static final int HOLD_VOLUME = 2;
     public static final int HOLD_SHAPE = 4;
@@ -178,8 +178,8 @@ public final class EffectScript {
     public static final int M_SKIPS = 16;
     public static final int M_SKIP_SHIFT = 5;
 
-    public static int action(int verb, int voice, int low) {
-        return verb | (voice << 3) | low;
+    public static int action(int opcode, int voice, int low) {
+        return opcode | (voice << 3) | low;
     }
 
     /**
@@ -493,7 +493,7 @@ public final class EffectScript {
     private void liveRetune(int p, int index, Channel channel, int code, int count) {
         channel.tlast = count;
         channel.prescaler = code & 7;
-        emit(p, index, action(VERB_RETUNE, VOICELESS, code & 7), count);
+        emit(p, index, action(OPCODE_RETUNE, VOICELESS, code & 7), count);
     }
 
     /**
@@ -527,7 +527,7 @@ public final class EffectScript {
                            int voice) {
         channel.tlast = count;
         channel.prescaler = code & 7;
-        emit(p, index, action(VERB_RETUNE, voice, code & 7), count);
+        emit(p, index, action(OPCODE_RETUNE, voice, code & 7), count);
     }
 
     /** .held: a running effect's count reload and parameter tracking -
@@ -566,7 +566,7 @@ public final class EffectScript {
             }
         }
         if (flags != 0) {
-            emit(p, index, action(VERB_HOLD, voice, flags), count);
+            emit(p, index, action(OPCODE_HOLD, voice, flags), count);
         }
     }
 
@@ -597,7 +597,7 @@ public final class EffectScript {
             // fraction of a frame at a level the sample itself named, against
             // a whole frame of a sample that should not be playing.
             if (endOwnPcm(p, index, -1)) {
-                emit(p, index, action(VERB_RELEASE, 0, 0), 0);
+                emit(p, index, action(OPCODE_RELEASE, 0, 0), 0);
             }
             return;                     // nothing left to stop: the code let go
         }                               // on the frame the marker ended it
@@ -606,11 +606,11 @@ public final class EffectScript {
             openOld(old);               // bsr ymx_burst_open_old
             if (tune.semantics().sidResume()) {
                 channel.masked = true;
-                emit(p, index, action(VERB_RELEASE, 0, RELEASE_MASK), 0);
+                emit(p, index, action(OPCODE_RELEASE, 0, RELEASE_MASK), 0);
                 return;
             }
         }
-        emit(p, index, action(VERB_RELEASE, 0, 0), 0);
+        emit(p, index, action(OPCODE_RELEASE, 0, 0), 0);
     }
 
     private void toggle(int p, int index, Channel channel, int code, int count,
@@ -660,20 +660,20 @@ public final class EffectScript {
                 channel.vol = value;
                 low |= RESUME_VOLUME;
             }
-            emit(p, index, action(VERB_RESUME, voice, low), count);
+            emit(p, index, action(OPCODE_RESUME, voice, low), count);
             return;
         }
         channel.tlast = count;
         channel.vol = value;
         channel.prescaler = code & 7;
         if (retune) {
-            emit(p, index, action(VERB_RETUNE, voice, code & 7), count);
+            emit(p, index, action(OPCODE_RETUNE, voice, code & 7), count);
             return;
         }
         channel.sel = voice;
         channel.vec = KIND_TOGGLE;
         channel.vecVoice = voice;
-        emit(p, index, action(VERB_START_TOGGLE, voice, code & 7), count);
+        emit(p, index, action(OPCODE_START_TOGGLE, voice, code & 7), count);
     }
 
     private void pcm(int p, int index, Channel channel, int code, int count,
@@ -704,7 +704,7 @@ public final class EffectScript {
                 stops |= M_CHANNEL_0 << c;
             }
         }
-        int verb = stops == 0 ? VERB_START_PCM : VERB_START_PCM_PREEMPT;
+        int opcode = stops == 0 ? OPCODE_START_PCM : OPCODE_START_PCM_PREEMPT;
         x[p] |= (byte) stops;           // a union: one frame may name more than one
         cut(p, index, voice);           // the retrigger's own voice gets a
         channel.tlast = count;             // fresh window, not a stuck flag
@@ -715,7 +715,7 @@ public final class EffectScript {
         skips |= 1 << voice;
         drumOwner[voice] = index;
         drumEnd[voice] = p + duration(p, code, count, voice);
-        emit(p, index, action(verb, voice, code & 7), count);
+        emit(p, index, action(opcode, voice, code & 7), count);
     }
 
     private void retrigger(int p, int index, Channel channel, int code, int count,
@@ -733,7 +733,7 @@ public final class EffectScript {
         channel.shape = shape(p);
         channel.vec = KIND_RETRIGGER;
         channel.vecVoice = voice;
-        emit(p, index, action(VERB_START_RETRIGGER, voice, code & 7), count);
+        emit(p, index, action(OPCODE_START_RETRIGGER, voice, code & 7), count);
     }
 
     /** Only an old toggle stream's voice rejoins the frame write. */

@@ -1419,7 +1419,7 @@ ymx_assign:
         rts
 
 ; -----------------------------------------------------------------------------
-; The action handlers: the script's verbs, one straight line each. The
+; The action handlers: the script's opcodes, one straight line each. The
 ; packer resolved everything - which channel acts, which voice, restart or
 ; retune, which stops which timer - so a handler only moves prepared bytes
 ; into prepared places and programs its timer in the contract's order.
@@ -1429,23 +1429,23 @@ ymx_assign:
 ; preserves d3/a3/a0; clobbers d0-d2/d4-d5, a1-a2/a4-a5.
 ; -----------------------------------------------------------------------------
 ymx_act:
-        move.b  (a4),d0                 ; verb 7-5, voice 4-3, low bits 2-0
+        move.b  (a4),d0                 ; opcode 7-5, voice 4-3, low bits 2-0
         move.w  d0,d1
         and.w   #$E0,d1
-        lsr.w   #4,d1                   ; verb * 2
-        move.w  ymx_verbs(pc,d1.w),d1
-        jmp     ymx_verbs(pc,d1.w)
-ymx_verbs:
-        dc.w    ymx_resume-ymx_verbs    ; verb 0: a masked toggle returns
-        dc.w    ymx_hold-ymx_verbs
-        dc.w    ymx_release-ymx_verbs
-        dc.w    ymx_toggle_start-ymx_verbs
-        dc.w    ymx_retune-ymx_verbs
-        dc.w    ymx_retrigger_start-ymx_verbs
-        dc.w    ymx_pcm-ymx_verbs
-        dc.w    ymx_pcm_preempt-ymx_verbs
+        lsr.w   #4,d1                   ; opcode * 2
+        move.w  ymx_opcodes(pc,d1.w),d1
+        jmp     ymx_opcodes(pc,d1.w)
+ymx_opcodes:
+        dc.w    ymx_resume-ymx_opcodes  ; opcode 0: a masked toggle returns
+        dc.w    ymx_hold-ymx_opcodes
+        dc.w    ymx_release-ymx_opcodes
+        dc.w    ymx_toggle_start-ymx_opcodes
+        dc.w    ymx_retune-ymx_opcodes
+        dc.w    ymx_retrigger_start-ymx_opcodes
+        dc.w    ymx_pcm-ymx_opcodes
+        dc.w    ymx_pcm_preempt-ymx_opcodes
 
-; The two operands the verbs read out of the rings: a voice's parameter
+; The two operands the opcodes read out of the rings: a voice's parameter
 ; byte off its own register stream, and the shape off stream X.
 ;
 ; ymx_shape: the envelope shape a retrigger stream must restart. A toggle

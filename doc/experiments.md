@@ -85,7 +85,7 @@ first. A fresh start writes the voice silent immediately and installs the
 loud half; the first tick, one timer period out, begins the alternation. Held
 codes free the phase; a retune keeps the installed half.
 
-Both models are ordinary stream verbs the player always carries: `RESUME` is
+Both models are ordinary stream opcodes the player always carries: `RESUME` is
 maxYMiser's, and `RELEASE` grew a mask flag for it. The packer sets it per
 tune with `-sidresume`. Since the model is per emitted byte, a packer could
 switch mid-song; nothing in the format forbids it.

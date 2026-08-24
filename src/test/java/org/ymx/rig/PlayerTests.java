@@ -421,7 +421,7 @@ final class PlayerTests {
         word(out, value);
     }
 
-    /** A rate pop under a running effect, done without stopping it: the verb
+    /** A rate pop under a running effect, done without stopping it: the opcode
      * is RETUNE addressed to voice 3, and its difference is only visible in
      * the MFP traffic - the ordinary retune stops the timer and runs it
      * again, and this must never write a zero into the timer's nibble. */
@@ -479,11 +479,11 @@ final class PlayerTests {
                 "org.ymr.Ymr", "-f", tune.toString(), out.toString()));
     }
 
-    /** Verb counts from one tune's compiled script: a RETUNE addressed to
+    /** Opcode counts from one tune's compiled script: a RETUNE addressed to
      * voice 3 is the live retune, one to a real voice stops the timer to
      * reprogram it, and a HOLD with bit 0 reloads the count under a running
      * one. */
-    static Map<String, Integer> scriptVerbs(Path tune) {
+    static Map<String, Integer> scriptOpcodes(Path tune) {
         String script = Rig.run(List.of("java", "-ea", "-cp",
                 Rig.CLASSES.toString(), "org.ymr.Ymr", "-script", tune.toString()));
         Map<String, Integer> counts = new HashMap<>(Map.of(
@@ -491,12 +491,12 @@ final class PlayerTests {
         Matcher action = Pattern.compile("A[0-3]=([0-9A-F]{2})").matcher(script);
         while (action.find()) {
             int value = Integer.parseInt(action.group(1), 16);
-            int verb = value >> 5;
+            int opcode = value >> 5;
             int voice = (value >> 3) & 3;
-            if (verb == 4) {
+            if (opcode == 4) {
                 String which = voice == 3 ? "live retune" : "stopping retune";
                 counts.merge(which, 1, Integer::sum);
-            } else if (verb == 1 && (value & 1) != 0) {
+            } else if (opcode == 1 && (value & 1) != 0) {
                 counts.merge("live reload", 1, Integer::sum);
             }
         }
@@ -510,7 +510,7 @@ final class PlayerTests {
     /** The figures ymr/CONVERSION.md quotes, against the tunes it names.
      * Every one is a measurement, re-measured the way the document says
      * they were taken: the packer's own report for the byte counts, and the
-     * compiled script for the verb counts. */
+     * compiled script for the opcode counts. */
     static String runConversionNumbers() {
         String flat;
         try {
@@ -539,17 +539,17 @@ final class PlayerTests {
             return reworded;
         }
         String tune = tuneAndLength.get(0);
-        List<String> verbCounts = said(flat,
+        List<String> opcodeCounts = said(flat,
                 "on `" + Pattern.quote(tune) + "` the compiled script carries"
                         + " ([\\d,]+) live reloads and ([\\d,]+) live retunes"
-                        + " against no verb that stops", "the verb counts");
-        List<String> otherVerbs = said(flat,
+                        + " against no opcode that stops", "the opcode counts");
+        List<String> otherOpcodes = said(flat,
                 "`([\\w./-]+\\.ymr)` has ([\\d,]+) live retunes and (\\d+)"
-                        + " that stop", "the second tune's verb counts");
-        if (verbCounts == null || otherVerbs == null) {
+                        + " that stop", "the second tune's opcode counts");
+        if (opcodeCounts == null || otherOpcodes == null) {
             return reworded;
         }
-        String other = otherVerbs.get(0);
+        String other = otherOpcodes.get(0);
         Path tunePath = Rig.REPO.resolve(tune);
         Path otherPath = Rig.REPO.resolve(other);
         if (!Files.exists(tunePath) || !Files.exists(otherPath)) {
@@ -610,18 +610,18 @@ final class PlayerTests {
         measured.add(new Measured("source frames", frames,
                 number(tuneAndLength.get(1))));
 
-        Map<String, Integer> verbs = scriptVerbs(tunePath);
-        measured.add(new Measured("live reloads", verb(verbs, "live reload"),
-                number(verbCounts.get(0))));
-        measured.add(new Measured("live retunes", verb(verbs, "live retune"),
-                number(verbCounts.get(1))));
+        Map<String, Integer> opcodes = scriptOpcodes(tunePath);
+        measured.add(new Measured("live reloads", opcode(opcodes, "live reload"),
+                number(opcodeCounts.get(0))));
+        measured.add(new Measured("live retunes", opcode(opcodes, "live retune"),
+                number(opcodeCounts.get(1))));
         measured.add(new Measured("stopping retunes",
-                verb(verbs, "stopping retune"), 0));
-        Map<String, Integer> second = scriptVerbs(otherPath);
+                opcode(opcodes, "stopping retune"), 0));
+        Map<String, Integer> second = scriptOpcodes(otherPath);
         measured.add(new Measured(other + " live retunes",
-                verb(second, "live retune"), number(otherVerbs.get(1))));
+                opcode(second, "live retune"), number(otherOpcodes.get(1))));
         measured.add(new Measured(other + " stopping retunes",
-                verb(second, "stopping retune"), number(otherVerbs.get(2))));
+                opcode(second, "stopping retune"), number(otherOpcodes.get(2))));
 
         StringBuilder wrong = new StringBuilder();
         for (Measured entry : measured) {
@@ -658,7 +658,7 @@ final class PlayerTests {
         return Long.parseLong(text.replace(",", ""));
     }
 
-    private static long verb(Map<String, Integer> counts, String name) {
+    private static long opcode(Map<String, Integer> counts, String name) {
         Integer count = counts.get(name);
         return count == null ? 0 : count;
     }
