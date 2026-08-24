@@ -6,12 +6,12 @@ using System.Text.RegularExpressions;
 namespace Ymx
 {
     /// <summary>
-    /// ymx/setversion.sh -dotnet - rewrite the format version at every
-    /// site that carries it, the same sites org.ymx.SetVersion patches:
-    /// the Java, C# and 68k constants and SPEC.md's three mentions. A
-    /// site must match exactly once, so a reworded sentence fails loudly
-    /// instead of being skipped - and nothing is written unless every
-    /// site matched.
+    /// ymx/setversion.sh -dotnet - rewrite the version at every site
+    /// that carries it, the same eight sites org.ymx.SetVersion patches:
+    /// the Java, C# and 68k format constants, SPEC.md's three mentions,
+    /// and the two patch constants. A site must match exactly once, so a
+    /// reworded sentence fails loudly instead of being skipped, and
+    /// nothing is written unless every site matched.
     /// </summary>
     public static class SetVersion
     {
@@ -121,7 +121,10 @@ namespace Ymx
                     throw new ArgumentException("setversion: " + file + ": "
                             + e.Message);
                 }
-                Console.WriteLine(file + ": version " + name + "." + patch);
+                Console.WriteLine(file + ": " + (file.EndsWith("YmxFormat.java")
+                        || file.EndsWith("YmxFormat.cs")
+                        ? "version " + name + "." + patch
+                        : "format version " + name));
             }
         }
 

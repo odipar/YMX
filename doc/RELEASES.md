@@ -17,9 +17,11 @@ The player, optimized. Every tune packed at format 0.4 plays unchanged -
 the format did not move.
 
 - 3,256 bytes at unit size 2, where 0.4 carried 3,324.
-- About 94 cycles a frame cheaper, measured under Hatari on a
-  cycle-exact ST: 1,700 frames of one tune cost 89 ticks of the 200 Hz
-  clock where 0.4 cost 93, with the same chip-write checksum.
+- Cheaper by about 94 cycles a frame, and the measurement resolves to
+  within about 24 of that: `ymx/test/run.sh` under Hatari 2.6.1 on a
+  cycle-exact 8 MHz ST with TOS 2.06 played 1,700 frames of one tune in
+  89 ticks of the 200 Hz clock where 0.4 took 93, three runs each, with
+  the same chip-write checksum.
 - The frame write counts its register selects through one step register,
   the channel-to-timer map is read through a displacement the init
   patches, the sample tick steps its pointer through its own patched

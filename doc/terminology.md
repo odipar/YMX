@@ -581,6 +581,8 @@ ordinary sense.
 | **tracker** | the program a composer writes music in, with its own file format |
 | **corpus** | the 544 YM files YMX is tested against; 543 readable |
 | **script data** | per-frame instructions saying which streams start when. Stored like a stream, never written to a register |
+| **format version** | the word a file's header carries at offset 4 and a core's descriptor at offset 22, the major byte then the minor. The compatibility gate: a player reads one, and rejects any other |
+| **release version** | the format version and the released binaries' own patch number, `0.4.1`. It names the binaries, the release tag and the manifest, and reaches no file a player reads |
 
 **The timer streams**
 

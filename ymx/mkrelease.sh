@@ -8,7 +8,9 @@
 # plus the PRG stub, verified against the descriptors the combiners read,
 # with a MANIFEST.txt of sizes and SHA-256 digests. doc/BINARIES.md is the
 # contract another system follows. -publish creates or updates the release
-# tagged binaries-v<format version> with gh, replacing its assets.
+# tagged binaries-v<release> - the format version and this release's patch
+# - with gh, replacing its assets and posting this release's section of
+# doc/RELEASES.md as the notes.
 #
 # The work is org.ymx.MkRelease's; this only finds the repo and the classes.
 # Needs rmac; -publish needs gh and a pushed HEAD.
@@ -21,8 +23,8 @@ REPO=$(cd "$YMX_DIR/.." && pwd)
 if [ "$1" = "-dotnet" ]; then
     shift
     DLL="$REPO/dotnet/bin/Release/net10.0/ymx.dll"
-    [ -f "$DLL" ] || (cd "$REPO/dotnet" && dotnet build -c Release -v q)
+    (cd "$REPO/dotnet" && dotnet build -c Release -v q)
     YMX_REPO="$REPO" exec dotnet "$DLL" mkrelease "$@"
 fi
-[ -d "$REPO/target/classes" ] || (cd "$REPO" && mvn -q compile)
+(cd "$REPO" && mvn -q compile)
 exec java -ea -Dymx.repo="$REPO" -cp "$REPO/target/classes" org.ymx.MkRelease "$@"

@@ -15,8 +15,10 @@ import java.util.List;
  * assembled by {@link MkCores}, verified against the descriptors
  * {@link MkSndh} and {@link MkPrg} read, and listed in a manifest with its
  * SHA-256. {@code -publish} creates or updates the GitHub release tagged
- * {@code binaries-v<format version>}, replacing its assets: a new format is
- * a new release, and an unchanged one updates in place.
+ * {@code binaries-v<release version>}, replacing its assets and posting
+ * this release's section of {@code doc/RELEASES.md} as the notes: a new
+ * format version is a new release, so is a patch of one, and an unchanged
+ * release updates in place.
  */
 public final class MkRelease {
 
@@ -116,7 +118,12 @@ public final class MkRelease {
                 + " binaries and MANIFEST.txt, release " + YmxFormat.releaseName());
 
         if (publish) {
-            publish(dir, commit);
+            try {
+                publish(dir, commit);
+            } catch (IllegalArgumentException e) {
+                String message = e.getMessage();
+                throw Tools.fail(message == null ? e.toString() : message);
+            }
         }
     }
 
@@ -125,7 +132,7 @@ public final class MkRelease {
      * one the assets were assembled at and the account of what changed
      * is this release's section of doc/RELEASES.md. */
     private static void publish(Path dir, String commit) {
-        String tag = "binaries-v" + YmxFormat.releaseName();
+        String tag = tag();
         String notes = releaseNotes() + "\n\nPrebuilt SNDH cores and the PRG"
                 + " stub, assembled at " + commit + ". doc/BINARIES.md is the"
                 + " combine contract; MANIFEST.txt lists sizes and SHA-256"
@@ -152,23 +159,37 @@ public final class MkRelease {
         System.out.println("published " + tag);
     }
 
+    /** The tag this release publishes under: the release version, the
+     * format version and the patch together. */
+    static String tag() {
+        return "binaries-v" + YmxFormat.releaseName();
+    }
+
     /** This release's section of {@code doc/RELEASES.md}, from its
      * heading to the next: the account the release page carries. A
-     * release with no section of its own is not published. */
+     * release with no section of its own is not published - this throws
+     * rather than leaving, so a test can call it. */
     static String releaseNotes() {
-        String heading = "## " + YmxFormat.releaseName();
+        return notesFor(YmxFormat.releaseName());
+    }
+
+    /** One release's section, by name. */
+    static String notesFor(String release) {
+        String heading = "## " + release;
         String document;
         try {
             document = Files.readString(Tools.repo().resolve("doc")
                     .resolve("RELEASES.md"));
         } catch (IOException e) {
-            throw Tools.fail("mkrelease: doc/RELEASES.md: " + e.getMessage());
+            throw new IllegalArgumentException(
+                    "mkrelease: doc/RELEASES.md: " + e.getMessage());
         }
         int start = document.indexOf(heading + "\n");
         if (start < 0) {
-            throw Tools.fail("mkrelease: doc/RELEASES.md carries no \""
-                    + heading + "\" section - write what this release"
-                    + " changes before publishing it");
+            throw new IllegalArgumentException(
+                    "mkrelease: doc/RELEASES.md carries no \"" + heading
+                    + "\" section - write what this release changes before"
+                    + " publishing it");
         }
         int next = document.indexOf("\n## ", start + heading.length());
         return document.substring(start + heading.length() + 1,
@@ -195,7 +216,7 @@ public final class MkRelease {
         if (MkSndh.word(core, MkSndh.CORE_FORMAT) != YmxFormat.VERSION) {
             throw new IllegalArgumentException(variant.name() + " reads format version "
                     + YmxFormat.versionName(MkSndh.word(core, MkSndh.CORE_FORMAT))
-                    + ", the release is " + YmxFormat.versionName());
+                    + ", this release reads " + YmxFormat.versionName());
         }
         if (MkSndh.word(core, MkSndh.CORE_UNIT) != variant.unit()) {
             throw new IllegalArgumentException(variant.name() + " serves unit "
