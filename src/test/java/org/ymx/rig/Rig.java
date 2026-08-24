@@ -42,7 +42,7 @@ final class Rig {
 
     static final int STREAMS = 25;              // fourteen register, eleven script
     static final int YMX_DEFAULT_MAP = 0x9C;    // the packer's: 0->A 1->D 2->B 3->C
-    static final int YMX_FIXED = 46 + STREAMS * 64; // the workspace before the rings
+    static final int YMX_FIXED = 50 + STREAMS * 64; // the workspace before the rings
 
     private Rig() {}
 

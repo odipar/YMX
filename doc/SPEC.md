@@ -542,9 +542,14 @@ One player call per frame, in this order:
    on frames where the frame number modulo `C` equals `k`. A `k` past the
    decoded streams (§1.5) refills nothing.
 
-Before frame 0, a player decodes one group of every stream - `C` values,
-or `O` when the tune is shorter and plays once - so frame 0's values are
-present.
+Where flag bit 0 is clear, or `O - L` is at most `N`, a stream is decoded
+to `O` values and refilled no further; the last refill before that is a
+short one. Otherwise a section that runs out mid-refill is opened again
+and the refills go on (§8).
+
+Before frame 0, a player decodes one group of every stream, so that frame
+0's values are present: `C` values, or `O` where the tune is shorter than
+a group and the refills stop at `O`.
 
 Actions follow the frame write so that their varying cost does not delay
 the register writes. Skips precede it so that a voice released in a frame
@@ -559,16 +564,26 @@ frame write is therefore optional.
 
 ## 8. Starting over
 
-A packed stream restarts only from its beginning. A tune with flag bit 0
-set plays its frames again from frame 0: when a section runs out
-mid-refill, the player opens the same section again - a fresh decoder
-writing into the same ring - and the ring contents stay one continuous
-sequence. `O` need not fall on a group boundary.
+A tune with flag bit 0 set plays its frames again from frame `L`, which
+is 0 at this version (§9.3), so one pass is `O - L` frames. A wrap takes
+one of two forms, and `O - L` against `N` selects which.
+
+Where `O - L` is larger than `N`, the streams are decoded again. A packed
+stream restarts only from its beginning, so a section that runs out
+mid-refill is opened again - a fresh decoder writing into the same ring -
+and the ring contents stay one continuous sequence. `O` need not fall on
+a group boundary.
+
+Where `O - L` is at most `N`, every value a pass reads is in the rings
+when the pass ends. Refilling stops at `O` values (§7), and on the wrap
+the read position in every ring moves back `O - L` bytes, then forward
+`N` where that lands before the ring's first byte. Nothing is decoded a
+second time.
 
 On the frame that ends the tune, after that frame's write, actions and
 refill: every claimed timer is stopped, its vector is parked on a routine
 with no effect, its interrupt is enabled with no tick pending, and the
-three skip states are cleared. This is the state before frame 0 of the
+three skip states are cleared. This is the state before frame `L` of the
 first pass, so every pass is identical.
 
 ---
@@ -626,7 +641,7 @@ The shape:
 - `O` is at least 1; `N` and `C` are within §1.3. At a unit size above 1,
   `O` and `C` are multiples of the unit size.
 - `L` and the loop table offset are 0. This version starts over at frame
-  0 (§8), and a player reads neither field.
+  0 (§8), and no player reads a loop table.
 - All twenty-five sections are present, and each decodes to exactly `O`
   values of one byte. No back-reference exceeds `N` bytes and no operation
   exceeds 65535 units (§1.4).

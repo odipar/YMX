@@ -22,6 +22,12 @@ at 0.4 has to be repacked from its `.ym` or `.ymr` source.
   at 38.
 - Both new fields carry 0: the loop frame is the beginning, and no file
   carries a loop table. A repacked tune plays as it did at 0.4.
+- A tune whose pass fits a ring - `O - L` at most `N` - is decoded once.
+  The refills stop at `O` values, and the wrap moves the read position
+  back `O - L` bytes in every ring, so a second pass decodes nothing.
+  The values written to the sound chip are the same either way.
+- The workspace before the rings is four bytes larger: 1,650 bytes, plus
+  25 `N` for the rings.
 
 ## 0.4.1
 
