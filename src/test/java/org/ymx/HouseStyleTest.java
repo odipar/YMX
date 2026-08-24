@@ -58,9 +58,11 @@ final class HouseStyleTest {
             "smuggl",
             "catastroph",
             // shape: no em dash construct anywhere - a dash that must
-            // stay is a single '-'; the list strikes the en dash too
+            // stay is a single '-'; the list strikes the en dash and the
+            // minus sign too
             "—",
             "–",
+            "−",
             // the verdict: the sentence grading itself or its subject
             "is deliberate",
             "asked properly",

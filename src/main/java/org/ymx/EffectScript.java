@@ -23,7 +23,7 @@ import java.util.List;
  * what this class resolves for each is exactly a stream's lifecycle: start,
  * hold, retune (a new rate, the same place in the cycle), release, resume,
  * and which stream preempts which when two contend for one register.
- * {@code doc/terminology.md} is the dictionary. The streams it emits are
+ * {@code doc/terminology.md} is the vocabulary. The streams it emits are
  * script data, not frame streams: their bytes never reach the chip.
 
  * <p>The format carries four timer channels. A YM frame starts at most two
@@ -71,7 +71,7 @@ import java.util.List;
  * 1 HOLD               flags: 1 = reload the count (P), 2 = track the
  *                      toggle stream's volume, 4 = track the retrigger
  *                      stream's shape - emitted only on frames where the
- *                      value actually changed (the reference player
+ *                      value changed (the reference player
  *                      repatched every frame)
  * 2 RELEASE            stop this channel's timer; bit 0 masks instead
  * 3 START_TOGGLE       selects, volume, vector := the loud half, full
@@ -531,7 +531,7 @@ public final class EffectScript {
     }
 
     /** .held: a running effect's count reload and parameter tracking -
-     * emitted only on frames where a value actually changed. */
+     * emitted only on frames where a value changed. */
     private void hold(int p, int index, Channel channel, int code, int count) {
         int type = code & 0xC0;
         int voice = ((code >> 4) & 3) - 1;
@@ -780,7 +780,7 @@ public final class EffectScript {
      * write's again; a voice a toggle stream is taking must stay skipped, so
      * its skip bit and its edge are that stream's to set, two lines on.
      *
-     * <p>Returns whether anything was actually taken away, which is how a
+     * <p>Returns whether anything was taken away, which is how a
      * release tells an early stop from a sample that had already finished: at
      * the computed end the window has expired earlier in this same frame, the
      * marker tick stopped the timer itself, and a RELEASE there would be a

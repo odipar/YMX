@@ -13,7 +13,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.ymx.EffectScript;
 import org.ymx.Tune;
+import org.ymx.YmxFormat;
 
 /**
  * The corpus figures {@code doc/terminology.md} quotes, taken again, and the
@@ -33,10 +35,22 @@ final class CorpusNumbersTest {
     private static final Path DOC = Path.of("doc", "terminology.md");
     private static final Path CONVERSION = Path.of("ym", "CONVERSION.md");
 
-    /** One tune, reduced to what the documents say about the collection. */
+    /** The pinned tunes doc/terminology.md works through by name. */
+    private static final Path RING_EXAMPLE =
+            Path.of("ym", "test", "Turrican - world 4-3.ymx");
+    private static final Path CUT_EXAMPLE =
+            Path.of("ym", "test", "Dragon Flight  4 - Finish 1.ymx");
+    private static final Path UNIT_EXAMPLE =
+            Path.of("ym", "test", "Crapman level  9.ymx");
+
+    /** One tune, reduced to what the documents say about the collection.
+     * {@code entersAtItsOwnFrame} and {@code cut} are the two the packer
+     * answers for a tune that starts over: whether the frame its header gives
+     * can be entered, and whether reaching it needs the streams cut in two. */
     private record Surveyed(String name, int playerHz, int drumFrames, long slowestDrum,
                             long fastestDrum, int sinus, int voicesOnEnvelopeAtOnce,
-                            int loopFrame, int frames) {}
+                            int loopFrame, int frames, boolean entersAtItsOwnFrame,
+                            boolean cut) {}
 
     @Test
     void theCorpusIsWhatTheVocabularySaysItIs() throws IOException {
@@ -117,17 +131,29 @@ final class CorpusNumbersTest {
     }
 
     /**
-     * What cutting the streams in two costs, against the tunes it is done to:
-     * every {@code .ymx} in {@code ym/test} that carries a loop table, beside
-     * the same source packed with {@code -l0} - one set of sections, the file
-     * the packer wrote before the cut existed.
+     * What starting over costs in each of its two forms, against the pinned
+     * tunes the documents work through.
+     *
+     * <p>The cut costs file bytes: every {@code .ymx} in {@code ym/test} that
+     * carries a loop table is measured beside the same source packed with
+     * {@code -l0} - one set of sections, the file the packer wrote before the
+     * cut existed - which is the figure both documents quote, as a range in
+     * {@code ym/CONVERSION.md} and tune by tune in {@code doc/terminology.md}.
+     * The ring form costs workspace and no file bytes, and the header of the
+     * tune the vocabulary names for it says so.
      */
     @Test
-    void whatACutCostsIsWhatTheConversionDocSaysItCosts() throws IOException {
+    void whatStartingOverCostsIsWhatTheDocumentsSayItCosts() throws IOException {
         String said = String.join(" ", Files.readString(CONVERSION).split("\\s+"));
+        String vocabulary = String.join(" ", Files.readString(DOC).split("\\s+"));
         int[] range = numbers(said,
                 "the file is (\\d+) to (\\d+) per cent larger than the same tune"
                         + " packed with `-l0`", "what a cut costs");
+        checkTheWorkedExamples(vocabulary);
+        String[] eachGrew = groups(vocabulary,
+                "the file grows by ([\\d.]+)%, ([\\d.]+)% and ([\\d.]+)%",
+                "what a cut costs each tune it is done to");
+        List<String> grewBy = new ArrayList<>();
         List<Path> cut = new ArrayList<>();
         try (Stream<Path> listing = Files.list(Path.of("ym", "test"))) {
             listing.filter(p -> p.toString().endsWith(".ymx")).sorted()
@@ -144,8 +170,10 @@ final class CorpusNumbersTest {
             Path flat = Files.createTempFile("uncut", ".ymx");
             try {
                 packStartingOverAtZero(source, flat);
-                long grown = Math.round(100.0
-                        * (Files.size(packed) - Files.size(flat)) / Files.size(flat));
+                double exactly = 100.0
+                        * (Files.size(packed) - Files.size(flat)) / Files.size(flat);
+                grewBy.add(String.format(java.util.Locale.ROOT, "%.1f", exactly));
+                long grown = Math.round(exactly);
                 smallest = Math.min(smallest, grown);
                 largest = Math.max(largest, grown);
             } finally {
@@ -154,6 +182,111 @@ final class CorpusNumbersTest {
         }
         assertEquals(range[0], smallest, "the smallest a cut file grows");
         assertEquals(range[1], largest, "the largest a cut file grows");
+        assertEquals(eachGrew.length, grewBy.size(), "the vocabulary quotes "
+                + eachGrew.length + " cut tunes and ym/test holds " + grewBy.size());
+        grewBy.sort(java.util.Comparator.comparingDouble(Double::parseDouble));
+        for (int at = 0; at < eachGrew.length; at++) {
+            assertEquals(eachGrew[at], grewBy.get(at),
+                    "the " + (at + 1) + "th cut file grows by " + grewBy.get(at) + "%");
+        }
+    }
+
+    /**
+     * The two tunes the vocabulary works through by name, and the third it
+     * names for the unit boundary, against the files themselves.
+     */
+    private static void checkTheWorkedExamples(String vocabulary) throws IOException {
+        byte[] ring = Files.readAllBytes(RING_EXAMPLE);
+        int[] ringShape = numbers(vocabulary,
+                "Say a tune is ([\\d,]+) frames and goes back to frame ([\\d,]+)."
+                        + " One pass after the first is ([\\d,]+) frames",
+                "the tune the ring form is worked through on");
+        int[] ringSize = numbers(vocabulary,
+                "Make `N` ([\\d,]+) and every byte the second pass needs",
+                "the ring that holds the pass");
+        int[] workspace = numbers(vocabulary,
+                "twenty-five rings of ([\\d,]+) bytes rather than ([\\d,]+), so"
+                        + " ([\\d,]+) bytes of ring rather than ([\\d,]+)",
+                "what the raised rings cost");
+        int[] cap = numbers(vocabulary, "up to the cap of ([\\d,]+) bytes a ring",
+                "the largest ring the format allows");
+        int[] ringFile = numbers(vocabulary,
+                "Its file is ([\\d,]+) bytes, the same as it would be with no"
+                        + " loop, and its header gives `N` = ([\\d,]+)",
+                "the file the ring form costs nothing in");
+        assertEquals(ringShape[0], (int) field(ring, YmxFormat.OFFSET_FRAMES, 4),
+                RING_EXAMPLE + "'s frame count");
+        assertEquals(ringShape[1], (int) field(ring, YmxFormat.OFFSET_LOOP_FRAME, 4),
+                RING_EXAMPLE + "'s loop frame");
+        assertEquals(ringShape[2], ringShape[0] - ringShape[1], "one pass");
+        assertEquals(ringSize[0], (int) field(ring, YmxFormat.OFFSET_RING_SIZE, 2),
+                RING_EXAMPLE + "'s ring size");
+        assertEquals(0, (int) field(ring, YmxFormat.OFFSET_LOOP_TABLE, 4),
+                RING_EXAMPLE + " carries a loop table, so it is not the ring form");
+        assertEquals(ringSize[0], ringFile[1], "the ring the two sentences give");
+        assertEquals(ringFile[0], Files.size(RING_EXAMPLE), RING_EXAMPLE + "'s size");
+        assertEquals(workspace[0], ringSize[0], "the raised ring");
+        assertEquals(workspace[1], YmxFormat.DEFAULT_RING_SIZE, "the default ring");
+        assertEquals(workspace[2], YmxFormat.STREAMS * workspace[0], "the raised rings");
+        assertEquals(workspace[3], YmxFormat.STREAMS * workspace[1], "the default rings");
+        assertEquals(cap[0], YmxFormat.MAX_RING_SIZE, "the ring cap");
+
+        byte[] streams = Files.readAllBytes(CUT_EXAMPLE);
+        int[] cutShape = numbers(vocabulary,
+                "is ([\\d,]+) frames and goes back to ([\\d,]+). One pass is"
+                        + " ([\\d,]+) frames, and no ring may exceed ([\\d,]+) bytes",
+                "the tune the cut is worked through on");
+        int[] halves = numbers(vocabulary,
+                "the first covering frames 0 to ([\\d,]+) and the second ([\\d,]+)"
+                        + " to ([\\d,]+)", "the two sections a cut stream carries");
+        int[] crossing = numbers(vocabulary,
+                "which happens at frame ([\\d,]+), the same value for every stream,"
+                        + " since every first section holds exactly ([\\d,]+) values",
+                "where the two sections meet");
+        assertEquals(cutShape[0], (int) field(streams, YmxFormat.OFFSET_FRAMES, 4),
+                CUT_EXAMPLE + "'s frame count");
+        assertEquals(cutShape[1], (int) field(streams, YmxFormat.OFFSET_LOOP_FRAME, 4),
+                CUT_EXAMPLE + "'s loop frame");
+        assertEquals(cutShape[2], cutShape[0] - cutShape[1], "one pass");
+        assertEquals(cutShape[3], YmxFormat.MAX_RING_SIZE, "the ring cap");
+        assertTrue(field(streams, YmxFormat.OFFSET_LOOP_TABLE, 4) != 0,
+                CUT_EXAMPLE + " carries no loop table, so it is not the cut form");
+        assertEquals(halves[0], cutShape[1] - 1, "the last frame of the first half");
+        assertEquals(halves[1], cutShape[1], "the first frame of the second half");
+        assertEquals(halves[2], cutShape[0] - 1, "the last frame of the tune");
+        assertEquals(crossing[0], cutShape[1], "the frame the sections meet at");
+        assertEquals(crossing[1], cutShape[1], "the values a first section holds");
+
+        int[] moved = numbers(vocabulary,
+                "gives ([\\d,]+) and its file carries ([\\d,]+)",
+                "the loop frame a unit boundary moved");
+        String stem = UNIT_EXAMPLE.getFileName().toString();
+        Ym6Reader.Song song = Ym6Reader.read(Files.readAllBytes(UNIT_EXAMPLE
+                .resolveSibling(stem.substring(0, stem.lastIndexOf('.')) + ".ym")));
+        assertEquals(moved[0], song.loopFrame(), UNIT_EXAMPLE + "'s source loop frame");
+        assertEquals(moved[1], (int) field(Files.readAllBytes(UNIT_EXAMPLE),
+                YmxFormat.OFFSET_LOOP_FRAME, 4), UNIT_EXAMPLE + "'s loop frame");
+    }
+
+    /** One big-endian header field of a packed file. */
+    private static long field(byte[] file, int at, int size) {
+        long value = 0;
+        for (int byteAt = 0; byteAt < size; byteAt++) {
+            value = (value << 8) | (file[at + byteAt] & 0xFF);
+        }
+        return value;
+    }
+
+    /** The strings one documented sentence gives, or a failure naming it. */
+    private static String[] groups(String document, String pattern, String what) {
+        Matcher found = Pattern.compile(pattern).matcher(document);
+        assertTrue(found.find(), "the sentence giving " + what + " no longer matches "
+                + pattern + " - this test reads the numbers out of it");
+        String[] said = new String[found.groupCount()];
+        for (int i = 0; i < said.length; i++) {
+            said[i] = found.group(i + 1);
+        }
+        return said;
     }
 
     /** Whether a packed file locates a second section per stream. */
@@ -184,28 +317,56 @@ final class CorpusNumbersTest {
         }
     }
 
+    /**
+     * How many tunes start over from a frame of their own, and what the packer
+     * answers for them: both documents count the same collection, so both are
+     * read back against one survey of it. The shape resolved against is the
+     * packer's default - 960-byte rings, groups of 24, two bytes a unit.
+     */
     @Test
-    void whatStartingOverCostsIsWhatTheConversionDocSaysItCosts() throws IOException {
+    void theLoopCensusIsWhatTheDocumentsSayItIs() throws IOException {
         String corpus = System.getenv("YM_CORPUS");
         assumeTrue(corpus != null && Files.isDirectory(Path.of(corpus)),
                 "set YM_CORPUS to the directory holding the YM collection"
                         + " ym/CONVERSION.md counts");
 
         String said = String.join(" ", Files.readString(CONVERSION).split("\\s+"));
-        int[] census = numbers(said,
-                "([\\d,]+) of the corpus's ([\\d,]+) readable files give one other than 0",
+        String vocabulary = String.join(" ", Files.readString(DOC).split("\\s+"));
+        String pattern = "([\\d,]+) of the corpus's ([\\d,]+) readable files give"
+                + " one other than 0";
+        int[] census = numbers(said, pattern,
                 "the files that loop from a frame other than 0");
+        int[] alsoSaid = numbers(vocabulary, pattern,
+                "the files that loop from a frame other than 0, in the vocabulary");
         int[] share = numbers(said, "is (\\d+)% of the tune on average",
                 "how much of a tune such an opening is");
+        int[] entered = numbers(vocabulary,
+                "([\\d,]+) of the ([\\d,]+) tunes with a loop frame can be entered"
+                        + " at the frame their own header gives",
+                "the tunes whose own loop frame can be entered");
+        int[] needTheCut = numbers(vocabulary,
+                "Of the ([\\d,]+) tunes with a loop frame, ([\\d,]+) need the cut",
+                "the tunes whose streams are cut in two");
 
         List<Surveyed> readable = readable(corpus);
         List<Surveyed> late = readable.stream()
                 .filter(t -> t.loopFrame() > 0 && t.loopFrame() < t.frames()).toList();
         assertEquals(census[1], readable.size(), "readable files");
         assertEquals(census[0], late.size(), "files looping from a frame other than 0");
-        long mean = late.stream().mapToLong(t -> 100L * t.loopFrame() / t.frames()).sum()
-                / late.size();
+        assertEquals(census[0], alsoSaid[0], "the two documents count the same files");
+        assertEquals(census[1], alsoSaid[1], "the two documents read the same corpus");
+        long mean = Math.round(late.stream()
+                .mapToDouble(t -> 100.0 * t.loopFrame() / t.frames()).average()
+                .orElseThrow());
         assertEquals(share[0], mean, "the mean opening, as a percentage of the tune");
+        assertEquals(entered[1], late.size(), "tunes with a loop frame, as the"
+                + " entered line has it");
+        assertEquals(entered[0], late.stream().filter(Surveyed::entersAtItsOwnFrame)
+                .count(), "tunes entered at the frame their own header gives");
+        assertEquals(needTheCut[0], late.size(), "tunes with a loop frame, as the"
+                + " cut line has it");
+        assertEquals(needTheCut[1], late.stream().filter(Surveyed::cut).count(),
+                "tunes whose streams are cut in two");
     }
 
     /** Every readable tune in the collection, surveyed. */
@@ -258,9 +419,18 @@ final class CorpusNumbersTest {
                 fastest = Math.max(fastest, hz);
             }
         }
+        int loopFrame = (int) Math.min(song.loopFrame(), Integer.MAX_VALUE);
+        boolean enters = false;
+        boolean cut = false;
+        if (loopFrame > 0 && loopFrame < song.frames()) {
+            Tune tune = YmEffects.tune(song, effects);
+            EffectScript.Result script = EffectScript.compile(tune);
+            enters = org.ymx.LoopFrame.qualifies(tune, script, loopFrame);
+            cut = org.ymx.LoopFrame.resolve(tune, script, true,
+                    YmxFormat.DEFAULT_RING_SIZE, YmxFormat.DEFAULT_CHUNK, 2).cut();
+        }
         return new Surveyed(name, song.playerHz(), drumFrames, slowest, fastest,
-                effects.sinus(), together,
-                (int) Math.min(song.loopFrame(), Integer.MAX_VALUE), song.frames());
+                effects.sinus(), together, loopFrame, song.frames(), enters, cut);
     }
 
     /** The numbers one documented sentence gives, or a failure naming the sentence. */

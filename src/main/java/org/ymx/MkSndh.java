@@ -273,7 +273,7 @@ public final class MkSndh {
     }
 
     /** Printable ASCII with the NUL-adjacent risks dropped: titles come out
-     * of YM headers, which carry anything at all. */
+     * of YM headers, which carry any text. */
     static String clean(String text) {
         StringBuilder out = new StringBuilder();
         for (char c : text.toCharArray()) {

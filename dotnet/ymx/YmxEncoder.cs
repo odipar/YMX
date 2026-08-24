@@ -31,7 +31,7 @@ namespace Ymx
         }
 
         /// <summary>The finished file plus the per-stream numbers the CLI
-        /// reports; Tune is the one actually packed, the padded one where the
+        /// reports; Tune is the one packed, the padded one where the
         /// length needed padding, RingSize the one the file carries, and
         /// LoopFrame the L it holds. Notes is what the loop frame moved or
         /// cost, for the CLI to report.</summary>
@@ -122,7 +122,7 @@ namespace Ymx
             // body that needs a bigger ring gets one, and a bigger ring lets a
             // back-reference reach further, so the sections are packed against
             // the ring the file ends up carrying. A plan that cuts the streams
-            // decides how many sections there are to pack at all.
+            // doubles the sections there are to pack.
             LoopFrame.Plan plan = LoopFrame.Resolve(tune, script, loops, ringSize,
                     chunk, unit);
             ringSize = plan.RingSize;
@@ -192,8 +192,8 @@ namespace Ymx
         }
 
         /// <summary>A stream byte is meaningful only on frames its master
-        /// bit marks - and for a count stream, only when the action actually
-        /// reads the count. Everywhere else the previous byte repeats, which
+        /// bit marks - and for a count stream, only when the action reads
+        /// the count. Everywhere else the previous byte repeats, which
         /// costs nothing packed.</summary>
         internal static byte[] Carry(byte[] values, byte[] master, int bit,
                 byte[]? actions)

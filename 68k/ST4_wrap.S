@@ -60,7 +60,7 @@
 ;   2. N mod (C * ST4_UNIT) = 0, so F = N/(C*UNIT) calls fill the ring exactly
 ;   3. no offset exceeds 32512 BYTES - the packer clamps -m to that
 ;   4. no operation is longer than 65535 units - compress with -l65535
-;   5. the caller knows O and makes exactly T = ceil(O/C) calls, as ST1_wrap
+;   5. the caller has O and makes exactly T = ceil(O/C) calls, as ST1_wrap
 ;   6. streams A and D start on even addresses, and A holds an even number of
 ;      bytes: the bit queue is refilled with a move.w, and so is a word offset
 ;
@@ -122,8 +122,8 @@ source_wrapped:
         bra.s   copy
 
 ; ST4_resume: a0/a1/d0/d1/d2 = state and d3.w = this call's budget.
-; Continuing calls emit d3 bytes; the final call may be shorter. The caller
-; knows the final span from O; [old a1 .. new a1) is fresh output.
+; Continuing calls emit d3 bytes; the final call may be shorter. O gives the
+; caller the final span; [old a1 .. new a1) is fresh output.
 ST4_resume:
         move.w  d3,d4                   ; seed n from the budget; a fresh state
 segment:                                ; runs one 0-unit match segment and

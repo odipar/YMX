@@ -31,7 +31,7 @@ The two packers have no wrapper of their own: the play scripts and
 `mvn -q compile exec:exec@ymx -Dargs="..."`, or
 `dotnet dotnet/bin/Release/net10.0/ymx.dll ymx ...`. A wrong call prints
 the tool's own usage - `mkcores.sh` and `mkrelease.sh` run with no
-arguments at all - and this document is the same information in one place.
+arguments - and this document is the same information in one place.
 
 ## The packers
 
@@ -105,8 +105,8 @@ when missing or stale. `doc/BINARIES.md` is the byte contract.
 
 A runnable TOS program around an SNDH file: the prebuilt stub, patched and
 concatenated. Takes packed tunes (combined into an SNDH file first) or a
-ready `.sndh`; both argument orders work, the `.prg` naming the output
-wherever it stands.
+ready `.sndh`; both argument orders work, and the `.prg` argument names
+the output.
 
     ymx/mkprg.sh [-m] [-perf] [-nomask] [-tTitle] [-cComposer] [-Nnamesfile]
                  output.prg tunes.ymx...|set.sndh
@@ -205,9 +205,9 @@ and libunicorn; `ymx/test/run.sh` needs rmac and Hatari with a TOS image.
 ### rig.sh
 
 The whole emulator battery: tune shapes, the SNDH container, the retrigger
-shape, the sample loop, the loop-point resolve, the live retune, the
-measured README and conversion numbers, and the effect stage in two
-builds.
+shape, the sample loop, the stored cut, the loop-point resolve, the live
+retune, the measured README and conversion numbers, and the effect stage
+in two builds.
 
     ymx/test/rig.sh [--quick]
 
@@ -223,8 +223,7 @@ PACKFAIL or SKIP; a non-zero exit on any ISSUE.
 
     ymx/test/sweep.sh song.ym [more.ym ...]
 
-`YMX_PACK_OPTIONS` adds packer options for a shape the corpus never asks
-for.
+`YMX_PACK_OPTIONS` adds packer options for a shape no corpus tune reaches.
 
 ### ymr_sweep.sh
 

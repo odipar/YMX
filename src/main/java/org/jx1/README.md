@@ -7,9 +7,8 @@ decoders cannot do: reading somebody else's ZX1.
 RhYMe's `.YMR` register dumps are ZX1, one stream at a time, each packed
 against the ring its player will decode it through. [`org.ymr.Zx1`](../ymr/Zx1.java)
 reads them, and it reads them with the ZX1 implementation that already exists
-rather than with a second one written to match it: a decoder is only worth
-having if it is the same decoder, and two ports of one format drift the moment
-either is touched.
+rather than with a second one written to match it: two ports of one format
+drift as soon as either changes.
 
 `Decompressor.java` is `org.jx1.Decompressor` from
 [jx1](https://github.com/odipar/jx1), which is itself a port of `dzx1.c`. It

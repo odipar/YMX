@@ -6,8 +6,9 @@ import java.util.List;
 /**
  * Which frame a packed tune starts over from, and what keeping it costs.
  *
- * <p>A source gives the frame its own player went back to. The file's {@code L}
- * is the packer's answer to it, and two things stand between the two.
+ * <p>A source gives the frame its own player went back to. The file's
+ * {@code L} is that frame where two rules allow it: what the wrap leaves at
+ * that frame, and how the player reaches it again.
  *
  * <p>The first is the state the wrap leaves behind. At the end of a pass every
  * claimed timer is stopped, its vector parked and every skip bit cleared, so
@@ -22,7 +23,8 @@ import java.util.List;
  *   <li>every skip bit set there is set by that frame's own M;</li>
  *   <li>no voice follows the envelope generator before the first frame at or
  *       after it that writes R13, since the wrap does not restart the
- *       envelope and the phase a voice would hear differs between passes.</li>
+ *       envelope and the phase a voice on the envelope is driven at differs
+ *       between passes.</li>
  * </ul>
  *
  * <p>The second is how the player reaches the frame again, in one of two
@@ -33,8 +35,8 @@ import java.util.List;
  * the cap the file carries two sections per stream instead - frames
  * {@code [0, L)} in the section table's, {@code [L, O)} in the loop table's -
  * which the player opens in turn (SPEC.md 1.4, 8). That one costs file bytes,
- * since the replayed frames are packed on their own, so the ring comes first
- * wherever it fits.
+ * since the replayed frames are packed on their own, so the ring form is
+ * taken where it reaches and the cut only past the cap.
  *
  * <p>Where the state rule holds for no frame within the budget, and where a
  * cut has no frame it can start at, {@code L} is 0: the tune starts over from
@@ -245,9 +247,9 @@ public final class LoopFrame {
      *
      * <p>R13's write is the restart, and the frame write puts it after R8, R9
      * and R10, so a frame that both writes R13 and puts a voice on the envelope
-     * ends with the phase set. A frame before that one with a voice on the
-     * envelope hears a phase that depends on the frames played earlier, and
-     * those differ between the first pass and the rest.
+     * ends with the phase set. Before that frame, a voice on the envelope is
+     * driven at a phase that depends on the frames played earlier, and those
+     * differ between the first pass and the rest.
      */
     private static boolean envelopeIsSetBeforeAVoiceHearsIt(Tune tune, int at) {
         byte[][] registers = tune.registers();
