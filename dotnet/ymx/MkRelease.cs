@@ -12,7 +12,10 @@ namespace Ymx
     /// and mask flags - plus the PRG stub, each assembled by MkCores,
     /// verified against the descriptors MkSndh and MkPrg read, and listed in
     /// a manifest with its SHA-256. -publish creates or updates the GitHub
-    /// release tagged binaries-v&lt;format version&gt;, replacing its assets.
+    /// release tagged binaries-v&lt;release version&gt;, replacing its assets
+    /// and posting this release's section of doc/RELEASES.md as the notes:
+    /// a new format version is a new release, so is a patch of one, and an
+    /// unchanged release updates in place.
     /// </summary>
     public static class MkRelease
     {
@@ -77,14 +80,25 @@ namespace Ymx
                     : Path.Combine(Tools.Repo(), "dist", "release"));
             string commit = Tools.Output(Tools.Repo(),
                     new List<string> {"git", "rev-parse", "--short", "HEAD"});
-            if (Directory.Exists(dir))
+            try
             {
-                foreach (string old in Directory.GetFiles(dir))
+                if (Directory.Exists(dir))
                 {
-                    File.Delete(old);
+                    foreach (string old in Directory.GetFileSystemEntries(dir))
+                    {
+                        File.Delete(old);      // a directory here throws, as
+                    }                          // it does in the Java tree
                 }
+                Directory.CreateDirectory(dir);
             }
-            Directory.CreateDirectory(dir);
+            catch (IOException)
+            {
+                throw Tools.Fail("mkrelease: cannot clear " + dir);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                throw Tools.Fail("mkrelease: cannot clear " + dir);
+            }
 
             for (int flags = 0; flags < 4; flags++)
             {
@@ -126,7 +140,14 @@ namespace Ymx
 
             if (publish)
             {
-                Publish(dir, commit);
+                try
+                {
+                    Publish(dir, commit);
+                }
+                catch (ArgumentException e)
+                {
+                    throw Tools.Fail(e.Message);
+                }
             }
         }
 
@@ -136,7 +157,7 @@ namespace Ymx
         /// changed is this release's section of doc/RELEASES.md.</summary>
         private static void Publish(string dir, string commit)
         {
-            string tag = "binaries-v" + YmxFormat.ReleaseName();
+            string tag = Tag();
             string notes = ReleaseNotes() + "\n\nPrebuilt SNDH cores and the"
                     + " PRG stub, assembled at " + commit + ". doc/BINARIES.md"
                     + " is the combine contract; MANIFEST.txt lists sizes and"
@@ -168,20 +189,37 @@ namespace Ymx
             Console.WriteLine("published " + tag);
         }
 
+        /// <summary>The tag this release publishes under: the release
+        /// version, the format version and the patch together.</summary>
+        public static string Tag()
+        {
+            return "binaries-v" + YmxFormat.ReleaseName();
+        }
+
         /// <summary>This release's section of doc/RELEASES.md, from its
         /// heading to the next: the account the release page carries. A
-        /// release with no section of its own is not published.</summary>
+        /// release with no section of its own is not published - this
+        /// throws rather than leaving, so a test can call it.</summary>
         public static string ReleaseNotes()
         {
             string heading = "## " + YmxFormat.ReleaseName();
-            string document = File.ReadAllText(
-                    Path.Combine(Tools.Repo(), "doc", "RELEASES.md"));
+            string path = Path.Combine(Tools.Repo(), "doc", "RELEASES.md");
+            string document;
+            try
+            {
+                document = File.ReadAllText(path);
+            }
+            catch (IOException e)
+            {
+                throw new ArgumentException("mkrelease: doc/RELEASES.md: "
+                        + e.Message);
+            }
             int start = document.IndexOf(heading + "\n");
             if (start < 0)
             {
-                throw Tools.Fail("mkrelease: doc/RELEASES.md carries no \""
-                        + heading + "\" section - write what this release"
-                        + " changes before publishing it");
+                throw new ArgumentException("mkrelease: doc/RELEASES.md"
+                        + " carries no \"" + heading + "\" section - write"
+                        + " what this release changes before publishing it");
             }
             int next = document.IndexOf("\n## ", start + heading.Length);
             return (next < 0 ? document.Substring(start + heading.Length + 1)
@@ -219,7 +257,7 @@ namespace Ymx
                 throw new ArgumentException(variant.FileName()
                         + " reads format version "
                         + YmxFormat.VersionName(MkSndh.Word(core, MkSndh.CoreFormat))
-                        + ", the release is " + YmxFormat.VersionName());
+                        + ", this release reads " + YmxFormat.VersionName());
             }
             if (MkSndh.Word(core, MkSndh.CoreUnit) != variant.Unit)
             {

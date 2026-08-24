@@ -22,10 +22,10 @@ REPO=$(cd "$TEST_DIR/../.." && pwd)
 if [ "$1" = "-dotnet" ]; then
     shift
     DLL="$REPO/dotnet/bin/Release/net10.0/ymx.dll"
-    [ -f "$DLL" ] || (cd "$REPO/dotnet" && dotnet build -c Release -v q)
+    (cd "$REPO/dotnet" && dotnet build -c Release -v q)
     YMX_REPO="$REPO" exec dotnet "$DLL" ymrsweep "$@"
 fi
-[ -d "$REPO/target/test-classes/org/ymx/rig" ] || (cd "$REPO" && mvn -q test-compile)
+(cd "$REPO" && mvn -q test-compile)
 exec java -ea --enable-native-access=ALL-UNNAMED -Dymx.repo="$REPO" \
     -cp "$REPO/target/classes:$REPO/target/test-classes" \
     org.ymx.rig.YmrSweep "$@"

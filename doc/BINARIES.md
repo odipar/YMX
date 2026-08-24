@@ -21,19 +21,19 @@ tunes the binary serves, then the release's own patch number, which
 moves when the binaries change and the format does not. Files from
 different releases tell apart on sight, and the core's descriptor
 carries the format version alone (§1), which is what a combiner
-matches. A `-perf` or
-`-nomask` in the name marks a core assembled with the raster monitor in,
-or with the frame write unmasked; the flags word below says which, so a
-combiner verifies rather than parses names.
+matches. A `-perf` or `-nomask` in the name marks a core assembled with
+the raster monitor in, or with the frame write unmasked; the flags word
+below says which, so a combiner verifies rather than parses names.
 
 Every variant is published at
 [github.com/odipar/YMX/releases](https://github.com/odipar/YMX/releases)
-under the tag `binaries-v<release>`, staged by `ymx/mkrelease.sh`: twelve
-cores - three unit sizes by the four flag combinations - the stub, and a
-`MANIFEST.txt` of sizes and SHA-256 digests with the source commit and
-both versions. The release notes are that release's section of
-[RELEASES.md](RELEASES.md), which says what changed in it. A new format version is a new release; so is a patch of
-the same format, which replaces the patch before it. An unchanged
+under the tag `binaries-v<release>`, staged by `ymx/mkrelease.sh`:
+twelve cores - three unit sizes by the four flag combinations - the
+stub, and a `MANIFEST.txt` of sizes and SHA-256 digests with the source
+commit, the release version and the format version. The release notes
+are that release's section of [RELEASES.md](RELEASES.md), which says
+what changed in it. A new format version is a new release; so is a patch
+of the same format, which replaces the patch before it. An unchanged
 release updates in place.
 
 ## The stack
@@ -222,14 +222,14 @@ combines with any core (§2).
 flags word (§1): the descriptor says what a core is, not the file name.
 
 **Another format version.** A tune's header word at offset 4 gives its
-format version; the release for it is tagged `binaries-v<that version>`,
-or `binaries-v<that version>.<patch>` where the binaries were patched.
-One release stands per format version - the newest patch, the older
-ones deleted - and the release for another format version stays
-published beside it. A combiner takes the tag its tunes' format version
-names and verifies the core's word at offset 22 against them; the word
-carries the format version alone, so every patch of one format serves
-the same tunes.
+format version; the release for it is tagged `binaries-v<that
+version>.<patch>` - every tag carries a patch, `0` where the binaries
+were never patched. One release stands per format version, the newest
+patch, and the release for another format version stays published
+beside it. A combiner takes the release whose format version its tunes
+declare and verifies the core's word at offset 22 against them; the
+word carries the format version alone, so every patch of one format
+serves the same tunes.
 
 **A program that reports its end.** One tune with header flag bit 0
 clear, and stub flag bit 0 set (§3): the program plays the patched frame

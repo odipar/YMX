@@ -25,8 +25,8 @@ REPO=$(cd "$YMX_DIR/.." && pwd)
 if [ "$1" = "-dotnet" ]; then
     shift
     DLL="$REPO/dotnet/bin/Release/net10.0/ymx.dll"
-    [ -f "$DLL" ] || (cd "$REPO/dotnet" && dotnet build -c Release -v q)
+    (cd "$REPO/dotnet" && dotnet build -c Release -v q)
     YMX_REPO="$REPO" exec dotnet "$DLL" ymrplay "$@"
 fi
-[ -d "$REPO/target/classes" ] || (cd "$REPO" && mvn -q compile)
+(cd "$REPO" && mvn -q compile)
 exec java -ea -Dymx.repo="$REPO" -cp "$REPO/target/classes" org.ymr.YmrPlay "$@"

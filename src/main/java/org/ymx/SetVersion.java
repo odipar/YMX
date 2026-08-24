@@ -10,13 +10,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * {@code ymx/setversion.sh} - rewrite the format version at every site
- * that carries it: the Java, C# and 68k constants and SPEC.md's three
- * mentions. A site is found by the exact text around the version and must
- * match exactly once, so a reworded sentence fails loudly instead of
- * being skipped - and nothing is written unless every site matched.
+ * {@code ymx/setversion.sh} - rewrite the version at every site that
+ * carries it: the Java, C# and 68k format constants, SPEC.md's three
+ * mentions, and the two patch constants a release version carries -
+ * eight sites. A site is found by the exact text around the version and
+ * must match exactly once, so a reworded sentence fails loudly instead
+ * of being skipped, and nothing is written unless every site matched.
  * {@code SpecConsistencyTest} reads the same sites back against
- * {@link YmxFormat#VERSION}.
+ * {@link YmxFormat#VERSION} and {@link YmxFormat#PATCH}.
  */
 public final class SetVersion {
 
@@ -107,8 +108,11 @@ public final class SetVersion {
                 throw new IllegalArgumentException("setversion: " + text.getKey()
                         + ": " + e.getMessage());
             }
-            System.out.println(text.getKey() + ": version " + name + "."
-                    + patch);
+            System.out.println(text.getKey() + ": "
+                    + (text.getKey().endsWith("YmxFormat.java")
+                            || text.getKey().endsWith("YmxFormat.cs")
+                    ? "version " + name + "." + patch
+                    : "format version " + name));
         }
     }
 

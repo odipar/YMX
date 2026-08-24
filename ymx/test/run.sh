@@ -17,10 +17,10 @@ REPO=$(cd ../.. && pwd)
 # (dotnet/) instead of the Java one; both produce the same bytes.
 if [ "$1" = "-dotnet" ]; then
     DLL="$REPO/dotnet/bin/Release/net10.0/ymx.dll"
-    [ -f "$DLL" ] || (cd "$REPO/dotnet" && dotnet build -c Release -v q)
+    (cd "$REPO/dotnet" && dotnet build -c Release -v q)
     YMX_REPO="$REPO" dotnet "$DLL" gendata
 else
-    [ -d "$REPO/target/test-classes/org/ymx/rig" ] || (cd "$REPO" && mvn -q test-compile)
+    (cd "$REPO" && mvn -q test-compile)
     java -ea -Dymx.repo="$REPO" \
         -cp "$REPO/target/classes:$REPO/target/test-classes" org.ymx.rig.GenData
 fi
