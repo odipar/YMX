@@ -11,7 +11,7 @@ package org.ymx;
  *
  * <pre>
  *   0   4  'YMX!'
- *   4   2  format version (1)
+ *   4   2  format version, the major byte then the minor (VERSION)
  *   6   2  flags: bit 0 set when the tune starts over at the end, bits 1-4
  *           one per timer channel, set when the tune uses it
  *   8   4  O, the number of frames

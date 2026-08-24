@@ -283,8 +283,9 @@ namespace Ymx
             int version = Word(file, YmxFormat.OffsetVersion);
             if (version != YmxFormat.Version)
             {
-                throw new IOException(path + " is format version " + version
-                        + ", this build reads " + YmxFormat.Version
+                throw new IOException(path + " is format version "
+                        + YmxFormat.VersionName(version) + ", this build reads "
+                        + YmxFormat.VersionName()
                         + " - repack the tune from its .ym source");
             }
             int section = 0;

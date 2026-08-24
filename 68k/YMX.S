@@ -106,8 +106,8 @@
 ; CALLS AND REGISTERS
 ;
 ;   YMX_init   in   a0 = .ymx file, at an even address, a1 = workspace
-;              out  d0 = 0 accepted, -1 not a v1 YMX file with 25 streams
-;                        packed at this build's unit size
+;              out  d0 = 0 accepted, -1 not a YMX file at YMX_VERSION with
+;                        25 streams packed at this build's unit size
 ;              Claims a timer for each timer channel the header flags:
 ;              stops it, parks its vector, drops stale pendings, enables
 ;              and unmasks it. It saves NOTHING - the machine state is the
