@@ -296,8 +296,8 @@ public final class MkSndh {
         int unit = unitOf(options.tunes());
         String suffix = (options.perf() ? "-perf" : "")
                 + (options.maskBurst() ? "" : "-nomask");
-        Path core = Tools.repo().resolve("dist")
-                .resolve("ymxsndh-k" + unit + suffix + ".bin");
+        Path core = Tools.repo().resolve("dist").resolve("ymxsndh-k"
+                + unit + suffix + Tools.binarySuffix() + ".bin");
         if (stale(core, "YMX_sndh.S", "YMX.S", "ST4_wrap.S")) {
             MkCores.cores(Tools.repo().resolve("dist"), options.perf(),
                     !options.maskBurst());

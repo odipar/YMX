@@ -25,7 +25,8 @@ public final class MkRelease {
 
         String name() {
             return "ymxsndh-k" + unit + (perf ? "-perf" : "")
-                    + (nomask ? "-nomask" : "") + ".bin";
+                    + (nomask ? "-nomask" : "") + Tools.binarySuffix()
+                    + ".bin";
         }
 
         int flags() {
@@ -99,8 +100,10 @@ public final class MkRelease {
                 manifest.append(entry(variant.name(), core,
                         variant.unit() + "  " + variant.flags()));
             }
-            byte[] stub = MkPrg.readStub(dir.resolve("ymxprg.bin"));
-            manifest.append(entry("ymxprg.bin", stub, "-  -"));
+            byte[] stub = MkPrg.readStub(
+                    dir.resolve("ymxprg" + Tools.binarySuffix() + ".bin"));
+            manifest.append(entry("ymxprg" + Tools.binarySuffix() + ".bin",
+                    stub, "-  -"));
             Files.writeString(dir.resolve("MANIFEST.txt"), manifest.toString(),
                     StandardCharsets.ISO_8859_1);
         } catch (IOException e) {
@@ -138,7 +141,8 @@ public final class MkRelease {
         for (Variant variant : matrix()) {
             upload.add(dir.resolve(variant.name()).toString());
         }
-        upload.add(dir.resolve("ymxprg.bin").toString());
+        upload.add(dir.resolve("ymxprg" + Tools.binarySuffix() + ".bin")
+                .toString());
         upload.add(dir.resolve("MANIFEST.txt").toString());
         Tools.run(Tools.repo(), upload);
         System.out.println("published " + tag);

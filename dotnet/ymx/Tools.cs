@@ -142,6 +142,14 @@ namespace Ymx
 
         /// <summary>Prints the message and leaves, the way the shell scripts
         /// did.</summary>
+        /// <summary>The prebuilt binaries' name suffix - the format
+        /// version, so files from different releases tell apart on
+        /// sight.</summary>
+        public static string BinarySuffix()
+        {
+            return "-v" + YmxFormat.VersionName();
+        }
+
         public static Exception Fail(string message)
         {
             Console.Error.WriteLine(message);
@@ -173,8 +181,8 @@ namespace Ymx
                         + "YMX_PERF        equ     " + (perf ? 1 : 0) + "\n"
                         + "YMX_MASK_BURST  equ     " + (nomask ? 0 : 1) + "\n"
                         + "        include \"YMX_sndh.S\"\n");
-                string core = Path.Combine(outDir,
-                        "ymxsndh-k" + unit + suffix + ".bin");
+                string core = Path.Combine(outDir, "ymxsndh-k" + unit
+                        + suffix + Tools.BinarySuffix() + ".bin");
                 Tools.RunLoudly(work, new List<string> {"rmac", "-m68000", "-fr",
                         "+o3", "-i" + Path.Combine(Tools.Repo(), "68k"),
                         "-o", core, "core.S"});
@@ -188,7 +196,8 @@ namespace Ymx
         public static void Stub(string outDir)
         {
             Directory.CreateDirectory(outDir);
-            string stub = Path.Combine(outDir, "ymxprg.bin");
+            string stub = Path.Combine(outDir,
+                    "ymxprg" + Tools.BinarySuffix() + ".bin");
             Tools.RunLoudly(Path.Combine(Tools.Repo(), "68k"),
                     new List<string> {"rmac", "-m68000", "-fr", "+o3",
                             "-o", stub, "YMX_player.S"});

@@ -18,8 +18,10 @@ final class MkReleaseTest {
             assertTrue(names.add(variant.name()), variant.name() + " twice");
         }
         assertEquals(12, names.size(), "three units by four flag combinations");
-        assertTrue(names.contains("ymxsndh-k2.bin"));
-        assertTrue(names.contains("ymxsndh-k4-perf-nomask.bin"));
+        assertTrue(names.contains(
+                "ymxsndh-k2" + Tools.binarySuffix() + ".bin"));
+        assertTrue(names.contains(
+                "ymxsndh-k4-perf-nomask" + Tools.binarySuffix() + ".bin"));
     }
 
     @Test
