@@ -256,12 +256,19 @@ final class SpecConsistencyTest {
                 "SPEC §1.1's version row no longer carries " + hex);
         assertTrue(said.contains("the version is " + hex + " - " + name),
                 "SPEC §9.1 no longer names version " + hex);
+        String cs = Files.readString(Path.of("dotnet", "ymx", "YmxFormat.cs"));
         Matcher constant = Pattern.compile(
-                "public const int Version = 0x([0-9A-Fa-f]{4});").matcher(
-                        Files.readString(Path.of("dotnet", "ymx", "YmxFormat.cs")));
+                "public const int Version = 0x([0-9A-Fa-f]{4});").matcher(cs);
         assertTrue(constant.find(), "YmxFormat.cs no longer declares Version");
         assertEquals(YmxFormat.VERSION, Integer.parseInt(constant.group(1), 16),
                 "the C# Version differs from the Java one");
+        Matcher patch = Pattern.compile("public const int Patch = (\\d+);")
+                .matcher(cs);
+        assertTrue(patch.find(), "YmxFormat.cs no longer declares Patch");
+        assertEquals(YmxFormat.PATCH, Integer.parseInt(patch.group(1)),
+                "the C# Patch differs from the Java one");
+        assertEquals(name + "." + YmxFormat.PATCH, YmxFormat.releaseName(),
+                "the release name is the format version plus the patch");
     }
 
     /** The section-offset rule, which is one bit of one long. */

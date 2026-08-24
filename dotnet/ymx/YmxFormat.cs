@@ -21,6 +21,20 @@ namespace Ymx
         /// 1.0.</summary>
         public const int Version = 0x0004;
 
+        /// <summary>The released binaries' patch number: it moves when
+        /// the binaries change and the format does not - an optimized
+        /// player, a fixed stub. The format version above is the
+        /// compatibility gate; this number never reaches the format
+        /// word.</summary>
+        public const int Patch = 1;
+
+        /// <summary>The release's version as prose: the format version
+        /// plus the patch, "0.4.1".</summary>
+        public static string ReleaseName()
+        {
+            return VersionName() + "." + Patch;
+        }
+
         /// <summary>A version word as prose: VersionName(0x0102) reads
         /// "1.2".</summary>
         public static string VersionName(int word)

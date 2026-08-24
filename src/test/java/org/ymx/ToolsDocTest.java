@@ -201,17 +201,18 @@ final class ToolsDocTest {
                 Path.of("src", "main", "java", "org", "ymx", "SetVersion.java")));
         List<String[]> cs = sites(Files.readString(
                 Path.of("dotnet", "ymx", "SetVersion.cs")));
-        assertTrue(java.size() == 6, "SetVersion.java carries " + java.size()
-                + " sites; doc/tools.md and SetVersion's doc enumerate six -"
-                + " three constants and SPEC.md's three mentions");
+        assertTrue(java.size() == 8, "SetVersion.java carries " + java.size()
+                + " sites; doc/tools.md and SetVersion's doc enumerate eight -"
+                + " three format constants, SPEC.md's three mentions and the"
+                + " two patch constants");
         assertTrue(java.size() == cs.size(), "SetVersion.java carries "
                 + java.size() + " sites and SetVersion.cs " + cs.size());
         for (int at = 0; at < java.size(); at++) {
             String[] ours = java.get(at);
             String[] theirs = cs.get(at);
             for (int part = 0; part < 3; part++) {
-                String cSharp = theirs[part]
-                        .replace("{0:X4}", "%04X").replace("{1}", "%2$s");
+                String cSharp = theirs[part].replace("{0:X4}", "%04X")
+                        .replace("{1}", "%2$s").replace("{2}", "%3$d");
                 assertTrue(ours[part].equals(cSharp), "site " + at
                         + " differs between the trees: " + ours[part]
                         + " against " + theirs[part]);

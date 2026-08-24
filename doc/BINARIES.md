@@ -13,22 +13,26 @@ Two kinds of binary:
 
 | file | contents |
 |---|---|
-| `ymxsndh-k1-v<format version>.bin`, `-k2`, `-k4` | an **SNDH core**: the player and its SNDH glue, one per ST4 unit size |
-| `ymxprg-v<format version>.bin` | the **PRG stub**: a TOS program that drives an appended SNDH file |
+| `ymxsndh-k1-v<release>.bin`, `-k2`, `-k4` | an **SNDH core**: the player and its SNDH glue, one per ST4 unit size |
+| `ymxprg-v<release>.bin` | the **PRG stub**: a TOS program that drives an appended SNDH file |
 
-Every name ends with the format version of the tunes the binary serves,
-so files from different releases tell apart on sight. A `-perf` or
+Every name ends with the release version - the format version of the
+tunes the binary serves, then the release's own patch number, which
+moves when the binaries change and the format does not. Files from
+different releases tell apart on sight, and the core's descriptor
+carries the format version alone (§1), which is what a combiner
+matches. A `-perf` or
 `-nomask` in the name marks a core assembled with the raster monitor in,
 or with the frame write unmasked; the flags word below says which, so a
 combiner verifies rather than parses names.
 
 Every variant is published at
 [github.com/odipar/YMX/releases](https://github.com/odipar/YMX/releases)
-under the tag `binaries-v<format version>`, staged by `ymx/mkrelease.sh`:
-twelve cores -
-three unit sizes by the four flag combinations - the stub, and a
-`MANIFEST.txt` of sizes and SHA-256 digests with the source commit. A new
-format version is a new release; an unchanged one updates in place.
+under the tag `binaries-v<release>`, staged by `ymx/mkrelease.sh`: twelve
+cores - three unit sizes by the four flag combinations - the stub, and a
+`MANIFEST.txt` of sizes and SHA-256 digests with the source commit and
+both versions. A new format version is a new release; so is a patch of
+the same format, and an unchanged release updates in place.
 
 ## The stack
 
@@ -162,8 +166,9 @@ the number keys 1-9.
 
 The whole build for a system with no assembler and no JVM.
 
-1. **Fetch** the release `binaries-v<format version>` and check each
-   file's SHA-256 against `MANIFEST.txt`.
+1. **Fetch** the release `binaries-v<release>` - the newest patch of the
+   tunes' format version - and check each file's SHA-256 against
+   `MANIFEST.txt`.
 2. **Pick the core** for the unit size the tunes are packed at - the
    fourth byte of any packed section's ST4 signature (`SPEC.md` §1.4) -
    and for the flags wanted. Verify its descriptor (§1): `'YMXC'`,
@@ -190,7 +195,7 @@ long. No instruction changes.
 Each case is §5 with one decision changed.
 
 **One tune, its own sizes.** Read the tune's header, take the core its
-sections' unit selects - `ymxsndh-k1-v<format version>.bin` for a tune
+sections' unit selects - `ymxsndh-k1-v<release>.bin` for a tune
 packed at unit 1 - write the SNDH with one table entry and a workspace
 of `F + 25 · N`, wrap it. The stub's frame count is the tune's frame
 count when header flag bit 0 is clear, 0 when the tune starts over.
@@ -215,10 +220,12 @@ combines with any core (§2).
 flags word (§1): the descriptor says what a core is, not the file name.
 
 **Another format version.** A tune's header word at offset 4 gives its
-format version; the release for it is `binaries-v<that version>`. A new
-format is a new release and the old releases stay published, so a
-combiner pins the tag its tunes need and verifies the core's word at
-offset 22 against them.
+format version; the releases for it are tagged `binaries-v<that
+version>` and, where the binaries were patched, `binaries-v<that
+version>.<patch>`. Old releases stay published, so a combiner pins the
+tag its tunes need and verifies the core's word at offset 22 against
+them - the word carries the format version alone, so every patch of one
+format serves the same tunes.
 
 **A program that reports its end.** One tune with header flag bit 0
 clear, and stub flag bit 0 set (§3): the program plays the patched frame

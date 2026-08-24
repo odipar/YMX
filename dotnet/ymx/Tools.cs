@@ -140,12 +140,12 @@ namespace Ymx
             }
         }
 
-        /// <summary>The prebuilt binaries' name suffix - the format
+        /// <summary>The prebuilt binaries' name suffix - the release
         /// version, so files from different releases tell apart on
         /// sight.</summary>
         public static string BinarySuffix()
         {
-            return "-v" + YmxFormat.VersionName();
+            return "-v" + YmxFormat.ReleaseName();
         }
 
         /// <summary>Prints the message and leaves, the way the shell scripts

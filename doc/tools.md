@@ -135,21 +135,25 @@ with sizes and SHA-256 digests.
 
 | flag | meaning |
 |---|---|
-| `-publish` | create or update the GitHub release `binaries-v<format version>` through `gh`, replacing its assets |
+| `-publish` | create or update the GitHub release `binaries-v<release>` through `gh`, replacing its assets |
 
 ### setversion.sh
 
-Rewrites the format version at every site that carries it: the constants
-in `org.ymx.YmxFormat`, `dotnet/ymx/YmxFormat.cs` and `68k/YMX.S`, and
-SPEC.md's three mentions. The version word is the major in the high byte,
-the minor in the low, so versions order numerically. A site whose
-surrounding text no longer matches fails loudly, and the consistency
-tests read the same sites back.
+Rewrites the version at every site that carries it: the format constants
+in `org.ymx.YmxFormat`, `dotnet/ymx/YmxFormat.cs` and `68k/YMX.S`,
+SPEC.md's three mentions, and the two patch constants. The format
+version word is the major in the high byte, the minor in the low, so
+versions order numerically; the patch is the released binaries' own
+number, which never reaches that word. A site whose surrounding text no
+longer matches fails loudly, and the consistency tests read the same
+sites back.
 
-    ymx/setversion.sh MAJOR.MINOR
+    ymx/setversion.sh MAJOR.MINOR[.PATCH]
 
-After a bump: reassemble the cores (`mkcores.sh`), repin the corpus
-(`mvn test -Dymx.pin=refresh`) and publish (`mkrelease.sh -publish`).
+The patch defaults to 0, so a format bump clears it. After a bump:
+reassemble the cores (`mkcores.sh`), repin the corpus
+(`mvn test -Dymx.pin=refresh`) and publish (`mkrelease.sh -publish`). A
+patch alone - the binaries changed, the format did not - needs no repin.
 
 ## Listening
 

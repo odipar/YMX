@@ -88,7 +88,8 @@ public final class MkRelease {
         MkCores.stub(dir);
 
         StringBuilder manifest = new StringBuilder();
-        manifest.append("YMX player binaries - format version ")
+        manifest.append("YMX player binaries - release ")
+                .append(YmxFormat.releaseName()).append(", format version ")
                 .append(YmxFormat.versionName()).append(", descriptor version 1\n");
         manifest.append("source commit ").append(commit).append('\n');
         manifest.append("doc/BINARIES.md is the combine contract\n\n");
@@ -112,7 +113,7 @@ public final class MkRelease {
             throw Tools.fail("mkrelease: " + e.getMessage());
         }
         System.out.println(dir + ": " + (matrix().size() + 1)
-                + " binaries and MANIFEST.txt, format version " + YmxFormat.versionName());
+                + " binaries and MANIFEST.txt, release " + YmxFormat.releaseName());
 
         if (publish) {
             publish(dir, commit);
@@ -123,14 +124,15 @@ public final class MkRelease {
      * and its notes rewritten, so the commit they name is the one the
      * assets were assembled at. */
     private static void publish(Path dir, String commit) {
-        String tag = "binaries-v" + YmxFormat.versionName();
+        String tag = "binaries-v" + YmxFormat.releaseName();
         String notes = "Prebuilt SNDH cores and the PRG stub, assembled at "
                 + commit + ". doc/BINARIES.md is the combine contract;"
                 + " MANIFEST.txt lists sizes and SHA-256 digests.";
         if (Tools.status(Tools.repo(),
                 List.of("gh", "release", "view", tag)) != 0) {
             Tools.run(Tools.repo(), List.of("gh", "release", "create", tag,
-                    "--title", "YMX player binaries, format " + YmxFormat.versionName(),
+                    "--title", "YMX player binaries " + YmxFormat.releaseName()
+                            + ", format " + YmxFormat.versionName(),
                     "--notes", notes));
         } else {
             Tools.run(Tools.repo(), List.of("gh", "release", "edit", tag,

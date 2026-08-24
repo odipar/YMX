@@ -46,11 +46,17 @@ public final class SetVersion {
                     + " - **$%04X**, version %2$s"),
             new Site("doc/SPEC.md",
                     "the version is \\$[0-9A-F]{4} - \\d+\\.\\d+;",
-                    "the version is $%04X - %2$s;"));
+                    "the version is $%04X - %2$s;"),
+            new Site("src/main/java/org/ymx/YmxFormat.java",
+                    "public static final int PATCH = \\d+;",
+                    "public static final int PATCH = %3$d;"),
+            new Site("dotnet/ymx/YmxFormat.cs",
+                    "public const int Patch = \\d+;",
+                    "public const int Patch = %3$d;"));
 
     public static void main(String[] args) {
         if (args.length != 1) {
-            throw Tools.fail("usage: setversion.sh MAJOR.MINOR");
+            throw Tools.fail("usage: setversion.sh MAJOR.MINOR[.PATCH]");
         }
         try {
             set(Tools.repo(), args[0]);
@@ -61,18 +67,22 @@ public final class SetVersion {
     }
 
     /** Rewrites every site under {@code repo} to {@code version}, given
-     * as MAJOR.MINOR. Every site is matched before the first write, so a
+     * as MAJOR.MINOR[.PATCH] - the patch defaults to 0. Every site is
+     * matched before the first write, so a
      * refusal leaves every file as it was. */
     static void set(Path repo, String version) {
-        if (!version.matches("[0-9]{1,3}\\.[0-9]{1,3}")) {
-            throw new IllegalArgumentException("usage: setversion.sh MAJOR.MINOR");
+        if (!version.matches("[0-9]{1,3}\\.[0-9]{1,3}(\\.[0-9]{1,4})?")) {
+            throw new IllegalArgumentException(
+                    "usage: setversion.sh MAJOR.MINOR[.PATCH]");
         }
-        String[] halves = version.split("\\.");
-        int major = Integer.parseInt(halves[0]);
-        int minor = Integer.parseInt(halves[1]);
+        String[] parts = version.split("\\.");
+        int major = Integer.parseInt(parts[0]);
+        int minor = Integer.parseInt(parts[1]);
+        int patch = parts.length > 2 ? Integer.parseInt(parts[2]) : 0;
         if (major > 255 || minor > 255) {
             throw new IllegalArgumentException(
-                    "setversion: each half is a byte, 0 to 255");
+                    "setversion: each half of the format version is a byte,"
+                    + " 0 to 255");
         }
         int word = (major << 8) | minor;
         String name = major + "." + minor;
@@ -87,8 +97,8 @@ public final class SetVersion {
                         + " does not carry exactly one match of \""
                         + site.pattern() + "\" - the site has moved");
             }
-            texts.put(site.file(), found.reset().replaceAll(Matcher
-                    .quoteReplacement(String.format(site.template(), word, name))));
+            texts.put(site.file(), found.reset().replaceAll(Matcher.quoteReplacement(
+                    String.format(site.template(), word, name, patch))));
         }
         for (Map.Entry<String, String> text : texts.entrySet()) {
             try {
@@ -97,7 +107,8 @@ public final class SetVersion {
                 throw new IllegalArgumentException("setversion: " + text.getKey()
                         + ": " + e.getMessage());
             }
-            System.out.println(text.getKey() + ": version " + name);
+            System.out.println(text.getKey() + ": version " + name + "."
+                    + patch);
         }
     }
 
