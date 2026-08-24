@@ -115,6 +115,12 @@ public final class Tools {
         }
     }
 
+    /** The prebuilt binaries' name suffix - the format version, so
+     * files from different releases tell apart on sight. */
+    public static String binarySuffix() {
+        return "-v" + YmxFormat.versionName();
+    }
+
     /** Prints the message and leaves, the way the shell scripts did. */
     public static RuntimeException fail(String message) {
         System.err.println(message);

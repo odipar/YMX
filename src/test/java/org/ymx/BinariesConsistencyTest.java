@@ -86,7 +86,8 @@ final class BinariesConsistencyTest {
 
         int fixed = fixedFromEquates();
         for (int unit : new int[] {1, 2, 4}) {
-            byte[] core = Files.readAllBytes(dir.resolve("ymxsndh-k" + unit + ".bin"));
+            byte[] core = Files.readAllBytes(dir.resolve("ymxsndh-k" + unit
+                    + Tools.binarySuffix() + ".bin"));
             assertEquals('Y', core[MkSndh.CORE_MAGIC], "core k" + unit);
             assertEquals('C', core[MkSndh.CORE_MAGIC + 3], "core k" + unit);
             assertEquals(1, MkSndh.word(core, MkSndh.CORE_VERSION), "core k" + unit);
@@ -99,7 +100,8 @@ final class BinariesConsistencyTest {
             assertEquals(0, core.length & 1, "core k" + unit + " is even-sized");
         }
 
-        byte[] stub = Files.readAllBytes(dir.resolve("ymxprg.bin"));
+        byte[] stub = Files.readAllBytes(
+                dir.resolve("ymxprg" + Tools.binarySuffix() + ".bin"));
         assertEquals('Y', stub[MkPrg.STUB_MAGIC]);
         assertEquals('P', stub[MkPrg.STUB_MAGIC + 3]);
         assertEquals(1, MkSndh.word(stub, MkPrg.STUB_VERSION));

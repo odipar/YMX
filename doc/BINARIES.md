@@ -13,11 +13,13 @@ Two kinds of binary:
 
 | file | contents |
 |---|---|
-| `ymxsndh-k1.bin`, `-k2`, `-k4` | an **SNDH core**: the player and its SNDH glue, one per ST4 unit size |
-| `ymxprg.bin` | the **PRG stub**: a TOS program that drives an appended SNDH file |
+| `ymxsndh-k1-v<format version>.bin`, `-k2`, `-k4` | an **SNDH core**: the player and its SNDH glue, one per ST4 unit size |
+| `ymxprg-v<format version>.bin` | the **PRG stub**: a TOS program that drives an appended SNDH file |
 
-A `-perf` or `-nomask` suffix marks a core assembled with the raster monitor
-in, or with the frame write unmasked; the flags word below says which, so a
+Every name ends with the format version of the tunes the binary serves,
+so files from different releases tell apart on sight. A `-perf` or
+`-nomask` in the name marks a core assembled with the raster monitor in,
+or with the frame write unmasked; the flags word below says which, so a
 combiner verifies rather than parses names.
 
 Every variant is published at
@@ -33,11 +35,11 @@ format version is a new release; an unchanged one updates in place.
 ```
 +----------------------------------------------+
 | PRG header, 28 bytes                         |
-| PRG stub: ymxprg.bin, patched (§3)           |
+| PRG stub, patched (§3)                       |
 |  +--------------------------------------+    |
 |  | entry triple and tags (§2)           |    |
-|  | SNDH core: ymxsndh-k<u>.bin, the     |    |
-|  |   assembly options in its flags (§1) |    |
+|  | SNDH core (§1), the assembly         |    |
+|  |   options in its flags               |    |
 |  | subtune table                        |    |
 |  | tune 1, .ymx                         |    |
 |  | tune 2, .ymx                         |    |
@@ -188,7 +190,8 @@ long. No instruction changes.
 Each case is §5 with one decision changed.
 
 **One tune, its own sizes.** Read the tune's header, take the core its
-sections' unit selects - `ymxsndh-k1.bin` for a tune packed at unit 1 -
+sections' unit selects - `ymxsndh-k1-v<format version>.bin` for a tune
+packed at unit 1 -
 write the SNDH with one table entry and a workspace of `F + 25 · N`, wrap
 it. The stub's frame count is the tune's frame count when header flag
 bit 0 is clear, 0 when the tune starts over.

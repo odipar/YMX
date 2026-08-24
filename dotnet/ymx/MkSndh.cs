@@ -328,7 +328,8 @@ namespace Ymx
             string suffix = (options.Perf ? "-perf" : "")
                     + (options.MaskBurst ? "" : "-nomask");
             string core = Path.Combine(Tools.Repo(), "dist",
-                    "ymxsndh-k" + unit + suffix + ".bin");
+                    "ymxsndh-k" + unit + suffix + Tools.BinarySuffix()
+                            + ".bin");
             if (Stale(core, "YMX_sndh.S", "YMX.S", "ST4_wrap.S"))
             {
                 MkCores.Cores(Path.Combine(Tools.Repo(), "dist"), options.Perf,

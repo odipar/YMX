@@ -35,7 +35,8 @@ public final class MkCores {
                                 include "YMX_sndh.S"
                         """.formatted(unit, perf ? 1 : 0, nomask ? 0 : 1),
                         StandardCharsets.ISO_8859_1);
-                Path core = out.resolve("ymxsndh-k" + unit + suffix + ".bin");
+                Path core = out.resolve("ymxsndh-k" + unit + suffix
+                        + Tools.binarySuffix() + ".bin");
                 Tools.run(work, List.of("rmac", "-m68000", "-fr", "+o3",
                         "-i" + Tools.repo().resolve("68k"),
                         "-o", core.toString(), "core.S"));
@@ -55,7 +56,7 @@ public final class MkCores {
         } catch (IOException e) {
             throw Tools.fail("mkcores: cannot make " + out);
         }
-        Path stub = out.resolve("ymxprg.bin");
+        Path stub = out.resolve("ymxprg" + Tools.binarySuffix() + ".bin");
         Tools.run(Tools.repo().resolve("68k"), List.of("rmac", "-m68000",
                 "-fr", "+o3", "-o", stub.toString(), "YMX_player.S"));
         System.out.println(stub + ": " + Tools.size(stub) + " bytes");

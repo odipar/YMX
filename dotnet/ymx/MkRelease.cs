@@ -22,7 +22,8 @@ namespace Ymx
             internal string FileName()
             {
                 return "ymxsndh-k" + Unit + (Perf ? "-perf" : "")
-                        + (Nomask ? "-nomask" : "") + ".bin";
+                        + (Nomask ? "-nomask" : "") + Tools.BinarySuffix()
+                        + ".bin";
             }
 
             internal int Flags()
@@ -107,8 +108,10 @@ namespace Ymx
                     manifest.Append(Entry(variant.FileName(), core,
                             variant.Unit + "  " + variant.Flags()));
                 }
-                byte[] stub = MkPrg.ReadStub(Path.Combine(dir, "ymxprg.bin"));
-                manifest.Append(Entry("ymxprg.bin", stub, "-  -"));
+                byte[] stub = MkPrg.ReadStub(Path.Combine(dir,
+                        "ymxprg" + Tools.BinarySuffix() + ".bin"));
+                manifest.Append(Entry("ymxprg" + Tools.BinarySuffix() + ".bin",
+                        stub, "-  -"));
                 File.WriteAllText(Path.Combine(dir, "MANIFEST.txt"),
                         manifest.ToString(), Encoding.Latin1);
             }
@@ -154,7 +157,8 @@ namespace Ymx
             {
                 upload.Add(Path.Combine(dir, variant.FileName()));
             }
-            upload.Add(Path.Combine(dir, "ymxprg.bin"));
+            upload.Add(Path.Combine(dir,
+                    "ymxprg" + Tools.BinarySuffix() + ".bin"));
             upload.Add(Path.Combine(dir, "MANIFEST.txt"));
             Tools.RunLoudly(Tools.Repo(), upload);
             Console.WriteLine("published " + tag);

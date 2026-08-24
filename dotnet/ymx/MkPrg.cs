@@ -163,7 +163,8 @@ namespace Ymx
             {
                 return named;
             }
-            string stub = Path.Combine(Tools.Repo(), "dist", "ymxprg.bin");
+            string stub = Path.Combine(Tools.Repo(), "dist",
+                    "ymxprg" + Tools.BinarySuffix() + ".bin");
             if (MkSndh.Stale(stub, "YMX_player.S"))
             {
                 MkCores.Stub(Path.Combine(Tools.Repo(), "dist"));
