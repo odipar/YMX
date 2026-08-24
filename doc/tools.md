@@ -289,6 +289,7 @@ of `dotnet dotnet/bin/Release/net10.0/ymx.dll` names the tool:
 | `YMX_PACK_OPTIONS` | sweep.sh | extra packer options for the sweep |
 | `YMR_FRAME_CAP` | ymr_sweep.sh | the .ymr sweep's frame cap |
 | `YM_CORPUS` | mvn test | the directory holding the YM collection the documents count; without it the tests that read those figures back are skipped |
+| `YMX_PLAY_FRAMES` | run.sh | how many frames the real-hardware harness plays; raise it to resolve a smaller cycle difference |
 | `ymx.repo` / `YMX_REPO` | the combiners, the play tools and the rigs | the repository root, when not derivable (the Java property, the C# variable) |
 | `ymx.core` / `YMX_CORE` | mksndh.sh | a core file, overriding `dist/` |
 | `ymx.stub` / `YMX_STUB` | mkprg.sh | a stub file, overriding `dist/` |

@@ -15,14 +15,28 @@ import java.util.List;
  *
  * <p>{@code ymx/test/run.sh} runs this before assembling the harness.
  */
-final class GenData {
+public final class GenData {
 
     private static final int FRAMES = 1500;
     private static final int RING = 960;
     private static final int CHUNK = 24;
     private static final int EXTRA = 200;   // frames played past the end,
                                             // through the restart
+
+    /** The frames the harness plays when nothing asks for more. */
+    public static final int DEFAULT_PLAY = FRAMES + EXTRA;
+
     private GenData() {}
+
+    /** How many frames the harness plays. One tick of its 200 Hz clock
+     * covers 40,000 cycles at 8 MHz, so the frames played set what a tick
+     * difference is worth: the default 1,700 resolve 24 cycles a frame,
+     * 18,000 resolve 2. {@code YMX_PLAY_FRAMES} raises it to compare two
+     * players. */
+    private static int played() {
+        String asked = System.getenv("YMX_PLAY_FRAMES");
+        return asked == null ? DEFAULT_PLAY : Integer.parseInt(asked);
+    }
 
     /** Fold what a YM2149 would read back after each frame into one long.
      * Registers keep their value until written again, which makes R13
@@ -49,7 +63,7 @@ final class GenData {
                 "org.ym6.Ymx", "-f", "-n" + RING, "-c" + CHUNK, "-k1",
                 tune.toString(), packed.toString()));
 
-        int played = FRAMES + EXTRA;
+        int played = played();
         long checksum = chipChecksum(GenYm.chipStates(FRAMES, source, true, 0, played));
         // The player reports a wrap on the frame that ends the tune, so
         // count the times the last frame is played, not the times frame 0 is.
