@@ -133,6 +133,14 @@ The three player tests run the 68000 player under emulation and need rmac
 and libunicorn (`brew install unicorn`, or `UNICORN_LIB` names the
 library).
 
+Two tests read the documents' figures back against the YM collection they
+count, which is not in the tree. `YM_CORPUS` says which directory holds
+it, and `mvn test` skips those two without it:
+
+```sh
+YM_CORPUS=/path/to/ym_collection mvn test
+```
+
 Every shell script also takes `-dotnet` as its first argument, which runs
 the C# tree in [dotnet/](dotnet) instead of the Java one - the same tools
 and rigs, producing the same bytes, built by the .NET SDK on first use.

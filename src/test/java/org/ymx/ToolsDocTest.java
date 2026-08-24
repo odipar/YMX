@@ -93,6 +93,7 @@ final class ToolsDocTest {
                 "src/test/java/org/ymx/rig/Sweep.java,dotnet/rig/Sweep.cs");
         map.put("YMR_FRAME_CAP",
                 "src/test/java/org/ymx/rig/YmrSweep.java,dotnet/rig/YmrSweep.cs");
+        map.put("YM_CORPUS", "src/test/java/org/ym6/CorpusNumbersTest.java");
         map.put("ymx.repo", "src/main/java/org/ymx/Tools.java");
         map.put("ymx.core", "src/main/java/org/ymx/MkSndh.java");
         map.put("ymx.stub", "src/main/java/org/ymx/MkPrg.java");
