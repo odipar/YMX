@@ -49,7 +49,7 @@ public record YmxHeader(int ring, int chunk, int unit, int hz, int flags, int fr
             throw new IOException(path + " is format version "
                     + YmxFormat.versionName(version) + ", this build reads "
                     + YmxFormat.versionName()
-                    + " - repack the tune from its .ym source");
+                    + " - repack the tune from its .ym or .ymr source");
         }
         // A stored section carries no signature, so the unit size comes from
         // the first section that is a container - out of either table, since

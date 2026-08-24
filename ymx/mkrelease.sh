@@ -12,6 +12,12 @@
 # - with gh, replacing its assets and posting this release's section of
 # doc/RELEASES.md as the notes.
 #
+# A new release is tagged at the staged commit, the one its notes name. An
+# existing tag stays where it is: a run from another commit stops rather
+# than posting notes naming a commit the tag does not reach. A patch is
+# published beside the patch before it, and the superseded release is
+# deleted by hand - nothing here removes a published release.
+#
 # The work is org.ymx.MkRelease's; this only finds the repo and the classes.
 # Needs rmac; -publish needs gh and a pushed HEAD.
 set -e

@@ -17,23 +17,28 @@ A loop frame in the header, and the sections to reach it. Format version
 0.5: a tune packed at 0.4 has to be repacked from its `.ym` or `.ymr`
 source.
 
+- The player is 3,394 bytes at unit size 2, where 0.4.1 carried 3,256.
 - The header is 138 bytes, eight more than 0.4 carried. The long at
   offset 30 is `L`, the frame a tune that starts over goes back to; the
   long at 34 is the offset of a loop table. The section table follows
   at 38.
 - `L` carries the frame the source starts over from, where the packer can
   keep it: the frame has to be one the wrap can enter with the timers
-  stopped and the skips cleared. Where it cannot be entered the packer
-  takes the next one that can, up to a second later; where no frame in
-  reach can be, `L` carries 0 and the tune starts over from its first
-  frame, as it did at 0.4. Each conversion says which.
-- A tune whose pass fits a ring - `O - L` at most `N` - is decoded once.
-  The refills stop at `O` values, and the wrap moves the read position
-  back `O - L` bytes in every ring, so a second pass decodes nothing.
-  The values written to the sound chip are the same either way.
+  stopped, the skips cleared and the envelope generator not restarted.
+  Where it cannot be entered the packer takes the next one that can, up to
+  a second later; where no frame in reach can be, `L` carries 0 and the
+  tune starts over from its first frame, as it did at 0.4. Each conversion
+  says which.
+- A tune whose pass fits a ring - `O - L` at most the ring size `N`, where
+  `O` is the frame count - is decoded once. The refills stop at `O`
+  values, and the wrap moves the read position back `O - L` bytes in every
+  ring, so a second pass decodes nothing. The values written to the sound
+  chip are the same either way.
 - Raising `N` to hold a pass costs workspace and no file bytes, and a
   bigger ring lets a back-reference reach further, so a body past the ring
-  raises it, up to the cap SPEC.md §1.3 sets.
+  raises it, up to the cap of 2,520 bytes a ring. The header carries the
+  raised size, and a host sizes its workspace from that word rather than
+  from the ring size the tune was packed with.
 - Past that cap the file carries two sections per stream instead: the
   section table locates frames `[0, L)` and the loop table, twenty-five
   entries at the offset in the header, locates `[L, O)`. A stream opens

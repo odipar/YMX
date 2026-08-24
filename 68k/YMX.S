@@ -103,12 +103,19 @@
 ;
 ;   YMX_SIZE = YMX_FIXED + 25 * N       ; 1658 + 25 * N bytes
 ;
-; For the default 960-byte rings that is 25658 bytes. A program with N at
-; build time can reserve it with
+; N is the file's own, the header word at YH_RING, and the packer raises it
+; above the ring size it was asked for where one pass of a tune needs a
+; longer ring: a file packed for 960-byte rings can carry N = 1776. A
+; program sizing at run time reads that word and takes
+; YMX_FIXED+(YMX_STREAMS*N) bytes. A program sizing at build time reserves
+; for the format's cap of 2520 bytes a ring, the largest N a file carries:
 ;
-;       ds.b    YMX_FIXED+(YMX_STREAMS*960)
+;       ds.b    YMX_FIXED+(YMX_STREAMS*2520)    ; 64658 bytes
 ;
 ; where the parentheses matter: rmac evaluates expressions left to right.
+; A workspace reserved for 960 holds only the files whose header says 960
+; or less: the player writes a longer file's rings past the end, and init
+; checks nothing (assumption 2).
 ;
 ; CALLS AND REGISTERS
 ;

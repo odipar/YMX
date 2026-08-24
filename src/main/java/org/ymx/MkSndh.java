@@ -362,7 +362,9 @@ public final class MkSndh {
             throw new IllegalArgumentException(path + " reads format version "
                     + YmxFormat.versionName(word(core, CORE_FORMAT))
                     + " and the tunes carry " + YmxFormat.versionName()
-                    + " - reassemble it with ymx/mkcores.sh");
+                    + " - take the core for " + YmxFormat.versionName()
+                    + " from the binaries release, or reassemble it with"
+                    + " ymx/mkcores.sh");
         }
         int flags = (options.perf() ? CORE_FLAG_PERF : 0)
                 | (options.maskBurst() ? 0 : CORE_FLAG_NOMASK);

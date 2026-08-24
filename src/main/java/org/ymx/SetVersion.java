@@ -17,7 +17,9 @@ import java.util.regex.Pattern;
  * must match exactly once, so a reworded sentence fails loudly instead
  * of being skipped, and nothing is written unless every site matched.
  * {@code SpecConsistencyTest} reads the same sites back against
- * {@link YmxFormat#VERSION} and {@link YmxFormat#PATCH}.
+ * {@link YmxFormat#VERSION} and {@link YmxFormat#PATCH}, and holds the
+ * prose around the two constants to naming no version, so these eight
+ * are the whole list.
  */
 public final class SetVersion {
 

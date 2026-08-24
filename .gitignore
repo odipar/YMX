@@ -45,6 +45,9 @@ build/
 .ym_work/
 .prg_work/
 
+# an assembler run by hand leaves an object file beside the source
+*.o
+
 # rig scratch: assembled builds, packed tunes, the SNDH build
 ymx/test/.work/
 

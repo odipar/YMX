@@ -125,6 +125,7 @@ namespace Ymx
                 }
                 byte[] stub = MkPrg.ReadStub(Path.Combine(dir,
                         "ymxprg" + Tools.BinarySuffix() + ".bin"));
+                VerifyStub(stub);
                 manifest.Append(Entry("ymxprg" + Tools.BinarySuffix() + ".bin",
                         stub, "-  -"));
                 File.WriteAllText(Path.Combine(dir, "MANIFEST.txt"),
@@ -154,10 +155,16 @@ namespace Ymx
         /// <summary>The GitHub release tagged by the release version, its
         /// assets replaced and its notes rewritten, so the commit they name
         /// is the one the assets were assembled at and the account of what
-        /// changed is this release's section of doc/RELEASES.md.</summary>
+        /// changed is this release's section of doc/RELEASES.md. A release
+        /// created here is tagged at the staged commit; a tag that exists
+        /// stays where it is, so a run whose HEAD has moved past it stops
+        /// instead of posting notes naming a commit the tag does not
+        /// reach.</summary>
         private static void Publish(string dir, string commit)
         {
             string tag = Tag();
+            string head = Tools.Output(Tools.Repo(),
+                    new List<string> {"git", "rev-parse", "HEAD"});
             string notes = ReleaseNotes() + "\n\nPrebuilt SNDH cores and the"
                     + " PRG stub, assembled at " + commit + ". doc/BINARIES.md"
                     + " is the combine contract; MANIFEST.txt lists sizes and"
@@ -165,17 +172,54 @@ namespace Ymx
             if (Tools.Status(Tools.Repo(),
                     new List<string> {"gh", "release", "view", tag}) != 0)
             {
-                Tools.RunLoudly(Tools.Repo(), new List<string> {"gh", "release",
-                        "create", tag,
-                        "--title", "YMX player binaries " + YmxFormat.ReleaseName()
-                                + ", format " + YmxFormat.VersionName(),
-                        "--notes", notes});
+                Tools.RunLoudly(Tools.Repo(), CreateCommand(tag, head, notes));
             }
             else
             {
-                Tools.RunLoudly(Tools.Repo(), new List<string> {"gh", "release",
-                        "edit", tag, "--notes", notes});
+                string tagged = Tools.Output(Tools.Repo(), new List<string>
+                        {"gh", "api", "repos/{owner}/{repo}/commits/" + tag,
+                        "--jq", ".sha"});
+                if (tagged != head)
+                {
+                    throw new ArgumentException("mkrelease: " + tag
+                            + " is tagged at " + ShortSha(tagged) + " and this"
+                            + " run staged " + commit + " - stage from "
+                            + ShortSha(tagged) + ", or delete the release and"
+                            + " its tag and publish again");
+                }
+                Tools.RunLoudly(Tools.Repo(), EditCommand(tag, notes));
             }
+            Tools.RunLoudly(Tools.Repo(), UploadCommand(dir, tag));
+            Console.WriteLine("published " + tag + " at " + commit);
+        }
+
+        /// <summary>The command that creates the release: --target tags the
+        /// commit whose bytes are staged, rather than the default branch's
+        /// head. The whole SHA goes in, not the short form the notes
+        /// carry.</summary>
+        internal static List<string> CreateCommand(string tag, string head,
+                string notes)
+        {
+            return new List<string> {"gh", "release", "create", tag,
+                    "--target", head,
+                    "--title", "YMX player binaries " + YmxFormat.ReleaseName()
+                            + ", format " + YmxFormat.VersionName(),
+                    "--notes", notes};
+        }
+
+        /// <summary>The command that rewrites an existing release's notes.
+        /// It moves no tag, which is why the caller reads the tag's commit
+        /// first.</summary>
+        internal static List<string> EditCommand(string tag, string notes)
+        {
+            return new List<string> {"gh", "release", "edit", tag,
+                    "--notes", notes};
+        }
+
+        /// <summary>The command that replaces every asset: each core, the
+        /// stub and the manifest, out of the staging directory.</summary>
+        internal static List<string> UploadCommand(string dir, string tag)
+        {
             var upload = new List<string> {"gh", "release", "upload", tag,
                     "--clobber"};
             foreach (Variant variant in Matrix())
@@ -185,8 +229,14 @@ namespace Ymx
             upload.Add(Path.Combine(dir,
                     "ymxprg" + Tools.BinarySuffix() + ".bin"));
             upload.Add(Path.Combine(dir, "MANIFEST.txt"));
-            Tools.RunLoudly(Tools.Repo(), upload);
-            Console.WriteLine("published " + tag);
+            return upload;
+        }
+
+        /// <summary>A commit as the notes spell it: the first seven
+        /// characters of the SHA, or all of a shorter string.</summary>
+        private static string ShortSha(string sha)
+        {
+            return sha.Length > 7 ? sha.Substring(0, 7) : sha;
         }
 
         /// <summary>The tag this release publishes under: the release
@@ -241,6 +291,8 @@ namespace Ymx
         internal static void VerifyCore(byte[] core, Variant variant)
         {
             if (core.Length < 34 || core[MkSndh.CoreMagic] != 'Y'
+                    || core[MkSndh.CoreMagic + 1] != 'M'
+                    || core[MkSndh.CoreMagic + 2] != 'X'
                     || core[MkSndh.CoreMagic + 3] != 'C')
             {
                 throw new ArgumentException(variant.FileName()
@@ -271,10 +323,74 @@ namespace Ymx
                         + MkSndh.Word(core, MkSndh.CoreFlags) + ", its name says "
                         + variant.Flags());
             }
+            int fixedBytes = MkSndh.Word(core, MkSndh.CoreWorkFixed);
+            if (fixedBytes == 0 || (fixedBytes & 1) != 0)
+            {
+                throw new ArgumentException(variant.FileName() + " gives F = "
+                        + fixedBytes + ", the workspace bytes before the rings:"
+                        + " nonzero and even");
+            }
+            if (!ZeroLong(core, MkSndh.CoreTableOff))
+            {
+                throw new ArgumentException(variant.FileName() + " carries a"
+                        + " table offset; a combiner patches that long, so a"
+                        + " released core carries 0");
+            }
+            if (!ZeroLong(core, MkSndh.CoreWorkOff))
+            {
+                throw new ArgumentException(variant.FileName() + " carries a"
+                        + " workspace offset; a combiner patches that long, so a"
+                        + " released core carries 0");
+            }
             if ((core.Length & 1) != 0)
             {
                 throw new ArgumentException(variant.FileName() + " is odd-sized");
             }
+        }
+
+        /// <summary>The descriptor checks MkPrg performs at wrap time, run
+        /// once at release time, with two of the fields a combiner patches
+        /// read back: a released stub carries the frame count and the flags
+        /// as the assembler left them.</summary>
+        internal static void VerifyStub(byte[] stub)
+        {
+            string name = "ymxprg" + Tools.BinarySuffix() + ".bin";
+            if (stub.Length < 18 || stub[MkPrg.StubMagic] != 'Y'
+                    || stub[MkPrg.StubMagic + 1] != 'M'
+                    || stub[MkPrg.StubMagic + 2] != 'X'
+                    || stub[MkPrg.StubMagic + 3] != 'P')
+            {
+                throw new ArgumentException(name + " is not a PRG stub");
+            }
+            if (MkSndh.Word(stub, MkPrg.StubVersion) != 1)
+            {
+                throw new ArgumentException(name
+                        + " carries stub descriptor version "
+                        + MkSndh.Word(stub, MkPrg.StubVersion) + ", not 1");
+            }
+            if (!ZeroLong(stub, MkPrg.StubFrames))
+            {
+                throw new ArgumentException(name + " carries a frame count;"
+                        + " a combiner patches that long, so a released stub"
+                        + " carries 0");
+            }
+            if (MkSndh.Word(stub, MkPrg.StubFlags) != 0)
+            {
+                throw new ArgumentException(name + " carries flags "
+                        + MkSndh.Word(stub, MkPrg.StubFlags) + "; a combiner"
+                        + " patches that word, so a released stub carries 0");
+            }
+            if ((stub.Length & 1) != 0)
+            {
+                throw new ArgumentException(name + " is odd-sized");
+            }
+        }
+
+        /// <summary>Whether the long at an offset is zero - the value the
+        /// assembler writes where a combiner patches.</summary>
+        private static bool ZeroLong(byte[] bytes, int at)
+        {
+            return MkSndh.Word(bytes, at) == 0 && MkSndh.Word(bytes, at + 2) == 0;
         }
 
         internal static string Sha256(byte[] bytes)

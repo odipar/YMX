@@ -112,7 +112,8 @@ final class YmxTest {
     @Test
     void playOnceClearsTheFlagTheHeaderOtherwiseSets(@TempDir Path dir)
             throws Exception {
-        assertTrue(pack(dir, "over.ymx").contains("Plays through, then starts over"));
+        assertTrue(pack(dir, "over.ymx").contains("Plays through, then starts over"
+                + " from frame 0, replaying all of its " + FRAMES + " frames"));
         assertTrue(pack(dir, "once.ymx", "-o").contains("Plays once, then stops"));
     }
 

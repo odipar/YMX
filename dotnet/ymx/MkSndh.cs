@@ -415,7 +415,9 @@ namespace Ymx
                 throw new ArgumentException(path + " reads format version "
                         + YmxFormat.VersionName(Word(core, CoreFormat))
                         + " and the tunes carry " + YmxFormat.VersionName()
-                        + " - reassemble it with ymx/mkcores.sh");
+                        + " - take the core for " + YmxFormat.VersionName()
+                        + " from the binaries release, or reassemble it with"
+                        + " ymx/mkcores.sh");
             }
             int flags = (options.Perf ? CoreFlagPerf : 0)
                     | (options.MaskBurst ? 0 : CoreFlagNomask);

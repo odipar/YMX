@@ -83,6 +83,12 @@ player byte for byte.
         bsr     YMX_stop                ; chip quiet, timers stopped
 ```
 
+`YMX_SIZE` follows the ring size the tune's own header gives, and the packer
+raises that above the `-n` it was asked for where one pass of a tune needs a
+longer ring: a program reads the header word rather than the flag the tune
+was packed with, or reserves for the format's cap. [68k/YMX.S](68k/YMX.S)
+gives both forms.
+
 <!-- The two byte counts below are measured by the rig (ymx/test/rig.sh),
      which reads them back out of this sentence: keep the shape of it. -->
 [68k/YMX.S](68k/YMX.S) is the player, 3,394 bytes at the `ST4_UNIT` 2 below,

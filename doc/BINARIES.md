@@ -33,8 +33,9 @@ stub, and a `MANIFEST.txt` of sizes and SHA-256 digests with the source
 commit, the release version and the format version. The release notes
 are that release's section of [RELEASES.md](RELEASES.md), which says
 what changed in it. A new format version is a new release; so is a patch
-of the same format, which replaces the patch before it. An unchanged
-release updates in place.
+of the same format, which is published beside the patch before it:
+`ymx/mkrelease.sh` removes no published release, so a superseded patch is
+deleted by hand. An unchanged release updates in place.
 
 ## The stack
 
@@ -204,7 +205,10 @@ count when header flag bit 0 is clear, 0 when the tune starts over.
 
 **A chosen workspace.** `N` is the packer's decision, written in the
 tune's header - the maximum back-reference distance, not a combiner
-option. A combiner chooses only the workspace size: anything at or above
+option. The packer also raises `N` above the ring size it was asked for
+where one pass of a tune needs a longer ring, so the ring size a set was
+packed with is not the `N` its tunes carry: read every tune's header. A
+combiner chooses only the workspace size: anything at or above
 `F + 25 · max(N)` (§1). `F + 25 · 2520` - the cap on `N` (`SPEC.md`
 §1.3) - covers every legal tune, so a combiner may write that once and
 skip the per-set maximum.

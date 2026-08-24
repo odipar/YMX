@@ -17,8 +17,7 @@ namespace Ymx
 
         /// <summary>The only version this release writes or reads: the
         /// major in the high byte, the minor in the low, so versions order
-        /// numerically - $0005, version 0.5, sorts before $0100, version
-        /// 1.0.</summary>
+        /// numerically.</summary>
         public const int Version = 0x0005;
 
         /// <summary>The released binaries' patch number: it moves when
@@ -28,8 +27,8 @@ namespace Ymx
         /// word.</summary>
         public const int Patch = 0;
 
-        /// <summary>The release's version as prose: the format version
-        /// plus the patch, "0.5.0".</summary>
+        /// <summary>The release's version as prose: the format version,
+        /// then the patch, a dot between them.</summary>
         public static string ReleaseName()
         {
             return VersionName() + "." + Patch;
@@ -327,7 +326,7 @@ namespace Ymx
                 throw new IOException(path + " is format version "
                         + YmxFormat.VersionName(version) + ", this build reads "
                         + YmxFormat.VersionName()
-                        + " - repack the tune from its .ym source");
+                        + " - repack the tune from its .ym or .ymr source");
             }
             // A stored section carries no signature, so the unit size comes
             // from the first section that is a container - out of either

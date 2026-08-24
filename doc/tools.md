@@ -48,7 +48,7 @@ tells them apart - and writes a `.ymx`.
 | `-f` | overwrite the output file |
 | `-o` | play once: stop at the end instead of starting over |
 | `-lF` | start over from frame F rather than from the frame the header gives; `-l0` from the beginning. Where the wrap cannot enter F the packer takes the next frame it can - `ym/CONVERSION.md` states how far it looks |
-| `-nN` | ring size per stream, bytes (default 960) |
+| `-nN` | ring size per stream, bytes (default 960). The packer raises it, up to the cap of 2520, where one pass of a tune needs a longer ring, and says so; the ring size the file carries is the header's, not this flag's |
 | `-cC` | values decoded per call, the round-robin group size (default 24) |
 | `-kK` | ST4 unit size 1, 2 or 4 (default 2); an odd tune length is padded with safe duplicate frames |
 | `-minM` `-secS` | trim: drop everything before M:S |
@@ -140,6 +140,12 @@ with no account of what it changes is not published.
 |---|---|
 | `-publish` | create or update the GitHub release `binaries-v<release>` through `gh`, replacing its assets |
 
+A new release is tagged at the staged commit, the one its notes name. An
+existing tag stays where it is, so a run from another commit stops rather
+than posting notes naming a commit the tag does not reach. A patch is
+published beside the patch before it, and the superseded release is
+deleted by hand: the tool removes no published release.
+
 ### setversion.sh
 
 Rewrites the version at every site that carries it: the format constants
@@ -153,10 +159,11 @@ sites back.
 
     ymx/setversion.sh MAJOR.MINOR[.PATCH]
 
-The patch defaults to 0, so a format bump clears it. After a bump:
-reassemble the cores (`mkcores.sh`), repin the corpus
-(`mvn test -Dymx.pin=refresh`) and publish (`mkrelease.sh -publish`). A
-patch alone - the binaries changed, the format did not - needs no repin.
+The patch defaults to 0, so a format bump clears it. After a bump: write
+this release's section in `doc/RELEASES.md`, reassemble the cores
+(`mkcores.sh`), repin the corpus (`mvn test -Dymx.pin=refresh`) and
+publish (`mkrelease.sh -publish`). A patch alone - the binaries changed,
+the format did not - needs no repin.
 
 ## Listening
 
