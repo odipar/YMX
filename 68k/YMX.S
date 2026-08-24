@@ -70,10 +70,14 @@
 ; player opens it again - a fresh decoder writing on into the same ring - so
 ; the rings always hold one continuous sequence of values and nothing on the
 ; read side changes when it happens. Nothing requires the boundary to fall on
-; a group boundary: a refill that straddles it decodes two pieces. On the
-; frame the tune ends, the player stops every claimed timer, parks its vector
-; and opens every skip, which is the state the script was compiled from - so
-; the second pass plays exactly as the first.
+; a group boundary: a refill that straddles it decodes two pieces. One pass
+; runs O - L frames, L the header's loop frame, and a pass of at most N
+; frames fits a ring: no section is opened twice, the refills stop at O
+; values, and at the wrap the cursor goes back by O - L onto the bytes of
+; the pass just played. L is 0 at this format version, so a pass is the whole
+; tune. On the frame the tune ends, the player stops every claimed timer,
+; parks its vector and opens every skip, which is the state the script was
+; compiled from - so the second pass plays exactly as the first.
 ;
 ; -----------------------------------------------------------------------------
 ; USING IT
@@ -94,9 +98,9 @@
 ; and one ring per stream, so its size depends on the ring size in the file.
 ; It is always sized for all twenty-five, whatever the tune uses:
 ;
-;   YMX_SIZE = YMX_FIXED + 25 * N       ; 1646 + 25 * N bytes
+;   YMX_SIZE = YMX_FIXED + 25 * N       ; 1650 + 25 * N bytes
 ;
-; For the default 960-byte rings that is 25646 bytes. A program with N at
+; For the default 960-byte rings that is 25650 bytes. A program with N at
 ; build time can reserve it with
 ;
 ;       ds.b    YMX_FIXED+(YMX_STREAMS*960)
@@ -244,8 +248,12 @@ YMX_TOTAL       equ     24              ; long  O, the tune length in frames
 YMX_N           equ     28              ; word  ring size N
 YMX_C           equ     30              ; word  values per call C
 YMX_SLOT        equ     32              ; word  refill turn, 0..C-1
-                                        ; 34: an unused word holds the
-                                        ; offsets below where they were
+YMX_RING        equ     34              ; word  nonzero when a pass fits a
+                                        ; ring: O - L <= N, and the tune
+                                        ; starts over. The frames of a pass
+                                        ; are then all resident at the wrap,
+                                        ; so O values are decoded once and
+                                        ; the cursor rewinds instead
 YMX_LOOPS       equ     36              ; word  nonzero when the tune starts over
 YMX_EFXOFF      equ     38              ; long  14*N: the cursor's ring to M's
 YMX_TMAP        equ     42              ; word  the channel-to-timer map in
@@ -255,7 +263,12 @@ YMX_LIVE        equ     44              ; word  streams still worth decoding:
                                         ; the channels sit last, so a tune
                                         ; that uses two leaves the others'
                                         ; pair off the end
-YMX_STATE       equ     46              ; the decoder states, from an even base
+YMX_BODY        equ     46              ; long  O - L, the frames one pass
+                                        ; plays; the countdown reloads with it
+YMX_STATE       equ     50              ; the decoder states, from an even
+                                        ; base. The lea that reaches them
+                                        ; carries this as an 8-bit
+                                        ; displacement, so it stays under 128
 
 ; A timer channel is the format's idea; which of the MFP's four serves it
 ; is this file's. One
@@ -407,6 +420,29 @@ YMX_init:
         move.w  YH_FLAGS(a0),d0
         and.w   #YMX_FLAG_LOOPS,d0
         move.w  d0,YMX_LOOPS(a3)
+
+; One pass is O - L frames, and L has a meaning only under the loop flag.
+; A pass that fits a ring leaves every frame of it resident at the wrap: the
+; refills stop at O values and the cursor goes back by the length of a pass.
+; Both fields are written on every init, not left as they were found: the
+; workspace is zero-filled once and never again, so a value from the tune
+; before this one would survive a switch.
+        move.l  YH_FRAMES(a0),d1
+        tst.w   d0
+        beq.s   .body_ready
+        sub.l   YH_LOOP(a0),d1
+.body_ready:
+        move.l  d1,YMX_BODY(a3)
+        clr.w   YMX_RING(a3)
+        tst.w   d0
+        beq.s   .ring_ready
+        moveq   #0,d0
+        move.w  YH_RING(a0),d0
+        cmp.l   d0,d1
+        bhi.s   .ring_ready
+        move.w  #1,YMX_RING(a3)
+.ring_ready:
+
         move.l  YH_FRAMES(a0),YMX_LEFTFR(a3)
         clr.w   YMX_SLOT(a3)
         lea     YMX_FIXED(a3),a1        ; the rings follow the decoder states
@@ -419,8 +455,11 @@ YMX_init:
 
         moveq   #0,d1                   ; the first group is C values, or the
         move.w  YMX_C(a3),d1            ; whole tune when that is shorter and
-        tst.w   YMX_LOOPS(a3)           ; there is no second pass to run into
+        tst.w   YMX_RING(a3)            ; the O values are all that is decoded
+        bne.s   .bounded_group
+        tst.w   YMX_LOOPS(a3)           ; a second pass to run into
         bne.s   .first_group
+.bounded_group:
         move.l  YMX_TOTAL(a3),d0
         cmp.l   d1,d0
         bcc.s   .first_group
@@ -962,8 +1001,12 @@ ymx_wT:
         bcc.s   .advance
         moveq   #0,d3
         move.w  YMX_C(a3),d3            ; a whole group
+        tst.w   YMX_RING(a3)
+        bne.s   .bounded                ; a pass that fits a ring is decoded
+                                        ; once and replayed from the ring
         tst.w   YMX_LOOPS(a3)
         bne.s   .refill                 ; a tune that starts over never runs out
+.bounded:
         move.l  YMX_TOTAL(a3),d1
         sub.l   YMX_NEXT(a3),d1         ; values still packed
         ble.s   .advance                ; all decoded: never call ST4 again
@@ -994,14 +1037,32 @@ ymx_wT:
 
 ; The rings hold the tune as one continuous sequence, so reaching the end of
 ; the last frame means the next values in them are frame 0's again.
-; The countdown follows: it reloads with the tune length.
+; The countdown follows: it reloads with the length of a pass.
         subq.l  #1,YMX_LEFTFR(a3)
         bne.s   .played
         tst.w   YMX_LOOPS(a3)
         beq.s   .played                 ; zero and it plays once: the next
                                         ; call ends
         bsr     ymx_restart             ; the tune starts over, from silence
-        move.l  YMX_TOTAL(a3),YMX_LEFTFR(a3)
+        move.l  YMX_BODY(a3),YMX_LEFTFR(a3)
+
+; A pass that fits a ring was decoded once, so the bytes ahead of the cursor
+; are the ones just played. The cursor goes back by the length of a pass, and
+; where a pass crossed the ring end that lands below the ring area: one ring
+; length forward puts it back. The cursor is an absolute long, so the
+; correction is a long add of a zero-extended N.
+        tst.w   YMX_RING(a3)
+        beq.s   .wrapped
+        move.l  YMX_CURSOR(a3),d0
+        sub.l   YMX_BODY(a3),d0
+        cmp.l   YMX_RINGS(a3),d0
+        bcc.s   .rewound
+        moveq   #0,d1
+        move.w  YMX_N(a3),d1
+        add.l   d1,d0
+.rewound:
+        move.l  d0,YMX_CURSOR(a3)
+.wrapped:
         .if YMX_PERF
         move.w  #$770,$FFFF8240.w       ; then the timers' bar: what the
         lea     ymx_perf_acc(pc),a0     ; ticks cost since last frame,

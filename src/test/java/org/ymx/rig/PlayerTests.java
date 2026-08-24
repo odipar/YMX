@@ -912,6 +912,7 @@ final class PlayerTests {
                 new Object[] {600, 960, 64, "long calls 960/64", true, 1, 1},
                 new Object[] {608, 34, 17, "tightest legal 34/17", true, 1, 1},
                 new Object[] {37, 960, 24, "shorter than a ring", true, 3, 1},
+                new Object[] {48, 48, 24, "exactly a ring", true, 2, 1},
                 new Object[] {40, 960, 24, "shorter than two groups", true, 4, 1},
                 new Object[] {24, 960, 24, "exactly one group", true, 2, 1},
                 new Object[] {9, 960, 24, "shorter than one group", true, 3, 1},
