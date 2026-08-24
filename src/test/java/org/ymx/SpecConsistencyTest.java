@@ -127,21 +127,31 @@ final class SpecConsistencyTest {
     }
 
     /**
-     * SPEC §9.3's rule on {@code L}, against every packed file in the tree.
+     * SPEC §9.3's rules on {@code L} and the loop table, against every packed
+     * file in the tree.
      *
-     * <p>The rule is what a player is built on: a wrap moves the read position
-     * in every ring back one pass, so a file whose pass is longer than a ring
-     * plays values that were never decoded. Nothing in a player checks it
-     * (§9.1), which puts the whole of it on the packer - and the pinned files
-     * are what the packer wrote.
+     * <p>The rules are what a player is built on: a wrap either moves the read
+     * position in every ring back one pass, which a file whose pass is longer
+     * than a ring cannot do, or opens a second section per stream, which needs
+     * a loop table naming twenty-five of them. Nothing in a player checks
+     * either (§9.1), which puts the whole of it on the packer - and the pinned
+     * files are what the packer wrote.
      */
     @Test
-    void everyPackedFileKeepsTheLoopRuleTheDocumentStates() throws IOException {
+    void everyPackedFileKeepsTheLoopRulesTheDocumentStates() throws IOException {
         String said = flat();
-        assertTrue(said.contains("Where `L` is not 0, `L` is less than `O` and"
-                        + " `O` - `L` is at most `N`"),
-                "SPEC §9.3's rule on L has been reworded: this test reads the"
-                        + " bounds it checks the packed files against out of it");
+        assertTrue(said.contains("Where the loop table offset is 0, each of the"
+                        + " twenty-five sections decodes to `O` values, and `L`"
+                        + " is 0 or leaves `O` - `L` at most `N`"),
+                "SPEC §9.3's rule on a file with no loop table has been"
+                        + " reworded: this test reads the bounds it checks the"
+                        + " packed files against out of it");
+        assertTrue(said.contains("Where the loop table offset is not 0 it is a"
+                        + " long boundary, `L` is not 0, and the loop table's"
+                        + " twenty-five entries are nonzero"),
+                "SPEC §9.3's rule on a file with a loop table has been"
+                        + " reworded: this test reads the bounds it checks the"
+                        + " packed files against out of it");
         List<Path> packed = new ArrayList<>();
         for (String corpus : new String[] {"ym", "ymr"}) {
             try (var listing = Files.list(Path.of(corpus, "test"))) {
@@ -151,23 +161,38 @@ final class SpecConsistencyTest {
         }
         assertTrue(!packed.isEmpty(), "no packed tunes in ym/test or ymr/test");
         int withLoopFrame = 0;
+        int withLoopTable = 0;
         for (Path file : packed) {
             byte[] bytes = Files.readAllBytes(file);
             int frames = (int) field(bytes, YmxFormat.OFFSET_FRAMES, 4);
             int ring = (int) field(bytes, YmxFormat.OFFSET_RING_SIZE, 2);
             int loopFrame = (int) field(bytes, YmxFormat.OFFSET_LOOP_FRAME, 4);
-            assertEquals(0, field(bytes, YmxFormat.OFFSET_LOOP_TABLE, 4),
-                    file + " carries a loop table offset");
+            int loopTable = (int) field(bytes, YmxFormat.OFFSET_LOOP_TABLE, 4);
             if (loopFrame == 0) {
+                assertEquals(0, loopTable, file + " carries a loop table"
+                        + " without a loop frame");
                 continue;
             }
             withLoopFrame++;
             assertTrue(loopFrame < frames, file + " starts over at frame "
                     + loopFrame + " of " + frames);
-            assertTrue(frames - loopFrame <= ring, file + " replays "
-                    + (frames - loopFrame) + " frames through rings of " + ring);
+            if (loopTable == 0) {
+                assertTrue(frames - loopFrame <= ring, file + " replays "
+                        + (frames - loopFrame) + " frames through rings of "
+                        + ring + " with no loop table");
+                continue;
+            }
+            withLoopTable++;
+            assertEquals(0, loopTable % 4, file + "'s loop table is at "
+                    + loopTable + ", off a long boundary");
+            for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
+                assertTrue(field(bytes, loopTable + 4 * stream, 4) != 0,
+                        file + "'s loop table has no section for stream " + stream);
+            }
         }
         assertTrue(withLoopFrame > 0, "no packed tune carries a loop frame, so"
+                + " this test is checking nothing");
+        assertTrue(withLoopTable > 0, "no packed tune carries a loop table, so"
                 + " this test is checking nothing");
     }
 
@@ -333,8 +358,8 @@ final class SpecConsistencyTest {
     @Test
     void theStoredBitIsBit31() throws IOException {
         String said = flat();
-        assertTrue(said.contains("Bit 31 of a table entry set marks a stored section;"
-                        + " bits 30-0 are the offset"),
+        assertTrue(said.contains("Bit 31 of an entry set marks a stored section,"
+                        + " in either table; bits 30-0 are the offset"),
                 "SPEC §1.4's stored-section sentence has been reworded");
         assertEquals(1L << 31, YmxFormat.SECTION_STORED);
         assertEquals(0x1234, YmxFormat.sectionOffset(0x1234L | YmxFormat.SECTION_STORED));

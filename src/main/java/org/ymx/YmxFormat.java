@@ -24,8 +24,9 @@ package org.ymx;
  *  28   2  sample count
  *  30   4  L, the frame a tune that starts over goes back to
  *  34   4  byte offset of the loop table; zero when there is none
- *  38   4*S  byte offset of each stream's section, covering frames [0, O)
- * 138   ...  the body: the packed sections, then the sample table
+ *  38   4*S  byte offset of each stream's section
+ * 138   ...  the body: the loop table where there is one, the packed
+ *            sections, then the sample table
  * </pre>
  *
  * <p>Streams 14-24 carry the compiled effect script, one byte per frame
@@ -57,9 +58,12 @@ package org.ymx;
  * {@code dst4} can unpack any container section straight out of the file for
  * debugging.
  *
- * <p>Each stream is one section covering every frame. A tune that starts over
- * reaches the end of that section and the player opens it again from the top,
- * which is the only way to restart a decoder.
+ * <p>A stream has one section covering every frame, or two where the file
+ * carries a loop table: the section table's covers the frames before {@code L}
+ * and the loop table's the frames from it. A tune that starts over reaches the
+ * end of a section and the player opens one from the top - the loop table's
+ * where there is one, the same one again where there is not - which is the
+ * only way to restart a decoder.
  *
  * <p>The player needs {@code O}, {@code N}, {@code C} and the offsets; the
  * packed sizes are implied by the next offset and never needed, because
@@ -185,8 +189,10 @@ public final class YmxFormat {
      * once through carries 0. */
     public static final int OFFSET_LOOP_FRAME = 30;
 
-    /** Byte offset of the loop table; zero where the file carries no such
-     * table, which is every file this release writes. */
+    /** Byte offset of the loop table: one long per stream, read exactly as
+     * the section table is, locating the section that covers frames
+     * {@code [L, O)}. Zero where one section per stream covers the whole
+     * tune, which is every file whose pass fits a ring. */
     public static final int OFFSET_LOOP_TABLE = 34;
 
     /**
@@ -210,7 +216,9 @@ public final class YmxFormat {
         return (entry & SECTION_STORED) != 0;
     }
 
-    /** One long offset per stream, in stream order: where its section is. */
+    /** One long offset per stream, in stream order: where its section is -
+     * the whole tune, or the frames before {@code L} where the file carries a
+     * loop table. */
     public static final int OFFSET_SECTION_TABLE = 38;
 
     public static final int HEADER_SIZE = OFFSET_SECTION_TABLE + 4 * STREAMS;

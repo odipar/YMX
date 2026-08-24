@@ -98,9 +98,9 @@
 ; and one ring per stream, so its size depends on the ring size in the file.
 ; It is always sized for all twenty-five, whatever the tune uses:
 ;
-;   YMX_SIZE = YMX_FIXED + 25 * N       ; 1650 + 25 * N bytes
+;   YMX_SIZE = YMX_FIXED + 25 * N       ; 1658 + 25 * N bytes
 ;
-; For the default 960-byte rings that is 25650 bytes. A program with N at
+; For the default 960-byte rings that is 25658 bytes. A program with N at
 ; build time can reserve it with
 ;
 ;       ds.b    YMX_FIXED+(YMX_STREAMS*960)
@@ -265,7 +265,20 @@ YMX_LIVE        equ     44              ; word  streams still worth decoding:
                                         ; pair off the end
 YMX_BODY        equ     46              ; long  O - L, the frames one pass
                                         ; plays; the countdown reloads with it
-YMX_STATE       equ     50              ; the decoder states, from an even
+YMX_TABLE       equ     50              ; long  the table ymx_reopen reads a
+                                        ; section out of: the section table
+                                        ; from init, and the loop table from
+                                        ; the first reopen of a file that
+                                        ; carries one
+YMX_SECLEN      equ     54              ; long  how many values a section of
+                                        ; that table carries: L while the
+                                        ; section table is in force, O - L
+                                        ; after the switch, and O for a file
+                                        ; with no loop table. Every stream
+                                        ; runs out at the same value, so the
+                                        ; pair is the workspace's rather than
+                                        ; each state block's
+YMX_STATE       equ     58              ; the decoder states, from an even
                                         ; base. The lea that reaches them
                                         ; carries this as an 8-bit
                                         ; displacement, so it stays under 128
@@ -346,9 +359,15 @@ YH_LOOP         equ     30              ; long: L, the frame a tune that
                                         ; starts over goes back to; it has a
                                         ; meaning only where the loop flag
                                         ; is set
-YH_LOOPTAB      equ     34              ; long: the loop table, 0 when none
+YH_LOOPTAB      equ     34              ; long: the loop table, 0 when none.
+                                        ; One offset per stream, read like
+                                        ; the section table: the frames from
+                                        ; L on, which every pass after the
+                                        ; first plays
 YH_SECTIONS     equ     38              ; one offset per stream: its section,
-                                        ; covering every frame of the tune
+                                        ; covering every frame of the tune,
+                                        ; or the frames before L where a
+                                        ; loop table covers the rest
 
 YMX_MAGIC       equ     $594D5821       ; 'YMX!'
 YMX_VERSION     equ     $0005           ; the format version: the major in
@@ -443,6 +462,20 @@ YMX_init:
         move.w  #1,YMX_RING(a3)
 .ring_ready:
 
+; The sections init opens are the section table's, and a file with a loop
+; table cuts them at L: they carry L values each, where the sections of a
+; file with no loop table carry O. ymx_reopen moves both fields on to the
+; loop table's when the first stream runs out. Written on every init for
+; the same reason the two above are.
+        lea     YH_SECTIONS(a0),a1
+        move.l  a1,YMX_TABLE(a3)
+        move.l  YH_FRAMES(a0),d1
+        tst.l   YH_LOOPTAB(a0)
+        beq.s   .seclen_ready
+        move.l  YH_LOOP(a0),d1
+.seclen_ready:
+        move.l  d1,YMX_SECLEN(a3)
+
         move.l  YH_FRAMES(a0),YMX_LEFTFR(a3)
         clr.w   YMX_SLOT(a3)
         lea     YMX_FIXED(a3),a1        ; the rings follow the decoder states
@@ -467,6 +500,19 @@ YMX_init:
 .first_group:
         move.l  d1,YMX_NEXT(a3)         ; values decoded once init is done
 
+; How many values each stream reads out of the section it opens below.
+; Every block is written before the first stream decodes anything, because
+; a stream whose section is shorter than a group runs out inside its own
+; first fill, and the reopen that follows moves YMX_SECLEN on to the loop
+; table's length - which is not what the streams after it open with.
+        lea     YMX_STATE+YS_LEFT(a3),a1
+        move.l  YMX_SECLEN(a3),d0
+        moveq   #YMX_STREAMS-1,d1
+.section_left:
+        move.l  d0,(a1)
+        lea     YMX_STATE_SIZE(a1),a1
+        dbra    d1,.section_left
+
         movem.l d6-d7/a6,-(sp)          ; the three registers a decoder call
         moveq   #0,d6                   ; leaves alone: d6 = N, d7 = the
         move.w  YMX_N(a3),d6            ; stream index, a6 = its ring - the
@@ -481,9 +527,6 @@ YMX_init:
         move.l  a1,YS_WRITE(a2)
         adda.l  d6,a6                   ; the next stream's ring
         move.l  a6,YS_END(a2)
-
-; One section per stream, covering every frame of the tune.
-        move.l  YMX_TOTAL(a3),YS_LEFT(a2)   ; values before this stream runs out
 
         move.w  d7,d0
         lsl.w   #2,d0                   ; the table holds long offsets
@@ -766,31 +809,44 @@ YMX_fill:
         bra     .done                   ; ways back are word displacements
 
 ; -----------------------------------------------------------------------------
-; ymx_reopen: a2 = state block. Starts this stream's section over - a fresh
+; ymx_reopen: a2 = state block. Opens a section for this stream - a fresh
 ; decoder, reading from the top of the section, still writing where the last
 ; one stopped. ST4_init needs the ring start so that its packed metadata comes
 ; out right; the write pointer is restored from the block, which is why it is
 ; stored rather than held in a register.
+;
+; Which section that is comes out of YMX_TABLE, and how many values it
+; carries out of YMX_SECLEN. A file with a loop table moves both on to it
+; here, and every reopen after this one finds them there: the entries are
+; the same two values every time, so the write costs less than the test
+; that would skip it. Every first section runs out at value L, so all
+; twenty-five streams cross over together.
 ; -----------------------------------------------------------------------------
 ; It runs inside YMX_fill, which guarantees d6 = the state block and a6 = the
 ; workspace - the two anchors that survive the decoder call.
 ymx_reopen:
         tst.w   YMX_LOOPS(a3)
         beq.s   .done                   ; a tune that plays once stops here
+        movea.l YMX_FILE(a3),a0
+        move.l  YH_LOOPTAB(a0),d0
+        beq.s   .table_ready            ; one table: its sections carry O
+        add.l   a0,d0
+        move.l  d0,YMX_TABLE(a3)        ; the loop table, from here on
+        move.l  YMX_BODY(a3),YMX_SECLEN(a3)     ; O - L values a section
+.table_ready:
         move.l  a2,d0
         sub.l   a3,d0
         sub.w   #YMX_STATE,d0
         lsr.w   #4,d0                   ; k * 64 becomes k * 4, a table index
-        add.w   #YH_SECTIONS,d0         ; the table holds long offsets
-        movea.l YMX_FILE(a3),a0
-        move.l  0(a0,d0.w),d0
+        movea.l YMX_TABLE(a3),a1        ; the table holds long offsets
+        move.l  0(a1,d0.w),d0
         beq.s   .done                   ; this stream has no section
         bpl.s   .container              ; the offset's top bit: stored values
         bclr    #31,d0
         adda.l  d0,a0
         move.l  a0,YS_INPUT(a2)         ; the values, read a byte at a time
         move.w  #1,YS_STORED(a2)
-        move.l  YMX_TOTAL(a6),YS_LEFT(a2)
+        move.l  YMX_SECLEN(a6),YS_LEFT(a2)
         rts
 .container:
         clr.w   YS_STORED(a2)
@@ -806,7 +862,7 @@ ymx_reopen:
         move.w  d0,YS_QUEUE(a2)
         move.l  d1,YS_D1(a2)
         move.l  d2,YS_D2(a2)
-        move.l  YMX_TOTAL(a3),YS_LEFT(a2)
+        move.l  YMX_SECLEN(a3),YS_LEFT(a2)
         move.l  a2,d6                   ; the block pointer, as fill keeps it
 .done:
         rts

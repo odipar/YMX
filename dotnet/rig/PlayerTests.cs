@@ -500,6 +500,128 @@ namespace Rig
             return outStream.ToArray();
         }
 
+        /// <summary>
+        /// A file cut in two at its loop frame, every section stored: the
+        /// section table locates frames [0, L) and the loop table [L, O). A
+        /// short replay packs smaller stored than as a container, so this is a
+        /// shape a writer reaches; here it also puts the loop table's own
+        /// entries on the stored path. L is under one group, so the first
+        /// refill of every stream already runs into the second section.
+        /// </summary>
+        public static string RunStoredCut()
+        {
+            int frames = 96;
+            int loop = 12;
+            int ring = 48;
+            byte[] file = StoredCutYmx(frames, loop, ring, 24);
+            var player = new Player(file, Rig.WorkspaceSize(ring), 1);
+            if (player.Init() != 0)
+            {
+                return "stored cut: YMX_init rejected the file";
+            }
+            // Two passes past the first: R0 carries the frame number, so the
+            // values written to it are the frames the player played.
+            for (int index = 0; index < frames + 2 * (frames - loop); index++)
+            {
+                Player.Frame played = player.PlayFrame();
+                int wanted = index < frames ? index
+                        : loop + (index - frames) % (frames - loop);
+                int got = -1;
+                foreach (Player.Pair write in played.Writes)
+                {
+                    if (write.Register == 0)
+                    {
+                        got = write.Value;
+                    }
+                }
+                if (got != wanted)
+                {
+                    return "stored cut: call " + index + " wrote R0=" + got
+                            + ", want frame " + wanted;
+                }
+            }
+            return "";
+        }
+
+        /// <summary>The file RunStoredCut plays: twenty-five stored sections of
+        /// loop values, twenty-five more of the rest, and the two tables that
+        /// locate them. R0 carries the frame number and every other stream
+        /// holds one value, so what reaches the chip says which frame is
+        /// playing.</summary>
+        private static byte[] StoredCutYmx(int frames, int loop, int ring, int chunk)
+        {
+            int table = Align(Ymx.YmxFormat.HeaderSize);
+            int at = table + 4 * Rig.Streams;
+            int[] first = new int[Rig.Streams];
+            int[] second = new int[Rig.Streams];
+            var body = new MemoryStream();
+            for (int half = 0; half < 2; half++)
+            {
+                for (int stream = 0; stream < Rig.Streams; stream++)
+                {
+                    while (at % 4 != 0)
+                    {
+                        body.WriteByte(0);
+                        at++;
+                    }
+                    int from = half == 0 ? 0 : loop;
+                    int to = half == 0 ? loop : frames;
+                    (half == 0 ? first : second)[stream] = at;
+                    for (int frame = from; frame < to; frame++)
+                    {
+                        body.WriteByte(StreamByte(stream, frame));
+                    }
+                    at += to - from;
+                }
+            }
+
+            var outStream = new MemoryStream();
+            outStream.Write(System.Text.Encoding.ASCII.GetBytes("YMX!"));
+            Word(outStream, Ymx.YmxFormat.Version);
+            Word(outStream, 1);             // flags: starts over
+            LongWord(outStream, frames);
+            Word(outStream, 50);
+            Word(outStream, Rig.Streams);
+            Word(outStream, ring);
+            Word(outStream, chunk);
+            LongWord(outStream, 2000000);
+            LongWord(outStream, 0);         // no samples
+            Word(outStream, 0);
+            LongWord(outStream, loop);      // L, where it starts over
+            LongWord(outStream, table);     // and the table for [L, O)
+            for (int stream = 0; stream < Rig.Streams; stream++)
+            {
+                LongWord(outStream, unchecked((int) 0x80000000) | first[stream]);
+            }                               // bit 31: stored
+            while (outStream.Length < table)
+            {
+                outStream.WriteByte(0);
+            }
+            for (int stream = 0; stream < Rig.Streams; stream++)
+            {
+                LongWord(outStream, unchecked((int) 0x80000000) | second[stream]);
+            }
+            body.WriteTo(outStream);
+            return outStream.ToArray();
+        }
+
+        /// <summary>One stream's byte on one frame of that file.</summary>
+        private static byte StreamByte(int stream, int frame)
+        {
+            return stream switch
+            {
+                0 => (byte) (frame & 0xFF),     // R0: the frame number
+                13 => 0xFF,                     // R13: no envelope restart
+                16 => 0xE4,                     // T: 0->A 1->B 2->C 3->D
+                _ => 0,
+            };
+        }
+
+        private static int Align(int at)
+        {
+            return at + ((-at) & 3);
+        }
+
         private static void Word(MemoryStream outStream, int value)
         {
             outStream.WriteByte((byte) (value >> 8));
@@ -1149,6 +1271,16 @@ namespace Rig
                 new object[] {600, 960, 24, "loops from frame 200", true, 2, 1, 200},
                 new object[] {600, 960, 24, "loops from frame 599", true, 3, 1, 599},
                 new object[] {600, 240, 24, "a body past the ring", true, 2, 1, 100},
+                // A body past the largest ring the format allows: the packer
+                // cuts every stream at the loop frame and the file carries a
+                // loop table, so the wrap opens the second section rather than
+                // moving the cursor back.
+                new object[] {2688, 960, 24, "cut at frame 100", true, 2, 1, 100},
+                // A first section shorter than a group: every stream runs out
+                // of it inside its own first fill, at init, and opens the loop
+                // table's before frame 0 is played.
+                new object[] {2688, 960, 24, "cut at frame 12, unit 2",
+                    true, 2, 2, 12},
                 new object[] {600, 960, 24, "loops from frame 200, unit 2",
                     true, 2, 2, 200},
             };
@@ -1198,6 +1330,8 @@ namespace Rig
                         "the sample loop{0,-9}    (back to the loop, not stopped)",
                         build));
             }
+            failures += Report(RunStoredCut(),
+                    "the stored cut           (both tables, values not containers)");
             failures += Report(RunLoopPointResolve(),
                     "the loop-point resolve   (an unsigned word, $8000 and up)");
             failures += Report(RunLiveRetune(),

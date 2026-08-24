@@ -34,7 +34,7 @@ namespace Rig
 
         public const int Streams = 25;      // fourteen register, eleven script
         public const int YmxDefaultMap = 0x9C;  // the packer's: 0->A 1->D 2->B 3->C
-        public const int YmxFixed = 50 + Streams * 64;  // before the rings
+        public const int YmxFixed = 58 + Streams * 64;  // before the rings
 
         public static int WorkspaceSize(int ring)
         {

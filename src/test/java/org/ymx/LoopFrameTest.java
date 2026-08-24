@@ -25,26 +25,45 @@ final class LoopFrameTest {
     private static final int RATE = 50;
 
     /** A tune with no effect script: registers alone, R13 held at the
-     * do-not-write marker except on the frames listed. */
+     * do-not-write marker except on the frames listed. Voice A follows the
+     * envelope throughout, so the frames R13 is written on are exactly the
+     * frames the tune can start over from. */
     private static Tune plain(int loopFrame, int... writesR13) {
-        byte[][] registers = new byte[YmxFormat.REGISTER_STREAMS][FRAMES];
-        for (int f = 0; f < FRAMES; f++) {
+        return plainOfLength(FRAMES, loopFrame, writesR13);
+    }
+
+    /** The same, of a chosen length: a tune long enough that no ring the
+     * format allows reaches back over its body. */
+    private static Tune plainOfLength(int frames, int loopFrame, int... writesR13) {
+        byte[][] registers = new byte[YmxFormat.REGISTER_STREAMS][frames];
+        for (int f = 0; f < frames; f++) {
             registers[13][f] = (byte) 0xFF;
             registers[8][f] = 0x10;             // voice A follows the envelope
         }
         for (int f : writesR13) {
             registers[13][f] = 0x0A;
         }
-        byte[][] codes = new byte[YmxFormat.CHANNELS][FRAMES];
-        byte[][] counts = new byte[YmxFormat.CHANNELS][FRAMES];
-        return new Tune(FRAMES, RATE, 2000000L, true, loopFrame, registers,
-                codes, counts, new byte[FRAMES], new byte[0][], new int[0],
+        byte[][] codes = new byte[YmxFormat.CHANNELS][frames];
+        byte[][] counts = new byte[YmxFormat.CHANNELS][frames];
+        return new Tune(frames, RATE, 2000000L, true, loopFrame, registers,
+                codes, counts, new byte[frames], new byte[0][], new int[0],
                 EffectScript.Semantics.YM, "", "", "", List.of());
     }
 
+    /** A tune whose body is past the largest ring, starting over at 101 or
+     * 103 - the two frames it can be entered at. */
+    private static Tune longTune() {
+        return plainOfLength(3000, 100, 101, 103);
+    }
+
     private static LoopFrame.Plan resolve(Tune tune, int ringSize) {
+        return resolve(tune, ringSize, 1);
+    }
+
+    /** The same, packing at {@code unit} bytes a unit: a cut falls on one. */
+    private static LoopFrame.Plan resolve(Tune tune, int ringSize, int unit) {
         return LoopFrame.resolve(tune, EffectScript.compile(tune), true,
-                ringSize, 24);
+                ringSize, 24, unit);
     }
 
     /** A voice hears the envelope at the frame the source gives, so the
@@ -90,15 +109,37 @@ final class LoopFrameTest {
         assertTrue(plan.ringSize() <= YmxFormat.MAX_RING_SIZE, "within the cap");
     }
 
-    /** A body past the largest ring cannot be replayed, so the frame goes
-     * and the file starts over from the beginning. */
+    /** A body past the largest ring is replayed out of a second section per
+     * stream instead, cut at the frame the file carries. */
     @Test
-    void aBodyPastTheLargestRingFallsBack() throws IOException {
-        Tune tune = source("Crapman level  9").startingOverAt(2019);
-        LoopFrame.Plan plan = resolve(tune, 960);
-        assertEquals(0, plan.frame(), "the body is past the cap");
-        assertTrue(plan.notes().stream().anyMatch(n -> n.contains("2019")),
-                "the frame the source gave is reported: " + plan.notes());
+    void aBodyPastTheLargestRingIsCutInTwo() {
+        LoopFrame.Plan plan = resolve(longTune(), 960);
+        assertEquals(101, plan.frame(), "the frame survives the cut");
+        assertTrue(plan.cut(), "the streams are cut at it");
+        assertEquals(960, plan.ringSize(), "a cut leaves the ring where it was");
+        assertTrue(plan.notes().stream().anyMatch(n -> n.contains("two sections")),
+                "the cut is reported: " + plan.notes());
+    }
+
+    /** Each of the two sections is a whole number of units, so a cut at a
+     * unit size above 1 falls on one. Frame 101 cannot be cut at, and the
+     * next frame that can be entered is 103, which cannot either. */
+    @Test
+    void aCutWithNoUnitBoundaryToFallOnFallsBack() {
+        LoopFrame.Plan plan = resolve(longTune(), 960, 2);
+        assertEquals(0, plan.frame(), "no frame the tune can be cut at");
+        assertTrue(plan.notes().stream().anyMatch(n -> n.contains("2-byte unit")),
+                "the unit the cut needs is reported: " + plan.notes());
+    }
+
+    /** With a frame on a unit boundary in reach, the cut moves to it. */
+    @Test
+    void aCutMovesToAUnitBoundary() {
+        LoopFrame.Plan plan = resolve(plainOfLength(3000, 100, 101, 104), 960, 4);
+        assertEquals(104, plan.frame(), "the first frame a section can end on");
+        assertTrue(plan.cut(), "the streams are cut at it");
+        assertTrue(plan.notes().stream().anyMatch(n -> n.contains("4-byte units")),
+                "the move is reported: " + plan.notes());
     }
 
     /** A tune that plays once carries no frame, whatever it was given. */
@@ -106,7 +147,7 @@ final class LoopFrameTest {
     void aTuneThatPlaysOnceCarriesNoFrame() {
         Tune tune = plain(100, 100);
         LoopFrame.Plan plan = LoopFrame.resolve(tune, EffectScript.compile(tune),
-                false, 960, 24);
+                false, 960, 24, 1);
         assertEquals(0, plan.frame());
         assertTrue(plan.notes().isEmpty(), "nothing to report: " + plan.notes());
     }

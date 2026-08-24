@@ -85,7 +85,7 @@ player byte for byte.
 
 <!-- The two byte counts below are measured by the rig (ymx/test/rig.sh),
      which reads them back out of this sentence: keep the shape of it. -->
-[68k/YMX.S](68k/YMX.S) is the player, 3,336 bytes at the `ST4_UNIT` 2 below,
+[68k/YMX.S](68k/YMX.S) is the player, 3,394 bytes at the `ST4_UNIT` 2 below,
 plus the 288 of [68k/ST4_wrap.S](68k/ST4_wrap.S), the stream decoder it is
 built on. Include both, with the unit size defined first:
 

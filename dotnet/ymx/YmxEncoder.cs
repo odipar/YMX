@@ -11,10 +11,13 @@ namespace Ymx
     /// as its own embedded ST4 container - or stored plain where the values
     /// are smaller than a container.
     ///
-    /// <para>A tune that repeats reaches its loop frame again by moving the read
-    /// position in every ring back one pass. Which frame that is, and whether it
-    /// can be kept at all, is LoopFrame's answer; the ring size the plan comes
-    /// back with is the one the file carries.</para>
+    /// <para>A tune that repeats reaches its loop frame again in one of two
+    /// ways: the player moves the read position in every ring back one pass, or
+    /// every stream is packed as two sections - the frames before the loop
+    /// frame, then the frames from it - and the player opens the second one at
+    /// the wrap. Which frame the file carries, and which of the two reaches it,
+    /// is LoopFrame's answer; the ring size the plan comes back with is the one
+    /// the file carries.</para>
     /// </summary>
     public static class YmxEncoder
     {
@@ -113,9 +116,10 @@ namespace Ymx
             // The loop frame comes before the packing rather than after it: a
             // body that needs a bigger ring gets one, and a bigger ring lets a
             // back-reference reach further, so the sections are packed against
-            // the ring the file ends up carrying.
+            // the ring the file ends up carrying. A plan that cuts the streams
+            // decides how many sections there are to pack at all.
             LoopFrame.Plan plan = LoopFrame.Resolve(tune, script, loops, ringSize,
-                    chunk);
+                    chunk, unit);
             ringSize = plan.RingSize;
 
             // A back-reference may never reach out of the ring the player
@@ -150,16 +154,34 @@ namespace Ymx
                         Carry(script.Counts[c], script.M, acts, action);
             }
 
+            // One section per stream, or two where the plan cuts them at the
+            // loop frame: the first covers the frames before it, the second the
+            // frames from it, and the pair is what the stream reports as its
+            // cost.
             var streams = new List<Stream>(YmxFormat.Streams);
             var sections = new Section[YmxFormat.Streams];
+            Section[]? loopSections = plan.Cut ? new Section[YmxFormat.Streams] : null;
             for (int stream = 0; stream < YmxFormat.Streams; stream++)
             {
-                sections[stream] = Pack(streams, stream, progress,
-                        vectors[stream], offsetLimit, unit);
+                byte[] values = vectors[stream];
+                if (loopSections == null)
+                {
+                    sections[stream] = Pack(progress, values, offsetLimit, unit);
+                }
+                else
+                {
+                    sections[stream] = Pack(progress, Slice(values, 0, plan.Frame),
+                            offsetLimit, unit);
+                    loopSections[stream] = Pack(progress,
+                            Slice(values, plan.Frame, values.Length), offsetLimit,
+                            unit);
+                }
+                streams.Add(Measure(stream, values.Length, sections[stream],
+                        loopSections == null ? null : loopSections[stream]));
             }
 
             byte[] file = Build(tune, ringSize, chunk, frames, loops, plan.Frame,
-                    sections, tune.Samples, channels);
+                    sections, loopSections, tune.Samples, channels);
             return new Result(file, streams, ringSize, chunk, loops, unit,
                     plan.Frame, tune, script, plan.Notes);
         }
@@ -199,16 +221,17 @@ namespace Ymx
 
         /// <summary>One section as it goes into the file: packed, or the
         /// values themselves.</summary>
-        private sealed record Section(byte[] Bytes, bool Stored)
+        private sealed record Section(byte[] Bytes, bool Stored, int LongestOp)
         {
-            internal static readonly Section Absent = new Section(new byte[0], false);
+            internal static readonly Section Absent =
+                    new Section(new byte[0], false, 0);
         }
 
         /// <summary>Packs one section; a short section costs more as a
         /// container than as itself, and then the values are what the file
         /// gets, with the section's offset saying so.</summary>
-        private static Section Pack(List<Stream> streams, int register,
-                bool progress, byte[] values, int offsetLimit, int unit)
+        private static Section Pack(bool progress, byte[] values, int offsetLimit,
+                int unit)
         {
             if (values.Length == 0)
             {
@@ -220,23 +243,60 @@ namespace Ymx
                     units, unit, St4Format.MaxOp);
             byte[] container = St4Cli.Container(result);
             bool stored = values.Length < container.Length;
-            byte[] bytes = stored ? values : container;
-            streams.Add(new Stream(register, values.Length, bytes.Length,
-                    result.LongestOp));
-            return new Section(bytes, stored);
+            return new Section(stored ? values : container, stored, result.LongestOp);
+        }
+
+        /// <summary>What one stream costs the file: its frames, and the bytes
+        /// of the one section covering them or of the two that share
+        /// them.</summary>
+        private static Stream Measure(int stream, int frames, Section first,
+                Section? second)
+        {
+            if (second == null)
+            {
+                return new Stream(stream, frames, first.Bytes.Length, first.LongestOp);
+            }
+            return new Stream(stream, frames,
+                    first.Bytes.Length + second.Bytes.Length,
+                    Math.Max(first.LongestOp, second.LongestOp));
+        }
+
+        /// <summary>One stream's values for frames [from, to).</summary>
+        private static byte[] Slice(byte[] values, int from, int to)
+        {
+            byte[] part = new byte[to - from];
+            Array.Copy(values, from, part, 0, part.Length);
+            return part;
         }
 
         private static byte[] Build(Tune tune, int ringSize, int chunk, int frames,
-                bool loops, int loopFrame, Section[] sections, byte[][] samples,
-                int channels)
+                bool loops, int loopFrame, Section[] sections,
+                Section[]? loopSections, byte[][] samples, int channels)
         {
             // Each section is placed on a long boundary: containers carry
             // alignment rules of their own, and a stored section takes the
             // same boundary - one placement rule.
+            //
+            // The loop table, where there is one, sits between the header and
+            // the sections: one more table of the same shape, on a long
+            // boundary like everything else in the body.
             int total = YmxFormat.HeaderSize;
+            int loopTable = 0;
+            if (loopSections != null)
+            {
+                loopTable = Align(total);
+                total = loopTable + 4 * YmxFormat.Streams;
+            }
             foreach (Section section in sections)
             {
                 total = Align(total) + section.Bytes.Length;
+            }
+            if (loopSections != null)
+            {
+                foreach (Section section in loopSections)
+                {
+                    total = Align(total) + section.Bytes.Length;
+                }
             }
             int sampleTable = samples.Length == 0 ? 0 : Align(total);
             if (samples.Length > 0)
@@ -265,12 +325,18 @@ namespace Ymx
             PutWord(file, YmxFormat.OffsetSampleCount, samples.Length);
             // L, the frame the tune starts over from: 0 where it plays once
             // through, and 0 where the packer could not keep the source's own.
-            // The loop table offset is 0, which says the file carries no such
-            // table.
+            // The loop table offset is 0 where the sections cover the whole
+            // tune, and otherwise where the second set of them is located from.
             PutLong(file, YmxFormat.OffsetLoopFrame, loopFrame);
-            PutLong(file, YmxFormat.OffsetLoopTable, 0);
+            PutLong(file, YmxFormat.OffsetLoopTable, loopTable);
 
-            Place(file, YmxFormat.OffsetSectionTable, sections, YmxFormat.HeaderSize);
+            int at = Place(file, YmxFormat.OffsetSectionTable, sections,
+                    loopTable == 0 ? YmxFormat.HeaderSize
+                            : loopTable + 4 * YmxFormat.Streams);
+            if (loopSections != null)
+            {
+                Place(file, loopTable, loopSections, at);
+            }
 
             // The sample table: entries first, then the samples, each closed
             // by the end marker the PCM tick handler stops on.
@@ -292,7 +358,8 @@ namespace Ymx
             return file;
         }
 
-        /// <summary>Copies the sections into the file and fills the offsets.</summary>
+        /// <summary>Copies one table's sections into the file and fills in its
+        /// offsets, and reports where the next part may begin.</summary>
         private static int Place(byte[] file, int table, Section[] sections, int at)
         {
             for (int register = 0; register < YmxFormat.Streams; register++)
