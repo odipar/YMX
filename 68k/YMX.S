@@ -175,14 +175,6 @@
 ;      doing that
 ; -----------------------------------------------------------------------------
 
-; YMX_SUPER_HOST is accepted and changes nothing: the PCM tick no longer
-; borrows a0, so there is no USP park for the flag to choose. Build lines
-; that define it still assemble.
-        .if ^^defined YMX_SUPER_HOST
-        .else
-YMX_SUPER_HOST  equ     0
-        .endif
-
 ; YMX_PERF equ 1 turns on the raster monitor: the frame's work paints the
 ; background red for exactly as long as it runs (one scanline = 512 cycles),
 ; each tick handler paints its own sliver - Timer A green, Timer D blue -

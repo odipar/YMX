@@ -36,7 +36,7 @@ final class Effects {
         return value == null ? -1 : value;
     }
 
-    static String runEffects(boolean superHost, boolean perf) {
+    static String runEffects(boolean perf) {
         int frames = 72;
         byte[][] values = new byte[16][frames];
         for (int frame = 0; frame < frames; frame++) {
@@ -110,8 +110,7 @@ final class Effects {
 
         byte[] packed = Rig.pack(GenYm.ym6File(frames, values, drum0, drum1),
                 960, 24, true, 1);
-        Player player = new Player(packed, Rig.workspaceSize(960), 1,
-                superHost, perf);
+        Player player = new Player(packed, Rig.workspaceSize(960), 1, perf);
         if (player.init() != 0) {
             return "effects: YMX_init rejected the file";
         }
@@ -454,8 +453,7 @@ final class Effects {
         // tune, then init an effect-free one into the same blob and
         // workspace.
         byte[] quiet = GenYm.ym6File(40, new byte[16][40]);
-        Player reused = new Player(packed, Rig.workspaceSize(960), 1,
-                superHost, perf);
+        Player reused = new Player(packed, Rig.workspaceSize(960), 1, perf);
         if (reused.init() != 0) {
             return "effects: init rejected the two-channel pack";
         }
@@ -489,7 +487,7 @@ final class Effects {
         // live.
         Player resumed = new Player(Rig.pack(
                 GenYm.ym6File(frames, values, drum0, drum1), 960, 24, true, 1,
-                "-sidresume"), Rig.workspaceSize(960), 1, superHost, perf);
+                "-sidresume"), Rig.workspaceSize(960), 1, perf);
         if (resumed.init() != 0) {
             return "effects: init rejected the -sidresume pack";
         }
