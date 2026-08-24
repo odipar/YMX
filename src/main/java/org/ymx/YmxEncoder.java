@@ -190,7 +190,7 @@ public final class YmxEncoder {
     /**
      * A stream byte is meaningful only on frames its master bit marks - and
      * for a count stream, only when the action actually reads the count (a
-     * program verb, or a HELD carrying the reload flag). Everywhere else the
+     * program opcode, or a HELD carrying the reload flag). Everywhere else the
      * previous byte repeats, which costs nothing packed.
      */
     static byte[] carry(byte[] values, byte[] master, int bit,
@@ -200,11 +200,11 @@ public final class YmxEncoder {
         for (int p = 0; p < out.length; p++) {
             boolean read = (master[p] & bit) != 0;
             if (read && actions != null) {
-                int verb = actions[p] & 0xE0;
-                read = verb >= EffectScript.VERB_START_TOGGLE
-                        || verb == EffectScript.VERB_HOLD
+                int opcode = actions[p] & 0xE0;
+                read = opcode >= EffectScript.OPCODE_START_TOGGLE
+                        || opcode == EffectScript.OPCODE_HOLD
                                 && (actions[p] & EffectScript.HOLD_RELOAD) != 0
-                        || verb == EffectScript.VERB_RESUME
+                        || opcode == EffectScript.OPCODE_RESUME
                                 && (actions[p] & EffectScript.RESUME_RELOAD) != 0;
             }
             if (read) {

@@ -393,10 +393,10 @@ that boundary loses the place in the cycle.
 | **preempt** | take a register from a stream that was using it |
 | **suppress** | fail to start because the register is taken, and retry next frame |
 
-The code's word for an action the script hands the player is a **verb**:
+The code's word for an action the script hands the player is an **opcode**:
 three bits of a timer channel's action byte, and all eight codes are
 spent - start alone takes four, one each for a toggle, a retrigger, a
-sample and a sample that preempts. Not every action above is a verb. A
+sample and a sample that preempts. Not every action above is an opcode. A
 stream expires or loops inside its own tick handler, with nothing to hand
 it; a live retune is a retune addressed to no voice rather than a code of
 its own; and a suppressed start is resolved at pack time and never
@@ -454,7 +454,7 @@ end in the tree, which carries its own mapping - and is not repeated here.
 | term | in the code |
 |---|---|
 | the four kinds | `KIND_PCM`, `KIND_TOGGLE`, `KIND_RETRIGGER`, `KIND_CURVE` - the **wave stream**, under its earlier name |
-| the **verbs**, the actions a stream can be given | `VERB_START_PCM`, `VERB_START_TOGGLE`, `VERB_START_RETRIGGER`, `VERB_START_PCM_PREEMPT`, `VERB_HOLD`, `VERB_RETUNE`, `VERB_RELEASE`, `VERB_RESUME` |
+| the **opcodes**, the actions a stream can be given | `OPCODE_START_PCM`, `OPCODE_START_TOGGLE`, `OPCODE_START_RETRIGGER`, `OPCODE_START_PCM_PREEMPT`, `OPCODE_HOLD`, `OPCODE_RETUNE`, `OPCODE_RELEASE`, `OPCODE_RESUME` |
 | the tick handlers | `ymx_pcm_a`, `ymx_toggle_a_on`, `ymx_toggle_a_off`, `ymx_retrigger_a`, and the same per timer - they belong to the timer, not the channel |
 | the timers and the map onto them | `ymx_timer_a` to `ymx_timer_d`, `ymx_desc_0` to `ymx_desc_3`, `ymx_assign` |
 | the actions the script runs | `ymx_pcm`, `ymx_pcm_preempt`, `ymx_toggle_start`, `ymx_retrigger_start`, `ymx_retune`, `ymx_live` - the live retune it branches to - `ymx_resume`, `ymx_hold`, `ymx_release` |
@@ -573,7 +573,7 @@ ordinary sense.
 | **phase policy** | what happens to phase across a stop: free-running, or zero-restart |
 | **disconnect** | mix no generator into a voice, leaving only its volume writes |
 | **frame write** | the once-a-frame round of register writes |
-| **verb** | the code's name for an action the script hands the player. Three bits of an action byte, all eight spent |
+| **opcode** | the code's name for an action the script hands the player. Three bits of an action byte, all eight spent |
 | **player** | anything that plays a `.ymx` file; SPEC.md states what one performs and checks |
 | **writer** | anything that emits a `.ymx` file: a packer, or a tracker targeting the format directly. SPEC.md states the rules no player checks |
 | **packer** | the tool that turns a source file into a YMX file. One per front end, and one kind of **writer** |

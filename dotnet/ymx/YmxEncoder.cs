@@ -145,11 +145,11 @@ namespace Ymx
                 bool read = (master[p] & bit) != 0;
                 if (read && actions != null)
                 {
-                    int verb = actions[p] & 0xE0;
-                    read = verb >= EffectScript.VerbStartToggle
-                            || verb == EffectScript.VerbHold
+                    int opcode = actions[p] & 0xE0;
+                    read = opcode >= EffectScript.OpcodeStartToggle
+                            || opcode == EffectScript.OpcodeHold
                                     && (actions[p] & EffectScript.HoldReload) != 0
-                            || verb == EffectScript.VerbResume
+                            || opcode == EffectScript.OpcodeResume
                                     && (actions[p] & EffectScript.ResumeReload) != 0;
                 }
                 if (read)

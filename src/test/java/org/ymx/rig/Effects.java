@@ -485,7 +485,7 @@ final class Effects {
 
         // The -sidresume gap model, on the same tune: a fresh player walks
         // to the release and resume and must see the mask, the counting-on
-        // timer, and the reload-only comeback - the player's resume verbs,
+        // timer, and the reload-only comeback - the player's resume opcodes,
         // live.
         Player resumed = new Player(Rig.pack(
                 GenYm.ym6File(frames, values, drum0, drum1), 960, 24, true, 1,

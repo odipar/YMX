@@ -108,7 +108,7 @@ import org.ymx.YmxFormat;
  * the timer without stopping it.
  * RhYMe reprograms a RUNNING timer: control register, then data register, the
  * timer never stopped, so the effect keeps its place and only its rate moves.
- * Half of that a YMX verb does do. A .YMR rate entry is a prescaler and a
+ * Half of that a YMX opcode does do. A .YMR rate entry is a prescaler and a
  * counter, only the prescaler is in the code byte, and a pop that moves the
  * counter alone therefore leaves the code where it was: it compiles to a HOLD
  * carrying the reload flag, and {@code ymx_hold} writes the new count to a
@@ -121,7 +121,7 @@ import org.ymx.YmxFormat;
  * addressed to voice 3, control nibble and reload written with the timer
  * running, the period in flight completing. Where the parameter moved too,
  * the ordinary form is emitted - a retune or a fresh start - and the period
- * in flight is truncated, since every verb that programs a rate goes through
+ * in flight is truncated, since every opcode that programs a rate goes through
  * {@code ymx_program}: stop, load, run.
  *
  * <p>One thing is knowingly not handled. A frame that pops the effect stream

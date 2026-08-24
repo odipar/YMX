@@ -122,18 +122,18 @@ final class SpecConsistencyTest {
     }
 
     @Test
-    void theVerbAndStreamTablesAreTheCompilersOwn() throws IOException {
+    void theOpcodeAndStreamTablesAreTheCompilersOwn() throws IOException {
         String said = flat();
-        int[] verbs = {EffectScript.VERB_RESUME, EffectScript.VERB_HOLD,
-                EffectScript.VERB_RELEASE, EffectScript.VERB_START_TOGGLE,
-                EffectScript.VERB_RETUNE, EffectScript.VERB_START_RETRIGGER,
-                EffectScript.VERB_START_PCM, EffectScript.VERB_START_PCM_PREEMPT};
+        int[] opcodes = {EffectScript.OPCODE_RESUME, EffectScript.OPCODE_HOLD,
+                EffectScript.OPCODE_RELEASE, EffectScript.OPCODE_START_TOGGLE,
+                EffectScript.OPCODE_RETUNE, EffectScript.OPCODE_START_RETRIGGER,
+                EffectScript.OPCODE_START_PCM, EffectScript.OPCODE_START_PCM_PREEMPT};
         String[] names = {"RESUME", "HOLD", "RELEASE", "START_TOGGLE", "RETUNE",
                 "START_RETRIGGER", "START_PCM", "START_PCM_PREEMPT"};
-        for (int verb = 0; verb < names.length; verb++) {
-            assertTrue(said.contains("| " + verb + " | `" + names[verb] + "` |"),
-                    "SPEC §3 row " + verb + " is not `" + names[verb] + "`");
-            assertEquals(verb << 5, verbs[verb], names[verb] + "'s bits");
+        for (int opcode = 0; opcode < names.length; opcode++) {
+            assertTrue(said.contains("| " + opcode + " | `" + names[opcode] + "` |"),
+                    "SPEC §3 row " + opcode + " is not `" + names[opcode] + "`");
+            assertEquals(opcode << 5, opcodes[opcode], names[opcode] + "'s bits");
         }
         assertEquals(EffectScript.VOICELESS, number(said,
                 "so \\*\\*(\\d) is no voice\\*\\*", "the voiceless code"));

@@ -79,7 +79,7 @@ namespace Ymx
             // A code names a kind in bits 7-6 and a voice PLUS ONE in bits
             // 5-4, so zero voice bits mean the channel is idle and the whole
             // byte must be 0; a voiceless kind would compile to a negative
-            // voice that floods the verb above it.
+            // voice that floods the opcode above it.
             for (int channel = 0; channel < codes.Length; channel++)
             {
                 for (int frame = 0; frame < frames; frame++)

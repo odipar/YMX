@@ -386,11 +386,11 @@ final class YmrEffectsTest {
 
         EffectScript.Result script = compile(convert(image));
 
-        assertEquals(EffectScript.action(EffectScript.VERB_START_TOGGLE, 0, PRESCALER),
+        assertEquals(EffectScript.action(EffectScript.OPCODE_START_TOGGLE, 0, PRESCALER),
                 script.actions()[0][0] & 0xFF);
-        assertEquals(EffectScript.action(EffectScript.VERB_START_RETRIGGER, 1, PRESCALER),
+        assertEquals(EffectScript.action(EffectScript.OPCODE_START_RETRIGGER, 1, PRESCALER),
                 script.actions()[1][0] & 0xFF);
-        assertEquals(EffectScript.action(EffectScript.VERB_START_TOGGLE, 2, PRESCALER),
+        assertEquals(EffectScript.action(EffectScript.OPCODE_START_TOGGLE, 2, PRESCALER),
                 script.actions()[2][0] & 0xFF);
         assertEquals(0, script.actions()[3][0]);
         // Voices A and C are skipped for their toggle streams; B is not, since
@@ -417,7 +417,7 @@ final class YmrEffectsTest {
         // A .ymr's trigger is a pop, not the code's continued presence, so the
         // frames after it are silent in the script: no second START_PCM, and
         // nothing where a YM dump would have re-fired the sample.
-        assertEquals(EffectScript.action(EffectScript.VERB_START_PCM, 0, 7),
+        assertEquals(EffectScript.action(EffectScript.OPCODE_START_PCM, 0, 7),
                 script.actions()[0][0] & 0xFF);
         for (int frame = 1; frame < script.frames(); frame++) {
             assertEquals(0, script.m()[frame] & EffectScript.M_CHANNEL_0,
@@ -468,11 +468,11 @@ final class YmrEffectsTest {
         Tune tune = convert(builder.build());
         EffectScript.Result script = compile(tune);
 
-        assertEquals(EffectScript.action(EffectScript.VERB_START_PCM, 0, 7),
+        assertEquals(EffectScript.action(EffectScript.OPCODE_START_PCM, 0, 7),
                 script.actions()[0][0] & 0xFF);
         // A hard stop: RELEASE with bit 0 clear stops the timer, where the bit
         // set would only mask a toggle stream's interrupt and leave it running.
-        assertEquals(EffectScript.action(EffectScript.VERB_RELEASE, 0, 0),
+        assertEquals(EffectScript.action(EffectScript.OPCODE_RELEASE, 0, 0),
                 script.actions()[0][5] & 0xFF);
         // And the voice rejoins the frame write on that same frame. The player
         // applies the skip bits before the register burst and the script's
@@ -526,9 +526,9 @@ final class YmrEffectsTest {
 
         EffectScript.Result script = compile(convert(builder.build()));
 
-        assertEquals(EffectScript.action(EffectScript.VERB_RELEASE, 0, 0),
+        assertEquals(EffectScript.action(EffectScript.OPCODE_RELEASE, 0, 0),
                 script.actions()[0][5] & 0xFF);
-        assertEquals(EffectScript.action(EffectScript.VERB_START_TOGGLE, 0, PRESCALER),
+        assertEquals(EffectScript.action(EffectScript.OPCODE_START_TOGGLE, 0, PRESCALER),
                 script.actions()[0][6] & 0xFF);
     }
 
@@ -547,7 +547,7 @@ final class YmrEffectsTest {
 
         EffectScript.Result script = compile(convert(builder.build()));
 
-        assertEquals(EffectScript.action(EffectScript.VERB_START_TOGGLE, 0, PRESCALER),
+        assertEquals(EffectScript.action(EffectScript.OPCODE_START_TOGGLE, 0, PRESCALER),
                 script.actions()[0][5] & 0xFF);
         // The skip never lifts: the sample needed voice A skipped and so does
         // square, so this is a change of owner and not a sample-end edge.

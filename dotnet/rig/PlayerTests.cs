@@ -541,11 +541,11 @@ namespace Rig
             return Rig.Run(command);
         }
 
-        /// <summary>Verb counts from one tune's compiled script: a RETUNE
+        /// <summary>Opcode counts from one tune's compiled script: a RETUNE
         /// addressed to voice 3 is the live retune, one to a real voice
         /// stops the timer, and a HOLD with bit 0 reloads the count under a
         /// running one.</summary>
-        public static Dictionary<string, int> ScriptVerbs(string tune)
+        public static Dictionary<string, int> ScriptOpcodes(string tune)
         {
             List<string> command = Rig.OwnTool("ymr");
             command.AddRange(new[] {"-script", tune});
@@ -557,13 +557,13 @@ namespace Rig
             foreach (Match action in Regex.Matches(script, "A[0-3]=([0-9A-F]{2})"))
             {
                 int value = Convert.ToInt32(action.Groups[1].Value, 16);
-                int verb = value >> 5;
+                int opcode = value >> 5;
                 int voice = (value >> 3) & 3;
-                if (verb == 4)
+                if (opcode == 4)
                 {
                     counts[voice == 3 ? "live retune" : "stopping retune"]++;
                 }
-                else if (verb == 1 && (value & 1) != 0)
+                else if (opcode == 1 && (value & 1) != 0)
                 {
                     counts["live reload"]++;
                 }
@@ -615,18 +615,18 @@ namespace Rig
                 return reworded;
             }
             string tune = tuneAndLength[0];
-            List<string>? verbCounts = Said(flat,
+            List<string>? opcodeCounts = Said(flat,
                     "on `" + Regex.Escape(tune) + "` the compiled script carries"
                     + " ([\\d,]+) live reloads and ([\\d,]+) live retunes"
-                    + " against no verb that stops", "the verb counts");
-            List<string>? otherVerbs = Said(flat,
+                    + " against no opcode that stops", "the opcode counts");
+            List<string>? otherOpcodes = Said(flat,
                     "`([\\w./-]+\\.ymr)` has ([\\d,]+) live retunes and (\\d+)"
-                    + " that stop", "the second tune's verb counts");
-            if (verbCounts == null || otherVerbs == null)
+                    + " that stop", "the second tune's opcode counts");
+            if (opcodeCounts == null || otherOpcodes == null)
             {
                 return reworded;
             }
-            string other = otherVerbs[0];
+            string other = otherOpcodes[0];
             string tunePath = Path.Combine(Rig.Repo, tune);
             string otherPath = Path.Combine(Rig.Repo, other);
             if (!File.Exists(tunePath) || !File.Exists(otherPath))
@@ -687,18 +687,18 @@ namespace Rig
             measured.Add(new Measured("source frames", frames,
                     Number(tuneAndLength[1])));
 
-            Dictionary<string, int> verbs = ScriptVerbs(tunePath);
-            measured.Add(new Measured("live reloads", verbs["live reload"],
-                    Number(verbCounts[0])));
-            measured.Add(new Measured("live retunes", verbs["live retune"],
-                    Number(verbCounts[1])));
+            Dictionary<string, int> opcodes = ScriptOpcodes(tunePath);
+            measured.Add(new Measured("live reloads", opcodes["live reload"],
+                    Number(opcodeCounts[0])));
+            measured.Add(new Measured("live retunes", opcodes["live retune"],
+                    Number(opcodeCounts[1])));
             measured.Add(new Measured("stopping retunes",
-                    verbs["stopping retune"], 0));
-            Dictionary<string, int> second = ScriptVerbs(otherPath);
+                    opcodes["stopping retune"], 0));
+            Dictionary<string, int> second = ScriptOpcodes(otherPath);
             measured.Add(new Measured(other + " live retunes",
-                    second["live retune"], Number(otherVerbs[1])));
+                    second["live retune"], Number(otherOpcodes[1])));
             measured.Add(new Measured(other + " stopping retunes",
-                    second["stopping retune"], Number(otherVerbs[2])));
+                    second["stopping retune"], Number(otherOpcodes[2])));
 
             var wrong = new System.Text.StringBuilder();
             foreach (Measured entry in measured)

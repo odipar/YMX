@@ -184,7 +184,7 @@ are script data whose bytes never reach a chip register.
 
 **Read schedule.** M, T and the fourteen register streams are read every
 frame. Every other stream byte is read only as specified: an A byte on a
-frame whose M bit marks the channel, a P or X byte where the verb reads
+frame whose M bit marks the channel, a P or X byte where the opcode reads
 one (§3). On other frames the byte's value is unspecified: any byte is
 valid there — a stream's bytes before its first read included — and
 repeating the previous byte compresses to nothing.
@@ -297,27 +297,27 @@ clock, and cannot be driven from a Timer C interrupt.
 `A` is one action byte:
 
 ```
-  7 6 5   4 3   2 1 0
- +-----+ +---+ +-----+
- | verb| |vc | | low |
- +-----+ +---+ +-----+
+  7 6 5    4 3   2 1 0
+ +------+ +---+ +-----+
+ |opcode| |vc | | low |
+ +------+ +---+ +-----+
 ```
 
-- **verb** (bits 7-5) — one of the eight in §3.
+- **opcode** (bits 7-5) — one of the eight in §3.
 - **voice** (bits 4-3) — 0, 1, 2 for voices A, B, C. Three voices in a
   two-bit field, so **3 is no voice**; see `RETUNE` in §3.
-- **low** (bits 2-0) — the MFP prescaler index for a verb that programs a
-  timer, or flags for `HOLD` and `RESUME`. A programming verb's index is
-  1 to 7; index 0 is the MFP's stopped state (§5), and no verb carries
+- **low** (bits 2-0) — the MFP prescaler index for an opcode that programs a
+  timer, or flags for `HOLD` and `RESUME`. A programming opcode's index is
+  1 to 7; index 0 is the MFP's stopped state (§5), and no opcode carries
   it.
 
-`P` is the MFP timer count for a verb that programs or reloads a timer.
+`P` is the MFP timer count for an opcode that programs or reloads a timer.
 
 ---
 
-## 3. The verbs
+## 3. The opcodes
 
-| # | verb | operation |
+| # | opcode | operation |
 |---:|---|---|
 | 0 | `RESUME` | re-enable a released toggle stream's interrupt. Flags: 1 = reload the count, 2 = reload the volume. Phase continued through the gap |
 | 1 | `HOLD` | update a running stream. Flags: 1 = reload the count from P, 2 = reload the toggle stream's volume, 4 = reload the retrigger stream's shape. Emitted only on frames where a value changed |
@@ -328,9 +328,9 @@ clock, and cannot be driven from a Timer C interrupt.
 | 6 | `START_PCM` | a trigger, fresh or repeated: sample table lookup, select, vector, full program |
 | 7 | `START_PCM_PREEMPT` | as `START_PCM`, but first stop the timer of every channel marked in X's low nibble |
 
-What each verb reads besides its action byte:
+What each opcode reads besides its action byte:
 
-| verb | P | X | the voice's register byte |
+| opcode | P | X | the voice's register byte |
 |---|---|---|---|
 | `RESUME` | with flag 1 | — | the volume, with flag 2 |
 | `HOLD` | with flag 1 | the shape, with flag 4 | the volume, with flag 2 |
@@ -365,7 +365,7 @@ is truncated.
 
 Either form continues the code held on its channel: same kind, same
 voice, a changed rate. A changed kind or voice re-enters through the
-kind's start verb. The ordinary form over a running PCM stream leaves the
+kind's start opcode. The ordinary form over a running PCM stream leaves the
 sample playing from its current position at the new rate — the vector
 stays installed, and the voice's byte it reads repatches the toggle
 volume, which the next `START_TOGGLE` repatches again.
@@ -395,7 +395,7 @@ time.
 
 `RESUME` is emitted only where the gap was a disabling release and the
 arriving code continues the same stream — same voice, same prescaler; the
-verb's low bits are flags, so it carries no rate. A prescaler changed
+opcode's low bits are flags, so it carries no rate. A prescaler changed
 across the gap re-enters through the voice-addressed `RETUNE`, whose
 program ends with the interrupt enabled (§9.2).
 
@@ -424,7 +424,7 @@ The four **kinds** of timer stream:
 The **code byte** does not appear in the file. It is the intermediate a
 writer compiles the script from, one byte per channel per frame, specified
 so that writers reading different source formats compile the same codes to
-the same script — §3.1 and §3.3 state which verb a code's arrival, change
+the same script — §3.1 and §3.3 state which opcode a code's arrival, change
 or departure selects:
 
 ```
@@ -529,7 +529,7 @@ One player call per frame, in this order:
    voice's volume register, and R13 on a frame carrying `$FF`. R7 is
    written with the host's port bits in 7-6 (§2).
 3. **Actions** — for each channel marked in M, in channel order: decode
-   the A byte, run the verb. A changed T byte takes effect before the
+   the A byte, run the opcode. A changed T byte takes effect before the
    first action (§2.3).
 4. **One refill** — decode `C` values into one stream's ring: stream `k`
    on frames where the frame number modulo `C` equals `k`. A `k` past the
@@ -599,7 +599,7 @@ a value. Those operations, in full:
 | X bits 3-0 with `START_PCM_PREEMPT` | each marked channel's timer is stopped before this channel's timer is programmed |
 | `RELEASE` bit 0 clear | the timer is stopped. Set: the timer's interrupt is disabled and the timer keeps counting; a tick falling due in the gap is dropped |
 | `RETUNE` addressed to voice 3 | the timer is reprogrammed without being stopped, so the count in flight runs to its end |
-| a toggle stream's volume, a PCM stream's sample number | read from the voice's own register stream on the frame the stream starts, and where a verb's flag re-reads them (§3) |
+| a toggle stream's volume, a PCM stream's sample number | read from the voice's own register stream on the frame the stream starts, and where an opcode's flag re-reads them (§3) |
 | `START_TOGGLE` | R8+v is written 0 among that frame's actions, and the first tick, one timer period later, writes the level |
 | programming a timer | four writes in the order stop, vector, count, run, with no tick of that timer between the first and the last, ending with that interrupt enabled and unmasked |
 | a sample byte with bit 7 set | it is written to the volume register as a level, and the sample ends there |
@@ -637,20 +637,20 @@ The values:
   any skip bit sets M's bit 4. After a one-shot sample the rejoin is
   bounded by §6.
 - On a frame that starts a PCM or toggle stream, on a frame whose
-  voice-addressed `RETUNE` retunes a toggle stream, and on any frame a
-  verb's flag re-reads the parameter, the voice's register byte carries
+  voice-addressed `RETUNE` retunes a toggle stream, and on any frame an
+  opcode's flag re-reads the parameter, the voice's register byte carries
   the operand defined in §3.
 
 The actions:
 
 - At most one timer stream runs on a voice at a time; where a source
   starts two, the conflict is resolved at pack time.
-- A programming verb's prescaler index is 1 to 7 (§2.4); its count byte
+- A programming opcode's prescaler index is 1 to 7 (§2.4); its count byte
   may be 0, read by the MFP as 256 (§5).
 - `RETUNE` to voice 3 is emitted only where the stream's parameter did
   not change that frame (§3.1).
 - A `RETUNE` keeps the stream's kind and voice; a changed kind or voice
-  re-enters through a start verb (§3.1).
+  re-enters through a start opcode (§3.1).
 - `RESUME` is emitted only after a disabling release, for the same
   stream, voice and prescaler (§3.3).
 - A `HOLD` sets at most one of flags 2 and 4: a channel runs one stream
