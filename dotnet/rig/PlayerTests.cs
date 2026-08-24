@@ -785,16 +785,26 @@ namespace Rig
         /// same SID on Timer B - and init-without-exit recovering by itself.</summary>
         public static string RunSndh()
         {
-            int frames = 200;
+            // Subtune 2 is shorter than the window played below, so it
+            // reaches its own wrap while the others do not: nothing a
+            // wrapped subtune leaves in the workspace survives the switch
+            // to the next.
+            int[] lengths = {200, 20, 200};
             int[][] signatures = new int[3][];
             for (int s = 0; s < 3; s++)
             {
-                signatures[s] = new int[frames];
+                signatures[s] = new int[lengths[s]];
             }
-            for (int f = 0; f < frames; f++)
+            for (int f = 0; f < lengths[0]; f++)
             {
                 signatures[0][f] = (3 * f + 1) & 0xFF;
-                signatures[1][f] = 0x55;
+            }
+            for (int f = 0; f < lengths[1]; f++)
+            {
+                signatures[1][f] = (0x55 + 7 * f) & 0xFF;
+            }
+            for (int f = 0; f < lengths[2]; f++)
+            {
                 signatures[2][f] = (0xA0 + f) & 0xFF;
             }
             Directory.CreateDirectory(Rig.Scratch);
@@ -803,6 +813,7 @@ namespace Rig
             command.Add(Path.Combine(Rig.Scratch, "sndh_test.sndh"));
             for (int i = 0; i < 3; i++)
             {
+                int frames = lengths[i];
                 byte[][] values = NewValues(frames);
                 for (int f = 0; f < frames; f++)
                 {
@@ -957,6 +968,7 @@ namespace Rig
         private static string PlayAndCheck(Sndh player, int[][] signatures,
                 int which)
         {
+            int[] want = signatures[which - 1];
             for (int f = 0; f < 30; f++)
             {
                 Sndh.Frame frame = player.PlayFrame();
@@ -965,11 +977,12 @@ namespace Rig
                     return "sndh: " + frame.Problem;
                 }
                 if (!frame.Writes.TryGetValue(2, out int got)
-                        || got != signatures[which - 1][f])
+                        || got != want[f % want.Length])
                 {
                     return "sndh: subtune " + which + " frame " + f + " played "
                             + (frame.Writes.ContainsKey(2) ? got.ToString() : "nothing")
-                            + " want " + signatures[which - 1][f];
+                            + " want " + want[f % want.Length]
+                            + (f >= want.Length ? " - past its wrap" : "");
                 }
             }
             return "";
