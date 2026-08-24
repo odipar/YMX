@@ -1,11 +1,11 @@
-# The prebuilt binaries — combine contract
+# The prebuilt binaries - combine contract
 
 How a system without a 68000 assembler builds a playable SNDH file, and a
 runnable TOS program, from binaries this repository assembles once.
 `ymx/mkcores.sh` assembles them into `dist/`; `org.ymx.MkSndh` and
 `org.ymx.MkPrg` are the reference combiners, and any tool that follows this
 document produces files of the same layout, played the same by any SNDH
-host — the tag text (title, composer, converter, subtune names) and the
+host - the tag text (title, composer, converter, subtune names) and the
 workspace size above §1's floor are each combiner's own. Big-endian
 throughout; every offset and size in bytes.
 
@@ -49,7 +49,7 @@ format version is a new release; an unchanged one updates in place.
 +----------------------------------------------+
 ```
 
-The inner box is the SNDH file of §2 — any SNDH host plays it as it
+The inner box is the SNDH file of §2 - any SNDH host plays it as it
 stands; §4 adds the outer box. The assembler produced
 only the two named binaries; every other byte is the combiners' or the
 tunes' own.
@@ -62,17 +62,17 @@ Position-independent. Fixed layout at its start:
 
 | offset | size | field |
 |---:|---:|---|
-| 0 | 4 | `bra.w` to init — the entry a combined file's outer header reaches |
+| 0 | 4 | `bra.w` to init - the entry a combined file's outer header reaches |
 | 4 | 4 | `bra.w` to exit |
 | 8 | 4 | `bra.w` to play |
 | 12 | 4 | `'YMXC'` |
-| 16 | 2 | descriptor version — **1** |
+| 16 | 2 | descriptor version - **1** |
 | 18 | 2 | the ST4 unit size this core decodes: 1, 2 or 4 |
 | 20 | 2 | flags: bit 0 = raster monitor built in, bit 1 = frame write unmasked |
-| 22 | 2 | the format version the core reads — a combiner combines only tunes of the same version |
+| 22 | 2 | the format version the core reads - a combiner combines only tunes of the same version |
 | 24 | 2 | `F`, the workspace bytes before the rings |
-| 26 | 4 | table offset — written 0, patched by the combiner |
-| 30 | 4 | workspace offset — written 0, patched by the combiner |
+| 26 | 4 | table offset - written 0, patched by the combiner |
+| 30 | 4 | workspace offset - written 0, patched by the combiner |
 
 Both patched offsets are relative to the core's first byte and must be even.
 
@@ -98,8 +98,8 @@ and every pad byte written 0:
 
 1. **The entry triple**, 12 bytes: three `bra.w` instructions
    (`$60 $00`, then a word displacement). Each branches to the same entry
-   of the core's own triple, so with the header `H` bytes long — the triple
-   plus the tag block, padded even — all three displacements are `H − 2`.
+   of the core's own triple, so with the header `H` bytes long - the triple
+   plus the tag block, padded even - all three displacements are `H − 2`.
 2. **The tag block**: `'SNDH'`, then the tags, then `'HDNS'`, padded even.
    A combiner writes, in order: `TITL` (NUL-terminated text),
    `COMM` (when there is a composer), `CONV` (NUL-terminated text naming
@@ -107,16 +107,16 @@ and every pad byte written 0:
    of the subtune count plus NUL, `TC` plus the frame rate in ASCII plus
    NUL, `FLAG~ady` plus NUL, an even pad, `FRMS` with one long frame count
    per subtune (0 for a tune that starts over), `!#SN` with one word offset
-   per subtune — each relative to the `!#SN` bytes — followed by the
+   per subtune - each relative to the `!#SN` bytes - followed by the
    NUL-terminated names, an even pad, `HDNS`.
 3. **The core**, with its two offsets patched.
 4. **The subtune table** (§1).
 5. **The tunes**, each even-aligned.
 6. **The workspace** (§1), last.
 
-Rules the combiner keeps: every tune's unit size equals the core's — a tune
+Rules the combiner keeps: every tune's unit size equals the core's - a tune
 whose sections are all stored reads the same at any unit size and combines
-with any core — one frame rate across the set for the `TC` tag, and at most
+with any core - one frame rate across the set for the `TC` tag, and at most
 99 subtunes, the `'##'` tag's two digits.
 
 ---
@@ -129,13 +129,13 @@ Position-independent, raw, even-sized. Fixed layout at its start:
 |---:|---:|---|
 | 0 | 4 | `bra.w` to the program |
 | 4 | 4 | `'YMXP'` |
-| 8 | 2 | descriptor version — **1** |
-| 10 | 2 | subtunes — patched by the combiner |
-| 12 | 4 | frames of subtune 1 when it plays once and stands alone — patched; 0 = play on |
-| 16 | 2 | flags — patched: bit 0 = drop `YMXDONE.MRK` on exit |
+| 8 | 2 | descriptor version - **1** |
+| 10 | 2 | subtunes - patched by the combiner |
+| 12 | 4 | frames of subtune 1 when it plays once and stands alone - patched; 0 = play on |
+| 16 | 2 | flags - patched: bit 0 = drop `YMXDONE.MRK` on exit |
 
 The stub reaches the SNDH file at its own last byte: the file is appended
-directly after it, at an even position — the reason the stub must be
+directly after it, at an even position - the reason the stub must be
 even-sized.
 
 ## 4. A program from the stub
@@ -149,7 +149,7 @@ In order:
    count come out of the SNDH file's own `'##'` and `FRMS` tags; the frame
    count is 0 when the file holds more than one subtune.
 3. **The SNDH file.**
-4. **The relocation table**: one zero long — nothing in the stub or a
+4. **The relocation table**: one zero long - nothing in the stub or a
    position-independent SNDH file is relocated.
 
 The program takes the machine over, calls play once per VBL, stops on
@@ -162,15 +162,15 @@ The whole build for a system with no assembler and no JVM.
 
 1. **Fetch** the release `binaries-v<format version>` and check each
    file's SHA-256 against `MANIFEST.txt`.
-2. **Pick the core** for the unit size the tunes are packed at — the
-   fourth byte of any packed section's ST4 signature (`SPEC.md` §1.4) —
+2. **Pick the core** for the unit size the tunes are packed at - the
+   fourth byte of any packed section's ST4 signature (`SPEC.md` §1.4) -
    and for the flags wanted. Verify its descriptor (§1): `'YMXC'`,
    descriptor version 1, the tunes' format version, the unit, the flags.
 3. **Read each tune's header** (`SPEC.md` §1.1; flag bit 0 in §1.2):
    frame count, rate, ring size, and flag bit 0 for the `FRMS` entry. One
    rate across the set.
 4. **Write the SNDH file** (§2): lay out the tag block before its entry
-   triple — the block's length sets the three displacements — then write
+   triple - the block's length sets the three displacements - then write
    §2's order: the triple, the tag block, the core with its two offsets
    patched, the subtune table, the tunes, the workspace.
 5. **Wrap it** (§4): the 28-byte PRG header, the stub with its subtune
@@ -188,16 +188,16 @@ long. No instruction changes.
 Each case is §5 with one decision changed.
 
 **One tune, its own sizes.** Read the tune's header, take the core its
-sections' unit selects — `ymxsndh-k1.bin` for a tune packed at unit 1 —
+sections' unit selects - `ymxsndh-k1.bin` for a tune packed at unit 1 -
 write the SNDH with one table entry and a workspace of `F + 25 · N`, wrap
 it. The stub's frame count is the tune's frame count when header flag
 bit 0 is clear, 0 when the tune starts over.
 
 **A chosen workspace.** `N` is the packer's decision, written in the
-tune's header — the maximum back-reference distance, not a combiner
+tune's header - the maximum back-reference distance, not a combiner
 option. A combiner chooses only the workspace size: anything at or above
-`F + 25 · max(N)` (§1). `F + 25 · 2520` — the cap on `N` (`SPEC.md`
-§1.3) — covers every legal tune, so a combiner may write that once and
+`F + 25 · max(N)` (§1). `F + 25 · 2520` - the cap on `N` (`SPEC.md`
+§1.3) - covers every legal tune, so a combiner may write that once and
 skip the per-set maximum.
 
 **Mixed tunes.** Tunes with different rings and chunks combine into one
@@ -233,5 +233,5 @@ rate, exit to hand the machine back. Every entry preserves d0-a6.
 
 **A changed set.** The file holds no checksums; the tags, the table and
 the workspace all follow from the tune headers and positions, so adding,
-dropping or replacing a tune is a rebuild from the same parts — §5 steps
+dropping or replacing a tune is a rebuild from the same parts - §5 steps
 4 and 5 again, not a patch.

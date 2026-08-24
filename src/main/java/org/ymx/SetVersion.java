@@ -41,12 +41,12 @@ public final class SetVersion {
                     "Version %2$s. Big-endian throughout."),
             new Site("doc/SPEC.md",
                     "format version, the major byte then the minor"
-                    + " — \\*\\*\\$[0-9A-F]{4}\\*\\*, version \\d+\\.\\d+",
+                    + " - \\*\\*\\$[0-9A-F]{4}\\*\\*, version \\d+\\.\\d+",
                     "format version, the major byte then the minor"
-                    + " — **$%04X**, version %2$s"),
+                    + " - **$%04X**, version %2$s"),
             new Site("doc/SPEC.md",
-                    "the version is \\$[0-9A-F]{4} — \\d+\\.\\d+;",
-                    "the version is $%04X — %2$s;"));
+                    "the version is \\$[0-9A-F]{4} - \\d+\\.\\d+;",
+                    "the version is $%04X - %2$s;"));
 
     public static void main(String[] args) {
         if (args.length != 1) {

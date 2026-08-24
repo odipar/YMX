@@ -1,6 +1,6 @@
-# YMX — a streaming YM format for the plain 68000
+# YMX - a streaming YM format for the plain 68000
 
-YMX extends the YM family — YM3, YM4, YM5, YM6 — into a format a 68000 plays
+YMX extends the YM family - YM3, YM4, YM5, YM6 - into a format a 68000 plays
 without ever holding the tune in memory. A `.ymx` file carries twenty-five
 independently compressed streams: fourteen for the YM2149's sound registers,
 one value per frame, and eleven carrying a **compiled effect script** that
@@ -8,11 +8,12 @@ drives the MFP's timers. Each stream decodes through its own small ring,
 refilled one stream per frame, so a tune's cost in RAM follows the player's
 configuration, not the tune's length.
 
-The one thing YMX changes about the YM lineage is where the work happens. What
-those formats call a "special effect" — a SID voice, a digidrum, a sync-buzzer
-— is carried in spare register bits, and the player has to re-derive on every
-frame what it means. YMX resolves that at pack time and writes down the
-outcome, so the player compares nothing and every frame costs the same.
+The one thing YMX changes about the YM lineage is where the work happens.
+What those formats call a "special effect" - a SID voice, a digidrum, a
+sync-buzzer - is carried in spare register bits, and the player has to
+re-derive on every frame what it means. YMX resolves that at pack time and
+writes down the outcome, so the player compares nothing and every frame
+costs the same.
 
 [**doc/SPEC.md**](doc/SPEC.md) is the format: the container, the streams, the
 opcodes and the frame contract. The rest of the documentation is beside it.
@@ -57,7 +58,7 @@ ym/ym_sndh.sh -t"My Set" my.sndh *.ym    # pack and combine in one
 ```
 
 The combiners run no assembler: `mkcores.sh` assembles the binaries, and
-`mksndh.sh` runs it for you the first time. Combining is byte appending and patching — a tracker or another
+`mksndh.sh` runs it for you the first time. Combining is byte appending and patching - a tracker or another
 build system does it without a 68000 toolchain;
 [doc/BINARIES.md](doc/BINARIES.md) is the contract, and
 `ymx/mkrelease.sh -publish` puts every prebuilt variant in a GitHub release
@@ -99,7 +100,7 @@ ST4_UNIT    equ     2
 |---|---|
 | [`org.ym6.Ymx`](src/main/java/org/ym6/Ymx.java) | the packer: `YM5!`/`YM6!` in, `.ymx` out |
 | [`org.ymr.Ymr`](src/main/java/org/ymr/Ymr.java) | the other packer: `YMR!` in, the same `.ymx` out |
-| [`org.ymx.Tune`](src/main/java/org/ymx/Tune.java) | what a front end produces and the engine works on — no format anywhere in it |
+| [`org.ymx.Tune`](src/main/java/org/ymx/Tune.java) | what a front end produces and the engine works on - no format anywhere in it |
 | [`org.ymx.EffectScript`](src/main/java/org/ymx/EffectScript.java) | the script compiler: a `Tune` in, prepared actions out |
 | [68k/YMX.S](68k/YMX.S) | the player |
 | [68k/YMX_sndh.S](68k/YMX_sndh.S), [68k/YMX_player.S](68k/YMX_player.S) | the SNDH core and the PRG stub, prebuilt by [ymx/mkcores.sh](ymx/mkcores.sh) |
@@ -131,7 +132,7 @@ and rigs, producing the same bytes, built by the .NET SDK on first use.
 
 The two sweeps are the broadest of these. Each replays a converted tune on the
 real player under emulation and compares every write it makes to the sound
-chip — and which MFP timers it claimed — against an independent model of the
+chip - and which MFP timers it claimed - against an independent model of the
 source file. A disagreement is reported exactly where it happened, which is
 how most of the bugs in this player were found.
 
@@ -144,7 +145,7 @@ repository vendors the parts it needs and has its own life-cycle.
 
 The results of the experiments that shaped the player came across too, in
 [doc/experiments.md](doc/experiments.md). What stayed behind is their full
-logs — the false trails and the instrument readings — and the
+logs - the false trails and the instrument readings - and the
 version-by-version argument for a container that is now what
 [doc/SPEC.md](doc/SPEC.md) says. Both are in ST4's history if anyone wants
 them.

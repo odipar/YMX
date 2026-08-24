@@ -56,6 +56,10 @@ final class HouseStyleTest {
             "cover version",
             "smuggl",
             "catastroph",
+            // shape: no em dash construct anywhere - a dash that must
+            // stay is a single '-' (the en dash rides along)
+            "—",
+            "–",
             // the verdict: the sentence grading itself or its subject
             "is deliberate",
             "asked properly",

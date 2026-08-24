@@ -89,7 +89,7 @@ final class SpecConsistencyTest {
         assertEquals(YmxFormat.HEADER_SIZE, number(said,
                 "the header is \\*\\*(\\d+) bytes\\*\\*", "the header size"));
         assertEquals(YmxFormat.STREAMS, number(said,
-                "`S`, the stream count — always \\*\\*(\\d+)\\*\\*", "the stream count"));
+                "`S`, the stream count - always \\*\\*(\\d+)\\*\\*", "the stream count"));
         assertEquals(2520, number(said,
                 "`N` is capped at \\*\\*(\\d+)\\*\\*", "the ring cap"));
         // 28 divides 2520 ninety times and covers all twenty-five streams; the
@@ -108,7 +108,7 @@ final class SpecConsistencyTest {
         // What a player decodes, by the highest channel a tune uses.
         List<Integer> steps = new ArrayList<>();
         Matcher decoded = Pattern.compile(
-                "\\*\\*decoded\\*\\* — ((?:\\d+, )*\\d+ or \\d+) \\|").matcher(said);
+                "\\*\\*decoded\\*\\* - ((?:\\d+, )*\\d+ or \\d+) \\|").matcher(said);
         assertTrue(decoded.find(), "SPEC §1.5's decoded row no longer matches");
         for (String n : decoded.group(1).split(", | or ")) {
             steps.add(Integer.parseInt(n));
@@ -159,7 +159,7 @@ final class SpecConsistencyTest {
 
         // The prescaler table, index by index.
         Matcher dividers = Pattern.compile(
-                "\\| divider \\| — \\| ((?:\\d+ \\| )*\\d+) \\|").matcher(said);
+                "\\| divider \\| - \\| ((?:\\d+ \\| )*\\d+) \\|").matcher(said);
         assertTrue(dividers.find(), "SPEC §5's divider row no longer matches");
         String[] cells = dividers.group(1).split(" \\| ");
         assertEquals(Tune.PRESCALERS - 1, cells.length, "one divider per index but 0");
@@ -170,8 +170,8 @@ final class SpecConsistencyTest {
         }
 
         // The rate range the table and the count byte allow.
-        int[] range = numbers(said, "The encodable range is ([\\d,]+) Hz — prescaler "
-                + "([\\d,]+), count (\\d+), which is ([\\d,]+) — to ([\\d,]+) Hz, "
+        int[] range = numbers(said, "The encodable range is ([\\d,]+) Hz - prescaler "
+                + "([\\d,]+), count (\\d+), which is ([\\d,]+) - to ([\\d,]+) Hz, "
                 + "prescaler (\\d+) and count (\\d+)", "the encodable range");
         assertEquals(range[0], Tune.MFP_CLOCK / (range[1] * range[3]), "the slowest rate");
         assertEquals(range[4], Tune.MFP_CLOCK / (range[5] * range[6]), "the fastest rate");
@@ -227,7 +227,7 @@ final class SpecConsistencyTest {
         String[] labels = {"R0, R2, R4", "R1, R3, R5", "R6", "R7",
                 "R8, R9, R10", "R11, R12", "R13"};
         for (int row = 0; row < rows.length; row++) {
-            assertTrue(said.contains("| " + labels[row] + " | " + kept[row] + " —"),
+            assertTrue(said.contains("| " + labels[row] + " | " + kept[row] + " -"),
                     "SPEC §2's mask table no longer gives " + labels[row] + " "
                             + kept[row] + " bits");
             for (int register : rows[row]) {
@@ -251,9 +251,9 @@ final class SpecConsistencyTest {
         String name = YmxFormat.versionName();
         assertTrue(said.contains("Version " + name + ". Big-endian throughout."),
                 "SPEC's opening line no longer carries version " + name);
-        assertTrue(said.contains("— **" + hex + "**, version " + name),
+        assertTrue(said.contains("- **" + hex + "**, version " + name),
                 "SPEC §1.1's version row no longer carries " + hex);
-        assertTrue(said.contains("the version is " + hex + " — " + name),
+        assertTrue(said.contains("the version is " + hex + " - " + name),
                 "SPEC §9.1 no longer names version " + hex);
         Matcher constant = Pattern.compile(
                 "public const int Version = 0x([0-9A-Fa-f]{4});").matcher(

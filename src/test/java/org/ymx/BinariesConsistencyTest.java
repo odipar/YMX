@@ -67,7 +67,7 @@ final class BinariesConsistencyTest {
             formulas++;
         }
         assertTrue(formulas >= 2, DOC + " no longer carries the workspace formulas");
-        Matcher cap = Pattern.compile("· (\\d+)` — the cap on `N`").matcher(doc);
+        Matcher cap = Pattern.compile("· (\\d+)` - the cap on `N`").matcher(doc);
         assertTrue(cap.find(), DOC + " no longer carries the capped formula");
         int ring = Integer.parseInt(cap.group(1));
         assertTrue(YmxFormat.checkShape(ring, 28).isEmpty(),
