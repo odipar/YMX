@@ -94,6 +94,8 @@ final class ToolsDocTest {
         map.put("YMR_FRAME_CAP",
                 "src/test/java/org/ymx/rig/YmrSweep.java,dotnet/rig/YmrSweep.cs");
         map.put("YM_CORPUS", "src/test/java/org/ym6/CorpusNumbersTest.java");
+        map.put("YMX_PLAY_FRAMES",
+                "src/test/java/org/ymx/rig/GenData.java,dotnet/rig/GenData.cs");
         map.put("ymx.repo", "src/main/java/org/ymx/Tools.java");
         map.put("ymx.core", "src/main/java/org/ymx/MkSndh.java");
         map.put("ymx.stub", "src/main/java/org/ymx/MkPrg.java");

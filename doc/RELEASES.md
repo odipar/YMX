@@ -17,7 +17,13 @@ A loop frame in the header, and the sections to reach it. Format version
 0.5: a tune packed at 0.4 has to be repacked from its `.ym` or `.ymr`
 source.
 
-- The player is 3,394 bytes at unit size 2, where 0.4.1 carried 3,256.
+- The player is 3,394 bytes at unit size 2, where 0.4.1 carried 3,256,
+  and costs about 16 cycles a frame more: `ymx/test/run.sh` under Hatari
+  2.6.1 on a cycle-exact 8 MHz ST with TOS 2.06 played 18,000 frames of
+  one tune in 945 ticks of the 200 Hz clock where 0.4.1 took 938, three
+  runs each, with the same chip-write checksum. That length resolves to
+  within about 2 cycles a frame; the harness's own 1,700 frames read 89
+  ticks for both.
 - The header is 138 bytes, eight more than 0.4 carried. The long at
   offset 30 is `L`, the frame a tune that starts over goes back to; the
   long at 34 is the offset of a loop table. The section table follows

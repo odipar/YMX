@@ -20,6 +20,17 @@ namespace Rig
         private const int Extra = 200;      // frames played past the end,
                                             // through the restart
 
+        /// <summary>How many frames the harness plays. One tick of its 200 Hz
+        /// clock covers 40,000 cycles at 8 MHz, so the frames played set what a
+        /// tick difference is worth: the default 1,700 resolve 24 cycles a
+        /// frame, 18,000 resolve 2. YMX_PLAY_FRAMES raises it to compare two
+        /// players.</summary>
+        private static int Played()
+        {
+            string? asked = Environment.GetEnvironmentVariable("YMX_PLAY_FRAMES");
+            return asked == null ? Frames + Extra : int.Parse(asked);
+        }
+
         /// <summary>Fold what a YM2149 would read back after each frame into
         /// one long; on a frame that says "leave the envelope alone" the
         /// chip still reads back the shape from an earlier frame.</summary>
@@ -49,7 +60,7 @@ namespace Rig
                     tune, packed});
             Rig.Run(command);
 
-            int played = Frames + Extra;
+            int played = Played();
             long checksum = ChipChecksum(GenYm.ChipStates(Frames, source, true, 0,
                     played));
             // The player reports a wrap on the frame that ends the tune, so

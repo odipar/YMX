@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
+import org.ymx.rig.GenData;
 
 /**
  * The figures {@code doc/RELEASES.md}'s newest section states, against the
@@ -175,6 +176,34 @@ final class ReleaseNotesTest {
     /** A tune whose loop frame no frame within the budget can be entered
      * at: voice A follows the envelope throughout and R13 is never written,
      * so the phase a second pass would start at is the first pass's. */
+    /**
+     * The cycle sentence names two frame counts and what each resolves to.
+     * Hatari is not run here, so the tick counts stand as measured; the
+     * frames and the resolutions they imply are arithmetic, and they are
+     * what a reader would use to repeat the measurement. One tick of the
+     * harness's 200 Hz clock covers 40,000 cycles at 8 MHz.
+     */
+    @Test
+    void theCycleSentenceResolvesWhatItSaysItDoes() {
+        String notes = newest();
+        int longRun = number(notes, "played ([\\d,]+) frames of one tune",
+                "the frames the cycle measurement played");
+        int shortRun = number(notes, "the harness's own ([\\d,]+) frames",
+                "the frames the harness plays by default");
+
+        assertEquals(GenData.DEFAULT_PLAY, shortRun,
+                "doc/RELEASES.md gives the harness's default as " + shortRun
+                        + " frames, where org.ymx.rig.GenData plays "
+                        + GenData.DEFAULT_PLAY);
+
+        int perTick = 40_000;
+        assertEquals(number(notes, "resolves to within about (\\d+) cycles a frame",
+                        "what the long run resolves"),
+                Math.round((float) perTick / longRun),
+                "doc/RELEASES.md says what " + longRun + " frames resolve;"
+                        + " a tick is " + perTick + " cycles at 8 MHz");
+    }
+
     private static Tune fallsBack() {
         int frames = 200;
         byte[][] registers = new byte[YmxFormat.REGISTER_STREAMS][frames];
