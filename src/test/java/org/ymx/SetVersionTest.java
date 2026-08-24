@@ -70,10 +70,18 @@ final class SetVersionTest {
 
     @Test
     void theArgumentGateRefusesWhatTheParseCannotRead(@TempDir Path scratch) {
-        for (String bad : new String[] {"1", "1.2.3", "0.4\n", "256.0",
-                "1234.0", "١.٢", "1. 2", ".4"}) {
-            assertThrows(IllegalArgumentException.class,
+        for (String bad : new String[] {"1", "1.2.3", "0.4\n", "1234.0",
+                "١.٢", "1. 2", ".4"}) {
+            IllegalArgumentException refused = assertThrows(
+                    IllegalArgumentException.class,
                     () -> SetVersion.set(scratch, bad), "\"" + bad + "\"");
+            assertTrue(String.valueOf(refused.getMessage()).startsWith("usage:"),
+                    "\"" + bad + "\" refused with: " + refused.getMessage());
         }
+        IllegalArgumentException outOfRange = assertThrows(
+                IllegalArgumentException.class,
+                () -> SetVersion.set(scratch, "256.0"));
+        assertTrue(String.valueOf(outOfRange.getMessage()).contains("0 to 255"),
+                String.valueOf(outOfRange.getMessage()));
     }
 }

@@ -18,11 +18,12 @@ import org.junit.jupiter.api.Test;
  * {@code doc/SPEC.md} against the two implementations of it in this tree.
  *
  * <p>The specification is the contract, and a Java constant, a 68000 {@code
- * equ} and a table row in the document are three copies of every number in it.
- * Two of them are compiled and the third is not, so the document is the one
- * that goes stale. Here it is read back: every offset, size and code the
- * document names is looked up in {@link YmxFormat}, {@link EffectScript},
- * {@link Tune} and {@code 68k/YMX.S}, and a row that no longer matches fails
+ * equ} and a table row in the document are three copies of every number in it
+ * - the format version has a fourth, in the C# tree. The compiled copies
+ * cannot go stale; the document can. Here it is read back: every offset,
+ * size and code the document names is looked up in {@link YmxFormat},
+ * {@link EffectScript}, {@link Tune}, {@code 68k/YMX.S} and
+ * {@code dotnet/ymx/YmxFormat.cs}, and a row that no longer matches fails
  * with the row and both values in the message.
  *
  * <p>A reworded sentence fails too, on purpose: these checks locate their
@@ -242,8 +243,8 @@ final class SpecConsistencyTest {
 
     /** Every version mention against {@link YmxFormat#VERSION}: SPEC's
      * three and the C# constant, read back so a bump that misses one
-     * fails by name. The 68k equate, {@code ymx/setversion.sh}'s sixth
-     * site, is bound with the header table above. */
+     * fails by name. The 68k equate, the one {@code ymx/setversion.sh}
+     * site not read back here, is bound with the header table above. */
     @Test
     void everyVersionMentionIsTheConstant() throws IOException {
         String said = flat();

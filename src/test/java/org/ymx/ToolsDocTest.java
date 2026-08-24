@@ -18,9 +18,11 @@ import org.ym6.YmEffects;
 
 /**
  * {@code doc/tools.md} against the sources it documents: every flag a tool
- * parses appears in that tool's section, every C# dispatcher name is
- * listed, the environment variables are the ones the sources read, and the
- * defaults quoted in prose are the constants' values.
+ * parses appears in that tool's section, the dispatcher and the C# tool
+ * names section list the same tools, the environment variables are the
+ * ones the sources read, and the defaults quoted in prose are the
+ * constants' values. The two trees are also held to each other: the tools
+ * both carry parse the same flags and rewrite the same sites.
  */
 final class ToolsDocTest {
 
@@ -200,7 +202,8 @@ final class ToolsDocTest {
         List<String[]> cs = sites(Files.readString(
                 Path.of("dotnet", "ymx", "SetVersion.cs")));
         assertTrue(java.size() == 6, "SetVersion.java carries " + java.size()
-                + " sites; doc/tools.md and SetVersion's own doc say six");
+                + " sites; doc/tools.md and SetVersion's doc enumerate six -"
+                + " three constants and SPEC.md's three mentions");
         assertTrue(java.size() == cs.size(), "SetVersion.java carries "
                 + java.size() + " sites and SetVersion.cs " + cs.size());
         for (int at = 0; at < java.size(); at++) {
