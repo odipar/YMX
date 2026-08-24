@@ -707,11 +707,21 @@ final class PlayerTests {
      * subtune 3 the same SID on Timer B, so the per-claim restore covers
      * both - and init-without-exit recovering by itself. */
     static String runSndh() throws IOException {
-        int frames = 200;
-        int[][] signatures = new int[3][frames];
-        for (int f = 0; f < frames; f++) {
+        // Subtune 2 is shorter than the window played below, so it
+        // reaches its own wrap while the others do not: nothing a wrapped
+        // subtune leaves in the workspace survives the switch to the next.
+        int[] lengths = {200, 20, 200};
+        int[][] signatures = new int[3][];
+        for (int i = 0; i < 3; i++) {
+            signatures[i] = new int[lengths[i]];
+        }
+        for (int f = 0; f < lengths[0]; f++) {
             signatures[0][f] = (3 * f + 1) & 0xFF;
-            signatures[1][f] = 0x55;
+        }
+        for (int f = 0; f < lengths[1]; f++) {
+            signatures[1][f] = (0x55 + 7 * f) & 0xFF;
+        }
+        for (int f = 0; f < lengths[2]; f++) {
             signatures[2][f] = (0xA0 + f) & 0xFF;
         }
         Files.createDirectories(Rig.SCRATCH);
@@ -719,6 +729,7 @@ final class PlayerTests {
                 Rig.REPO.resolve("ymx").resolve("mksndh.sh").toString(),
                 "-tRig", Rig.SCRATCH.resolve("sndh_test.sndh").toString()));
         for (int i = 0; i < 3; i++) {
+            int frames = lengths[i];
             byte[][] values = new byte[16][frames];
             for (int f = 0; f < frames; f++) {
                 values[2][f] = (byte) signatures[i][f];
@@ -841,15 +852,17 @@ final class PlayerTests {
     }
 
     private static String playAndCheck(Sndh player, int[][] signatures, int which) {
+        int[] want = signatures[which - 1];
         for (int f = 0; f < 30; f++) {
             Sndh.Frame frame = player.frame();
             if (!frame.problem().isEmpty()) {
                 return "sndh: " + frame.problem();
             }
             Integer got = frame.writes().get(2);
-            if (got == null || got != signatures[which - 1][f]) {
+            if (got == null || got != want[f % want.length]) {
                 return "sndh: subtune " + which + " frame " + f + " played "
-                        + got + " want " + signatures[which - 1][f];
+                        + got + " want " + want[f % want.length]
+                        + (f >= want.length ? " - past its wrap" : "");
             }
         }
         return "";
