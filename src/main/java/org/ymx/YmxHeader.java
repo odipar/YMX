@@ -46,8 +46,9 @@ public record YmxHeader(int ring, int chunk, int unit, int hz, int flags, int fr
         }
         int version = word(file, YmxFormat.OFFSET_VERSION);
         if (version != YmxFormat.VERSION) {
-            throw new IOException(path + " is format version " + version
-                    + ", this build reads " + YmxFormat.VERSION
+            throw new IOException(path + " is format version "
+                    + YmxFormat.versionName(version) + ", this build reads "
+                    + YmxFormat.versionName()
                     + " - repack the tune from its .ym source");
         }
         // A stored section carries no signature, so the unit size comes from

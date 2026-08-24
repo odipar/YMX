@@ -39,7 +39,8 @@ final class MkSndhTest {
         core[15] = 'C';
         core[17] = 1;                               // descriptor version
         core[19] = (byte) unit;
-        core[23] = (byte) YmxFormat.VERSION;        // format version
+        core[22] = (byte) (YmxFormat.VERSION >> 8); // format version, a word
+        core[23] = (byte) YmxFormat.VERSION;
         core[25] = 100;                             // workspace fixed size
         return core;
     }
