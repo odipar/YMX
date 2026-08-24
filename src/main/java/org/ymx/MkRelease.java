@@ -116,17 +116,22 @@ public final class MkRelease {
         }
     }
 
-    /** The GitHub release tagged by format version, its assets replaced. */
+    /** The GitHub release tagged by format version, its assets replaced
+     * and its notes rewritten, so the commit they name is the one the
+     * assets were assembled at. */
     private static void publish(Path dir, String commit) {
         String tag = "binaries-v" + YmxFormat.VERSION;
+        String notes = "Prebuilt SNDH cores and the PRG stub, assembled at "
+                + commit + ". doc/BINARIES.md is the combine contract;"
+                + " MANIFEST.txt lists sizes and SHA-256 digests.";
         if (Tools.status(Tools.repo(),
                 List.of("gh", "release", "view", tag)) != 0) {
             Tools.run(Tools.repo(), List.of("gh", "release", "create", tag,
                     "--title", "YMX player binaries, format " + YmxFormat.VERSION,
-                    "--notes", "Prebuilt SNDH cores and the PRG stub, assembled"
-                            + " at " + commit + ". doc/BINARIES.md is the combine"
-                            + " contract; MANIFEST.txt lists sizes and SHA-256"
-                            + " digests."));
+                    "--notes", notes));
+        } else {
+            Tools.run(Tools.repo(), List.of("gh", "release", "edit", tag,
+                    "--notes", notes));
         }
         List<String> upload = new ArrayList<>(List.of("gh", "release", "upload",
                 tag, "--clobber"));

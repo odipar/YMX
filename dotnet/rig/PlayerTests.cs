@@ -380,6 +380,99 @@ namespace Rig
             return "";
         }
 
+        /// <summary>The loop word is unsigned - a point of $8000 through
+        /// $FFFE is legal in any sample long enough to hold it - and init
+        /// resolves it to an absolute address. A sign-extended resolve lands
+        /// 65536 bytes low, so the proof is the resolved long against the
+        /// arithmetic done by hand. The packers keep samples short, so the
+        /// file is built here, stored sections alone.</summary>
+        public static string RunLoopPointResolve()
+        {
+            int loop = 0x8084;
+            byte[] packed = StoredYmx(4, loop + 96, loop);
+            var player = new Player(packed, Rig.WorkspaceSize(960));
+            if (player.Init() != 0)
+            {
+                return "loop resolve: YMX_init rejected the tune";
+            }
+            long table = DrumTable(player);
+            long offset = player.Uc.Value(player.File + (ulong) table, 4);
+            long resolved = player.Uc.Value(
+                    Rig.Code + (ulong) player.Symbol("ymx_samples") + 4, 4);
+            ulong want = player.File + (ulong) offset + (ulong) loop;
+            if ((ulong) resolved != want)
+            {
+                return "loop resolve: loop point $" + loop.ToString("x")
+                        + " resolved to $" + resolved.ToString("x")
+                        + ", want $" + want.ToString("x");
+            }
+            return "";
+        }
+
+        /// <summary>A .ymx of stored sections, built to SPEC.md's header and
+        /// table layout, with one looped sample of the given length.</summary>
+        private static byte[] StoredYmx(int frames, int length, int loop)
+        {
+            var body = new MemoryStream();
+            int[] where = new int[Rig.Streams];
+            int at = 130;
+            for (int stream = 0; stream < Rig.Streams; stream++)
+            {
+                while (at % 4 != 0)
+                {
+                    body.WriteByte(0);
+                    at++;
+                }
+                where[stream] = at;
+                for (int frame = 0; frame < frames; frame++)
+                {
+                    body.WriteByte(stream == 16 ? (byte) 0xE4 : (byte) 0);
+                }                           // T: 0->A 1->B 2->C 3->D
+                at += frames;
+            }
+            while (at % 4 != 0)
+            {
+                body.WriteByte(0);
+                at++;
+            }
+            int table = at;
+            var outStream = new MemoryStream();
+            outStream.Write(System.Text.Encoding.ASCII.GetBytes("YMX!"));
+            Word(outStream, 1);             // version
+            Word(outStream, 1);             // flags: starts over
+            LongWord(outStream, frames);
+            Word(outStream, 50);
+            Word(outStream, Rig.Streams);
+            Word(outStream, 960);           // ring
+            Word(outStream, 24);            // chunk
+            LongWord(outStream, 2000000);
+            LongWord(outStream, table);
+            Word(outStream, 1);             // one sample
+            for (int stream = 0; stream < Rig.Streams; stream++)
+            {
+                LongWord(outStream, unchecked((int) 0x80000000) | where[stream]);
+            }                               // bit 31: stored
+            body.WriteTo(outStream);
+            LongWord(outStream, table + 8); // the sample's offset
+            Word(outStream, length);
+            Word(outStream, loop);
+            outStream.Write(new byte[length]);  // the levels, then the
+            outStream.WriteByte(0x80);          // end marker
+            return outStream.ToArray();
+        }
+
+        private static void Word(MemoryStream outStream, int value)
+        {
+            outStream.WriteByte((byte) (value >> 8));
+            outStream.WriteByte((byte) value);
+        }
+
+        private static void LongWord(MemoryStream outStream, int value)
+        {
+            Word(outStream, value >> 16);
+            Word(outStream, value);
+        }
+
         /// <summary>A rate pop under a running effect, done without stopping
         /// it: the ordinary retune stops the timer and runs it again, and
         /// this must never write a zero into the timer's nibble.</summary>
@@ -1040,6 +1133,8 @@ namespace Rig
                         "the sample loop{0,-9}    (back to the loop, not stopped)",
                         build));
             }
+            failures += Report(RunLoopPointResolve(),
+                    "the loop-point resolve   (an unsigned word, $8000 and up)");
             failures += Report(RunLiveRetune(),
                     "the live retune          (the timer is never stopped)");
             failures += Report(RunReadmeSizes(),

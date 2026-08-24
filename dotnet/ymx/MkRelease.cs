@@ -127,20 +127,26 @@ namespace Ymx
         }
 
         /// <summary>The GitHub release tagged by format version, its assets
-        /// replaced.</summary>
+        /// replaced and its notes rewritten, so the commit they name is the
+        /// one the assets were assembled at.</summary>
         private static void Publish(string dir, string commit)
         {
             string tag = "binaries-v" + YmxFormat.Version;
+            string notes = "Prebuilt SNDH cores and the PRG stub, assembled"
+                    + " at " + commit + ". doc/BINARIES.md is the combine"
+                    + " contract; MANIFEST.txt lists sizes and SHA-256 digests.";
             if (Tools.Status(Tools.Repo(),
                     new List<string> {"gh", "release", "view", tag}) != 0)
             {
                 Tools.RunLoudly(Tools.Repo(), new List<string> {"gh", "release",
                         "create", tag,
                         "--title", "YMX player binaries, format " + YmxFormat.Version,
-                        "--notes", "Prebuilt SNDH cores and the PRG stub,"
-                                + " assembled at " + commit + ". doc/BINARIES.md"
-                                + " is the combine contract; MANIFEST.txt lists"
-                                + " sizes and SHA-256 digests."});
+                        "--notes", notes});
+            }
+            else
+            {
+                Tools.RunLoudly(Tools.Repo(), new List<string> {"gh", "release",
+                        "edit", tag, "--notes", notes});
             }
             var upload = new List<string> {"gh", "release", "upload", tag,
                     "--clobber"};
