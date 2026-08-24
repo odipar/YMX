@@ -31,7 +31,8 @@ Every variant is published at
 under the tag `binaries-v<release>`, staged by `ymx/mkrelease.sh`: twelve
 cores - three unit sizes by the four flag combinations - the stub, and a
 `MANIFEST.txt` of sizes and SHA-256 digests with the source commit and
-both versions. A new format version is a new release; so is a patch of
+both versions. The release notes are that release's section of
+[RELEASES.md](RELEASES.md), which says what changed in it. A new format version is a new release; so is a patch of
 the same format, which replaces the patch before it. An unchanged
 release updates in place.
 
