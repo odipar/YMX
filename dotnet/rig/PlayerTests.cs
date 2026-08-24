@@ -764,7 +764,7 @@ namespace Rig
                         + " them out of";
             }
             int unit = int.Parse(playerSaid.Groups[2].Value);
-            Rig.Build build = Rig.Assemble(unit, false);
+            Rig.Build build = Rig.AssembleMasked(unit, false);
             int player = Rig.Symbol(build.Symbols, "ST4_init");
             int wrap = build.Binary.Length - player;
             long saidPlayer = Number(playerSaid.Groups[1].Value);

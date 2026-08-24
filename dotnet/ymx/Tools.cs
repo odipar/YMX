@@ -140,8 +140,6 @@ namespace Ymx
             }
         }
 
-        /// <summary>Prints the message and leaves, the way the shell scripts
-        /// did.</summary>
         /// <summary>The prebuilt binaries' name suffix - the format
         /// version, so files from different releases tell apart on
         /// sight.</summary>
@@ -150,6 +148,8 @@ namespace Ymx
             return "-v" + YmxFormat.VersionName();
         }
 
+        /// <summary>Prints the message and leaves, the way the shell scripts
+        /// did.</summary>
         public static Exception Fail(string message)
         {
             Console.Error.WriteLine(message);
