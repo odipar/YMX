@@ -42,8 +42,9 @@ source.
   packed on their own - and a section is a whole number of units, so a cut
   falls on one.
 - The workspace before the rings is twelve bytes larger: 1,658 bytes, plus
-  25 `N` for the rings. The two longs are the table a stream reopens from
-  and the values a section of it carries.
+  25 `N` for the rings. The three longs are `O - L`, the frames one pass
+  plays; the table a stream opens a section out of; and how many values a
+  section of that table carries.
 
 ## 0.4.1
 
@@ -68,7 +69,7 @@ the format did not move.
 
 The first release of format 0.4, renumbered from 1 while the format is
 short of the stability 1.0 states. The binaries' names carry the release
-version, so files from different releases tell apart on sight.
+version, so a file states which release it came from.
 
 - A sample's loop point resolves as an unsigned word: a loop point of
   `$8000` through `$FFFE` addressed 65,536 bytes below the sample.

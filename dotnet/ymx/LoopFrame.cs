@@ -8,7 +8,8 @@ namespace Ymx
     /// ported from org.ymx.LoopFrame.
     ///
     /// <para>A source gives the frame its own player went back to. The file's L
-    /// is the packer's answer to it, and two things stand between the two.</para>
+    /// is that frame where two rules allow it: what the wrap leaves at that
+    /// frame, and how the player reaches it again.</para>
     ///
     /// <para>The first is the state the wrap leaves behind. At the end of a pass
     /// every claimed timer is stopped, its vector parked and every skip bit
@@ -248,9 +249,9 @@ namespace Ymx
         /// on it, counting from frame at. R13's write is the restart, and the
         /// frame write puts it after R8, R9 and R10, so a frame that both writes
         /// R13 and puts a voice on the envelope ends with the phase set. A frame
-        /// before that one with a voice on the envelope hears a phase that
-        /// depends on the frames played earlier, and those differ between the
-        /// first pass and the rest.
+        /// before that one with a voice on the envelope is driven at a phase
+        /// that depends on the frames played earlier, and those differ between
+        /// the first pass and the rest.
         /// </summary>
         private static bool EnvelopeIsSetBeforeAVoiceHearsIt(Tune tune, int at)
         {

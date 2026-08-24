@@ -301,7 +301,7 @@ namespace Ymx
         }
 
         /// <summary>Printable ASCII with the NUL-adjacent risks dropped:
-        /// titles come out of YM headers, which carry anything at all.</summary>
+        /// titles come out of YM headers, which carry any text.</summary>
         internal static string Clean(string text)
         {
             var kept = new StringBuilder();

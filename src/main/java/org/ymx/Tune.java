@@ -14,9 +14,9 @@ import org.jspecify.annotations.Nullable;
  * format's own words - {@code org.ym6} in YM's, {@code org.ymr} in RhYMe's -
  * and stops here, at a record whose every field is a term from
  * {@code doc/terminology.md}. Nothing downstream of this line can ask which
- * format the bytes came from, because no field here records it. That is the
- * point. A second front end is a PEER of the first, and two peers can only
- * meet on ground neither one owns.
+ * format the bytes came from, because no field here records it. A second front
+ * end is a PEER of the first: both stop at this record, and neither reads the
+ * other's format.
  *
  * <p>The two kinds of stream sit side by side because they are one timeline.
  * {@code registers[r][frame]} is the FRAME STREAM targeting register
@@ -119,7 +119,7 @@ public record Tune(int frames, int frameRate, long masterClock, boolean loops,
     /** How many prescaler indices a code byte's bits 2-0 can name. */
     public static final int PRESCALERS = 8;
 
-    /** The MFP prescaler table. Index 0 is not a divider at all but the
+    /** The MFP prescaler table. Index 0 is not a divider but the
      * MFP's stopped state, so a code that selects it starts nothing. */
     private static final int[] PRESCALER_TABLE = {0, 4, 10, 16, 50, 64, 100, 200};
 

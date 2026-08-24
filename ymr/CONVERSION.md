@@ -125,7 +125,7 @@ difference paid in bytes, and it buys the flat frame.
 
 ### What a .ymr gives up
 
-Everything not on this list is exact, and
+Everything not on this list, and not the loop frame below, is exact, and
 [test/ymr_sweep.sh](../ymx/test/ymr_sweep.sh) says so: it replays a converted
 tune on the real player and compares every write `YMX_play` makes to the sound
 chip, plus which MFP timers it claimed, against its own decoder and replay of
@@ -240,6 +240,13 @@ parameter moved on the same frame as the rate, which is the row.
   should not be playing. No ordering of the opcodes closes it either: the
   actions sit after the burst so their varying cost cannot jitter the
   register writes, and the one byte is the cost of that ordering.
+* **The frame a `.YMR` starts over from.** A `.YMR` header gives one, and the
+  packer resolves it as the YM packer does: it keeps the frame where nothing
+  is carried into it, takes the next frame within a second that can be entered
+  where something is, raises the rings or packs every stream as two sections
+  to reach it, and carries 0 where no frame in reach holds. `-lF` gives a
+  frame of its own. [../ym/CONVERSION.md](../ym/CONVERSION.md) has the account
+  in full.
 
 Everything else the conversion has to change, it counts and names the same way:
 

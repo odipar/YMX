@@ -148,7 +148,8 @@ final class SpecConsistencyTest {
                         + " packed files against out of it");
         assertTrue(said.contains("Where the loop table offset is not 0 it is a"
                         + " long boundary, `L` is not 0, and the loop table's"
-                        + " twenty-five entries are nonzero"),
+                        + " twenty-five entries are nonzero, `O` - `L` is larger"
+                        + " than `N`"),
                 "SPEC §9.3's rule on a file with a loop table has been"
                         + " reworded: this test reads the bounds it checks the"
                         + " packed files against out of it");
@@ -183,6 +184,9 @@ final class SpecConsistencyTest {
                 continue;
             }
             withLoopTable++;
+            assertTrue(frames - loopFrame > ring, file + " replays "
+                    + (frames - loopFrame) + " frames through rings of " + ring
+                    + " and still carries a loop table");
             assertEquals(0, loopTable % 4, file + "'s loop table is at "
                     + loopTable + ", off a long boundary");
             for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {

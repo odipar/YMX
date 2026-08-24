@@ -8,7 +8,7 @@ drives the MFP's timers. Each stream decodes through its own small ring,
 refilled one stream per frame, so a tune's cost in RAM follows the player's
 configuration, not the tune's length.
 
-The one thing YMX changes about the YM lineage is where the work happens.
+YMX changes one thing about the YM lineage: where the work happens.
 What those formats call a "special effect" - a SID voice, a digidrum, a
 sync-buzzer - is carried in spare register bits, and the player has to
 re-derive on every frame what it means. YMX resolves that at pack time and
@@ -59,9 +59,9 @@ ym/ym_sndh.sh -t"My Set" my.sndh *.ym    # pack and combine in one
 ```
 
 The combiners run no assembler: `mkcores.sh` assembles the binaries, and
-`mksndh.sh` runs it for you the first time. Combining is byte appending and patching - a tracker or another
-build system does it without a 68000 toolchain;
-[doc/BINARIES.md](doc/BINARIES.md) is the contract, and
+`mksndh.sh` runs it for you the first time. Combining is byte appending and
+patching - a tracker or another build system does it without a 68000
+toolchain; [doc/BINARIES.md](doc/BINARIES.md) is the contract, and
 `ymx/mkrelease.sh -publish` puts every prebuilt variant in a GitHub release
 for systems without the repository.
 
@@ -117,7 +117,7 @@ which format a tune came out of.
 ## Tests
 
 ```sh
-mvn test                              # packers, 35 pinned tunes, a rig slice
+mvn test                              # packers, 39 pinned tunes, a rig slice
 ymx/test/rig.sh                       # the player, under emulation
 ymx/test/sweep.sh songs/*.ym          # a YM collection, differentially
 ymx/test/ymr_sweep.sh songs/*.ymr     # the same for .YMR
@@ -159,5 +159,5 @@ commercially, as long as your documentation says you used ZX1 through ST4.
 See [LICENSE](LICENSE).
 
 The player was inspired by Steve Clarets' MinYMiser. Sinus-SID is the one YM
-effect deliberately left unplayed, as it is in every other player, including
-the format author's.
+effect this player leaves unplayed, as every other player does, including the
+format author's.

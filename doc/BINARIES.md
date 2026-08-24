@@ -18,12 +18,12 @@ Two kinds of binary:
 
 Every name ends with the release version - the format version of the
 tunes the binary serves, then the release's own patch number, which
-moves when the binaries change and the format does not. Files from
-different releases tell apart on sight, and the core's descriptor
-carries the format version alone (§1), which is what a combiner
-matches. A `-perf` or `-nomask` in the name marks a core assembled with
-the raster monitor in, or with the frame write unmasked; the flags word
-below says which, so a combiner verifies rather than parses names.
+moves when the binaries change and the format does not. A file name
+therefore states which release it came from, and the core's descriptor
+carries the format version alone (§1), which a combiner matches. A
+`-perf` or `-nomask` in the name marks a core assembled with the raster
+monitor in, or with the frame write unmasked; the flags word below says
+which, so a combiner verifies rather than parses names.
 
 Every variant is published at
 [github.com/odipar/YMX/releases](https://github.com/odipar/YMX/releases)
@@ -107,7 +107,7 @@ and every pad byte written 0:
 1. **The entry triple**, 12 bytes: three `bra.w` instructions
    (`$60 $00`, then a word displacement). Each branches to the same entry
    of the core's own triple, so with the header `H` bytes long - the triple
-   plus the tag block, padded even - all three displacements are `H − 2`.
+   plus the tag block, padded even - all three displacements are `H - 2`.
 2. **The tag block**: `'SNDH'`, then the tags, then `'HDNS'`, padded even.
    A combiner writes, in order: `TITL` (NUL-terminated text),
    `COMM` (when there is a composer), `CONV` (NUL-terminated text naming

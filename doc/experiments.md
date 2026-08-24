@@ -2,9 +2,10 @@
 
 Ideas measured against the real corpus and the real tools, and what the
 measurements said. Most are declines - an idea can be good, measurable and
-still not worth its complexity, and writing the number down keeps it from
-being proposed, measured and declined a second time. The rest are diagnoses:
-bugs whose causes were buried deep enough that finding them taught something.
+still cost more complexity than it saves, and writing the number down keeps
+it from being proposed, measured and declined a second time. The rest are
+diagnoses: bugs whose causes were buried deep enough that finding them
+taught something.
 
 These are the results only. The full logs - the false trails, the instrument
 readings, the method - were kept while the work was live and are in the
@@ -48,7 +49,7 @@ and RAM - and clustering moves neither.
 
 **Untried:** if file size ever becomes the constraint, the cheap
 variant is fixed, menu-less, always-on clustering of (2,3), (4,5) and
-(11,12) - one layout, two cursors, no adaptivity, −3.3% of register data. The
+(11,12) - one layout, two cursors, no adaptivity, -3.3% of register data. The
 script's A/P pairs would likely join for the same correlation reason.
 
 ---
@@ -93,7 +94,7 @@ switch mid-song; nothing in the format forbids it.
 **The drum reopen click** (2026-08-20). A click after every digidrum, from
 one cautionary `+1` frame in the packer's computed sample end.
 
-Four things worth keeping:
+Four rules this left behind:
 
 1. **A differential must compare event *timing*, not event counts.** An audit
    can verify every count, marker and invariant in both builds and still miss
@@ -119,7 +120,7 @@ TACR, TBCR, TCDCR and the four data registers, and restores them at exit,
 counts before controls. A player claims a timer per channel its tune uses,
 and nothing else.
 
-Two things worth keeping:
+Two rules this left behind:
 
 1. **"Identical chip writes" is not "identical playback":** timer state
    never crosses the bus.
@@ -174,8 +175,8 @@ different from the game.
 - **Drum content: replaced.** The original's samples are nearly binary, two
   thirds 0s and 15s - a bright buzzing waveform. The dump's are smooth
   full-range data, aligned correlation ~0.1. The converter re-rendered them
-  through some other chain, and that darker character is what an ear that
-  knows the game hears.
+  through some other chain, and a listener who knows the game hears that
+  darker character.
 
 Every YM player renders this identically, because it is in the file; the
 SNDH carries the game's own drums.

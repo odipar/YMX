@@ -11,6 +11,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
@@ -52,6 +54,14 @@ final class PinnedCorpusTest {
             }
         }
         assertTrue(!sources.isEmpty(), "no tunes in " + CORPORA);
+        // The README counts them in the line that says what mvn test covers.
+        String readme = Files.readString(Path.of("README.md"));
+        Matcher counted = Pattern.compile("packers, (\\d+) pinned tunes").matcher(readme);
+        assertTrue(counted.find(), "README.md no longer says how many tunes are"
+                + " pinned - this test reads the count out of that line");
+        assertTrue(Integer.parseInt(counted.group(1)) == sources.size(),
+                "README.md says " + counted.group(1) + " pinned tunes; "
+                        + CORPORA + " hold " + sources.size());
         boolean refresh = "refresh".equals(System.getProperty("ymx.pin"));
         return sources.stream().map(source -> dynamicTest(source.getFileName().toString(),
                 () -> checkOrRefresh(source, refresh)));

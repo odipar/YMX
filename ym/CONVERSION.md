@@ -56,7 +56,7 @@ the host's.
 | A drum number with no sample behind it | dropped to idle | yes |
 | A drum above the rate ceiling | bandwidth only: the sample is resampled and every trigger's divisor scaled by the same ratio | yes |
 | A tune whose length is not a whole unit | one duplicated safe frame, inaudible | yes |
-| A loop frame the wrap cannot enter | the repeat starts at the next frame it can | yes |
+| A loop frame the wrap cannot enter | the repeat starts at the next frame it can, or at frame 0 where no frame within a second can be entered | yes |
 | A loop frame further from the end than a ring holds | the rings grow to hold the frames between | yes |
 | A loop frame further from the end than the largest ring holds | every stream is packed as two sections, which costs file bytes | yes |
 | A loop frame with no unit boundary in reach, packing at 2 or 4 bytes a unit | the tune starts over from frame 0, so its opening is heard on every pass | yes |
@@ -96,7 +96,7 @@ not lossy.
 * **A tune starts over from the frame its header gives.** A YM header gives
   the frame its own player went back to, and 99 of the corpus's 543 readable
   files give one other than 0 - on those, the opening that played once under
-  the header is 46% of the tune on average. The file carries that frame as
+  the header is 47% of the tune on average. The file carries that frame as
   `L` and the player goes back to it, on two conditions.
 
   The first is the state at that frame. Every claimed timer is stopped and

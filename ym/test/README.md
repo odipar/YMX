@@ -15,7 +15,8 @@ bytes to 55 KB).
 The compiled script's opcodes are covered between the two collections. A YM
 dump reaches `START_PCM`, `START_TOGGLE`, `RELEASE`, and, through
 `Synergy Credits`, `HOLD` and the voice-addressed `RETUNE`. No YM file in
-the 544 uses a sync-buzzer or preempts a running timer, so `START_RETRIGGER`
+the 544 starts a retrigger stream or preempts a running timer, so
+`START_RETRIGGER`
 comes from [../../ymr/test](../../ymr/test), as does the live `RETUNE`
 addressed to voice 3, which a YM dump has no way to ask for.
 `START_PCM_PREEMPT` and `RESUME` appear in neither collection and are built

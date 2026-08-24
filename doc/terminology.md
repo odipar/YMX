@@ -254,10 +254,10 @@ about what the comparison to avoid it would cost. Two exceptions: the
 envelope shape is left alone where a restart would be wrong, and any
 voice's volume is left out while a timer stream holds it. That is the
 voice's **skip**: the register is left out of the frame write - though
-the player can still write the register outside the burst, and does. A tracker writes only what
-changed, because its own format records which registers those are. A YM
-file has no such record - a full row every frame, with nothing marking
-what is new.
+the player can still write the register outside the burst, and does. A
+tracker writes only what changed, because its own format records which
+registers those are. A YM file has no such record - a full row every
+frame, with nothing marking what is new.
 
 Most hard bugs come from a tick landing during a frame write, or both
 writing the same register:
@@ -421,6 +421,105 @@ Most of what a composer does needs no timer stream:
 A tracker effect that seems missing from the YM format is usually a frame
 stream nobody named.
 
+## How a tune repeats
+
+<!-- The corpus and pinned-file figures in this section are re-measured by
+     CorpusNumbersTest, which reads them back out of these sentences: keep
+     the shape of them. -->
+
+Most tunes are written to go round. A YM header carries the frame its own
+player went back to, and 99 of the corpus's 543 readable files give one
+other than 0: the opening plays once and the rest plays for ever. That
+frame is `L`, and a `.ymx` carries it at header offset 30.
+
+A `.ymx` is not in memory. A frame is a byte read out of each of
+twenty-five rings, and a ring holds only the last `N` bytes a stream
+decoded. A section can be opened again from its start, so frame 0 is
+always in reach. Frame 4,000 of 5,000 is not: a decoder starts only at a
+section's first value, and a ring of `N` bytes holds frame 4,000's byte
+only while fewer than `N` frames have been read since.
+
+There are two ways round that, and the length of a pass against `N`
+selects one.
+
+### The pass is still in the rings
+
+Say a tune is 1,920 frames and goes back to frame 160. One pass after the
+first is 1,760 frames, and a ring holds `N` bytes. Make `N` 1,776 and
+every byte the second pass needs is still there when the first pass ends,
+because a ring holds the last 1,776 values and the pass is 1,760 of them.
+
+So the player stops decoding when it has produced 1,920 values, and at
+the end of the pass it moves its read position back 1,760 bytes and
+plays those bytes again. Nothing is decompressed a second time.
+
+On disk this costs nothing. Every header carries a loop frame, whether
+the tune starts over or not, and the sections are exactly what they would
+have been. It costs memory instead, because the rings have to be big
+enough: twenty-five rings of 1,776 bytes rather than 960, so 44,400 bytes
+of ring rather than 24,000. The ring size is per tune and lives in its
+header, so the packer raises it only where the raised ring holds the
+pass, up to the cap of 2,520 bytes a ring.
+
+`Turrican - world 4-3` is this case. Its file is 2,532 bytes, the same as
+it would be with no loop, and its header gives `N` = 1,776.
+
+### The pass is too long to keep
+
+`Dragon Flight 4 - Finish 1` is 5,440 frames and goes back to 1,440. One
+pass is 4,000 frames, and no ring may exceed 2,520 bytes, so the pass
+cannot be kept. Here each of the twenty-five streams is compressed as
+two sections rather than one, the first covering frames 0 to 1,439 and
+the second 1,440 to 5,439.
+
+A second table of twenty-five offsets says where each stream's second
+section begins. The header carries that table's position at offset 34,
+and 0 where there is none.
+
+Playing it: each stream decodes its first section, and when that section
+runs out - which happens at frame 1,440, the same value for every stream,
+since every first section holds exactly 1,440 values - the stream opens
+the second section instead. From then on, every time a stream runs out it
+opens that same second section again. The rings are unchanged; only
+which section is opened is new.
+
+This costs bytes. The two halves cannot compress against each other, so a
+match in the second half cannot reach back into the first, and the file
+carries twenty-five more section headers. Of the 99 tunes with a loop
+frame, 36 need the cut, and on the three of them in `ym/test` the file
+grows by 13.8%, 22.5% and 40.9%. It costs no memory.
+
+### What the packer has to check first
+
+A wrap stops every timer the tune claimed, parks its vector, and clears
+the three skip states. That is the state frame 0 was played in on the
+first pass, so frame `L` has to play the same way in it.
+
+Most frames do. A frame that starts a drum is fine, because it programs
+everything it uses. A frame in the middle of a SID note is not: the note
+was set up frames earlier, and on the second pass those frames did not
+play. A frame with a voice on the envelope is the third case: the shape
+register is written only where a tune restarts the envelope, so a voice
+following the envelope at `L` is driven by the shape set before it, and
+that shape differs between the first pass and the rest.
+
+So the packer keeps the frame the header gives when nothing is carried
+into it, takes the next frame within a second that qualifies when it is
+not, and where neither holds, packs the tune to start over from frame 0
+and reports that it did. Over the corpus, 87 of the 99 tunes with a loop
+frame can be entered at the frame their own header gives.
+
+One more thing moves a frame: a section holds a whole number of ST4
+units, so at the default unit size of 2, a cut can only begin on an even
+frame. `Crapman level 9` gives 2,019 and its file carries 2,020.
+
+### What a listener hears
+
+The same music either way. The two forms differ in where the bytes come
+from, not in what reaches the sound chip, and the rig checks that: a
+looping tune is played past two wraps and every frame is compared with
+what an independent model says a YM2149 should hold.
+
 ## The rest of the mapping
 
 The YM format names bytes and fields; YMX names what those bytes do. The
@@ -521,9 +620,9 @@ the reference player's stop-load-run. Both are there for a source that
 can express them.
 
 Not in the model yet: a PCM stream with a **derived** rate, a sample
-tracking the note the way a toggle stream does. The format carries a rate the source moves; nothing yet derives one
-from a melody. With the loop point, that would be a wavetable in the
-ordinary sense.
+tracking the note the way a toggle stream does. The format carries a rate
+the source moves; nothing yet derives one from a melody. With the loop
+point, that would be a wavetable in the ordinary sense.
 
 ## Quick reference
 

@@ -565,7 +565,7 @@ namespace Ymx
 
         /// <summary>The samples this channel still owns, ended here because
         /// the channel was told to do something else - the ChannelEndsPcm
-        /// rule. Returns whether anything was actually taken away.</summary>
+        /// rule. Returns whether anything was taken away.</summary>
         private bool EndOwnPcm(int p, int index, int taken)
         {
             bool ended = false;

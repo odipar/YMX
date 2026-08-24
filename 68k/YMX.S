@@ -15,11 +15,10 @@
 ; idea; WHICH of the MFP's timers serves it is the FILE's: stream T maps
 ; the four channels onto the MFP's four timers, two bits each, and
 ; ymx_timers holds one row per timer for the map to point at. A timer is
-; claimed only when a tune says it uses that channel. In this player's
-; own words a channel's streams are
+; claimed only when a tune says it uses that channel. A channel's streams are
 ; TIMER STREAMS: series of values written to one register between frames,
 ; timer-driven, as against the FRAME STREAMS that carry the music itself.
-; Sinus-SID, which no player has ever implemented, is dropped at pack time.
+; Sinus-SID is dropped at pack time, as it is in every other player.
 ; doc/SPEC.md is the format and doc/terminology.md the vocabulary.
 ;
 ; REQUIRES ST4_wrap.S, built for the SAME unit size the tune was packed with
@@ -44,11 +43,11 @@
 ; channel, twenty-one for a YM tune - every one is refilled once per C frames,
 ; one refill per VBL, so the work per frame is flat, and ordered for the chip's
 ; benefit: the skips, then the fourteen register writes - the FRAME WRITE,
-; leaving the VBL at a FIXED offset whatever the frame's timer streams cost -
-; then the script's actions, then one ST4_resume of C bytes. Since C divides N
-; and a call never reaches the ring end, ST4_wrap.S is the decoder that fits:
-; the player counts the calls itself and wraps the write pointer when it lands
-; on the ring end.
+; leaving the VBL at a FIXED offset, which the frame's timer streams do not
+; move - then the script's actions, then one ST4_resume of C bytes. Since C
+; divides N and a call never reaches the ring end, ST4_wrap.S is the decoder
+; that fits: the player counts the calls itself and wraps the write pointer
+; when it lands on the ring end.
 ;
 ; THE SCRIPT. The last eleven rings are not frame streams: their bytes never
 ; reach a register. They carry the COMPILED EFFECT SCRIPT, in which the
@@ -62,22 +61,25 @@
 ; tick handlers - digidrum, SID square, sync-buzzer - and compare NOTHING
 ; at run time. A sample's voice is DISCONNECTED by mixing baked into the
 ; R7 stream, so its sample is heard alone, and no ring byte is ever edited:
-; what the reference player discovered per frame, the file says.
+; what the reference player resolved per frame, the file states.
 ;
-; STARTING OVER. A packed stream can only be restarted from its beginning, so
-; a tune that repeats plays its frames again from frame 0: each stream is one
-; section covering [0, O), and when a stream's section runs out mid-refill the
-; player opens it again - a fresh decoder writing on into the same ring - so
-; the rings always hold one continuous sequence of values and nothing on the
-; read side changes when it happens. Nothing requires the boundary to fall on
-; a group boundary: a refill that straddles it decodes two pieces. One pass
-; runs O - L frames, L the header's loop frame, and a pass of at most N
-; frames fits a ring: no section is opened twice, the refills stop at O
-; values, and at the wrap the cursor goes back by O - L onto the bytes of
-; the pass just played. L is 0 at this format version, so a pass is the whole
-; tune. On the frame the tune ends, the player stops every claimed timer,
-; parks its vector and opens every skip, which is the state the script was
-; compiled from - so the second pass plays exactly as the first.
+; STARTING OVER. A packed stream can only be restarted from its beginning. A
+; tune that repeats plays [0, O) once and [L, O) for ever after, L the
+; header's loop frame, so one pass runs O - L frames and O - L against N picks
+; the form. A pass of at most N frames fits a ring: no section is opened
+; twice, the refills stop at O values, and at the wrap the cursor goes back by
+; O - L onto the bytes of the pass just played. A longer pass is decoded
+; again: a stream's section runs out mid-refill and the player opens one from
+; its start - a fresh decoder writing on into the same ring - so the rings
+; always hold one continuous sequence of values and nothing on the read side
+; changes when it happens. Nothing requires the boundary to fall on a group
+; boundary: a refill that straddles it decodes two pieces. The header's loop
+; table says which section is opened: with none, the same section again, so L
+; is 0 and a pass is the whole tune; with one, that stream's loop section and
+; the same one on every open after it, each stream being two sections, [0, L)
+; and [L, O). On the frame the tune ends, the player stops every claimed
+; timer, parks its vector and clears every skip, which is the state the script
+; was compiled from - so the second pass plays exactly as the first.
 ;
 ; -----------------------------------------------------------------------------
 ; USING IT
@@ -96,7 +98,8 @@
 ;
 ; The workspace holds the player's own fields, one decoder state per stream
 ; and one ring per stream, so its size depends on the ring size in the file.
-; It is always sized for all twenty-five, whatever the tune uses:
+; It is always sized for all twenty-five, including the streams a tune
+; leaves idle:
 ;
 ;   YMX_SIZE = YMX_FIXED + 25 * N       ; 1658 + 25 * N bytes
 ;
@@ -128,7 +131,7 @@
 ;   YMX_play   in   a0 = workspace
 ;              out  d0 = 0 played a frame
 ;                   d0 = 1 played a frame, and that frame ended the tune: the
-;                          next one is frame 0 again
+;                          next one is frame L again
 ;                   d0 = -1 the tune is over and nothing was written, which
 ;                          only a tune packed with -o can report
 ;   YMX_stop   in   a0 = workspace
@@ -819,8 +822,8 @@ YMX_fill:
 ; carries out of YMX_SECLEN. A file with a loop table moves both on to it
 ; here, and every reopen after this one finds them there: the entries are
 ; the same two values every time, so the write costs less than the test
-; that would skip it. Every first section runs out at value L, so all
-; twenty-five streams cross over together.
+; that would skip it. Every first section runs out at value L, so every
+; stream crosses over on its own refill turn.
 ; -----------------------------------------------------------------------------
 ; It runs inside YMX_fill, which guarantees d6 = the state block and a6 = the
 ; workspace - the two anchors that survive the decoder call.
@@ -936,12 +939,12 @@ YMX_play:
         .endm
 
 ; The skips first, then the burst, then everything else: the fourteen chip
-; writes leave the VBL at a FIXED offset, whatever the frame's effects cost.
-; Only the skip bits must precede the burst (a trigger frame's voice must be
-; skipped before the burst would write its sample number); the actions -
-; timer programs, handler patches - happen after, where their varying cost
-; cannot jitter the writes. Skip changes are rare, so the burst's offset
-; moves only on those frames, and by a fixed amount.
+; writes leave the VBL at a FIXED offset, which the frame's effects do not
+; move. Only the skip bits must precede the burst (a trigger frame's voice
+; must be skipped before the burst would write its sample number); the
+; actions - timer programs, handler patches - happen after, where their
+; varying cost cannot jitter the writes. Skip changes are rare, so the
+; burst's offset moves only on those frames, and by a fixed amount.
         movea.l YMX_CURSOR(a3),a0
         adda.l  YMX_EFXOFF(a3),a0       ; ring M, at this frame's offset
         move.b  (a0),d0                 ; a0 survives everything below
@@ -1092,7 +1095,7 @@ ymx_wT:
         move.w  d0,YMX_SLOT(a3)
 
 ; The rings hold the tune as one continuous sequence, so reaching the end of
-; the last frame means the next values in them are frame 0's again.
+; the last frame means the next values in them are frame L's again.
 ; The countdown follows: it reloads with the length of a pass.
         subq.l  #1,YMX_LEFTFR(a3)
         bne.s   .played
@@ -1128,7 +1131,7 @@ ymx_wT:
         dbra    d0,.perf_bar_w
         move.w  (sp)+,$FFFF8240.w
         .endif
-        moveq   #1,d0                   ; played, and wrapped to frame 0
+        moveq   #1,d0                   ; played, and wrapped to frame L
         rts
 .played:
         .if YMX_PERF

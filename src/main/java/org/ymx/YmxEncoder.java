@@ -58,7 +58,7 @@ public final class YmxEncoder {
     }
 
     /** The finished file plus the per-stream numbers the CLI reports; the
-     * tune is the one that was actually packed, the padded one where the
+     * tune is the one that was packed, the padded one where the
      * length needed padding, {@code ringSize} the one the file carries, and
      * {@code loopFrame} the {@code L} it holds. {@code notes} is what the loop
      * frame moved or cost, for the CLI to report. */
@@ -180,8 +180,8 @@ public final class YmxEncoder {
         // The loop frame comes before the packing rather than after it: a body
         // that needs a bigger ring gets one, and a bigger ring lets a
         // back-reference reach further, so the sections are packed against the
-        // ring the file ends up carrying. A plan that cuts the streams decides
-        // how many sections there are to pack at all.
+        // ring the file ends up carrying. A plan that cuts the streams doubles
+        // the sections there are to pack.
         LoopFrame.Plan plan = LoopFrame.resolve(tune, script, loops, ringSize, chunk,
                 unit);
         ringSize = plan.ringSize();
@@ -243,7 +243,7 @@ public final class YmxEncoder {
 
     /**
      * A stream byte is meaningful only on frames its master bit marks - and
-     * for a count stream, only when the action actually reads the count (a
+     * for a count stream, only when the action reads the count (a
      * program opcode, or a HELD carrying the reload flag). Everywhere else the
      * previous byte repeats, which costs nothing packed.
      */

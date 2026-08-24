@@ -67,12 +67,13 @@ source formats and their tools use:
 | 20 | 4 | the YM2149's master clock in Hz - informational; **2000000** for an ST tune, 0 with no source clock |
 | 24 | 4 | byte offset of the sample table; 0 when there are none |
 | 28 | 2 | sample count |
-| 30 | 4 | `L`, the frame a tune that starts over goes back to (§8), within the bounds §9.3 gives it; 0 where the tune plays once through |
+| 30 | 4 | `L`, the frame a tune that starts over goes back to (§8), within the bounds §9.3 gives it; 0 where the tune plays once through, and 0 where it starts over from its first frame |
 | 34 | 4 | byte offset of the **loop table** (§1.4); 0 where the sections cover the whole tune |
 | 38 | 4·S | byte offset of each **section** (§1.4) |
 
 With `S` fixed at 25 the header is **138 bytes**. Everything after it is
-body: the sections (§1.4), then the sample table (§6). Content in the body
+body: the loop table (§1.4) where the file carries one, then the sections
+(§1.4), then the sample table (§6). Content in the body
 is located only by offset - a section by its table entry, the sample table
 by the offset at byte 24. Every offset counts from the file's first byte,
 the magic at offset 0, and a **long boundary** is an offset divisible by
@@ -128,11 +129,11 @@ loop table's covering `[L, O)`. Two sections carry the tune between them,
 each frame in one of the pair, and the second is where a pass after the
 first reads its values (§8).
 
-**Packed sections.** A packed section is a complete ST4 container -
-signature, twenty-byte header, four streams. The container layout is
-defined by the [ST4](https://github.com/odipar/ST4) repository's
-specification, the normative companion of this document for packed
-sections. A writer with no ST4 compressor stores every section instead
+**Packed sections.** A packed section is a complete ST4 container - a
+twenty-byte header whose first long is the signature, then four streams.
+The container layout is defined by the
+[ST4](https://github.com/odipar/ST4) repository's specification, the
+normative companion of this document for packed sections. A writer with no ST4 compressor stores every section instead
 (below) and emits no container.
 
 **Two fixed parameters.** No back-reference exceeds `N` bytes (§1.3),
@@ -157,10 +158,12 @@ boundary, so a player may read a container's header a long at a time.
 Bytes between one part and the next long boundary are padding: nothing
 reads them, and their value is free.
 
-**Starting over.** When a tune with flag bit 0 set reaches the end of a
-section, the player opens a section from its start: the loop table's
-section for that stream where the file carries a loop table, the same
-section again where it does not (§8).
+**Starting over.** Where a tune with flag bit 0 set decodes past the end
+of a section - which happens only where `O - L` is larger than `N` (§8) -
+the player opens a section from its start: the loop table's section for
+that stream where the file carries a loop table, the same section again
+where it does not. Where `O - L` is at most `N`, refilling stops at `O`
+values and no section is opened twice.
 
 Packed sizes are not stored: ST4 counts output units, so a decoder does
 not need them.
@@ -325,9 +328,9 @@ clock, and cannot be driven from a Timer C interrupt.
 - **voice** (bits 4-3) - 0, 1, 2 for voices A, B, C. Three voices in a
   two-bit field, so **3 is no voice**; see `RETUNE` in §3.
 - **low** (bits 2-0) - the MFP prescaler index for an opcode that programs a
-  timer, or flags for `HOLD` and `RESUME`. A programming opcode's index is
-  1 to 7; index 0 is the MFP's stopped state (§5), and no opcode carries
-  it.
+  timer, or flags for `HOLD`, `RESUME` and `RELEASE`. A programming opcode's
+  index is 1 to 7; index 0 is the MFP's stopped state (§5), and no opcode
+  carries it.
 
 `P` is the MFP timer count for an opcode that programs or reloads a timer.
 
@@ -532,8 +535,9 @@ frames = ceil(((length + 1) · prescaler[index] · count · rate + 2457600/16) /
 The ticks are `length + 1` - the marker ticks too - each
 `prescaler[index] · count` cycles of the 2457600 Hz clock; `rate` is the
 tune's frame rate, and the sixteenth of a frame covers the trigger
-running partway into its own frame. A skip lifted earlier puts the frame
-write and a tick on one register.
+running partway into its own frame. A count byte of 0 counts as 256 here,
+as §5 has it. A skip lifted earlier puts the frame write and a tick on one
+register.
 
 ---
 
@@ -575,36 +579,52 @@ frame write is therefore optional.
 
 ## 8. Starting over
 
-A tune with flag bit 0 set plays its frames again from frame `L`, so one
-pass is `O - L` frames and the first pass is the only one that plays the
-frames before `L`. A wrap takes one of three forms; `O - L` against `N`
-and the loop table offset select which.
+A tune with flag bit 0 set plays `[0, O)` once and `[L, O)` for ever
+after. `L` is 0 where the whole tune repeats.
 
-Where `O - L` is at most `N`, every value a pass reads is in the rings
-when the pass ends. Refilling stops at `O` values (§7), and on the wrap
-the read position in every ring moves back `O - L` bytes, then forward
-`N` where that lands before the ring's first byte. Nothing is decoded a
-second time.
+```
+      0                        L                        O
+      |------------------------|------------------------|
+      |      played once       |    played every pass   |
+                               |<-------- O - L ------->|
+```
 
-Where `O - L` is larger than `N`, the streams are decoded again. A packed
-stream restarts only from its beginning, so a section that runs out
-mid-refill is opened again - a fresh decoder writing into the same ring -
-and the ring contents stay one continuous sequence. `O` need not fall on
-a group boundary. The loop table offset selects which section is opened.
+On the frame that ends the tune, after its write, actions and refill,
+every claimed timer is stopped, its vector parked on a routine with no
+effect, its interrupt enabled with no tick pending, and the three skip
+states cleared. That is the state frame 0 was played in on the first
+pass, so every pass is identical.
 
-With no loop table, `L` is 0 and a stream opens its own section again, so
-the values that follow are frame 0's onwards. With one, a stream opens
-the loop table's section, and every section it opens after that is the
-same one: the section table's sections carry the `L` values a stream
-reads once, the loop table's the `O - L` values it reads on every pass
-from the first wrap on. Every first section runs out at the same value,
-`L`, so the twenty-five streams cross to the loop table together.
+Frame `L` is then reached in one of two ways, and `O - L` against `N`
+selects which.
 
-On the frame that ends the tune, after that frame's write, actions and
-refill: every claimed timer is stopped, its vector is parked on a routine
-with no effect, its interrupt is enabled with no tick pending, and the
-three skip states are cleared. This is the state before frame `L` of the
-first pass, so every pass is identical.
+**The rings still hold the pass**, where `O - L` is at most `N`.
+Refilling stops at `O` values (§7). A read position advances one byte per
+frame and returns to its ring's first byte at the ring end; on the wrap
+it moves back `O - L` bytes from the byte that would carry frame `O`,
+then forward `N` where that lands before the ring's first byte, so it
+comes to rest on frame `L`'s byte. Nothing is decoded twice.
+
+**The streams are decoded again**, where `O - L` is larger than `N`.
+Refilling continues and the wrap moves no read position.
+
+A section that runs out mid-refill is opened again - a fresh decoder
+writing into the same ring, so the ring contents stay one continuous
+sequence. No section boundary need fall on a group boundary. The loop
+table offset (§1.4) says which section is opened:
+
+```
+      0        the section that just ran out, so the values that follow
+               are frame 0's onwards. L is 0.
+      not 0    the loop table's section, and that same one every time a
+               section is opened after it.
+```
+
+A loop table therefore splits each stream: the section table's section
+carries the `L` values read once, the loop table's the `O - L` read on
+every pass. Every first section runs out at the same value, `L`, so each
+stream crosses on its own refill turn and none crosses before it has read
+`L` values.
 
 ---
 
@@ -666,7 +686,8 @@ The shape:
   decodes to `O` values, and `L` is 0 or leaves `O` - `L` at most `N`, so
   a wrap reaches back one pass into the rings and no further (§8).
 - Where the loop table offset is not 0 it is a long boundary, `L` is not
-  0, and the loop table's twenty-five entries are nonzero: each section
+  0, and the loop table's twenty-five entries are nonzero, `O` - `L` is
+  larger than `N`, so §8's second form is the one in force: each section
   table's section decodes to `L` values and each loop table's to `O` -
   `L`. At a unit size above 1, `L` is a multiple of the unit size.
 - Every section decodes to values of one byte. No back-reference exceeds
