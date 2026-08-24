@@ -32,7 +32,8 @@ under the tag `binaries-v<release>`, staged by `ymx/mkrelease.sh`: twelve
 cores - three unit sizes by the four flag combinations - the stub, and a
 `MANIFEST.txt` of sizes and SHA-256 digests with the source commit and
 both versions. A new format version is a new release; so is a patch of
-the same format, and an unchanged release updates in place.
+the same format, which replaces the patch before it. An unchanged
+release updates in place.
 
 ## The stack
 
@@ -220,12 +221,14 @@ combines with any core (§2).
 flags word (§1): the descriptor says what a core is, not the file name.
 
 **Another format version.** A tune's header word at offset 4 gives its
-format version; the releases for it are tagged `binaries-v<that
-version>` and, where the binaries were patched, `binaries-v<that
-version>.<patch>`. Old releases stay published, so a combiner pins the
-tag its tunes need and verifies the core's word at offset 22 against
-them - the word carries the format version alone, so every patch of one
-format serves the same tunes.
+format version; the release for it is tagged `binaries-v<that version>`,
+or `binaries-v<that version>.<patch>` where the binaries were patched.
+One release stands per format version - the newest patch, the older
+ones deleted - and the release for another format version stays
+published beside it. A combiner takes the tag its tunes' format version
+names and verifies the core's word at offset 22 against them; the word
+carries the format version alone, so every patch of one format serves
+the same tunes.
 
 **A program that reports its end.** One tune with header flag bit 0
 clear, and stub flag bit 0 set (§3): the program plays the patched frame
