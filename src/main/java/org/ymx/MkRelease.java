@@ -88,7 +88,7 @@ public final class MkRelease {
 
         StringBuilder manifest = new StringBuilder();
         manifest.append("YMX player binaries - format version ")
-                .append(YmxFormat.VERSION).append(", descriptor version 1\n");
+                .append(YmxFormat.versionName()).append(", descriptor version 1\n");
         manifest.append("source commit ").append(commit).append('\n');
         manifest.append("doc/BINARIES.md is the combine contract\n\n");
         manifest.append("name  bytes  sha256  unit  flags\n");
@@ -109,7 +109,7 @@ public final class MkRelease {
             throw Tools.fail("mkrelease: " + e.getMessage());
         }
         System.out.println(dir + ": " + (matrix().size() + 1)
-                + " binaries and MANIFEST.txt, format version " + YmxFormat.VERSION);
+                + " binaries and MANIFEST.txt, format version " + YmxFormat.versionName());
 
         if (publish) {
             publish(dir, commit);
@@ -120,14 +120,14 @@ public final class MkRelease {
      * and its notes rewritten, so the commit they name is the one the
      * assets were assembled at. */
     private static void publish(Path dir, String commit) {
-        String tag = "binaries-v" + YmxFormat.VERSION;
+        String tag = "binaries-v" + YmxFormat.versionName();
         String notes = "Prebuilt SNDH cores and the PRG stub, assembled at "
                 + commit + ". doc/BINARIES.md is the combine contract;"
                 + " MANIFEST.txt lists sizes and SHA-256 digests.";
         if (Tools.status(Tools.repo(),
                 List.of("gh", "release", "view", tag)) != 0) {
             Tools.run(Tools.repo(), List.of("gh", "release", "create", tag,
-                    "--title", "YMX player binaries, format " + YmxFormat.VERSION,
+                    "--title", "YMX player binaries, format " + YmxFormat.versionName(),
                     "--notes", notes));
         } else {
             Tools.run(Tools.repo(), List.of("gh", "release", "edit", tag,
@@ -163,8 +163,8 @@ public final class MkRelease {
         }
         if (MkSndh.word(core, MkSndh.CORE_FORMAT) != YmxFormat.VERSION) {
             throw new IllegalArgumentException(variant.name() + " reads format version "
-                    + MkSndh.word(core, MkSndh.CORE_FORMAT) + ", the release is "
-                    + YmxFormat.VERSION);
+                    + YmxFormat.versionName(MkSndh.word(core, MkSndh.CORE_FORMAT))
+                    + ", the release is " + YmxFormat.versionName());
         }
         if (MkSndh.word(core, MkSndh.CORE_UNIT) != variant.unit()) {
             throw new IllegalArgumentException(variant.name() + " serves unit "

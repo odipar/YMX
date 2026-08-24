@@ -35,6 +35,7 @@ final class ToolsDocTest {
         map.put("src/main/java/org/ymx/MkPrg.java", "### mkprg.sh");
         map.put("src/main/java/org/ymx/MkCores.java", "### mkcores.sh");
         map.put("src/main/java/org/ymx/MkRelease.java", "### mkrelease.sh");
+        map.put("src/main/java/org/ymx/SetVersion.java", "### setversion.sh");
         map.put("src/main/java/org/ym6/YmSndh.java", "### ym_sndh.sh");
         map.put("src/main/java/org/ym6/Play.java", "### play.sh");
         map.put("src/main/java/org/ymr/YmrPlay.java", "### ymr.sh");
@@ -48,6 +49,7 @@ final class ToolsDocTest {
         map.put("dotnet/ymx/MkPrg.cs", "### mkprg.sh");
         map.put("dotnet/ymx/Tools.cs", "### mkcores.sh");
         map.put("dotnet/ymx/MkRelease.cs", "### mkrelease.sh");
+        map.put("dotnet/ymx/SetVersion.cs", "### setversion.sh");
         map.put("dotnet/ym6/PlayTools.cs", "## Listening");
         map.put("dotnet/ymr/YmrPlay.cs", "### ymr.sh");
         map.put("dotnet/st4/St4Cli.cs", "### st4 and dst4");
@@ -66,6 +68,7 @@ final class ToolsDocTest {
         map.put("src/main/java/org/ymx/MkPrg.java", "dotnet/ymx/MkPrg.cs");
         map.put("src/main/java/org/ymx/MkCores.java", "dotnet/ymx/Tools.cs");
         map.put("src/main/java/org/ymx/MkRelease.java", "dotnet/ymx/MkRelease.cs");
+        map.put("src/main/java/org/ymx/SetVersion.java", "dotnet/ymx/SetVersion.cs");
         map.put("src/main/java/org/ymr/YmrPlay.java", "dotnet/ymr/YmrPlay.cs");
         return map;
     }

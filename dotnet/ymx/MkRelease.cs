@@ -93,7 +93,7 @@ namespace Ymx
 
             var manifest = new StringBuilder();
             manifest.Append("YMX player binaries - format version ")
-                    .Append(YmxFormat.Version).Append(", descriptor version 1\n");
+                    .Append(YmxFormat.VersionName()).Append(", descriptor version 1\n");
             manifest.Append("source commit ").Append(commit).Append('\n');
             manifest.Append("doc/BINARIES.md is the combine contract\n\n");
             manifest.Append("name  bytes  sha256  unit  flags\n");
@@ -118,7 +118,7 @@ namespace Ymx
             }
             Console.WriteLine(dir + ": " + (Matrix().Count + 1)
                     + " binaries and MANIFEST.txt, format version "
-                    + YmxFormat.Version);
+                    + YmxFormat.VersionName());
 
             if (publish)
             {
@@ -131,7 +131,7 @@ namespace Ymx
         /// one the assets were assembled at.</summary>
         private static void Publish(string dir, string commit)
         {
-            string tag = "binaries-v" + YmxFormat.Version;
+            string tag = "binaries-v" + YmxFormat.VersionName();
             string notes = "Prebuilt SNDH cores and the PRG stub, assembled"
                     + " at " + commit + ". doc/BINARIES.md is the combine"
                     + " contract; MANIFEST.txt lists sizes and SHA-256 digests.";
@@ -140,7 +140,7 @@ namespace Ymx
             {
                 Tools.RunLoudly(Tools.Repo(), new List<string> {"gh", "release",
                         "create", tag,
-                        "--title", "YMX player binaries, format " + YmxFormat.Version,
+                        "--title", "YMX player binaries, format " + YmxFormat.VersionName(),
                         "--notes", notes});
             }
             else
@@ -189,8 +189,8 @@ namespace Ymx
             {
                 throw new ArgumentException(variant.FileName()
                         + " reads format version "
-                        + MkSndh.Word(core, MkSndh.CoreFormat)
-                        + ", the release is " + YmxFormat.Version);
+                        + YmxFormat.VersionName(MkSndh.Word(core, MkSndh.CoreFormat))
+                        + ", the release is " + YmxFormat.VersionName());
             }
             if (MkSndh.Word(core, MkSndh.CoreUnit) != variant.Unit)
             {

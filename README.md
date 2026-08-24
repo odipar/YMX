@@ -138,8 +138,8 @@ how most of the bugs in this player were found.
 ## Where this came from
 
 YMX began as the `.yx6` container from the
-[ST4](https://github.com/odipar/ST4) repository, adopted whole and renumbered
-to version 1. ST4 is the compression format underneath, and stays there; this
+[ST4](https://github.com/odipar/ST4) repository, adopted whole and
+renumbered. ST4 is the compression format underneath, and stays there; this
 repository vendors the parts it needs and has its own life-cycle.
 
 The results of the experiments that shaped the player came across too, in

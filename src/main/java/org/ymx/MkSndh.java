@@ -360,8 +360,9 @@ public final class MkSndh {
         }
         if (word(core, CORE_FORMAT) != YmxFormat.VERSION) {
             throw new IllegalArgumentException(path + " reads format version "
-                    + word(core, CORE_FORMAT) + " and the tunes carry "
-                    + YmxFormat.VERSION + " - reassemble it with ymx/mkcores.sh");
+                    + YmxFormat.versionName(word(core, CORE_FORMAT))
+                    + " and the tunes carry " + YmxFormat.versionName()
+                    + " - reassemble it with ymx/mkcores.sh");
         }
         int flags = (options.perf() ? CORE_FLAG_PERF : 0)
                 | (options.maskBurst() ? 0 : CORE_FLAG_NOMASK);

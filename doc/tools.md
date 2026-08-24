@@ -136,6 +136,20 @@ with sizes and SHA-256 digests.
 |---|---|
 | `-publish` | create or update the GitHub release `binaries-v<format version>` through `gh`, replacing its assets |
 
+### setversion.sh
+
+Rewrites the format version at every site that carries it: the constants
+in `org.ymx.YmxFormat`, `dotnet/ymx/YmxFormat.cs` and `68k/YMX.S`, and
+SPEC.md's three mentions. The version word is the major in the high byte,
+the minor in the low, so versions order numerically. A site whose
+surrounding text no longer matches fails loudly, and the consistency
+tests read the same sites back.
+
+    ymx/setversion.sh MAJOR.MINOR
+
+After a bump: reassemble the cores (`mkcores.sh`), repin the corpus
+(`mvn test -Dymx.pin=refresh`) and publish (`mkrelease.sh -publish`).
+
 ## Listening
 
 ### play.sh
@@ -245,7 +259,7 @@ of `dotnet dotnet/bin/Release/net10.0/ymx.dll` names the tool:
 |---|---|
 | `ymx`, `ymr` | the two packers |
 | `st4`, `dst4` | the ST4 CLIs |
-| `mksndh`, `mkprg`, `mkcores`, `mkrelease` | the combiners |
+| `mksndh`, `mkprg`, `mkcores`, `mkrelease`, `setversion` | the combiners and `setversion.sh` |
 | `ymsndh`, `play`, `ymrplay` | `ym_sndh.sh`, `play.sh`, `ymr.sh` |
 | `rig`, `sweep`, `ymrsweep`, `gendata` | the test rigs and `run.sh`'s data step |
 

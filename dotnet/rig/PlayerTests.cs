@@ -438,7 +438,7 @@ namespace Rig
             int table = at;
             var outStream = new MemoryStream();
             outStream.Write(System.Text.Encoding.ASCII.GetBytes("YMX!"));
-            Word(outStream, 1);             // version
+            Word(outStream, Ymx.YmxFormat.Version);
             Word(outStream, 1);             // flags: starts over
             LongWord(outStream, frames);
             Word(outStream, 50);

@@ -14,7 +14,8 @@ public static class Program
         {
             Console.Error.WriteLine("usage: ymx <tool> [arguments...]\n"
                     + "tools: st4 dst4 ymx ymr mksndh mkprg mkcores mkrelease"
-                    + " ymsndh play ymrplay rig sweep ymrsweep gendata");
+                    + " setversion ymsndh play ymrplay rig sweep ymrsweep"
+                    + " gendata");
             return 1;
         }
         string[] rest = args[1..];
@@ -43,6 +44,9 @@ public static class Program
                 return 0;
             case "mkrelease":
                 Ymx.MkRelease.Main(rest);
+                return 0;
+            case "setversion":
+                Ymx.SetVersion.Main(rest);
                 return 0;
             case "ymsndh":
                 Ym6.YmSndh.Main(rest);
