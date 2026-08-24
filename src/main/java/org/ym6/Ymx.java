@@ -3,6 +3,7 @@ package org.ym6;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.function.IntPredicate;
 import org.jspecify.annotations.Nullable;
 import org.ymx.EffectScript;
@@ -54,7 +55,7 @@ public final class Ymx {
                 throw error(args[1] + ": " + e.getMessage());
             }
             EffectScript.Result script = EffectScript.compile(YmEffects.tune(song));
-            System.out.printf("%d frames%n", script.frames());
+            System.out.printf(Locale.ROOT, "%d frames%n", script.frames());
             for (int f = 0; f < script.frames(); f++) {
                 if (script.m()[f] == 0 && script.r7force()[f] == 0) {
                     continue;
@@ -67,7 +68,7 @@ public final class Ymx {
                             script.actions()[c][f] & 0xFF, c,
                             script.counts()[c][f] & 0xFF));
                 }
-                System.out.printf("%s R7|=%02X%n", line,
+                System.out.printf(Locale.ROOT, "%s R7|=%02X%n", line,
                         script.r7force()[f] & 0xFF);
             }
             script.notes().forEach(n -> System.out.println("note: " + n));
@@ -317,14 +318,14 @@ public final class Ymx {
             long kept = song.loopFrame() >= start && song.loopFrame() < end
                     ? song.loopFrame() - start : 0;
             if (song.loopFrame() != 0 && kept == 0) {
-                System.out.printf("Frame %d, which the header loops from, is outside"
+                System.out.printf(Locale.ROOT, "Frame %d, which the header loops from, is outside"
                         + " the kept window: the excerpt starts over from its own"
                         + " first frame%n", song.loopFrame());
             }
             song = new Ym6Reader.Song(song.format(), end - start, song.playerHz(),
                     song.masterClock(), kept, song.interleaved(), song.attributes(),
                     song.drums(), song.name(), song.author(), song.comment(), cut);
-            System.out.printf("Trimmed to frames %d-%d: %d frames%n",
+            System.out.printf(Locale.ROOT, "Trimmed to frames %d-%d: %d frames%n",
                     start, end - 1, end - start);
         }
 
@@ -421,7 +422,7 @@ public final class Ymx {
         Tune padded = Tune.padToUnit(tune, unit, safeToDuplicate(song));
         if (padded != null && padded != tune) {
             int added = padded.frames() - tune.frames();
-            System.out.printf("Padded %d frame%s (duplicates of safe frames) so the "
+            System.out.printf(Locale.ROOT, "Padded %d frame%s (duplicates of safe frames) so the "
                     + "length is whole %d-byte units%n", added, added == 1 ? "" : "s",
                     unit);
         }
@@ -455,7 +456,7 @@ public final class Ymx {
     private static void report(Ym6Reader.Song song, YmEffects.Extraction effects,
                                YmxEncoder.Result result) {
         Tune tune = result.tune();
-        System.out.printf("%s: %s%s%s%n", song.format(),
+        System.out.printf(Locale.ROOT, "%s: %s%s%s%n", song.format(),
                 song.name().isBlank() ? "(untitled)" : song.name(),
                 song.author().isBlank() ? "" : " by " + song.author(),
                 song.interleaved() ? "" : " (de-interleaved)");
@@ -464,21 +465,21 @@ public final class Ymx {
             for (byte[] sample : effects.samples()) {
                 bytes += sample.length + 1;
             }
-            System.out.printf("%d digidrum%s, %d bytes%n", effects.samples().length,
+            System.out.printf(Locale.ROOT, "%d digidrum%s, %d bytes%n", effects.samples().length,
                     effects.samples().length == 1 ? "" : "s", bytes);
         }
         if (effects.sinus() > 0) {
-            System.out.printf("Warning: %d Sinus-SID frame%s dropped (unimplemented "
+            System.out.printf(Locale.ROOT, "Warning: %d Sinus-SID frame%s dropped (unimplemented "
                     + "everywhere, the reference player included)%n",
                     effects.sinus(), effects.sinus() == 1 ? "" : "s");
         }
         if (effects.tooFast() > 0) {
-            System.out.printf("Warning: %d effect frame%s dropped: timer above %d Hz%n",
+            System.out.printf(Locale.ROOT, "Warning: %d effect frame%s dropped: timer above %d Hz%n",
                     effects.tooFast(), effects.tooFast() == 1 ? "" : "s",
                     YmEffects.MAX_TIMER_HZ);
         }
         if (effects.missingDrum() > 0) {
-            System.out.printf("Warning: %d drum trigger%s dropped: no such sample%n",
+            System.out.printf(Locale.ROOT, "Warning: %d drum trigger%s dropped: no such sample%n",
                     effects.missingDrum(), effects.missingDrum() == 1 ? "" : "s");
         }
         for (String note : effects.notes()) {
@@ -487,7 +488,7 @@ public final class Ymx {
 
         // What was packed: one byte per frame per stream, script included.
         int raw = result.script().frames() * YmxFormat.STREAMS;
-        System.out.printf("%d frames at %d Hz (%d:%02d), %d rings of %d bytes, %d per call%n",
+        System.out.printf(Locale.ROOT, "%d frames at %d Hz (%d:%02d), %d rings of %d bytes, %d per call%n",
                 tune.frames(), tune.frameRate(),
                 tune.frames() / tune.frameRate() / 60,
                 tune.frames() / tune.frameRate() % 60,
@@ -502,18 +503,20 @@ public final class Ymx {
             String name = stream.register() < YmxFormat.REGISTER_STREAMS
                     ? String.format("R%-2d", stream.register())
                     : effectNames[stream.register() - YmxFormat.REGISTER_STREAMS] + " ";
-            System.out.printf("  %s %6d -> %6d bytes (%5.1f%%)%n", name,
+            System.out.printf(Locale.ROOT, "  %s %6d -> %6d bytes (%5.1f%%)%s%n", name,
                     stream.frames(), stream.packedSize(),
-                    100.0 * stream.packedSize() / stream.frames());
+                    100.0 * stream.packedSize() / stream.frames(),
+                    stream.loopSize() == 0 ? "" : String.format("  %6d + %d",
+                            stream.firstSize(), stream.loopSize()));
         }
-        System.out.printf("Packed %d register bytes into %d (%.1f%%), file %d bytes%n",
+        System.out.printf(Locale.ROOT, "Packed %d register bytes into %d (%.1f%%), file %d bytes%n",
                 raw, result.packedSize(), 100.0 * result.packedSize() / raw, result.file().length);
         int flags = ((result.file()[YmxFormat.OFFSET_FLAGS] & 0xFF) << 8)
                 | (result.file()[YmxFormat.OFFSET_FLAGS + 1] & 0xFF);
         // The chunk is a slot count: one stream refilled per call, so it has
         // to cover the streams this tune DECODES, not all the format defines.
         int live = YmxFormat.liveStreams(flags);
-        System.out.printf("Player needs %d bytes of ring plus its state, and"
+        System.out.printf(Locale.ROOT, "Player needs %d bytes of ring plus its state, and"
                         + " decodes %d of the %d streams - one refill a call,"
                         + " so C=%d covers them with %d slots idle%n",
                 YmxFormat.STREAMS * result.ringSize(), live, YmxFormat.STREAMS,
@@ -526,7 +529,7 @@ public final class Ymx {
             // A literal run, the one operation ZX1 cannot split. Only a tune
             // longer than 65535 frames with a register that never repeats can
             // reach this, and the 68000 decoder would mis-decode it.
-            System.out.printf("Warning: longest operation is %d bytes, over the 65535 the "
+            System.out.printf(Locale.ROOT, "Warning: longest operation is %d bytes, over the 65535 the "
                     + "68000 decoder can represent: do not play this file%n",
                     result.longestOp());
         }

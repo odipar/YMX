@@ -416,9 +416,12 @@ namespace Ymr
                         : scriptNames[stream.Register - YmxFormat.RegisterStreams]
                                 + " ";
                 Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
-                        "  {0} {1,6} -> {2,6} bytes ({3,5:F1}%)", name,
+                        "  {0} {1,6} -> {2,6} bytes ({3,5:F1}%){4}", name,
                         stream.Frames, stream.PackedSize,
-                        100.0 * stream.PackedSize / stream.Frames));
+                        100.0 * stream.PackedSize / stream.Frames,
+                        stream.LoopSize == 0 ? "" : string.Format(
+                                CultureInfo.InvariantCulture, "  {0,6} + {1}",
+                                stream.FirstSize, stream.LoopSize)));
             }
             Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
                     "Packed {0} register bytes into {1} ({2:F1}%), file {3} bytes",
