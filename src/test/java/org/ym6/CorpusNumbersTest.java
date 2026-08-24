@@ -109,7 +109,7 @@ final class CorpusNumbersTest {
 
         String said = String.join(" ", Files.readString(CONVERSION).split("\\s+"));
         int[] census = numbers(said,
-                "([\\d,]+) of the corpus's ([\\d,]+) readable files name one other than 0",
+                "([\\d,]+) of the corpus's ([\\d,]+) readable files give one other than 0",
                 "the files that loop from a frame other than 0");
         int[] share = numbers(said, "is (\\d+)% of the tune on average",
                 "how much of a tune such an opening is");

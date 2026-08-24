@@ -90,14 +90,13 @@ not lossy.
   state is held one inaudible tick longer. Only where no safe frame exists
   near the end does the packer fall back to `-k1`, and it says so.
 
-* **A tune starts over from its first frame.** A YM header names the frame
-  its own player went back to, and 99 of the corpus's 543 readable files name
-  one other than 0 - on those, the opening that played once under the header
-  is 46% of the tune on average, and it is heard on every pass here. In
-  exchange, each stream is one section instead of two cut at the loop frame:
-  the half after the cut cannot reference the half before it, so every tune
-  paid for a shape only some tunes used. Each conversion says which
-  frame the header named.
+* **A tune starts over from its first frame.** A YM header gives the frame
+  its own player went back to, and 99 of the corpus's 543 readable files
+  give one other than 0 - on those, the opening that played once under the
+  header is 46% of the tune on average, and it is heard on every pass here.
+  The header has carried a field for that frame since format version 0.5,
+  held at 0 while the wrap that reads it is built (SPEC.md 9.3). Each
+  conversion reports the frame its own header gave.
 
 * **Samples never loop.** A YM file has no field for a repeating digidrum,
   so every sample crosses marked one-shot. This costs nothing -
