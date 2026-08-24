@@ -371,7 +371,7 @@ final class PlayerTests {
     private static byte[] storedYmx(int frames, int length, int loop) {
         ByteArrayOutputStream body = new ByteArrayOutputStream();
         int[] where = new int[Rig.STREAMS];
-        int at = 130;
+        int at = org.ymx.YmxFormat.HEADER_SIZE;
         for (int stream = 0; stream < Rig.STREAMS; stream++) {
             while (at % 4 != 0) {
                 body.write(0);
@@ -400,6 +400,8 @@ final class PlayerTests {
         longWord(out, 2000000);
         longWord(out, table);
         word(out, 1);                               // one sample
+        longWord(out, 0);                           // L: back to the beginning
+        longWord(out, 0);                           // no loop table
         for (int stream = 0; stream < Rig.STREAMS; stream++) {
             longWord(out, 0x80000000 | where[stream]);  // bit 31: stored
         }

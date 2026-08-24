@@ -4,7 +4,7 @@ using System.IO;
 namespace Ymx
 {
     /// <summary>
-    /// The .ymx container, ported from org.ymx.YmxFormat: a fixed 130-byte
+    /// The .ymx container, ported from org.ymx.YmxFormat: a fixed 138-byte
     /// big-endian header, then one embedded ST4 container (or stored section)
     /// per stream - fourteen frame streams carrying the YM2149's registers
     /// and eleven carrying the compiled effect script - then the sample
@@ -17,19 +17,19 @@ namespace Ymx
 
         /// <summary>The only version this release writes or reads: the
         /// major in the high byte, the minor in the low, so versions order
-        /// numerically - $0004, version 0.4, sorts before $0100, version
+        /// numerically - $0005, version 0.5, sorts before $0100, version
         /// 1.0.</summary>
-        public const int Version = 0x0004;
+        public const int Version = 0x0005;
 
         /// <summary>The released binaries' patch number: it moves when
         /// the binaries change and the format does not - an optimized
         /// player, a fixed stub. The format version above is the
         /// compatibility gate; this number never reaches the format
         /// word.</summary>
-        public const int Patch = 1;
+        public const int Patch = 0;
 
         /// <summary>The release's version as prose: the format version
-        /// plus the patch, "0.4.1".</summary>
+        /// plus the patch, "0.5.0".</summary>
         public static string ReleaseName()
         {
             return VersionName() + "." + Patch;
@@ -122,6 +122,16 @@ namespace Ymx
         public const int OffsetSampleTable = 24;
         public const int OffsetSampleCount = 28;
 
+        /// <summary>L, the frame a tune that starts over goes back to. It
+        /// has a meaning only where FlagLoops is set, and a tune that plays
+        /// once through carries 0.</summary>
+        public const int OffsetLoopFrame = 30;
+
+        /// <summary>Byte offset of the loop table; zero where the file
+        /// carries no such table, which is every file this release
+        /// writes.</summary>
+        public const int OffsetLoopTable = 34;
+
         /// <summary>Bit 31 of a section offset: the bytes there are the
         /// section's values, one per frame, with no container around them.</summary>
         public const long SectionStored = 0x8000_0000L;
@@ -140,7 +150,7 @@ namespace Ymx
         }
 
         /// <summary>One long offset per stream, in stream order.</summary>
-        public const int OffsetSectionTable = 30;
+        public const int OffsetSectionTable = 38;
 
         public const int HeaderSize = OffsetSectionTable + 4 * Streams;
 

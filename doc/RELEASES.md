@@ -11,6 +11,18 @@ patch number the binaries carry of their own. The format version is the
 compatibility gate: tunes packed at one format version play on every
 patch of it.
 
+## 0.5.0
+
+Room in the header for a loop frame. Format version 0.5: a tune packed
+at 0.4 has to be repacked from its `.ym` or `.ymr` source.
+
+- The header is 138 bytes, eight more than 0.4 carried. The long at
+  offset 30 is `L`, the frame a tune that starts over goes back to; the
+  long at 34 is the offset of a loop table. The section table follows
+  at 38.
+- Both new fields carry 0: the loop frame is the beginning, and no file
+  carries a loop table. A repacked tune plays as it did at 0.4.
+
 ## 0.4.1
 
 The player, optimized. Every tune packed at format 0.4 plays unchanged -

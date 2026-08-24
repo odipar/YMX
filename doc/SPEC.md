@@ -1,6 +1,6 @@
 # The YMX format - specification
 
-Version 0.4. Big-endian throughout.
+Version 0.5. Big-endian throughout.
 
 YMX is a streaming register-dump format for the YM2149 sound chip in the
 Atari ST, playable by a 68000 without the tune resident in memory. A file
@@ -44,7 +44,7 @@ source formats and their tools use:
 
 ```
 +--------------------------------+
-| header, 30 bytes fixed         |
+| header, 38 bytes fixed         |
 | section table, 4 x S           |
 | sections, located by offset    |
 | sample table + sample bytes    |
@@ -56,7 +56,7 @@ source formats and their tools use:
 | offset | size | field |
 |---:|---:|---|
 | 0 | 4 | `'YMX!'` - `$594D5821` |
-| 4 | 2 | format version, the major byte then the minor - **$0004**, version 0.4 |
+| 4 | 2 | format version, the major byte then the minor - **$0005**, version 0.5 |
 | 6 | 2 | flags (§1.2) |
 | 8 | 4 | `O`, the frame count |
 | 12 | 2 | frame rate in Hz: how often the player is called |
@@ -66,9 +66,11 @@ source formats and their tools use:
 | 20 | 4 | the YM2149's master clock in Hz - informational; **2000000** for an ST tune, 0 with no source clock |
 | 24 | 4 | byte offset of the sample table; 0 when there are none |
 | 28 | 2 | sample count |
-| 30 | 4·S | byte offset of each **section**, covering frames `[0, O)` |
+| 30 | 4 | `L`, the frame a tune that starts over goes back to. This version starts over at frame 0, so every file carries 0 (§9.3) |
+| 34 | 4 | byte offset of the loop table; 0 when there is none |
+| 38 | 4·S | byte offset of each **section**, covering frames `[0, O)` |
 
-With `S` fixed at 25 the header is **130 bytes**. Everything after it is
+With `S` fixed at 25 the header is **138 bytes**. Everything after it is
 body: the sections (§1.4), then the sample table (§6). Content in the body
 is located only by offset - a section by its table entry, the sample table
 by the offset at byte 24. Every offset counts from the file's first byte,
@@ -576,7 +578,7 @@ first pass, so every pass is identical.
 ### 9.1 What a player checks
 
 - the magic is `'YMX!'`;
-- the version is $0004 - 0.4;
+- the version is $0005 - 0.5;
 - the stream count is 25 - it is fixed, not a size to adapt to;
 - every section that is a container carries an ST4 signature matching the
   format version and unit size the player was built for - a tune packed
@@ -623,6 +625,8 @@ The shape:
 
 - `O` is at least 1; `N` and `C` are within §1.3. At a unit size above 1,
   `O` and `C` are multiples of the unit size.
+- `L` and the loop table offset are 0. This version starts over at frame
+  0 (§8), and a player reads neither field.
 - All twenty-five sections are present, and each decodes to exactly `O`
   values of one byte. No back-reference exceeds `N` bytes and no operation
   exceeds 65535 units (§1.4).

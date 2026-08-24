@@ -416,7 +416,7 @@ namespace Rig
         {
             var body = new MemoryStream();
             int[] where = new int[Rig.Streams];
-            int at = 130;
+            int at = Ymx.YmxFormat.HeaderSize;
             for (int stream = 0; stream < Rig.Streams; stream++)
             {
                 while (at % 4 != 0)
@@ -449,6 +449,8 @@ namespace Rig
             LongWord(outStream, 2000000);
             LongWord(outStream, table);
             Word(outStream, 1);             // one sample
+            LongWord(outStream, 0);         // L: back to the beginning
+            LongWord(outStream, 0);         // no loop table
             for (int stream = 0; stream < Rig.Streams; stream++)
             {
                 LongWord(outStream, unchecked((int) 0x80000000) | where[stream]);
