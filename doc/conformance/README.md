@@ -198,8 +198,21 @@ flight (§3), what a toggle stream's phase does across a disabled gap
 what the call reporting -1 carries (§7), two timers due at one instant,
 and where a tick that coincides with a call goes. The document carries
 the seven that were its own now, and `TASK-player.md` carries the two
-that were the task's: a tick due at the instant a call begins belongs to
-that call, and two ticks due in one cycle are listed A, B, C, D.
+that were the task's.
+
+A second player run followed, against the document those nine were
+written into. All three implementers again produced every call and every
+tick of all ten tunes byte for byte, and the marks fell from seventeen to
+eleven. All three found the same sentence: §3.3, rewritten for the first
+run, said `RESUME` "delivers the next tick one period after the count
+reaches its next underflow", which passes over an underflow that §9.2
+does not drop. A fix from one round opening a smaller hole for the next
+to find is how two of the last three rounds have gone, so a round's
+output is not purely additive. The rest of the run named where a PCM
+trigger's read position starts, which prescaler a flag-1 reload
+multiplies by, and three more of the task's own conventions: what a tick
+coinciding with a call sees, what its first period is measured from, and
+the order of a call's own writes.
 
 ## What it does not cover
 
