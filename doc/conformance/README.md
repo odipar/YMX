@@ -30,11 +30,15 @@ directory nothing else writes to.
 
 Two things reach an implementer that the copied directory does not
 carry, and both belong in its `SOURCES.md`. The first is what the harness
-puts in its context before the task begins - in this repository
-that is `CLAUDE.md` and `AGENTS.md`, which state prose rules and no
-field, offset or opcode. The second is what it already knows: LZ77
-coding and Elias gamma are general, and an implementer who recognises
-them has not read an implementation.
+puts in its context before the task begins. Run from this repository that
+is `CLAUDE.md` and `AGENTS.md`, the index lines of a memory file, and the
+git status with the subject lines of the most recent commits. None of it
+states a field, an offset or an opcode, and the subject lines do name the
+format and say the repository holds an implementation and this kit. An
+exercise run from outside the repository carries none of it, which is how
+to run one where the isolation has to be complete. The second is what an
+implementer already knows: LZ77 coding and Elias gamma are general, and
+recognising them is not reading an implementation.
 
 The implementer produces `decode.py`, `SOURCES.md` and `NOTES.md`,
 described in `TASK.md`. Compare their output against the reference, which
@@ -54,7 +58,7 @@ Three tests, all three of which must hold:
    a byte is a sentence the document owes its implementer, whether or
    not the guess landed on the reference.
 
-Five runs have been measured. The first four ran against an earlier kit:
+Six runs have been measured. The first four ran against an earlier kit:
 two of its tunes have since been replaced by different ones, built from
 sources in the tree. The first run failed all three tests. The second and
 third passed the second test and failed the other two, on one sentence and
@@ -76,8 +80,20 @@ Eight entries were marked "decides output", five distinct places: three in
 Appendix A.3's bitstream - the flag bit against the two class bits, what
 sets the last offset, and what the first block keeps - one on a
 container's output bytes being the stream's values at a unit size above 1,
-and one on which of the end-of-pass state a reader holds. The document
-carries all five now.
+and one on which of the end-of-pass state a reader holds.
+
+The sixth ran against the document those five were written into, with a
+scratch directory for each implementer. All three passed the first two
+tests: 29,406 entries each, byte for byte the reference, and no
+implementer read another's work or anything else. None of the five came
+back. Five entries were marked "decides output", four distinct places:
+Appendix A.4's closing sentence against the formula three lines above it,
+found by two of the three; a reader's skip states before its first call,
+which §7 states in a preamble a reader is not given; §9.4's own pass-end
+sentence, written for the fifth run, reading as an override of §7 step 1;
+and the absence of any statement that a container tests a decoder only by
+how much of streams A, B and C is left over. The document carries those
+four now.
 
 ## What the tunes cover
 
