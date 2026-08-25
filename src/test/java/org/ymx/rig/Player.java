@@ -36,7 +36,11 @@ final class Player {
     final List<Integer> palette = new ArrayList<>(); // $FFFF8240 words (perf)
     private final List<Write> stray = new ArrayList<>();
 
-    Player(byte[] packed, int workspaceSize, int unit, boolean perf) {
+    /** The workspace is the file's own: {@link Rig#workspaceFor} reads the
+     * ring out of its header, since the packer raises that above the size it
+     * was asked for. No caller passes a size, so none can pass a short one. */
+    Player(byte[] packed, int unit, boolean perf) {
+        int workspaceSize = Rig.workspaceFor(packed);
         long[][] map = {{Rig.CODE, 0x4000}, {Rig.FILE, 0x30000},
                 {Rig.WORK, 0x40000}, {Rig.STACK_TOP - 0x8000, 0x8000},
                 {Rig.MAGIC, 0x1000}, {Rig.PSG_PAGE, 0x1000},
@@ -61,12 +65,12 @@ final class Player {
         uc.write(Rig.MAGIC, new byte[] {0x4E, 0x71});
     }
 
-    Player(byte[] packed, int workspaceSize) {
-        this(packed, workspaceSize, 1, false);
+    Player(byte[] packed) {
+        this(packed, 1, false);
     }
 
-    Player(byte[] packed, int workspaceSize, int unit) {
-        this(packed, workspaceSize, unit, false);
+    Player(byte[] packed, int unit) {
+        this(packed, unit, false);
     }
 
     private void watch(long address, int size, long value) {

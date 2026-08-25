@@ -74,8 +74,7 @@ namespace Rig
             List<GenYm.ChipState> expected = GenYm.ChipStates(frames, source,
                     loops, carried, played);
 
-            var player = new Player(packed, Rig.WorkspaceSize(
-                    Header(packed, YmxRingSize, 2)), unit);
+            var player = new Player(packed, unit);
             if (player.Init() != 0)
             {
                 return label + ": YMX_init rejected the file";
@@ -168,7 +167,6 @@ namespace Rig
 
         /// <summary>Header offsets the battery reads back out of a packed
         /// file.</summary>
-        public const int YmxRingSize = 16;
         public const int YmxLoopFrame = 30;
 
         /// <summary>One big-endian header field of a packed file.</summary>
@@ -241,7 +239,7 @@ namespace Rig
                 values[14][frame] = 200;
             }
             var player = new Player(Rig.Pack(GenYm.Ym6File(frames, values),
-                    960, 24, true, 1), Rig.WorkspaceSize(960));
+                    960, 24, true, 1));
             if (player.Init() != 0)
             {
                 return "shape source: YMX_init rejected the YM tune";
@@ -271,7 +269,7 @@ namespace Rig
                 [14] = new byte[] {3},              // Timer B runs an RTE
                 [15] = new byte[] {6, 200},         // prescaler 6, count 200
             }, 0);
-            player = new Player(Rig.PackYmr(image, 960, 24), Rig.WorkspaceSize(960));
+            player = new Player(Rig.PackYmr(image, 960, 24));
             if (player.Init() != 0)
             {
                 return "shape source: YMX_init rejected the .ymr tune";
@@ -307,7 +305,7 @@ namespace Rig
                 [17] = new byte[] {3},              // Timer D runs an RTE
                 [18] = new byte[] {6, 200},
             }, 0);
-            player = new Player(Rig.PackYmr(image, 960, 24), Rig.WorkspaceSize(960));
+            player = new Player(Rig.PackYmr(image, 960, 24));
             if (player.Init() != 0)
             {
                 return "shape source: YMX_init rejected the unshaped .ymr tune";
@@ -340,7 +338,7 @@ namespace Rig
                 [16] = new byte[] {0},              // sample 0
             }, 0, new Rig.SampleBlock(new byte[] {1, 2, 3, 4}, true, 1));
             var player = new Player(Rig.PackYmr(image, 960, 24),
-                    Rig.WorkspaceSize(960), 1, perf);
+                    1, perf);
             if (player.Init() != 0)
             {
                 return "sample loop: YMX_init rejected the tune";
@@ -428,7 +426,7 @@ namespace Rig
         {
             int loop = 0x8084;
             byte[] packed = StoredYmx(4, loop + 96, loop);
-            var player = new Player(packed, Rig.WorkspaceSize(960));
+            var player = new Player(packed);
             if (player.Init() != 0)
             {
                 return "loop resolve: YMX_init rejected the tune";
@@ -515,7 +513,7 @@ namespace Rig
             int loop = 12;
             int ring = 48;
             byte[] file = StoredCutYmx(frames, loop, ring, 24);
-            var player = new Player(file, Rig.WorkspaceSize(ring), 1);
+            var player = new Player(file, 1);
             if (player.Init() != 0)
             {
                 return "stored cut: YMX_init rejected the file";
@@ -650,8 +648,7 @@ namespace Rig
                 [14] = new byte[] {1},      // Timer B runs a PWM
                 [15] = new byte[] {6, 200, 5, 200},     // prescaler 6 -> 5
             }, 0);
-            var player = new Player(Rig.PackYmr(image, 960, 24),
-                    Rig.WorkspaceSize(960));
+            var player = new Player(Rig.PackYmr(image, 960, 24));
             if (player.Init() != 0)
             {
                 return "live retune: YMX_init rejected the tune";

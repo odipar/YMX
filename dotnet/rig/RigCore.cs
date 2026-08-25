@@ -36,8 +36,18 @@ namespace Rig
         public const int YmxDefaultMap = 0x9C;  // the packer's: 0->A 1->D 2->B 3->C
         public const int YmxFixed = 58 + Streams * 64;  // before the rings
 
-        public static int WorkspaceSize(int ring)
+        public const int OffsetRingSize = 16;   // the header's ring word
+
+        /// <summary>The workspace a packed tune needs, read out of the
+        /// tune's own header. The packer raises the ring above the size it
+        /// was asked for where a tune that starts over needs it, so the ring
+        /// a caller passed to Pack is not the ring the file carries: sizing
+        /// from anything but the header under-reserves, and the player
+        /// writes past the end.</summary>
+        public static int WorkspaceFor(byte[] packed)
         {
+            int ring = ((packed[OffsetRingSize] & 0xFF) << 8)
+                    | (packed[OffsetRingSize + 1] & 0xFF);
             return YmxFixed + Streams * ring;
         }
 
