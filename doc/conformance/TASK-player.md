@@ -36,7 +36,8 @@ does not say where a tick falls against a call, because that is the
 host's. These four settle it, and they are this task's, not the format's:
 
 1. A call's own writes come first, then the ticks falling before the next
-   call. No tick lands inside a call.
+   call. No tick lands inside a call. A tick due at the exact instant a
+   call begins belongs to that call's window, not the one before it.
 2. One call lasts `2457600 / rate` of the MFP clock's cycles, where
    `rate` is the header's frame rate.
 3. A timer started by a call has its first tick one period after that
@@ -45,6 +46,8 @@ host's. These four settle it, and they are this task's, not the format's:
    stopped and started again begins its count over.
 4. A timer whose interrupt is disabled lands no tick, and its count
    keeps running (§3, `RELEASE` bit 0).
+5. Two ticks due in one cycle are listed in the order an MFP ranks their
+   timers: A, then B, then C, then D.
 
 ## The tunes
 

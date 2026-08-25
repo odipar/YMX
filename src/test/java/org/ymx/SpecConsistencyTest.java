@@ -639,6 +639,39 @@ final class SpecConsistencyTest {
         assertTrue(kit.contains("§9.4"),
                 "doc/conformance/README.md does not say which role it tests,"
                         + " and the kit measures a reader rather than a player");
+        assertTrue(flat().contains("It lands no tick either: the run has"
+                        + " ended at it"),
+                "SPEC §7 no longer says whether the call reporting -1 carries"
+                        + " ticks");
+        assertTrue(flat().contains("A stream's ticks name the timer the map"
+                        + " gave its channel when that stream's timer was last"
+                        + " programmed"),
+                "SPEC §2.3 no longer says which map names a running stream's"
+                        + " ticks");
+        assertTrue(flat().contains("that call lands no tick of its own"),
+                "SPEC §8 no longer says whether the call that ends a pass"
+                        + " carries ticks. Read the other way a stray tick of"
+                        + " the old pass reaches the new one");
+        assertTrue(flat().contains("leaves a toggle stream on the half the"
+                        + " release left standing"),
+                "SPEC §3.3 no longer says what a dropped tick leaves behind."
+                        + " Read the other way a resumed stream comes back on"
+                        + " the other half");
+        assertTrue(flat().contains("the count reaches the data register with"
+                        + " the timer running, so the period in flight runs to"
+                        + " its end"),
+                "SPEC §9.2 no longer says what `HOLD` and `RESUME` flag 1 do"
+                        + " to the period already running");
+        assertTrue(flat().contains("it writes the marker byte, then 13, and"
+                        + " the timer stops after the second"),
+                "SPEC §6 no longer says both of the marker tick's writes are"
+                        + " one tick's. Read the other way a one-shot's last"
+                        + " two levels fall in different ticks");
+        assertTrue(flat().contains("`$80` is written as `$80`"),
+                "SPEC §6 no longer says the end marker reaches the volume"
+                        + " register unchanged. Read the other way a player"
+                        + " masks bit 7 off and §6's own explanation of why"
+                        + " the marker is silent has nothing to explain");
         assertTrue(flat().contains("Frame `L` is then played as §7 has it:"
                         + " its own M byte sets the skip states again where it"
                         + " carries bit 4"),
