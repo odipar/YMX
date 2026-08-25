@@ -21,6 +21,7 @@ defaults quoted below are the constants' own values.
 | `ymx/test/rig.sh` | `org.ymx.rig.PlayerTests` | the emulator test battery |
 | `ymx/test/sweep.sh` | `org.ymx.rig.Sweep` | a `.ym` corpus, differentially |
 | `ymx/test/run.sh` | `org.ymx.rig.GenData` + rmac + Hatari | the real-hardware harness |
+| `ymx/test/ticks.sh` | `org.ymx.rig.TickDump` + Hatari | the tick reference against a real MFP |
 
 The packer has no wrapper of its own: the play script and `ym_sndh.sh`
 run it, and a direct run is
@@ -201,6 +202,21 @@ PACKFAIL or SKIP; a non-zero exit on any ISSUE.
     ymx/test/sweep.sh song.ym [more.ym ...]
 
 `YMX_PACK_OPTIONS` adds packer options for a shape no corpus tune reaches.
+
+### ticks.sh
+
+The tick reference against a real MFP. `TickDump` models the timers,
+because the unit-test emulator raises no interrupt; Hatari emulates
+them. For each tune this builds a program, traces every sound-chip write
+it makes and compares the two, one register at a time. One block per
+tune, a line per register: how many ticks each side has, how many agree
+from the start, and how many differ.
+
+    ymx/test/ticks.sh [tune ...]
+
+With no argument it takes the seven conformance tunes that run a timer;
+the other three carry none. `HATARI=` and `TOS=` point at your own
+install, and `VBLS=` sets how long each tune plays.
 
 ### run.sh
 

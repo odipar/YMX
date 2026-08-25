@@ -33,6 +33,7 @@ final class HouseStyleTest {
             Path.of("ym", "test", "README.md"),
             Path.of("doc", "conformance", "README.md"),
             Path.of("doc", "conformance", "TASK.md"),
+            Path.of("doc", "conformance", "TASK-player.md"),
             Path.of("doc", "conformance", "SOURCES.md"));
 
     /** Struck in review, lowercase; matched as substrings. */

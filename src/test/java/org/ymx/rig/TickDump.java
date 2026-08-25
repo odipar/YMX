@@ -44,6 +44,18 @@ final class TickDump {
 
     private static final String NAMES = "ABCD";
 
+    /**
+     * The enable register, the mask register and the bit each timer owns.
+     * A released toggle stream keeps its timer counting and has only its
+     * interrupt disabled (§3, `RELEASE` bit 0), so a timer whose control
+     * register is running still lands no tick while its bit is down.
+     */
+    private static final long[][] INTERRUPT = {
+            {0xFFFFFA07L, 0xFFFFFA13L, 5},
+            {0xFFFFFA07L, 0xFFFFFA13L, 0},
+            {0xFFFFFA09L, 0xFFFFFA15L, 5},
+            {0xFFFFFA09L, 0xFFFFFA15L, 4}};
+
     private TickDump() {
     }
 
@@ -101,6 +113,14 @@ final class TickDump {
                 if (soonest < 0) {
                     break;
                 }
+                if (!armed(player, soonest)) {
+                    // A released stream's timer keeps counting and lands no
+                    // tick (§3). Its count runs on, so the phase it resumes
+                    // at is the one it would have reached: step over this
+                    // period rather than owing a tick for it.
+                    due[soonest] += period[soonest];
+                    continue;
+                }
                 long vector = player.uc.value(TIMER[soonest][3], 4);
                 List<Player.Pair> wrote = PlayerTests.invokeIsr(player, vector);
                 if (!first) {
@@ -148,6 +168,13 @@ final class TickDump {
             first = false;
             out.append('"').append(entry.getKey()).append("\":").append(entry.getValue());
         }
+    }
+
+    /** Whether the timer's interrupt is both enabled and unmasked. */
+    private static boolean armed(Player player, int timer) {
+        long bit = 1L << INTERRUPT[timer][2];
+        return (player.uc.value(INTERRUPT[timer][0], 1) & bit) != 0
+                && (player.uc.value(INTERRUPT[timer][1], 1) & bit) != 0;
     }
 
     /** The period in MFP cycles, or 0 where the timer is stopped. */
