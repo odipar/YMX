@@ -19,14 +19,14 @@ namespace Ymx
         /// <summary>The only version this release writes or reads: the
         /// major in the high byte, the minor in the low, so versions order
         /// numerically.</summary>
-        public const int Version = 0x0005;
+        public const int Version = 0x0006;
 
         /// <summary>The released binaries' patch number: it moves when
         /// the binaries change and the format does not - an optimized
         /// player, a fixed stub. The format version above is the
         /// compatibility gate; this number never reaches the format
         /// word.</summary>
-        public const int Patch = 2;
+        public const int Patch = 0;
 
         /// <summary>The release's version as prose: the format version,
         /// then the patch, a dot between them.</summary>
@@ -59,6 +59,13 @@ namespace Ymx
 
         /// <summary>R0..R13 plus the script streams M, X, T and four A/P pairs.</summary>
         public const int Streams = 25;
+
+        /// <summary>The stream ceiling, at this version and at every later
+        /// one: Q, the required-streams mask, is one long with one bit per
+        /// stream, so a thirty-third stream has no bit to be required by.
+        /// Streams Streams to MaxStreams - 1 are the extension streams of
+        /// SPEC.md section 1.6.</summary>
+        public const int MaxStreams = 32;
 
         /// <summary>The frame streams: one per YM2149 sound register.</summary>
         public const int RegisterStreams = 14;
@@ -151,7 +158,24 @@ namespace Ymx
         }
 
         /// <summary>One long offset per stream, in stream order.</summary>
-        public const int OffsetSectionTable = 38;
+        public const int OffsetSectionTable = 42;
+
+        /// <summary>Q, the required-streams mask: bit k for stream k. A set
+        /// bit requires the stream, and a consumer that does not understand
+        /// it rejects the file; a clear bit on a stream the file carries
+        /// makes it advisory (SPEC.md section 1.6).</summary>
+        public const int OffsetRequired = 38;
+
+        /// <summary>The mask a file carrying no extension stream holds: the
+        /// twenty-five streams section 2 defines, and nothing above
+        /// them.</summary>
+        public const int RequiredBase = 0x01FFFFFF;
+
+        /// <summary>The header of a file storing this many sections.</summary>
+        public static int SizeOfHeader(int streams)
+        {
+            return OffsetSectionTable + 4 * streams;
+        }
 
         public const int HeaderSize = OffsetSectionTable + 4 * Streams;
 

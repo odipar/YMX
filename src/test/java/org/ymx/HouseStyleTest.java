@@ -40,7 +40,12 @@ final class HouseStyleTest {
             // consuming, bits standing as they were
             "promise",
             "guarantee",
-            "consum",
+            // "consumer" is a role SPEC.md §1.6 defines, as "caller" and
+            // "owner" are roles: only the verb is struck
+            "consume ",
+            "consumes",
+            "consumed",
+            "consuming",
             "stand as they were",
             // the sweep: a trailing clause generalising the sentence
             "whatever",

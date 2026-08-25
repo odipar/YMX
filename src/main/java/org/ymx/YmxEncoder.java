@@ -370,6 +370,9 @@ public final class YmxEncoder {
         // otherwise where the second set of them is located from.
         putLong(file, YmxFormat.OFFSET_LOOP_FRAME, loopFrame);
         putLong(file, YmxFormat.OFFSET_LOOP_TABLE, loopTable);
+        // Q: this version carries no extension stream, so the mask names the
+        // twenty-five §2 defines and nothing above them (SPEC.md §1.6).
+        putLong(file, YmxFormat.OFFSET_REQUIRED, YmxFormat.REQUIRED_BASE);
 
         int at = place(file, YmxFormat.OFFSET_SECTION_TABLE, sections,
                 loopTable == 0 ? YmxFormat.HEADER_SIZE

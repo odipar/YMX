@@ -120,14 +120,14 @@ java -ea -cp target/classes org.ymr.Ymr -f ymr/test/deeper.ymr doc.ymx
 ```
 
 reports 249,600 bytes of register and script data packed into 11,348 (4.5%) in
-a 12,664-byte file, 25 rings of 960 bytes, decoding 23 of the 25 streams so
+a 12,668-byte file, 25 rings of 960 bytes, decoding 23 of the 25 streams so
 that one of the default `C`=24's slots is idle. 4,860 of those 11,348 packed
 bytes are the eleven script streams, which the `.YMR` - 10,488 bytes - does
 not carry:
 RhYMe's player reconciles its three timers every frame from what popped, and
 this one replays decisions taken at pack time. The `.YMR` spends its own bytes
 on the command stream that drives that reconciliation, so the two files differ
-by 2,176 bytes rather than by 4,860, and those buy the flat frame.
+by 2,180 bytes rather than by 4,860, and those buy the flat frame.
 
 ### What a .ymr gives up
 

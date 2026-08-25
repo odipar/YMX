@@ -1,6 +1,6 @@
 # The YMX format - specification
 
-Version 0.5. Big-endian throughout.
+Version 0.6. Big-endian throughout.
 
 YMX is a streaming register-dump format for the YM2149 sound chip in the
 Atari ST, playable by a 68000 without the tune resident in memory. A file
@@ -23,10 +23,11 @@ Three terms recur, for the three things that read or write the format.
 | **writer** | a packer, or a tracker emitting the format directly | every rule here; §9.3 lists the ones a player does not check |
 | **player** | drives a sound chip from the file, frame by frame | §1, §2, §6, performs §7, §8 and §9.2, checks §9.1 |
 | **reader** | produces the values a frame writes, and drives nothing | §1, §2, §7 steps 1 to 3, §8's frame sequence, checks §9.1 (§9.4) |
+| **consumer** | a player or a reader - what reads a file rather than writing one | §1.6, §9.1 |
 
-A player and a reader differ in what they produce, not in how much of the
-file they understand: both decode every stream. §9.4 says what a reader
-may leave unread and why.
+A player and a reader differ in what they produce, not in which streams
+they read: each reads every stream of §2, and each reads the extension
+streams it implements. §9.4 says what a reader leaves unread and why.
 
 The format began as the `.yx6` container of the [ST4](https://github.com/odipar/ST4)
 repository, renumbered; the layout has changed since, and this document
@@ -51,7 +52,7 @@ source formats and their tools use:
 
 ```
 +--------------------------------+
-| header, 38 bytes fixed         |
+| header, 42 bytes fixed         |
 | section table, 4 x S           |
 | loop table, 4 x S, or absent   |
 | sections, located by offset    |
@@ -64,11 +65,11 @@ source formats and their tools use:
 | offset | size | field |
 |---:|---:|---|
 | 0 | 4 | `'YMX!'` - `$594D5821` |
-| 4 | 2 | format version, the major byte then the minor - **$0005**, version 0.5 |
+| 4 | 2 | format version, the major byte then the minor - **$0006**, version 0.6 |
 | 6 | 2 | flags (§1.2) |
 | 8 | 4 | `O`, the frame count |
 | 12 | 2 | frame rate in Hz: how often the player is called |
-| 14 | 2 | `S`, the stream count - always **25**, see §1.5 |
+| 14 | 2 | `S`, the stream count - **25** to **32**, see §1.5 |
 | 16 | 2 | `N`, the ring size in bytes |
 | 18 | 2 | `C`, values decoded per call |
 | 20 | 4 | the YM2149's master clock in Hz - informational; **2000000** for an ST tune, 0 with no source clock |
@@ -76,12 +77,14 @@ source formats and their tools use:
 | 28 | 2 | sample count |
 | 30 | 4 | `L`, the frame a tune that starts over goes back to (§8), within the bounds §9.3 gives it; 0 where the tune plays once through, and 0 where it starts over from its first frame |
 | 34 | 4 | byte offset of the **loop table** (§1.4); 0 where the sections cover the whole tune |
-| 38 | 4·S | byte offset of each **section** (§1.4) |
+| 38 | 4 | `Q`, the **required-streams mask** (§1.6): bit `k` for stream `k` |
+| 42 | 4·S | byte offset of each **section** (§1.4) |
 
-The fixed fields occupy bytes 0 to 37 and the section table bytes 38 to
-137, so with `S` fixed at 25 the header is **138 bytes**. Every body item
-begins on a long boundary, so the first of them is at offset 140 or later.
-Everything after the header is
+The fixed fields occupy bytes 0 to 41 and the section table bytes 42 to
+`41 + 4·S`, so the header is **142 bytes** where `S` is 25 and 170 where
+`S` is 32. `42 + 4·S` is two short of a long boundary at every `S`, so two
+pad bytes follow the header and the first body item is at offset 144, or
+172 where `S` is 32. Everything after the header is
 body: the loop table (§1.4) where the file carries one, then the sections
 (§1.4), then the sample table (§6). Content in the body
 is located only by offset - a section by its table entry, the sample table
@@ -109,13 +112,18 @@ stream T (§2.3).
 `N` is the ring size in bytes, one ring per stream, and the maximum
 back-reference distance in every section. `N` is capped at **2520**: a
 player may read register `k`'s ring through an assembled-in displacement of
-`k·N`, and `13·N` must fit a signed 16-bit displacement.
+`k·N`, and `13·N` must fit a signed 16-bit displacement. The cap is the
+register streams'. Stream 14's ring is 35280 bytes from stream 0's at the
+cap, past what a signed 16-bit displacement reaches, so streams 14 and
+above are read through a computed address and place no bound of their own
+on `N`.
 
 `C` is the number of values decoded per refill call. Constraints:
 
-- `C` is at least the number of streams the tune decodes: 17 with no timer
-  channel in use, then 19, 21, 23 or 25 by the highest channel in use
-  (§1.5);
+- `C` is at least the length of the longest decode list the file admits:
+  the base count of §1.5, and one more for each extension stream the file
+  carries. A consumer that implements every extension the file carries
+  holds that list, and a `C` that covers it covers every shorter one;
 - `C` divides `N`;
 - `N` is at least `2C`.
 
@@ -127,17 +135,24 @@ any other, so the last of them is frame `O - 1`. Nothing marks an added
 frame, so a reader reads `O` frames and no fewer.
 
 960/24 is the default pair, valid for every tune that leaves channel 3
-idle.
+idle. Twenty-four covers the base count and what is left over: seven
+extension streams with no channel in use, five with channel 0, three with
+channel 1, one with channel 2. Past that, `C` and `N` move together,
+because `C` divides `N`: 960 does not divide by 26, and a writer picks an
+`N` its `C` divides. 2520 is `2³·3²·5·7`, so it serves a `C` of 28 and of
+30 and not of 32; 2496 is the largest ring a `C` of 32 divides.
 
 ### 1.4 The sections
 
 A section carries one stream's values, packed or stored. `O` is at least
-1 and all twenty-five section-table entries are nonzero. Section order in
+1, section-table entries 0 to 24 are nonzero, and an entry from 25 up is
+nonzero where the file carries that stream and 0 where it does not
+(§1.5). Section order in
 the file is not significant; a section is located only by its offset.
 
 **One set of sections or two.** Where the header's loop table offset is
 0, each stream has one section, covering frames `[0, O)`. Where it is
-not, it locates a second table of twenty-five long entries, read exactly
+not, it locates a second table of `S` long entries, read exactly
 as the section table is and beginning on a long boundary: each stream then
 has two sections, the section table's covering frames `[0, L)` and the
 loop table's covering `[L, O)`. Two sections carry the tune between them,
@@ -190,29 +205,130 @@ and `L` in the section table with `O - L` in the loop table where it does.
 
 ### 1.5 Three stream counts
 
-`S` is fixed at 25; a player must reject any other value. The section table is
-therefore always 100 bytes and the payload begins at a constant offset.
+`S` is the stored count: 25 where the file carries no extension stream, and
+one past the highest extension index it carries otherwise. A consumer
+rejects an `S` below 25 or above 32 (§9.1). The section table is `4·S`
+bytes, 100 of them where `S` is 25, and the loop table, where the file
+carries one, is the same size.
+
+Streams 0 to 24 are the streams §2 defines. Streams 25 to 31 are
+**extension streams** (§1.6). A file **carries** a stream where its
+section-table entry is nonzero: entries 0 to 24 are nonzero in every file,
+and an entry from 25 to `S - 1` is 0 where the file does not carry that
+stream. A stream's loop table entry is nonzero exactly where its section
+table entry is.
+
 Three counts apply:
 
 | | |
 |---|---|
-| **stored** - always 25 | the size of the section table; all entries nonzero |
-| **decoded** - 17, 19, 21, 23 or 25 | what a player reads per cycle: 17 where no channel is flagged, and `17 + 2(h + 1)` where `h` is the **highest** flagged channel |
+| **stored** - `S`, 25 to 32 | the size of the section table |
+| **decoded** - 17, 19, 21, 23 or 25 | the base count a consumer reads per cycle: 17 where no channel is flagged, and `17 + 2(h + 1)` where `h` is the **highest** flagged channel. Each extension stream a consumer reads adds one |
 | **carrying** - fewer still | an idle channel's pair is one value repeated, and compresses to almost nothing |
 
-`C` covers the middle count. It steps by the highest channel in use, not
-by the number in use: a player decodes stream 0 through the highest used
-channel's pair and stops. A tune using only channel 3 decodes 25.
+The base count steps by the highest channel in use, not by the number in
+use: a consumer reads stream 0 through the highest used channel's pair and
+stops. A tune using only channel 3 has a base count of 25. The channel
+pairs are last in base stream order, so idle channels lie past the base
+count and cost nothing.
 
-The channel pairs are last in stream order, so idle channels lie past the
-decoded range and cost nothing.
+A consumer's **decode list** is streams 0 to the base count less one, in
+that order, then the extension streams it implements and the file carries,
+in ascending index order. §7 step 4 gives each position in the list its
+refill turn. The list is not a prefix of stream order: a consumer that
+implements the extension at index 30 reads streams 0 to 16 and stream 30,
+and nothing between. Every extension index is above every base index, so a
+base stream holds the same position in every consumer's list, and two
+consumers of one file refill the base streams on the same calls.
+
+### 1.6 The required-streams mask and the extension streams
+
+Streams 25 to 31 are **extension streams**. §1.7's registry gives each
+index its meaning. No field in the file names a stream: the index is the
+name, and a stream carries no tag, no length and no type. A carried
+extension stream is read as a base stream is: one section, or two where the
+file carries a loop table, decoding to the counts §1.4 gives every other
+stream, and delivering one value per frame through a ring of `N` bytes.
+
+`Q`, the long at offset 38, carries one bit per stream, bit `k` for stream
+`k`. A set bit **requires** the stream: a consumer that does not understand
+it rejects the file (§9.1). A clear bit on a stream the file carries makes
+the stream **advisory**: a consumer that does not understand it reads none
+of it, gives it no position in its decode list, and produces the values it
+would produce from a file without it.
+
+Bits 0 to 24 are set in every file. Bits for streams the file does not
+carry are clear. `Q` is therefore `$01FFFFFF` in a file carrying no
+extension stream, and a consumer that implements no extension accepts
+exactly the files whose `Q` holds that value.
+
+Thirty-two is the stream ceiling at this version and at every later one,
+because `Q` is one long with one bit per stream, and `S` never exceeds it.
+
+**What an advisory stream leaves alone.** Where a stream's mask bit is
+clear, a consumer that reads the stream and a consumer that does not
+produce the same register writes, the same actions and the same reported
+value on every frame (§7). A stream that changes any of the three carries a
+set bit, and a consumer that does not implement it rejects the file rather
+than playing it wrong.
+
+A consumer checks none of this: nothing in a file separates an advisory
+stream that holds to the rule from one that breaks it. The rule binds a
+writer (§9.3), and a file that breaks it produces two sets of values from
+two conformant consumers, with nothing in the format to say which is right.
+
+**What an advisory stream costs.** It raises the length `C` covers by one
+(§1.3), so every consumer of the file decodes one more value on a refill
+call and holds two more bytes of ring at the minimum, including a consumer
+that reads none of the stream. The values a frame writes are unchanged.
+
+**An extension stream's ring.** It is not a register's, so §1.3's
+assembled-in displacement does not reach it, and a consumer reaches it as
+it reaches M, X, T and the channel pairs.
+
+### 1.7 The extension registry
+
+| index | this version |
+|---:|---|
+| 25 | reserved |
+| 26 | reserved |
+| 27 | reserved |
+| 28 | reserved |
+| 29 | reserved |
+| 30 | private |
+| 31 | private |
+
+This version assigns no index, and a file of this version carries no stream
+at a reserved index.
+
+A **reserved** index is this document's to assign. A later version assigns
+one by filling its row: the name, what one value carries, whether the mask
+bit is ever clear, and what a consumer that implements it produces.
+Assigning an index does not change the format version. A consumer built
+before the assignment rejects a file that requires the index, and reads
+none of a file that leaves it advisory.
+
+A **private** index carries what a writer and its own tools agree it
+carries. This document assigns nothing from 30 or 31 at any version, so a
+private stream never collides with a registered one. Two private streams at
+one index are one stream to the format, and no field in the file separates
+them: a consumer that implements its own index 30 reads another writer's
+index 30 as its own. A writer whose private stream would change what plays
+sets its bit, so a consumer that implements nothing at that index rejects
+the file instead. A consumer that implements a different stream at that
+index misreads it, and the format offers no defence.
+
+An extension that turns out to be shared is registered from 25 to 29 in a
+later version, and a writer moves it there from its private index.
 
 ---
 
 ## 2. The streams
 
 Twenty-five slots, in this order. Streams 0-13 are frame streams; 14-24
-are script data whose bytes never reach a chip register.
+are script data whose bytes never reach a chip register. Streams 25 to 31,
+where a file carries them, are extension streams (§1.6) and are not in this
+table.
 
 | # | name | carries |
 |---:|---|---|
@@ -593,19 +709,21 @@ One player call per frame, in this order:
    skipped voice included, and the other seven opcodes write no sound
    register. A changed T byte takes effect before the first action
    (§2.3).
-4. **One refill** - decode `C` values into one stream's ring: stream `k`
-   on the call whose count of calls since init, modulo `C`, equals `k`. The
-   count runs on across a wrap, so the stream refilled after frame `O - 1`
-   is the next in turn from the one refilled on it, for any `L`. A `k` past
-   the decoded streams (§1.5) refills nothing.
+4. **One refill** - decode `C` values into one stream's ring: the stream
+   at position `k` of the consumer's decode list (§1.5) on the call whose
+   count of calls since init, modulo `C`, equals `k`. The count runs on
+   across a wrap, so the stream refilled after frame `O - 1` is the next in
+   turn from the one refilled on it, for any `L`. A `k` past the end of the
+   list refills nothing. Where the consumer reads no extension stream,
+   position `k` is stream `k`.
 
 Where flag bit 0 is clear, or `O - L` is at most `N`, a stream is decoded
 to `O` values and refilled no further; the last refill before that is a
 short one. Otherwise a section that runs out mid-refill is opened again
 and the refills go on (§8).
 
-Before frame 0, a player decodes one group of every stream, so that frame
-0's values are present: `C` values, or `O` where the tune is shorter than
+Before frame 0, a player decodes one group of every stream in its decode
+list, so that frame 0's values are present: `C` values, or `O` where the tune is shorter than
 a group and the refills stop at `O`.
 
 Actions follow the frame write so that their varying cost does not delay
@@ -692,8 +810,14 @@ stream crosses on its own refill turn and none crosses before it has read
 ### 9.1 What a player checks
 
 - the magic is `'YMX!'`;
-- the version is $0005 - 0.5;
-- the stream count is 25 - it is fixed, not a size to adapt to;
+- the version is $0006 - 0.6;
+- the stream count `S` is 25 to 32;
+- the required-streams mask names no stream the consumer does not
+  understand: `Q AND NOT understood` is zero, where bit `k` of
+  `understood` is set for each stream `k` the consumer understands. Every
+  consumer of this version understands streams 0 to 24; a consumer that
+  implements no extension stream understands those twenty-five, and
+  testing `Q` against `$01FFFFFF` is that check for it;
 - every section that is a container carries an ST4 signature matching the
   format version and unit size the player was built for - a tune packed
   for a different one is rejected, not garbled. A stored section has no
@@ -728,7 +852,10 @@ a value. Those operations:
 | loop point `$FFFF` | on the marker, 13 is written to the volume register and the timer is stopped. Any other value: the read position becomes that offset into the sample and the ticks continue |
 | the frame's order | skip bits, then the fourteen register writes, then the frame's actions in channel order, then one refill |
 | the frame after the last, flag bit 0 set | every claimed timer is stopped, its vector parked, its interrupt enabled with nothing pending, and every skip bit cleared, before frame `L` is played again |
-| refill turn | on call `n` counted from init, stream `n` modulo `C` is decoded `C` values further, the count running on across a wrap |
+| the required-streams mask | a bit outside the streams the consumer understands: the file is rejected. A bit inside it: that stream is read |
+| an extension stream's table entry that is 0 | the file does not carry that stream: nothing is decoded there and it takes no position in the decode list |
+| the decode list | streams 0 to the base count less one, then the extension streams the consumer implements and the file carries, in ascending index order |
+| refill turn | on call `n` counted from init, the stream at position `n` modulo `C` of the consumer's decode list is decoded `C` values further, the count running on across a wrap |
 | a section running out mid-refill | decoding continues into the same ring, from the start of a section |
 | a loop table offset that is not 0 | the section opened there, and at every later one, is the loop table's for that stream; with 0 it is the same section again |
 
@@ -741,6 +868,15 @@ The shape:
 
 - `O` is at least 1; `N` and `C` are within §1.3. At a unit size above 1,
   `O` and `C` are multiples of the unit size.
+- `S` is 25 where the file carries no extension stream, and one past the
+  highest extension index it carries otherwise.
+- Section-table entries 0 to 24 are nonzero. An entry from 25 to `S - 1`
+  is nonzero where the file carries that stream and 0 where it does not.
+  Where the file carries a loop table, a stream's two entries are both
+  nonzero or both 0.
+- Bits 0 to 24 of the required-streams mask are set. A bit from 25 up is
+  set only for a stream the file carries.
+- The file carries no stream at an index §1.7 leaves reserved.
 - Where `L` is not 0, `L` is less than `O`.
 - Where the loop table offset is 0, each of the twenty-five sections
   decodes to `O` values, and `L` is 0 or leaves `O` - `L` at most `N`, so
@@ -759,6 +895,10 @@ The shape:
 The values:
 
 - M marks only channels flagged in §1.2.
+- An extension stream's mask bit is set where a consumer that reads none
+  of the stream would produce a register write, an action or a reported
+  value that a consumer reading it would not, and clear where it would not
+  (§1.6).
 - A register value contains only the bits of its mask (§2). R13 carries
   `$FF` on every frame that must not restart the envelope. R7 carries
   bits 5-0, with every generator masked off a voice for as long as a PCM
@@ -823,6 +963,15 @@ reads §3's fourth column, which says which opcodes write a sound register
 in their own frame, and needs no other column; and it reads neither §5
 nor §6, which say at what rate a tick lands and which sample byte it
 carries.
+
+A reader checks the mask as a player checks it (§9.1): a mask that names
+an extension stream the reader does not implement is a rejection, not a
+stream to step over. A reader reads every base stream §1.5 counts and each
+extension stream it implements and the file carries. What it leaves unread
+past that is an advisory extension, and by §1.6 that changes none of the
+values it produces. So a reader and a player that implement different
+extension streams still agree on every value a frame writes, and an
+extension one of them lacks is a rejection rather than a disagreement.
 
 A reader still reads M's skip bits and applies them (§2.1). A skip is
 carried in the file, frame by frame, so a reader omits the same volume
@@ -917,7 +1066,7 @@ any `k`, and a match at a new offset is at least 2 units long.
 
 ## Appendix B. A worked file
 
-A file of 240 bytes, four frames, every section stored. Read against §1
+A file of 244 bytes, four frames, every section stored. Read against §1
 and §7 it settles the header's fields, where the body begins, how a stored
 section is read, and what a call reports.
 
@@ -925,10 +1074,11 @@ section is read, and what a call reports.
 
 ```
    0  59 4D 58 21   'YMX!'
-   4  00 05         format version 0.5
+   4  00 06         format version 0.6
    6  00 01         flags: bit 0 set, the tune starts over
    8  00 00 00 04   O = 4 frames
   12  00 32         50 Hz
+  14  00 19         S = 25: no extension stream
   16  03 C0         N = 960
   18  00 18         C = 24
   20  00 1E 84 80   master clock 2000000
@@ -936,15 +1086,15 @@ section is read, and what a call reports.
   28  00 00         sample count 0
   30  00 00 00 00   L = 0, the tune starts over from its first frame
   34  00 00 00 00   no loop table, so each stream has one section
-  38  80 00 00 8C   stream 0: bit 31 set, stored, at offset 140
-  42  80 00 00 90   stream 1: stored, at offset 144
-  46  80 00 00 94   stream 2: stored, at offset 148
+  38  01 FF FF FF   Q = $01FFFFFF: the twenty-five, and no extension
+  42  80 00 00 90   stream 0: bit 31 set, stored, at offset 144
+  46  80 00 00 94   stream 1: stored, at offset 148
        ...
- 134  80 00 00 C0   stream 24: stored, at offset 192
+ 138  80 00 00 F0   stream 24: stored, at offset 240
 ```
 
-The header ends at byte 137. Bytes 138 and 139 are padding to the next
-long boundary, so the first body item is at 140, as §1.1 has it.
+The header ends at byte 141. Bytes 142 and 143 are padding to the next
+long boundary, so the first body item is at 144, as §1.1 has it.
 
 ### B.2 Two sections
 
@@ -953,9 +1103,9 @@ offset are the values, one per frame, with no container and no signature.
 Four frames, so four bytes each.
 
 ```
- 140  A3 8E FB 59   stream 0, R0: 163, 142, 251, 89
- 144  02 0C 04 02   stream 1, R1: 2, 12, 4, 2
- 192  FF FF FF FF   stream 13, R13: $FF on every frame
+ 144  A3 8E FB 59   stream 0, R0: 163, 142, 251, 89
+ 148  02 0C 04 02   stream 1, R1: 2, 12, 4, 2
+ 196  FF FF FF FF   stream 13, R13: $FF on every frame
 ```
 
 A file of stored sections reads the same at any unit size, so this one

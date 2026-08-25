@@ -356,6 +356,12 @@ YS_STORED       equ     44              ; word  set when the section is its own
 ; as plain (a2) - see the note where they are used.
 
 ; The .ymx header, as written by the packer.
+; The extension streams a file may store past the twenty-five, and the mask
+; a file that stores none carries: this build understands streams 0 to 24 and
+; no extension, so any other mask is a stream it cannot honour.
+YMX_EXT_MAX     equ     7
+YMX_REQUIRED_BASE equ   $01FFFFFF
+
 YH_MAGIC        equ     0
 YH_VERSION      equ     4
 YH_FLAGS        equ     6
@@ -376,13 +382,20 @@ YH_LOOPTAB      equ     34              ; long: the loop table, 0 when none.
                                         ; the section table: the frames from
                                         ; L on, which every pass after the
                                         ; first plays
-YH_SECTIONS     equ     38              ; one offset per stream: its section,
+YH_REQUIRED     equ     38              ; long: Q, the required-streams mask.
+                                        ; Bit k requires stream k, and a
+                                        ; consumer that does not understand a
+                                        ; required stream rejects the file.
+                                        ; This build understands the
+                                        ; twenty-five and no extension, so it
+                                        ; takes the one value and no other
+YH_SECTIONS     equ     42              ; one offset per stream: its section,
                                         ; covering every frame of the tune,
                                         ; or the frames before L where a
                                         ; loop table covers the rest
 
 YMX_MAGIC       equ     $594D5821       ; 'YMX!'
-YMX_VERSION     equ     $0005           ; the format version: the major in
+YMX_VERSION     equ     $0006           ; the format version: the major in
                                         ; the high byte, the minor in the
                                         ; low. There is no older version to
                                         ; stay compatible with; doc/SPEC.md
@@ -442,8 +455,13 @@ YMX_init:
         bne     .rejected
         cmp.w   #YMX_VERSION,YH_VERSION(a0)
         bne     .rejected
-        cmp.w   #YMX_STREAMS,YH_STREAM_COUNT(a0)
-        bne     .rejected
+        move.w  YH_STREAM_COUNT(a0),d0  ; S is 25 to 32: a file may store
+        sub.w   #YMX_STREAMS,d0         ; extension streams past the ones
+        cmp.w   #YMX_EXT_MAX,d0         ; this build reads
+        bhi     .rejected
+        cmp.l   #YMX_REQUIRED_BASE,YH_REQUIRED(a0)
+        bne     .rejected               ; a required stream this build does
+                                        ; not understand
 
         move.l  YH_FRAMES(a0),YMX_TOTAL(a3)
         move.w  YH_RING(a0),YMX_N(a3)

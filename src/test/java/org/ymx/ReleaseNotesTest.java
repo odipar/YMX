@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,7 +46,8 @@ final class ReleaseNotesTest {
 
     /** The numbers the notes spell out rather than write in digits. */
     private static final Map<String, Integer> SPELLED =
-            Map.of("eight", 8, "twelve", 12, "twenty-five", 25);
+            Map.of("eight", 8, "twelve", 12, "twenty-five", 25,
+                    "thirty-two", 32);
 
     /**
      * The size the section leads with, against the README's, which the rig
@@ -95,36 +97,53 @@ final class ReleaseNotesTest {
      */
     @Test
     void theSectionNamesTheFormatVersionThisBuildReads() {
-        assertEquals(YmxFormat.versionName(), group(theFormat(),
+        assertEquals(YmxFormat.versionName(), group(
+                whicheverStates("Format version [\\d.]+: a tune packed at"),
                 "Format version ([\\d.]+): a tune packed at",
                 "the format version its tunes carry"));
     }
 
-    /** The header the section describes, field by field. */
+    /**
+     * The header the notes describe, field by field. Each figure is read
+     * from the section that states it: the header's size moved at 0.6 and
+     * the loop frame's offset did not, so the two live in different
+     * sections and each check finds its own.
+     */
     @Test
     void theHeaderFiguresAreTheHeaderBothTreesWrite() {
-        String notes = theFormat();
-        assertEquals(YmxFormat.HEADER_SIZE,
-                number(notes, "The header is (\\d+) bytes", "the header size"));
-        assertEquals(YmxFormat.OFFSET_SECTION_TABLE - YmxFormat.OFFSET_LOOP_FRAME,
-                spelled(notes, "The header is \\d+ bytes, ([\\w-]+) more"),
-                "the bytes the two longs added");
-        assertEquals(YmxFormat.OFFSET_LOOP_FRAME,
-                number(notes, "The long at offset (\\d+) is `L`", "`L`'s offset"));
-        assertEquals(YmxFormat.OFFSET_LOOP_TABLE, number(notes,
+        assertEquals(YmxFormat.HEADER_SIZE, number(
+                whicheverStates("The header is \\d+ bytes"),
+                "The header is (\\d+) bytes", "the header size"));
+        assertEquals(YmxFormat.OFFSET_SECTION_TABLE - YmxFormat.OFFSET_REQUIRED,
+                number(whicheverStates("The section table follows at \\d+"),
+                        "The section table follows at (\\d+)",
+                        "the section table's offset")
+                        - YmxFormat.OFFSET_REQUIRED,
+                "the section table sits one long past the mask");
+        assertEquals(YmxFormat.OFFSET_REQUIRED, number(
+                whicheverStates("The long at offset \\d+ is `Q`"),
+                "The long at offset (\\d+) is `Q`", "`Q`'s offset"));
+        assertEquals(YmxFormat.OFFSET_LOOP_FRAME, number(
+                whicheverStates("The long at offset \\d+ is `L`"),
+                "The long at offset (\\d+) is `L`", "`L`'s offset"));
+        assertEquals(YmxFormat.OFFSET_LOOP_TABLE, number(
+                whicheverStates("the long at \\d+ is the offset of a loop table"),
                 "the long at (\\d+) is the offset of a loop table",
                 "the loop table's offset"));
-        assertEquals(YmxFormat.OFFSET_SECTION_TABLE, number(notes,
-                "The section table follows at (\\d+)", "the section table's offset"));
-        assertEquals(YmxFormat.STREAMS,
-                spelled(notes, "the loop table, ([\\w-]+) entries"),
+        assertEquals(YmxFormat.STREAMS, spelled(
+                whicheverStates("the loop table, [\\w-]+ entries"),
+                "the loop table, ([\\w-]+) entries"),
                 "the loop table's entries");
+        assertEquals(YmxFormat.MAX_STREAMS, spelled(
+                whicheverStates("[\\w-]+ is the stream ceiling"),
+                "([\\w-]+) is the stream ceiling"),
+                "the stream ceiling");
     }
 
     /** The cap a ring is raised to, and the workspace the rings sit past. */
     @Test
     void theRingCapAndTheWorkspaceFloorAreThePlayersOwn() throws IOException {
-        String notes = theFormat();
+        String notes = whicheverStates("up to the cap of [\\d,]+ bytes a ring");
         assertEquals(YmxFormat.MAX_RING_SIZE, number(notes,
                 "up to the cap of ([\\d,]+) bytes a ring", "the ring cap"));
 
@@ -151,7 +170,7 @@ final class ReleaseNotesTest {
      */
     @Test
     void theConditionsTheNotesStateAreThePackersOwn() {
-        String notes = theFormat();
+        String notes = whicheverStates("the timers stopped");
         String conditions = group(notes,
                 "the frame has to be one the wrap can enter (with the timers[^.]*)\\.",
                 "the conditions a frame is kept under");
@@ -234,15 +253,37 @@ final class ReleaseNotesTest {
      * and a patch section repeats none of them.
      */
     /**
-     * The newest section stating something, which is the newest section
-     * where it changed there and an older one where it did not. A patch
-     * that leaves the player alone restates none of the player's figures,
-     * and the release that measured them keeps them.
+     * The newest section stating something. A figure is stated once, in the
+     * release that set it: a patch that leaves the player alone restates
+     * none of the player's figures, and a format version that moves the
+     * header restates the header and not the loop frame. So a check walks
+     * the sections newest first and reads the one that carries its figure.
      */
     private static String whicheverStates(String pattern) {
-        String newest = newest();
-        return Pattern.compile(pattern).matcher(newest).find()
-                ? newest : theFormat();
+        Pattern wanted = Pattern.compile(pattern);
+        for (String section : sections()) {
+            if (wanted.matcher(section).find()) {
+                return section;
+            }
+        }
+        return newest();                // fails in the caller, by name
+    }
+
+    /** Every section of doc/RELEASES.md, newest first, whitespace flat. */
+    private static List<String> sections() {
+        String all;
+        try {
+            all = Files.readString(Path.of("doc", "RELEASES.md"));
+        } catch (IOException e) {
+            throw new IllegalStateException("doc/RELEASES.md: " + e);
+        }
+        List<String> found = new ArrayList<>();
+        for (String part : all.split("(?m)^## ")) {
+            if (!part.isBlank() && Character.isDigit(part.charAt(0))) {
+                found.add(String.join(" ", part.split("\\s+")));
+            }
+        }
+        return found;
     }
 
     private static String theFormat() {

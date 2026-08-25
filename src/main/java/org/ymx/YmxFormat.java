@@ -78,13 +78,13 @@ public final class YmxFormat {
      * high byte, the minor in the low, so versions order numerically.
      * There is no version history here to be compatible with;
      * doc/SPEC.md defines the layout. */
-    public static final int VERSION = 0x0005;
+    public static final int VERSION = 0x0006;
 
     /** The released binaries' patch number: it moves when the binaries
      * change and the format does not - an optimized player, a fixed
      * stub. The format version above is the compatibility gate; this
      * number never reaches the format word. */
-    public static final int PATCH = 2;
+    public static final int PATCH = 0;
 
     /** The release's version as prose: the format version, then the
      * patch, a dot between them. */
@@ -115,6 +115,15 @@ public final class YmxFormat {
 
     /** R0..R13 plus the script streams M, X, T and four A/P pairs. */
     public static final int STREAMS = 25;
+
+    /**
+     * The stream ceiling, at this version and at every later one: `Q`, the
+     * required-streams mask, is one long with one bit per stream, so a
+     * thirty-third stream has no bit to be required by. Streams
+     * {@link #STREAMS} to {@code MAX_STREAMS - 1} are the extension streams
+     * of SPEC.md §1.6.
+     */
+    public static final int MAX_STREAMS = 32;
 
     /** The frame streams: one per YM2149 sound register. */
     public static final int REGISTER_STREAMS = 14;
@@ -218,9 +227,26 @@ public final class YmxFormat {
     /** One long offset per stream, in stream order: where its section is -
      * the whole tune, or the frames before {@code L} where the file carries a
      * loop table. */
-    public static final int OFFSET_SECTION_TABLE = 38;
+    public static final int OFFSET_SECTION_TABLE = 42;
 
-    public static final int HEADER_SIZE = OFFSET_SECTION_TABLE + 4 * STREAMS;
+    /**
+     * {@code Q}, the required-streams mask: bit {@code k} for stream
+     * {@code k}. A set bit requires the stream, and a consumer that does not
+     * understand it rejects the file; a clear bit on a stream the file
+     * carries makes it advisory (SPEC.md §1.6).
+     */
+    public static final int OFFSET_REQUIRED = 38;
+
+    /** The mask a file carrying no extension stream holds: the twenty-five
+     * streams §2 defines, and nothing above them. */
+    public static final int REQUIRED_BASE = 0x01FFFFFF;
+
+    /** The header of a file storing {@code streams} sections. */
+    public static int headerSize(int streams) {
+        return OFFSET_SECTION_TABLE + 4 * streams;
+    }
+
+    public static final int HEADER_SIZE = headerSize(STREAMS);
 
     /** A sample table entry: a long offset and a word length. */
     public static final int SAMPLE_ENTRY_SIZE = 8;

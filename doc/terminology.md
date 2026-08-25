@@ -464,7 +464,7 @@ of ring rather than 24,000. The ring size is per tune and lives in its
 header, so the packer raises it only where the raised ring holds the
 pass, up to the cap of 2,520 bytes a ring.
 
-`Turrican - world 4-3` is this case. Its file is 2,532 bytes, the same as
+`Turrican - world 4-3` is this case. Its file is 2,536 bytes, the same as
 it would be with no loop, and its header gives `N` = 1,776.
 
 ### The pass is too long to keep
@@ -490,7 +490,7 @@ This costs bytes. The two halves cannot compress against each other, so a
 match in the second half cannot reach back into the first, and the file
 carries twenty-five more section headers. Of the 99 tunes with a loop
 frame, 36 need the cut, and on the three of them in `ym/test` the file
-grows by 13.8%, 22.5% and 40.9%. It costs no memory.
+grows by 13.8%, 22.5% and 40.8%. It costs no memory.
 
 ### What the packer has to check first
 
@@ -677,6 +677,9 @@ point, that would be a wavetable in the ordinary sense.
 | **frame write** | the once-a-frame round of register writes |
 | **opcode** | the code's name for an action the script hands the player. Three bits of an action byte, all eight spent |
 | **player** | anything that plays a `.ymx` file; SPEC.md states what one performs and checks |
+| **reader** | anything that produces the values a frame writes and drives no chip: a converter, an analyser. SPEC.md §9.4 states what it may leave unread |
+| **consumer** | a player or a reader - what reads a `.ymx` file rather than writing one. The word the required-streams mask is stated in |
+| **extension stream** | a stream past the twenty-five, at index 25 to 31. SPEC.md §1.6 and §1.7 |
 | **writer** | anything that emits a `.ymx` file: a packer, or a tracker targeting the format directly. SPEC.md states the rules no player checks |
 | **packer** | the tool that turns a source file into a YMX file. One per front end, and one kind of **writer** |
 | **front end** | the pair of classes that reads one source format and stops at a `Tune`. `org.ym6` for YM |
