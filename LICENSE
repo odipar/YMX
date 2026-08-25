@@ -4,8 +4,8 @@ YMX License
 YMX is a streaming chiptune format for the Atari ST's 68000. This repository
 holds the format specification (doc/SPEC.md, doc/BINARIES.md), the 68000
 players, the Java and C# tools that pack and combine, and the test rigs. It
-vendors the ST4 compression project (https://github.com/odipar/ST4) and,
-through it, the ZX1 data compression format
+carries a copy of the ST4 compression project (https://github.com/odipar/ST4)
+and, through it, of the ZX1 data compression format
 (https://github.com/einar-saukas/ZX1), and it follows their dual licensing
 structure:
 
@@ -48,7 +48,7 @@ Attribution
   by Einar Saukas (Copyright (c) 2021), with thanks to introspec/spke. The
   original C and z80 sources live in the ZX1 repository.
 * The ST4 format (the four streams, the unit alignment, the container) is
-  Copyright (c) 2026 Robbert van Dalen, vendored here as org.st4, dotnet/st4
+  Copyright (c) 2026 Robbert van Dalen, copied here as org.st4, dotnet/st4
   and the 68k/ decoders. ST4_wrap.S is based on ST1_wrap.S, which OpenAI
   Codex adapted for ST1 from ST1_ring.S.
 * The YMX format, the packers and combiners, the SNDH and PRG tooling, the
@@ -69,10 +69,10 @@ Used by the build and the tests, not distributed
 * rmac, the 68000 assembler, assembles the players and prebuilt binaries.
 * Hatari, with a TOS or EmuTOS image, runs the real-hardware harness.
 * The Unicorn engine (GPL-2.0) is loaded at run time by the emulator rigs
-  from the machine's own installed copy; nothing of it is vendored or
+  from the machine's own installed copy; no part of it is kept or
   distributed here.
 * Maven pulls JSpecify, JUnit, Error Prone and NullAway for the Java build;
-  the .NET SDK builds the C# tree. None are vendored.
+  the .NET SDK builds the C# tree. No copy of any of them is kept here.
 
 BSD 3-Clause License (the compressor)
 -------------------------------------

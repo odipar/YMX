@@ -8,6 +8,11 @@ Standard terms, not coinages. A compound that says one thing twice is a term
 the reader has to decode, and the plain description is shorter than the
 compound it replaces.
 
+A noun pressed into service as a verb is the same fault. A repository does
+not *vendor* a library: it carries a copy of one, and the copy is what the
+sentence is about. Write what happened - copied here, carried here, kept
+here - and the reader needs no glossary.
+
 ## One vocabulary
 
 Where a project defines its terms, those are the names. A term that changes in

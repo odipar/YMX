@@ -75,6 +75,9 @@ final class HouseStyleTest {
             "—",
             "–",
             "−",
+            // a noun pressed into service as a verb: a repository carries a
+            // copy of a library, it does not vendor one
+            "vendor",
             // the verdict: the sentence grading itself or its subject
             "is deliberate",
             "by design",
