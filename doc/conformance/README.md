@@ -2,8 +2,16 @@
 
 Ten packed tunes, and what the 68000 player writes to the sound chip for
 each. The kit exists to test [SPEC.md](../SPEC.md) rather than the code:
-hand it to a reader who has never seen this repository, and see whether
-the document alone is enough to decode the tunes.
+hand it to someone who has never seen this repository, and see whether the
+document alone is enough to decode the tunes.
+
+What it tests is the **reader** of SPEC.md §9.4 - something that produces
+the values a frame writes and drives no chip. A reader is one of the
+three roles §1 names, and the narrowest: it needs neither §5's rates nor
+§6's sample table, because both describe what a timer writes between
+frames and a reader produces one set of values a frame. The claim this
+kit measures is therefore "a converter or an analyser can be written from
+the document", not "a player can be ported from it".
 
 ## Running the exercise
 
@@ -51,10 +59,12 @@ guess.
 
 Seven of the eight opcodes write no sound register in their own frame,
 and the exercise asks for a call's own writes only. So no growth of this
-corpus tests §3: a decoder that runs no opcode at all still matches the
-reference on nearly every entry. Testing §3, §5 and §6 needs a reference
-that carries what a timer stream writes between frames, which this one
-does not.
+corpus tests §3's operations: a decoder that runs no opcode at all still
+matches the reference on nearly every entry. That is by design now - §9.4
+puts what a timer writes between frames outside a reader's work - and it
+is the limit of what this kit can claim. A player ported from the
+document would need a reference carrying every tick, which this one does
+not.
 
 `START_PCM_PREEMPT` and `RESUME` are played by no tune here, and by no
 tune in the tree. Nothing exercises a channel-3 flag, a T byte that
