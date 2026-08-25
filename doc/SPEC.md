@@ -441,6 +441,12 @@ One byte, two bits per channel:
 
 Channel 0 in bits 1-0, channel 1 in bits 3-2, and so on.
 
+A stream's ticks name the timer the map gave its channel when that
+stream's timer was last programmed, not the timer the current byte gives
+it. A channel whose timer counts with its interrupt disabled (§3.3) is
+running, so §9.3's rule that a change reaches only a channel with nothing
+running holds over a disabling release as well as over a playing stream.
+
 Frame 0's byte defines the map at claim time: for each flagged channel
 (§1.2) a player claims the timer named by the channel's two bits, and
 flagged channels name distinct timers. The byte is read every frame; a
@@ -555,10 +561,19 @@ writes the level.
 
 Phase is retained only across a held code and its retunes.
 
+`HOLD` and `RESUME` read the register byte of the voice their channel's
+stream runs on, which is the voice their own action byte names: a channel
+carries one voice between one start opcode and the next (§9.3).
+
 `RESUME` implements the alternative gap model: a release disables the
 timer's interrupt, the timer keeps counting, and a re-arrival resumes the
 toggle stream at its current phase. A tick that fell due while disabled
-is not delivered. The model in use is the writer's choice, fixed at pack
+is not delivered: no interrupt is taken and the tick's handler does not
+run, so it writes no register, reads no sample byte, and leaves a toggle
+stream on the half the release left standing. The count runs on under it,
+and the stream owes no tick for the gap: `RESUME` delivers the next tick
+one period after the count reaches its next underflow, not one for each
+that passed. The model in use is the writer's choice, fixed at pack
 time.
 
 `RESUME` is emitted only where the gap was a disabling release and the
@@ -660,18 +675,21 @@ At the header's sample-table offset - a long boundary - `count` entries of
 Sample bytes are volume levels 0-15, followed by one **end marker**,
 `$80`. A PCM tick writes a byte to the volume register, advances its
 pointer, and ends the sample on a byte with bit 7 set; nothing is counted
-or compared per tick. The marker has been written as a level by the time
-it is tested, and `$80`'s level bits are zero, so the marker plays as one
-tick of silence at the loop seam.
+or compared per tick. The byte reaches the register unchanged, the marker
+included: `$80` is written as `$80`, and the chip takes its low five bits,
+which are zero. So the marker has been written as a level by the time it
+is tested, and it plays as one tick of silence at the loop seam.
 
 The **loop point** is a position in the sample, not an address. On the end
 marker, a tick with a loop point other than `$FFFF` sets its pointer to
 that position and continues; the seam costs the marker's one tick of
-silence. A one-shot writes 13 - a mid-scale level - to the volume
-register and stops its timer, so the voice holds that level until it
-rejoins the frame write. `0` is a valid loop point - the sample repeats
-whole - so the no-loop value is one past the largest position a sample can
-hold.
+silence. A one-shot writes 13 - a mid-scale level - to the volume register
+and stops its timer, so the voice holds that level until it rejoins the
+frame write. Both writes are the marker tick's own: it writes the marker
+byte, then 13, and the timer stops after the second. That tick is the one
+place in the format where a tick writes one register twice. `0` is a valid
+loop point - the sample repeats whole - so the no-loop value is one past
+the largest position a sample can hold.
 
 A sample number is read from a voice's five-bit volume register (§3.2), so
 a file may carry at most **32** samples.
@@ -745,6 +763,7 @@ frame before `O - 1` reports 0. Every call that plays frame `O - 1` reports
 1 where flag bit 0 is set, and 0 where it is clear, on the first pass and
 on every later one. Where flag bit 0 is
 clear, the next call plays no frame, writes no register and reports -1.
+It lands no tick either: the run has ended at it.
 The run has ended at that call: every later call repeats the report, and a
 record of the run ends with that call's entry.
 
@@ -769,10 +788,14 @@ frame reads.
 ```
 
 On the frame that ends the tune, after its write, actions and refill,
-every claimed timer is stopped, its vector parked on a routine with no
+and as the last thing that call does, every claimed timer is stopped, its
+vector parked on a routine with no
 effect, its interrupt enabled with no tick pending, and the three skip
 states cleared. That is the state frame 0 was played in on the first
-pass, so every pass is identical.
+pass, so every pass is identical. The stop being the call's last step,
+that call lands no tick of its own: every timer is stopped before the
+next one would fall due, and nothing of the pass that ended reaches the
+one that follows.
 
 Frame `L` is then reached in one of two ways, and `O - L` against `N`
 selects which.
@@ -850,6 +873,7 @@ a value. Those operations:
 | `RELEASE` bit 0 clear | the timer is stopped |
 | `RELEASE` bit 0 set | the timer's interrupt is disabled and the timer keeps counting; a tick falling due in the gap is dropped |
 | `RETUNE` addressed to voice 3 | the timer is reprogrammed without being stopped, so the count in flight runs to its end |
+| `HOLD` flag 1, `RESUME` flag 1 | the count reaches the data register with the timer running, so the period in flight runs to its end and the next one takes the new count. Neither opcode stops a timer |
 | a toggle stream's volume, a PCM stream's sample number | read from the voice's own register stream on the frame the stream starts, and where an opcode's flag re-reads them (§3) |
 | `START_TOGGLE` | R8+v is written 0 among that frame's actions, and the first tick, one timer period later, writes the level |
 | programming a timer | four writes in the order stop, vector, count, run, with no tick of that timer between the first and the last, ending with that interrupt enabled and unmasked. This document names no register and no address: which they are is the host's, and the order is what a player owes a stream |

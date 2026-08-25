@@ -196,8 +196,10 @@ flight (§3), what a toggle stream's phase does across a disabled gap
 (§3.3), where the pass-end teardown falls against the last call's ticks
 (§8), which voice flag 2 reads (§3.2), which timer a tick names (§2.3),
 what the call reporting -1 carries (§7), two timers due at one instant,
-and where a tick that coincides with a call goes. The last two are the
-task's to settle rather than the format's. None is fixed yet.
+and where a tick that coincides with a call goes. The document carries
+the seven that were its own now, and `TASK-player.md` carries the two
+that were the task's: a tick due at the instant a call begins belongs to
+that call, and two ticks due in one cycle are listed A, B, C, D.
 
 ## What it does not cover
 
