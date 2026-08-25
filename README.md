@@ -168,3 +168,6 @@ have used ZX1, via ST4 or YMX. See [LICENSE](LICENSE).
 The player was inspired by Steven Tattersall's MinYMiser. Sinus-SID is the one
 YM effect this player leaves unplayed. ST-Sound, the format author's own
 player, reads the effect code and runs an empty handler.
+
+Special thanks to Sandor Drieënhuizen and Wietze Spijkerman for their support,
+proofreading, and ideas.
