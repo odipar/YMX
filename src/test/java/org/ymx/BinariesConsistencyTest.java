@@ -121,6 +121,18 @@ final class BinariesConsistencyTest {
                             + " fewer than twice, so it does not both save and"
                             + " give back what the player parked there");
         }
+
+        // Timer C's count is written, never read: a timer's data register
+        // reads as the count it has reached rather than the count it
+        // restarts from, so a takeover that reads one back and writes it
+        // again leaves the system's 200 Hz tick at a rate of its own, and
+        // the desktop cannot time a double click. $FFFFFA23 is therefore
+        // reached exactly once, by the write.
+        assertEquals(1, occurrences(stub, 0xFA23),
+                "the stub reaches Timer C's data register other than once."
+                        + " It reads as a live count, so the takeover must not"
+                        + " save it and the handback must write the system's"
+                        + " own value");
     }
 
     /** How often a stub reaches one absolute-short address. */

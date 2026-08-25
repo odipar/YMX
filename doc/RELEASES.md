@@ -11,6 +11,32 @@ patch number the binaries carry of their own. The format version is the
 compatibility gate: tunes packed at one format version play on every
 patch of it.
 
+## 0.5.2
+
+The player is 3,394 bytes at unit size 2, where 0.5.1 carried 3,394: the
+player did not move, and every tune packed at format 0.5 plays unchanged.
+The three SNDH cores are byte for byte what 0.5.0 published. The PRG stub
+gives the system's own tick back.
+
+- After a program ran, the desktop could no longer time a double click.
+  0.5.1 read that as parked timer vectors and gave those back, which was
+  a real omission and not this fault. The cause is Timer C's count. A
+  timer's data register reads as the count it has reached, not as the
+  count it restarts from, so a takeover that reads $FFFFFA23 and writes
+  it back at the end leaves the operating system's 200 Hz tick running to
+  the count the timer had reached. The desktop measures a double click, a
+  key repeat and the time of day in that tick.
+- The count is written rather than read now: 192, which with the /64
+  prescaler the control register restores is 2457600 / 64 / 192, or
+  200 Hz. The prescaler needs no such care, since a control register does
+  read as what was written to it.
+- The stub is 2,878 bytes where 0.5.1 carried 2,884.
+
+Reported fixed on the machine, which is what 0.5.1 lacked: its own note
+said no program had been run with $114 read back afterwards, and the
+symptom outlived the release. The same fault, and the same cause, was
+found in the RhYMe tracker's exported player.
+
 ## 0.5.1
 
 The player is 3,394 bytes at unit size 2, where 0.5.0 carried 3,394: the
@@ -36,6 +62,9 @@ Verified by reading the assembled stub: each of the four addresses is
 reached twice, a save and a give-back, which
 `BinariesConsistencyTest` holds it to. Not verified by running: no
 program has been run under emulation with $114 read back after it exits.
+
+**This release does not fix the double click.** The vectors were a real
+omission and the wrong cause; 0.5.2 has the count that fixes it.
 
 ## 0.5.0
 
