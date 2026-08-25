@@ -185,6 +185,11 @@ public final class YmrEffects {
      * may pass this. */
     private static final int MAX_SAMPLE_BYTES = 65535;
 
+    /** The window a looped sample stays armed for: it has no end of its own,
+     * so it stays armed until the source stops the timer. Large enough that no
+     * tune reaches it, small enough that a frame added to it stays an int. */
+    private static final int FOREVER = 1 << 30;
+
     /** Bit 4 of a volume register: the voice takes its level from the envelope
      * generator, and the volume nibble is ignored. */
 
@@ -364,8 +369,10 @@ public final class YmrEffects {
         }
         int start = block.loopStart();
         if (start >= data.length) {
-            note("sample " + index + " is marked looped from " + start + ", which is past"
-                    + " its " + data.length + " bytes: played once instead");
+            note("sample " + index + " is marked looped from " + start + ", which is at or"
+                    + " past the " + data.length + " bytes it "
+                    + (data.length == block.data().length ? "carries" : "keeps after the cut")
+                    + ": played once instead");
             return new Prepared(data, YmxFormat.SAMPLE_ONE_SHOT);
         }
         return new Prepared(data, start);
@@ -554,8 +561,15 @@ public final class YmrEffects {
      * disagree the code would still be armed on the frame the skip lifts,
      * and the sample number sitting in the volume register would be written to
      * the chip as a volume.
+     *
+     * <p>A looped sample has no end of its own to compute: it plays until the
+     * source stops the timer, so it stays armed. The two computations agree on
+     * that too, {@code EffectScript.drum} holding the skip for the same reason.
      */
     private int armed(int sample, int prescaler, int counter) {
+        if (samples[sample].loopStart() != YmxFormat.SAMPLE_ONE_SHOT) {
+            return FOREVER;
+        }
         long ticks = samples[sample].data().length + 1L;
         long divisor = (long) Tune.prescaler(prescaler & 7) * counter;
         long scaled = ticks * divisor * source.frameRate() + Tune.MFP_CLOCK / 16;

@@ -28,17 +28,19 @@ each ring and no bookkeeping. So the conversion's shape is:
 stream once, from the start, and hands on the flat per-frame view. The pops
 become frames.
 
-The effect vocabularies then line up one to one: both formats hang the same
-three tricks off an MFP timer, and each pair is the same effect for the same
-reason.
+The .YMR's whole effect vocabulary then maps into the engine's: three of the
+four kinds, hung off an MFP timer the same way, each pair the same effect for
+the same reason. The fourth, the wave stream - YM's Sinus-SID - no .YMR
+names.
 
 * **A RhYMe PWM is a toggle stream** - what YM calls a SID voice. Both write
   one voice's volume register from a timer interrupt at audio rate,
   alternating a level with zero, and neither touches the mixer for it, so the
   values chop the signal the voice's own generators make rather than
   replacing it. Both take the loud level from what the song last set on that
-  voice: RhYMe's handler toggles between the shadow volume and zero, and the
-  toggle tick reads its level out of `R(8+voice)`. Same effect, same
+  voice: RhYMe's handler toggles between the shadow volume and zero, and a
+  toggle stream takes its level from `R(8+voice)`, patched into the tick when
+  the stream arms and again when the level moves. Same effect, same
   parameter, same place - which is why the converter writes nothing for a PWM.
 * **A RhYMe Sample is a PCM stream** - a digidrum. Both walk a block of 4-bit
   levels into the voice's volume register, one byte a tick, at the rate the
@@ -55,7 +57,8 @@ reason.
   where each format FILES the shape - RhYMe in its own copy of R13, a YM dump
   in a voice's spare nibble - and the player reads neither place: the front
   end resolves it and stream X carries it. So nothing is written over a
-  volume register for an RTE either.
+  volume register for an RTE either. A .YMR that arms an RTE before it has
+  popped any shape carries `$08`, the value the format's own player assumes.
 
 Two more correspondences say why the register vector needs so little done to it.
 
@@ -103,8 +106,10 @@ where a code byte CHANGES, so bit 3 of the code is flipped on every sample
 trigger, and two pops of one sample at one rate become two different codes
 and two starts.
 
-<!-- The figures in this section are re-measured by the rig (ymx/test/rig.sh),
-     which reads them back out of these sentences: keep the shape of them. -->
+<!-- The rig (ymx/test/rig.sh) re-measures the figures in this paragraph and
+     the opcode counts below, reading them back out of these sentences: keep
+     the shape of them. It does not read the frame rate, the percentage, `C`,
+     or the ring count and ring size apart - only their product. -->
 `ymr/test/deeper.ymr` is 9,984 frames at 50 Hz with a PWM on voice A, a
 sync-buzzer on voice B and a PWM on voice C - three effects at once, which two
 fixed channels could not have carried, and which is the case the four-channel
@@ -120,12 +125,14 @@ that one of the default `C`=24's slots is idle. 4,860 of those 11,348 packed
 bytes are the eleven script streams, which the `.YMR` - 10,488 bytes - does
 not carry:
 RhYMe's player reconciles its three timers every frame from what popped, and
-this one replays decisions taken at pack time. That is the bookkeeping
-difference paid in bytes, and it buys the flat frame.
+this one replays decisions taken at pack time. The `.YMR` spends its own bytes
+on the command stream that drives that reconciliation, so the two files differ
+by 2,176 bytes rather than by 4,860, and those buy the flat frame.
 
 ### What a .ymr gives up
 
-Everything not on this list, and not the loop frame below, is exact, and
+Everything not on this list, not the loop frame below, and not the duplicated
+safe frame an odd length is padded with at `-k2` or `-k4`, is exact, and
 [test/ymr_sweep.sh](../ymx/test/ymr_sweep.sh) says so: it replays a converted
 tune on the real player and compares every write `YMX_play` makes to the sound
 chip, plus which MFP timers it claimed, against its own decoder and replay of
@@ -141,7 +148,7 @@ the rate row below is about.
 |---|---|---|
 | A sample numbered past the 32nd | the sample is dropped, and so is every trigger of it | yes |
 | A sample past 65535 bytes | everything after its 65535th, so the length fits a word | yes |
-| A sample looped from past its own end | it is played once instead | yes |
+| A loop point at or past the sample's length, the cut above included | the loop: each trigger plays the sample once | yes |
 | A sample byte above the 4-bit levels | masked, since bit 7 ends a PCM stream | yes |
 | A rate pop that also moves the effect's parameter | the timer period in flight, truncated | no - see below |
 | A sample the song stops early | one sample byte, held until the next frame | no - the window is sub-frame |
@@ -189,9 +196,9 @@ parameter moved on the same frame as the rate, which is the row.
   condition and the reason it costs no compare per tick. The sample table
   carries a loop word beside each sample, `YMX_init` resolves it to an address
   once, and the tick that meets the end marker moves that address into its own
-  operand instead of stopping the timer. A one-shot says so with `$FFFF`, a
-  value no length can reach - 0 is a real loop point, the sample that repeats
-  whole. The end tick has already written the marker as a level by the time it
+  operand instead of stopping the timer. A one-shot says so with `$FFFF`, one
+  past the largest position a sample can hold - 0 is a real loop point, the
+  sample that repeats whole. The end tick has already written the marker as a level by the time it
   tests it, so a loop costs one sample of silence at the seam and nothing
   else; a one-shot's end path is marker byte, middle volume, timer stopped.
   The alternative - writing the loop region out again and again towards a
@@ -217,7 +224,9 @@ parameter moved on the same frame as the rate, which is the row.
   writes the reload, which the MFP takes at the next underflow. Addressed to
   no voice, it repatches nothing, so it is emitted only on a frame where
   the effect's parameter - a PWM's volume, an RTE's shape - did not change. Where
-  the parameter moved too, the ordinary retune is emitted and the period in
+  the parameter moved too, the ordinary form is emitted - a voice-addressed
+  retune for a PWM, a fresh start for an RTE, whose shape is repatched at the
+  arm - and the period in
   flight is truncated as before.
 * **A sample the song stops early may write one byte more.** A .YMR can end
   a sample before its data runs out - an effect pop of 0, or a different

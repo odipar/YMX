@@ -714,7 +714,8 @@ public final class EffectScript {
         channel.vecVoice = voice;
         skips |= 1 << voice;
         drumOwner[voice] = index;
-        drumEnd[voice] = p + duration(p, code, count, voice);
+        drumEnd[voice] = looped(p, voice) ? STUCK
+                : p + duration(p, code, count, voice);
         emit(p, index, action(opcode, voice, code & 7), count);
     }
 
@@ -842,6 +843,19 @@ public final class EffectScript {
      * held every voice skipped 20ms past its drum: a click the reference
      * player never had.
      */
+    /**
+     * Whether the sample this frame triggers on {@code voice} loops. A
+     * looped sample runs until something else takes the voice, so the skip
+     * that covers it does not lift on the schedule {@link #duration} gives
+     * a one-shot: the frame write would reach a register the loop is still
+     * writing.
+     */
+    private boolean looped(int p, int voice) {
+        int number = tune.registers()[8 + voice][p] & 31;
+        return number < tune.sampleLoops().length
+                && tune.sampleLoops()[number] != YmxFormat.SAMPLE_ONE_SHOT;
+    }
+
     private int duration(int p, int code, int count, int voice) {
         int number = tune.registers()[8 + voice][p] & 31;
         long ticks = tune.samples()[number].length + 1L;

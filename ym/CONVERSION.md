@@ -43,7 +43,8 @@ already disconnected.
 
 A YM frame starts at most two effects, so a YM tune uses two of the format's
 four timer channels - the packer's default puts them on Timers A and D - and
-the other two channels' streams pack to nothing. Timer B and Timer C stay
+the other two channels' streams pack to the format's floor, and the header
+leaves them out of the streams the player decodes. Timer B and Timer C stay
 the host's.
 
 ## What a YM file gives up
@@ -51,21 +52,24 @@ the host's.
 | What changes | What it costs | Reported |
 |---|---|---|
 | A Sinus-SID code | the effect is dropped to idle: nothing plays | yes |
-| A code with a prescaler or count of 0 | dropped to idle: prescaler 0 is the MFP's stopped state, and count 0 is 256 | yes |
+| A code with a prescaler or count of 0 | dropped to idle: prescaler 0 is the MFP's stopped state, a count of 0 is 256, and neither is armed here | yes |
 | A SID or buzzer rate above what a real machine can run | dropped to idle | yes |
 | A drum number with no sample behind it | dropped to idle | yes |
-| A drum above the rate ceiling | bandwidth only: the sample is resampled and every trigger's divisor scaled by the same ratio | yes |
-| A tune whose length is not a whole unit | one duplicated safe frame, inaudible | yes |
+| A drum above the rate ceiling, every trigger taking the exact ratio | bandwidth only: the sample is resampled and each divisor scaled by that ratio | yes |
+| A drum above the rate ceiling, its triggers unable to all take it | the sample halves by a power of two, and a trigger the halved divisor cannot express is dropped to idle | yes |
+| A tune whose length is not a whole unit | up to unit-1 duplicated safe frames, inaudible | yes |
 | A loop frame the wrap cannot enter | the repeat starts at the next frame it can, or at frame 0 where no frame within a second can be entered | yes |
 | A loop frame further from the end than a ring holds | the rings grow to hold the frames between | yes |
+| A loop frame further from the end than the largest ring holds | the repeat starts at the first later frame within a second that a ring reaches back over | yes |
 | A loop frame further from the end than the largest ring holds | every stream is packed as two sections, which costs file bytes | yes |
 | A loop frame with no unit boundary in reach, packing at 2 or 4 bytes a unit | the tune starts over from frame 0, so its opening is heard on every pass | yes |
 | The SID gap model | a choice the file cannot record - see below | no |
 
 The four drop counters are counts of YM effects the front end normalised
-away. They exist because the reference player would not have
-started those codes either: dropping them makes the conversion faithful,
-not lossy.
+away. Three of them are drops the reference player makes too, so those are
+faithful rather than lossy. The rate ceiling is this converter's own: an
+8 MHz 68000 spends a quarter of itself on a 25,600 Hz interrupt, and a code
+above it is dropped whichever way the reference player went.
 
 * **Sinus-SID.** ST-Sound, the format author's own player, reads the effect
   code and runs an empty handler. The packer warns and drops it.
@@ -74,15 +78,18 @@ not lossy.
   resampled to the highest MFP-representable rate under the ceiling, through
   the chip's volume curve and with a windowed-sinc filter, so no aliased
   fold-back brightens it. Every trigger of that drum has its timer divisor
-  scaled by the same exact ratio, so **pitch and duration stay what the dump
-  specified** and only bandwidth falls, by as little as the ceiling allows. A
+  scaled by the same exact ratio, so **pitch stays what the dump specified,
+  and duration to within one output sample of it**, and only bandwidth falls,
+  by as little as the ceiling allows. A
   29 kHz conversion-family drum lands at 25.6 kHz, not at the old half-rate
   14.6. Where a drum's triggers cannot all take the exact ratio, a
-  power-of-two factor is the fallback. `-drumhz` moves the ceiling; each
-  rescue is a note.
+  power-of-two factor is the fallback, and a trigger whose scaled divisor no
+  prescaler and count pair represents is dropped to idle. No file in `test` or
+  in the corpus takes that path: every drum rescued there takes the ratio.
+  `-drumhz` moves the ceiling; each rescue is a note.
 
 * **Drum samples become PSG-ready volume values** - the high nibble of an
-  8-bit sample, or the byte as-is for a 4-bit file. That is exactly the
+  8-bit sample, or the low nibble for a 4-bit file. That is exactly the
   real-hardware mapping in the reference player's source, not a choice made
   here.
 
@@ -90,8 +97,9 @@ not lossy.
   be whole units, because a padded section would decode one extra value into
   the ring and it would be played. A tune with an odd length is padded by
   duplicating a frame that neither writes R13 nor triggers a drum - the chip
-  state is held one inaudible tick longer. Only where no safe frame exists
-  near the end does the packer fall back to `-k1`, and it says so.
+  state is held one inaudible tick longer. Where no safe frame exists in the
+  last 64, a packer that chose the unit itself drops to `-k1` and says so; an
+  explicit `-kK` stops with the length it cannot pack.
 
 * **A tune starts over from the frame its header gives.** A YM header gives
   the frame its own player went back to, and 99 of the corpus's 543 readable
@@ -112,11 +120,13 @@ not lossy.
   The second is how the player gets back to it. A wrap that moves the read
   position in every ring back by the length of a pass reaches only as far as
   a ring holds, so the frames from `L` to the end have to fit one. Where they
-  do not, the rings grow to the smallest size that holds them, which costs
-  workspace and no file bytes.
+  do not, the rings grow to the smallest multiple of `C` that holds them,
+  which costs workspace and no file bytes.
 
-  Where the largest ring the format allows still will not hold them, every
-  stream is packed as two sections instead - the frames before `L`, then the
+  Where the largest ring the format allows still will not hold them, the
+  packer takes the first later frame within the budget that a ring does reach.
+  Where the budget holds none, every stream is packed as two sections instead
+  - the frames before `L`, then the
   frames from `L` on - and the player opens the second at the wrap. That one
   costs file bytes, since the replayed frames are packed on their own and no
   match reaches across the cut: on the three tunes in `test` that take it,
@@ -158,13 +168,15 @@ not lossy.
   because the parameter field sits at one place for all three kinds and a
   buzzer's voice, following the envelope, leaves that nibble spare. The front
   end resolves it and writes the number into stream X; the player reads it
-  there. A tune that arms a buzzer before it has written any shape carries 0,
-  which is a YM dump's own default. See
+  there. Before the first buzzer and the first R13 write, X carries 0, a YM
+  dump's own default; from the frame a buzzer is armed, X carries that voice's
+  nibble, whether or not R13 was ever written. See
   [SPEC.md](../doc/SPEC.md#22-x---the-spare-operands).
 
 ## What it does not do
 
 * **YM2's drums.** Mad Max's forty samples are held in the player, not in the
   file; supporting them means embedding the bank in the converter. Not yet.
-* **YM2, YM3, YM4 and packed `.ym` files.** The reader takes `YM5!` and
-  `YM6!` only, and reports which it found.
+* **YM2, YM3 and YM4 files.** The reader takes `YM5!` and `YM6!` only, and
+  reports which it found. An LHA-archived `.ym` it does read: the wrapper is
+  unpacked first, and every file in `test` is one.

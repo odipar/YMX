@@ -479,6 +479,11 @@ public final class Ymx {
                     effects.tooFast(), effects.tooFast() == 1 ? "" : "s",
                     YmEffects.MAX_TIMER_HZ);
         }
+        if (effects.inert() > 0) {
+            System.out.printf(Locale.ROOT, "Warning: %d effect frame%s dropped: a prescaler"
+                    + " of 0 is the MFP's stopped state, a counter of 0 is 256, and neither"
+                    + " is armed here%n", effects.inert(), effects.inert() == 1 ? "" : "s");
+        }
         if (effects.missingDrum() > 0) {
             System.out.printf(Locale.ROOT, "Warning: %d drum trigger%s dropped: no such sample%n",
                     effects.missingDrum(), effects.missingDrum() == 1 ? "" : "s");
