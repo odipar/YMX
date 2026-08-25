@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.ymx.MkCores;
 import org.ymx.MkSndh;
 import org.ymx.Tools;
@@ -960,6 +961,93 @@ final class PlayerTests {
         return "";
     }
 
+    /**
+     * Every tune the tree pins, played twice: straight through the player,
+     * and through the combine path a release gives a host - the tune inside
+     * an SNDH file built around a real core. The two must write the same
+     * values to the sound chip on every frame.
+     *
+     * <p>The sweeps replay a whole collection against the player and compare
+     * it to a model of the source, so the packer and the player are covered
+     * broadly. The combine path is not the same code: the SNDH glue claims
+     * the timers, sets the replay rate and enters through its own triple,
+     * and until now three synthetic subtunes were all that had gone through
+     * it. These are real tunes, one of them the ring form with its raised
+     * ring and one the cut.
+     *
+     * <p>Nothing is compared against a model here: the straight path is
+     * already held to one by the sweeps, so the two paths agreeing is what
+     * this adds.
+     */
+    static String runSndhCorpus() throws IOException {
+        Path cores = Rig.SCRATCH.resolve("cores");
+        MkCores.cores(cores, false, false);
+        Path core = cores.resolve("ymxsndh-k2" + Tools.binarySuffix() + ".bin");
+        List<Path> pinned = new ArrayList<>();
+        for (String where : new String[] {"ym", "ymr"}) {
+            try (Stream<Path> walk = Files.list(Rig.REPO.resolve(where)
+                    .resolve("test"))) {
+                walk.filter(path -> path.toString().endsWith(".ymx"))
+                        .sorted().forEach(pinned::add);
+            }
+        }
+        if (pinned.isEmpty()) {
+            return "sndh corpus: no pinned .ymx under ym/test or ymr/test";
+        }
+        for (Path tune : pinned) {
+            String problem = sndhAgainstPlayer(tune, core);
+            if (!problem.isEmpty()) {
+                return problem;
+            }
+        }
+        return "";
+    }
+
+    /** One pinned tune down both paths, frame by frame. */
+    private static String sndhAgainstPlayer(Path tune, Path core)
+            throws IOException {
+        byte[] packed = Files.readAllBytes(tune);
+        String name = tune.getFileName().toString();
+        int frames = header(packed, 8, 4);
+        int budget = Math.min(frames + 40, 400);
+
+        Player straight = new Player(packed, 2);
+        if (straight.init() != 0) {
+            return "sndh corpus: " + name + ": YMX_init rejected the tune";
+        }
+        Path out = Rig.SCRATCH.resolve("corpus.sndh");
+        MkSndh.build(new MkSndh.Options(out, List.of(tune), "Rig", null, null,
+                false, true), core);
+        Sndh combined = new Sndh(Files.readAllBytes(out));
+        String problem = combined.call(0, 1);
+        if (!problem.isEmpty()) {
+            return "sndh corpus: " + name + ": " + problem;
+        }
+
+        for (int f = 0; f < budget; f++) {
+            Player.Frame one = straight.frame();
+            Sndh.Frame two = combined.frame();
+            if (!two.problem().isEmpty()) {
+                return "sndh corpus: " + name + " frame " + f + ": "
+                        + two.problem();
+            }
+            if (one.result() == -1) {
+                break;
+            }
+            Map<Integer, Integer> want = new HashMap<>();
+            for (Player.Pair pair : one.writes()) {
+                want.put(pair.register(), pair.value());
+            }
+            if (!want.equals(two.writes())) {
+                return "sndh corpus: " + name + " frame " + f
+                        + ": the player wrote " + want
+                        + " and the SNDH core wrote " + two.writes();
+            }
+        }
+        combined.call(4, 0xD0D0D0D0L);
+        return "";
+    }
+
     /** One core, combined with tunes packed at its own unit size and
      * played. The core is given rather than resolved from {@code dist/},
      * which is the only way to reach the variants a release carries. */
@@ -1193,6 +1281,8 @@ final class PlayerTests {
                 "the SNDH container       (subtunes, handback, re-init)");
         failures += report(runSndhEveryCore(),
                 "every published core     (3 units x monitor x mask)");
+        failures += report(runSndhCorpus(),
+                "the pinned tunes combined (both paths, same chip writes)");
         failures += report(runShapeSource(),
                 "the retrigger shape      (both sources, off the patched tick)");
         for (boolean perf : new boolean[] {false, true}) {
