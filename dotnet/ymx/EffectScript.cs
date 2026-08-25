@@ -506,7 +506,8 @@ namespace Ymx
             channel.VecVoice = voice;
             skips |= 1 << voice;
             drumOwner[voice] = index;
-            drumEnd[voice] = p + Duration(p, code, count, voice);
+            drumEnd[voice] = Looped(p, voice) ? Stuck
+                    : p + Duration(p, code, count, voice);
             Emit(p, index, Action(opcode, voice, code & 7), count);
         }
 
@@ -604,6 +605,18 @@ namespace Ymx
         /// <summary>A sample's length in frames, rounded so the reopen is
         /// never early: the sample plus its marker tick at the timer rate,
         /// plus a sixteenth of a frame for the arming phase.</summary>
+        /// <summary>Whether the sample this frame triggers on voice loops. A
+        /// looped sample runs until something else takes the voice, so the
+        /// skip that covers it does not lift on the schedule Duration gives a
+        /// one-shot: the frame write would reach a register the loop is still
+        /// writing.</summary>
+        private bool Looped(int p, int voice)
+        {
+            int number = tune.Registers[8 + voice][p] & 31;
+            return number < tune.SampleLoops.Length
+                    && tune.SampleLoops[number] != YmxFormat.SampleOneShot;
+        }
+
         private int Duration(int p, int code, int count, int voice)
         {
             int number = tune.Registers[8 + voice][p] & 31;

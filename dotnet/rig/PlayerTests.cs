@@ -1162,6 +1162,96 @@ namespace Rig
             return CheckSndh(File.ReadAllBytes(outFile), signatures);
         }
 
+        /// <summary>A looped sample owns its voice until something stops the
+        /// timer. A one-shot's voice comes back to the frame write at the
+        /// sample's computed end; a looped sample has no such end, so the skip
+        /// that covers it has to hold. Both front ends compute that window and
+        /// both once read the sample's length alone, so a looped sample's voice
+        /// rejoined the frame write one pass in while the loop kept writing the
+        /// same register.</summary>
+        public static string RunLoopedSample()
+        {
+            string problem = SampleVoiceReturns(false, "a one-shot");
+            if (problem.Length != 0)
+            {
+                return problem;
+            }
+            return SampleVoiceReturns(true, "a looped sample");
+        }
+
+        /// <summary>Whether voice A's volume register is written again after
+        /// the sample's one-shot window, which is what the skip lifting looks
+        /// like from the chip's side.</summary>
+        private static string SampleVoiceReturns(bool looped, string what)
+        {
+            int frames = 60;
+            var pops = new int[frames][];
+            for (int f = 0; f < frames; f++)
+            {
+                pops[f] = new int[0];
+            }
+            pops[0] = new[] {5, 6, 11, 12, 13};
+            for (int f = 5; f < frames; f += 5)
+            {
+                pops[f] = new[] {6};
+            }
+            var volumes = new byte[1 + (frames - 1) / 5];
+            for (int i = 0; i < volumes.Length; i++)
+            {
+                volumes[i] = (byte) (i % 16);
+            }
+            var levels = new byte[64];
+            for (int i = 0; i < levels.Length; i++)
+            {
+                levels[i] = (byte) (1 + i % 15);
+            }
+            byte[] image = Rig.YmrImage(frames, pops,
+                    new Dictionary<int, byte[]>
+                    {
+                        [5] = new byte[] {0x38},
+                        [6] = volumes,
+                        [11] = new byte[] {2},
+                        [12] = new byte[] {7, 11},
+                        [13] = new byte[] {0},
+                    }, 0,
+                    new Rig.SampleBlock(levels, looped, looped ? 1 : 0));
+
+            var player = new Player(Rig.PackYmr(image, 960, 24));
+            if (player.Init() != 0)
+            {
+                return "looped sample: YMX_init rejected " + what;
+            }
+            bool returned = false;
+            for (int f = 0; f < 40; f++)
+            {
+                Player.Frame frame = player.PlayFrame();
+                if (f < 8)
+                {
+                    continue;
+                }
+                foreach (Player.Pair pair in frame.Writes)
+                {
+                    if (pair.Register == 8)
+                    {
+                        returned = true;
+                    }
+                }
+            }
+            if (looped && returned)
+            {
+                return "looped sample: voice A's volume was written again while"
+                        + " the sample was still looping - the skip lifted on"
+                        + " the one-shot's window";
+            }
+            if (!looped && !returned)
+            {
+                return "looped sample: the control failed - " + what + "'s voice"
+                        + " never came back to the frame write, so this check"
+                        + " would pass whatever the looped case did";
+            }
+            return "";
+        }
+
         /// <summary>The three subtunes' register-2 values, one per frame.
         /// Subtune 2 is shorter than the window played below, so it reaches
         /// its own wrap while the others do not.</summary>
@@ -1518,6 +1608,8 @@ namespace Rig
                     "every published core     (3 units x monitor x mask)");
             failures += Report(RunSndhCorpus(),
                     "the pinned tunes combined (both paths, same chip writes)");
+            failures += Report(RunLoopedSample(),
+                    "a looped sample          (the skip holds, the voice does not)");
             failures += Report(RunShapeSource(),
                     "the retrigger shape      (both sources, off the patched tick)");
             foreach (bool perf in new[] {false, true})

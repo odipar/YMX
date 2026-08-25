@@ -520,7 +520,7 @@ namespace Ymr
                 "A conversion is not a copy, and the few things this one",
                 "has to change it counts and reports as it goes. What they",
                 "are and what each costs is \"What a .ymr gives up\" in",
-                "doc/CONVERSION.md."}));
+                "ymr/CONVERSION.md."}));
             Environment.Exit(1);
         }
 

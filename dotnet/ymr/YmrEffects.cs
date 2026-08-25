@@ -39,6 +39,12 @@ namespace Ymr
         /// <summary>A YMX sample table entry stores its length in a word.</summary>
         private const int MaxSampleBytes = 65535;
 
+        /// <summary>The window a looped sample stays armed for: it has no end
+        /// of its own, so it stays armed until the source stops the timer.
+        /// Large enough that no tune reaches it, small enough that a frame
+        /// added to it stays an int.</summary>
+        private const int Forever = 1 << 30;
+
         private const int REnvelopeShape = 13;
         private const int RVolumeA = 8;
 
@@ -188,8 +194,10 @@ namespace Ymr
             if (start >= data.Length)
             {
                 Note("sample " + index + " is marked looped from " + start
-                        + ", which is past its " + data.Length
-                        + " bytes: played once instead");
+                        + ", which is at or past the " + data.Length + " bytes it "
+                        + (data.Length == block.Data.Length
+                                ? "carries" : "keeps after the cut")
+                        + ": played once instead");
                 return new Prepared(data, YmxFormat.SampleOneShot);
             }
             return new Prepared(data, start);
@@ -371,6 +379,10 @@ namespace Ymr
         /// back.</summary>
         private int Armed(int sampleAt, int prescaler, int counter)
         {
+            if (samples[sampleAt].LoopStart != YmxFormat.SampleOneShot)
+            {
+                return Forever;
+            }
             long ticks = samples[sampleAt].Data.Length + 1L;
             long divisor = (long) Tune.Prescaler(prescaler & 7) * counter;
             long scaled = ticks * divisor * source.FrameRate + Tune.MfpClock / 16;

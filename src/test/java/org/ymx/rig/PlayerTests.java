@@ -889,6 +889,84 @@ final class PlayerTests {
     }
 
     /**
+     * A looped sample owns its voice until something stops the timer. A
+     * one-shot's voice comes back to the frame write at the sample's computed
+     * end; a looped sample has no such end, so the skip that covers it has to
+     * hold. Both front ends compute that window - {@code YmrEffects.armed}
+     * and {@code EffectScript.duration} - and both once read the sample's
+     * length alone, so a looped sample's voice rejoined the frame write one
+     * pass in while the loop kept writing the same register.
+     *
+     * <p>Two tunes differing only in the sample's loop flag, the timer never
+     * stopped: the one-shot's volume register comes back, the looped one's
+     * does not.
+     */
+    static String runLoopedSample() throws IOException {
+        String problem = sampleVoiceReturns(false, "a one-shot");
+        if (!problem.isEmpty()) {
+            return problem;
+        }
+        return sampleVoiceReturns(true, "a looped sample");
+    }
+
+    /** Whether voice A's volume register is written again after the sample's
+     * one-shot window, which is what the skip lifting looks like from the
+     * chip's side. */
+    private static String sampleVoiceReturns(boolean looped, String what) {
+        int frames = 60;
+        int[][] pops = new int[frames][];
+        Arrays.fill(pops, new int[0]);
+        // frame 0 arms Timer A on sample 0; nothing ever stops it
+        pops[0] = new int[] {5, 6, 11, 12, 13};
+        for (int f = 5; f < frames; f += 5) {   // voice A's level moves, so a
+            pops[f] = new int[] {6};            // frame write would be visible
+        }
+        byte[] volumes = new byte[1 + (frames - 1) / 5];
+        for (int i = 0; i < volumes.length; i++) {
+            volumes[i] = (byte) (i % 16);
+        }
+        byte[] levels = new byte[64];
+        for (int i = 0; i < levels.length; i++) {
+            levels[i] = (byte) (1 + i % 15);
+        }
+        byte[] image = Rig.ymrImage(frames, pops, Map.of(
+                5, new byte[] {0x38},                   // mixer
+                6, volumes,                             // voice A's level
+                11, new byte[] {2},                     // Timer A runs a sample
+                12, new byte[] {7, (byte) 11},          // prescaler 7, count 11
+                13, new byte[] {0}),                    // sample 0
+                0, new Rig.SampleBlock(levels, looped, looped ? 1 : 0));
+
+        Player player = new Player(Rig.packYmr(image, 960, 24));
+        if (player.init() != 0) {
+            return "looped sample: YMX_init rejected " + what;
+        }
+        boolean returned = false;
+        for (int f = 0; f < 40; f++) {
+            Player.Frame frame = player.frame();
+            if (f < 8) {                        // the window is three frames;
+                continue;                       // give the release room
+            }
+            for (Player.Pair pair : frame.writes()) {
+                if (pair.register() == 8) {     // voice A's volume
+                    returned = true;
+                }
+            }
+        }
+        if (looped && returned) {
+            return "looped sample: voice A's volume was written again while the"
+                    + " sample was still looping - the skip lifted on the"
+                    + " one-shot's window";
+        }
+        if (!looped && !returned) {
+            return "looped sample: the control failed - " + what + "'s voice"
+                    + " never came back to the frame write, so this check"
+                    + " would pass whatever the looped case did";
+        }
+        return "";
+    }
+
+    /**
      * The three subtunes' register-2 values, one per frame. Subtune 2 is
      * shorter than the window played below, so it reaches its own wrap
      * while the others do not: nothing a wrapped subtune leaves in the
@@ -1283,6 +1361,8 @@ final class PlayerTests {
                 "every published core     (3 units x monitor x mask)");
         failures += report(runSndhCorpus(),
                 "the pinned tunes combined (both paths, same chip writes)");
+        failures += report(runLoopedSample(),
+                "a looped sample          (the skip holds, the voice does not)");
         failures += report(runShapeSource(),
                 "the retrigger shape      (both sources, off the patched tick)");
         for (boolean perf : new boolean[] {false, true}) {

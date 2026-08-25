@@ -483,6 +483,13 @@ namespace Ym6
                         + " dropped: timer above {2} Hz", effects.TooFast,
                         effects.TooFast == 1 ? "" : "s", YmEffects.MaxTimerHz));
             }
+            if (effects.Inert > 0)
+            {
+                Console.WriteLine(string.Format("Warning: {0} effect frame{1}"
+                        + " dropped: a prescaler of 0 is the MFP's stopped state,"
+                        + " a counter of 0 is 256, and neither is armed here",
+                        effects.Inert, effects.Inert == 1 ? "" : "s"));
+            }
             if (effects.MissingDrum > 0)
             {
                 Console.WriteLine(string.Format("Warning: {0} drum trigger{1}"
