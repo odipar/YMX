@@ -11,6 +11,37 @@ patch number the binaries carry of their own. The format version is the
 compatibility gate: tunes packed at one format version play on every
 patch of it.
 
+## 0.7.0
+
+The player is 3,412 bytes at unit size 2, where 0.6.0 carried 3,412.
+Format version 0.7: a tune packed at 0.6 has to be repacked from its
+`.ym` source. Nothing in the file's bytes moved but the version word:
+the repack is the whole cost, and the reason for the bump is that the
+document changed under the format.
+
+- **The specification is the release.** Eight runs of the conformance
+  exercise - six at reader level, two at player level - each handed the
+  document to three implementers with no access to any implementation,
+  and each fixed every place where the document made an implementer
+  choose. The last run at each level produced every value byte for byte
+  from the document alone, and the sentences all eight runs asked for
+  are in this version's SPEC.md.
+- **A second reference carries every timer tick.** `MANIFEST.txt`
+  records what each call writes, which checks a reader;
+  `MANIFEST-ticks.txt` records the 286,452 ticks the timers land across
+  the same ten tunes, which checks a player. The tick model is measured
+  against Hatari's MFP, register by register, and the two player-level
+  runs were measured against it.
+- **Every kit tune is packed from a recorded source.** `SOURCES.md`
+  names each tune's `.ym` and options, a test repacks and compares, and
+  this bump repacked the kit from those recipes alone.
+- **The documents were read whole for a human reader**, three passes,
+  under AGENTS.md's rules; every figure in prose is read back by a
+  test.
+
+The binaries are reassembled at the new version and behave as 0.6.0's
+did; the stub is unchanged at 2,878 bytes.
+
 ## 0.6.0
 
 The player is 3,412 bytes at unit size 2, where 0.5.2 carried 3,394.
