@@ -22,8 +22,22 @@ it. Keep `MANIFEST.txt` and the reference dumps back: an implementer who
 can check an answer is not reading the document, and the exercise
 measures the document.
 
-The implementer produces `decode.py`, `SOURCES.md` and `NOTES.md`, described
-in `TASK.md`. Compare their output against the reference, which
+Where several implementers run at once, each needs scratch space of its
+own as well as its own copy of the directory. The fifth run gave all
+three one scratch root; two of them wrote a first decoder to the same
+obvious filename under it, and one read the other's. Give each a
+directory nothing else writes to.
+
+Two things reach an implementer that the copied directory does not
+carry, and both belong in its `SOURCES.md`. The first is what the harness
+puts in its context before the task begins - in this repository
+that is `CLAUDE.md` and `AGENTS.md`, which state prose rules and no
+field, offset or opcode. The second is what it already knows: LZ77
+coding and Elias gamma are general, and an implementer who recognises
+them has not read an implementation.
+
+The implementer produces `decode.py`, `SOURCES.md` and `NOTES.md`,
+described in `TASK.md`. Compare their output against the reference, which
 `ymx/test/rig.sh` regenerates from the player. Where each tune comes from
 is [SOURCES.md](SOURCES.md) - a `.ym` under `ym/test` and the options it
 was packed with, which `ConformanceSourcesTest` repacks and compares.
@@ -40,15 +54,30 @@ Three tests, all three of which must hold:
    a byte is a sentence the document owes its implementer, whether or
    not the guess landed on the reference.
 
-Four runs have been measured, against the kit as it then stood: two of
-its tunes have since been replaced by different ones, built from sources
-in the tree, and the entries below are that earlier kit's. The first run
-failed all three tests. The second and third passed the second test and
-failed the other two, on one sentence and one guess each time. The fourth
-passed the first two: three implementers produced 53,055 entries with no
-value, no result and no register's presence differing from the player
-anywhere, and left six places where the document made an implementer
-choose. The kit now comes to 29,406 entries.
+Five runs have been measured. The first four ran against an earlier kit:
+two of its tunes have since been replaced by different ones, built from
+sources in the tree. The first run failed all three tests. The second and
+third passed the second test and failed the other two, on one sentence and
+one guess each time. The fourth passed the first two: three implementers
+produced 53,055 entries with no value, no result and no register's
+presence differing from the player anywhere, and left six places where the
+document made an implementer choose.
+
+The fifth ran against this kit, which comes to 29,406 entries. Three
+implementers each produced all 29,406, byte for byte the reference on all
+ten tunes: no value, no result and no register's presence differed
+anywhere. Two of the three passed the second test. The third read another
+implementer's decoder out of a scratch directory the harness gave all
+three, and reported it; its own decoder was decoding every section a run
+earlier, and the leak is the harness's to fix rather than that
+implementer's to answer for.
+
+Eight entries were marked "decides output", five distinct places: three in
+Appendix A.3's bitstream - the flag bit against the two class bits, what
+sets the last offset, and what the first block keeps - one on a
+container's output bytes being the stream's values at a unit size above 1,
+and one on which of the end-of-pass state a reader holds. The document
+carries all five now.
 
 ## What the tunes cover
 
