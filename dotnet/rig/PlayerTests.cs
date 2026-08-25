@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
+using Ymx;
 
 namespace Rig
 {
@@ -949,48 +950,17 @@ namespace Rig
             // reaches its own wrap while the others do not: nothing a
             // wrapped subtune leaves in the workspace survives the switch
             // to the next.
-            int[] lengths = {200, 20, 200};
-            int[][] signatures = new int[3][];
-            for (int s = 0; s < 3; s++)
-            {
-                signatures[s] = new int[lengths[s]];
-            }
-            for (int f = 0; f < lengths[0]; f++)
-            {
-                signatures[0][f] = (3 * f + 1) & 0xFF;
-            }
-            for (int f = 0; f < lengths[1]; f++)
-            {
-                signatures[1][f] = (0x55 + 7 * f) & 0xFF;
-            }
-            for (int f = 0; f < lengths[2]; f++)
-            {
-                signatures[2][f] = (0xA0 + f) & 0xFF;
-            }
+            int[][] signatures = SndhSignatures();
             Directory.CreateDirectory(Rig.Scratch);
             List<string> command = Rig.OwnTool("mksndh");
             command.Add("-tRig");
             command.Add(Path.Combine(Rig.Scratch, "sndh_test.sndh"));
             for (int i = 0; i < 3; i++)
             {
-                int frames = lengths[i];
-                byte[][] values = NewValues(frames);
-                for (int f = 0; f < frames; f++)
-                {
-                    values[2][f] = (byte) signatures[i][f];
-                    values[13][f] = (byte) GenYm.NoEnvelopeChange;
-                }
-                for (int f = 5; f < frames; f++)
-                {                           // a held SID on voice A, so the
-                    values[1][f] |= 0x10;   // tune claims channel 0's timer
-                    values[6][f] |= 1 << 5;
-                    values[14][f] = 100;
-                    values[8][f] = 10;
-                }
                 string[] extra = i == 2 ? new[] {"-timersB"} : new string[0];
                 string tune = Path.Combine(Rig.Scratch,
                         "sndh_tune" + (i + 1) + ".ymx");
-                File.WriteAllBytes(tune, Rig.Pack(GenYm.Ym6File(frames, values),
+                File.WriteAllBytes(tune, Rig.Pack(SndhSource(signatures[i]),
                         960, 24, true, 2, extra));
                 command.Add(tune);
             }
@@ -1022,6 +992,118 @@ namespace Rig
                 }
             }
 
+            return CheckSndh(blob, signatures);
+        }
+
+        /// <summary>Every core a release publishes, each playing a tune.
+        /// RunSndh covers the one core dist/ holds for the default flags;
+        /// the twelve a release carries are three unit sizes by the raster
+        /// monitor and the frame mask. The monitor paints a colour register
+        /// and the mask changes what the frame write sits behind, so neither
+        /// reaches the sound chip: every core plays the same values.</summary>
+        public static string RunSndhEveryCore()
+        {
+            string cores = Path.Combine(Rig.Scratch, "cores");
+            Directory.CreateDirectory(cores);
+            foreach (bool perf in new[] {false, true})
+            {
+                foreach (bool nomask in new[] {false, true})
+                {
+                    MkCores.Cores(cores, perf, nomask);
+                    foreach (int unit in new[] {1, 2, 4})
+                    {
+                        string name = "ymxsndh-k" + unit
+                                + (perf ? "-perf" : "")
+                                + (nomask ? "-nomask" : "")
+                                + Tools.BinarySuffix() + ".bin";
+                        string problem = SndhOnCore(Path.Combine(cores, name),
+                                unit, perf, !nomask);
+                        if (problem.Length != 0)
+                        {
+                            return name + ": " + problem;
+                        }
+                    }
+                }
+            }
+            return "";
+        }
+
+        /// <summary>One core, combined with tunes packed at its own unit
+        /// size and played. The core is given rather than resolved from
+        /// dist/, which is the only way to reach a release's variants.
+        /// </summary>
+        private static string SndhOnCore(string core, int unit, bool perf,
+                bool maskBurst)
+        {
+            int[][] signatures = SndhSignatures();
+            var tunes = new List<string>();
+            for (int i = 0; i < 3; i++)
+            {
+                string tune = Path.Combine(Rig.Scratch,
+                        "core_tune" + (i + 1) + ".ymx");
+                File.WriteAllBytes(tune, Rig.Pack(SndhSource(signatures[i]),
+                        960, 24, true, unit,
+                        i == 2 ? new[] {"-timersB"} : new string[0]));
+                tunes.Add(tune);
+            }
+            string outFile = Path.Combine(Rig.Scratch, "core_test.sndh");
+            MkSndh.Build(new MkSndh.Options(outFile, tunes, "Rig", null, null,
+                    perf, maskBurst), core);
+            return CheckSndh(File.ReadAllBytes(outFile), signatures);
+        }
+
+        /// <summary>The three subtunes' register-2 values, one per frame.
+        /// Subtune 2 is shorter than the window played below, so it reaches
+        /// its own wrap while the others do not.</summary>
+        private static int[][] SndhSignatures()
+        {
+            int[] lengths = {200, 20, 200};
+            int[][] signatures = new int[3][];
+            for (int s = 0; s < 3; s++)
+            {
+                signatures[s] = new int[lengths[s]];
+            }
+            for (int f = 0; f < lengths[0]; f++)
+            {
+                signatures[0][f] = (3 * f + 1) & 0xFF;
+            }
+            for (int f = 0; f < lengths[1]; f++)
+            {
+                signatures[1][f] = (0x55 + 7 * f) & 0xFF;
+            }
+            for (int f = 0; f < lengths[2]; f++)
+            {
+                signatures[2][f] = (0xA0 + f) & 0xFF;
+            }
+            return signatures;
+        }
+
+        /// <summary>One subtune as a YM6 file: its own value in register 2
+        /// each frame, and a held SID on voice A from frame 5, so the tune
+        /// claims a timer.</summary>
+        private static byte[] SndhSource(int[] signature)
+        {
+            int frames = signature.Length;
+            byte[][] values = NewValues(frames);
+            for (int f = 0; f < frames; f++)
+            {
+                values[2][f] = (byte) signature[f];
+                values[13][f] = (byte) GenYm.NoEnvelopeChange;
+            }
+            for (int f = 5; f < frames; f++)
+            {
+                values[1][f] |= 0x10;
+                values[6][f] |= 1 << 5;
+                values[14][f] = 100;
+                values[8][f] = 10;
+            }
+            return GenYm.Ym6File(frames, values);
+        }
+
+        /// <summary>One built SNDH blob, driven through its three entries.
+        /// </summary>
+        private static string CheckSndh(byte[] blob, int[][] signatures)
+        {
             var player = new Sndh(blob);
             // sentinels for every timer's state: what a claim must hand
             // back, and what an unclaimed timer must never touch
@@ -1124,6 +1206,7 @@ namespace Rig
             player.Call(4, 0xD0D0D0D0);
             return "";
         }
+
 
         private static string PlayAndCheck(Sndh player, int[][] signatures,
                 int which)
@@ -1321,6 +1404,8 @@ namespace Rig
 
             failures += Report(RunSndh(),
                     "the SNDH container       (subtunes, handback, re-init)");
+            failures += Report(RunSndhEveryCore(),
+                    "every published core     (3 units x monitor x mask)");
             failures += Report(RunShapeSource(),
                     "the retrigger shape      (both sources, off the patched tick)");
             foreach (bool perf in new[] {false, true})
