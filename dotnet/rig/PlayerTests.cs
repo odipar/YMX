@@ -1025,6 +1025,119 @@ namespace Rig
             return "";
         }
 
+        /// <summary>Every tune the tree pins, played twice: straight
+        /// through the player, and through the combine path a release gives
+        /// a host - the tune inside an SNDH file built around a real core.
+        /// The two must write the same values to the sound chip on every
+        /// frame. The sweeps hold the straight path to a model of the
+        /// source, so the two paths agreeing is what this adds.</summary>
+        public static string RunSndhCorpus()
+        {
+            string cores = Path.Combine(Rig.Scratch, "cores");
+            MkCores.Cores(cores, false, false);
+            string core = Path.Combine(cores,
+                    "ymxsndh-k2" + Tools.BinarySuffix() + ".bin");
+            var pinned = new List<string>();
+            foreach (string where in new[] {"ym", "ymr"})
+            {
+                string dir = Path.Combine(Rig.Repo, where, "test");
+                var found = new List<string>(Directory.GetFiles(dir, "*.ymx"));
+                found.Sort(StringComparer.Ordinal);
+                pinned.AddRange(found);
+            }
+            if (pinned.Count == 0)
+            {
+                return "sndh corpus: no pinned .ymx under ym/test or ymr/test";
+            }
+            foreach (string tune in pinned)
+            {
+                string problem = SndhAgainstPlayer(tune, core);
+                if (problem.Length != 0)
+                {
+                    return problem;
+                }
+            }
+            return "";
+        }
+
+        /// <summary>One pinned tune down both paths, frame by frame.</summary>
+        private static string SndhAgainstPlayer(string tune, string core)
+        {
+            byte[] packed = File.ReadAllBytes(tune);
+            string name = Path.GetFileName(tune);
+            int frames = Header(packed, 8, 4);
+            int budget = Math.Min(frames + 40, 400);
+
+            var straight = new Player(packed, 2);
+            if (straight.Init() != 0)
+            {
+                return "sndh corpus: " + name + ": YMX_init rejected the tune";
+            }
+            string outFile = Path.Combine(Rig.Scratch, "corpus.sndh");
+            MkSndh.Build(new MkSndh.Options(outFile, new List<string> {tune},
+                    "Rig", null, null, false, true), core);
+            var combined = new Sndh(File.ReadAllBytes(outFile));
+            string problem = combined.Call(0, 1);
+            if (problem.Length != 0)
+            {
+                return "sndh corpus: " + name + ": " + problem;
+            }
+
+            for (int f = 0; f < budget; f++)
+            {
+                Player.Frame one = straight.PlayFrame();
+                Sndh.Frame two = combined.PlayFrame();
+                if (two.Problem.Length != 0)
+                {
+                    return "sndh corpus: " + name + " frame " + f + ": "
+                            + two.Problem;
+                }
+                if (one.Result == -1)
+                {
+                    break;
+                }
+                var want = new Dictionary<int, int>();
+                foreach (Player.Pair pair in one.Writes)
+                {
+                    want[pair.Register] = pair.Value;
+                }
+                if (want.Count != two.Writes.Count)
+                {
+                    return Divergence(name, f, want, two.Writes);
+                }
+                foreach (KeyValuePair<int, int> wrote in want)
+                {
+                    if (!two.Writes.TryGetValue(wrote.Key, out int got)
+                            || got != wrote.Value)
+                    {
+                        return Divergence(name, f, want, two.Writes);
+                    }
+                }
+            }
+            combined.Call(4, 0xD0D0D0D0);
+            return "";
+        }
+
+        private static string Divergence(string name, int frame,
+                Dictionary<int, int> want, Dictionary<int, int> got)
+        {
+            return "sndh corpus: " + name + " frame " + frame
+                    + ": the player wrote " + Registers(want)
+                    + " and the SNDH core wrote " + Registers(got);
+        }
+
+        private static string Registers(Dictionary<int, int> writes)
+        {
+            var keys = new List<int>(writes.Keys);
+            keys.Sort();
+            var text = new List<string>();
+            foreach (int key in keys)
+            {
+                text.Add(key + "=" + writes[key]);
+            }
+            return "{" + string.Join(", ", text) + "}";
+        }
+
         /// <summary>One core, combined with tunes packed at its own unit
         /// size and played. The core is given rather than resolved from
         /// dist/, which is the only way to reach a release's variants.
@@ -1403,6 +1516,8 @@ namespace Rig
                     "the SNDH container       (subtunes, handback, re-init)");
             failures += Report(RunSndhEveryCore(),
                     "every published core     (3 units x monitor x mask)");
+            failures += Report(RunSndhCorpus(),
+                    "the pinned tunes combined (both paths, same chip writes)");
             failures += Report(RunShapeSource(),
                     "the retrigger shape      (both sources, off the patched tick)");
             foreach (bool perf in new[] {false, true})
