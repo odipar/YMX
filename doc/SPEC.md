@@ -123,7 +123,8 @@ At a unit size above 1 (§1.4), `C` and `O` are multiples of the unit size.
 Where a tune's own length falls short of a multiple, a writer raises `O`
 by duplicating a frame near the end, the same frame in every stream, and
 `L` moves with the frame it points at. The added frames are played like
-any other, so the last of them is frame `O - 1`.
+any other, so the last of them is frame `O - 1`. Nothing marks an added
+frame, so a reader reads `O` frames and no fewer.
 
 960/24 is the default pair, valid for every tune that leaves channel 3
 idle.
@@ -367,7 +368,7 @@ clock, and cannot be driven from a Timer C interrupt.
 | 0 | `RESUME` | re-enable a released toggle stream's interrupt. Flags: 1 = reload the count, 2 = reload the volume. Phase continued through the gap | none |
 | 1 | `HOLD` | update a running stream. Flags: 1 = reload the count from P, 2 = reload the toggle stream's volume, 4 = reload the retrigger stream's shape. Emitted only on frames where a value changed | none |
 | 2 | `RELEASE` | stop this channel's timer. Bit 0 set: disable the interrupt instead, leaving the timer counting | none |
-| 3 | `START_TOGGLE` | start a toggle stream: select, volume, vector := the loud half, then a full program | `R(8+v) := 0` |
+| 3 | `START_TOGGLE` | start a toggle stream: select, volume, vector := the loud half, then a full program | `R(8+v) := 0`, a skipped voice included |
 | 4 | `RETUNE` | a new rate for a running stream, keeping its place in the cycle. See §3.1 | none |
 | 5 | `START_RETRIGGER` | start a retrigger stream: shape, vector := the retrigger tick, then a full program | none |
 | 6 | `START_PCM` | a trigger, fresh or repeated: sample table lookup, select, vector, full program | none |
@@ -620,8 +621,9 @@ Where a frame writes one register twice, the action's write follows the
 frame write, and the register holds the action's value.
 
 **What a call reports.** Each call reports one value. A call that plays a
-frame before `O - 1` reports 0. The call that plays frame `O - 1` reports
-1 where flag bit 0 is set, and 0 where it is clear. Where flag bit 0 is
+frame before `O - 1` reports 0. Every call that plays frame `O - 1` reports
+1 where flag bit 0 is set, and 0 where it is clear, on the first pass and
+on every later one. Where flag bit 0 is
 clear, the next call plays no frame, writes no register and reports -1.
 The run has ended at that call: every later call repeats the report, and a
 record of the run ends with that call's entry.
@@ -634,7 +636,8 @@ A tune with flag bit 0 set plays `[0, O)` once and `[L, O)` for ever
 after. `L` is 0 where the whole tune repeats.
 
 Frames are played 0 to `O - 1`, then `L` to `O - 1` on every later pass,
-and frame `f` takes each stream's `f`-th value. The two forms below reach
+and frame `f` takes each stream's `f`-th value. `L` may be `O - 1`, and
+every later pass is then one frame long. The two forms below reach
 that sequence through a ring of `N` bytes. Neither changes which value a
 frame reads.
 
@@ -809,7 +812,9 @@ pass.
 
 A per-frame register dump written by a reader carries the frame's values
 alone: a voice a timer stream owns holds no level there, because the
-levels it plays are a tick's.
+levels it plays are a tick's. `START_TOGGLE`'s `R(8+v) := 0` is one of the
+frame's own writes and stands in the dump, on a skipped voice too; the
+levels the stream plays afterwards are a tick's.
 
 What it leaves unread is what a timer writes between frames. A timer
 stream's values reach the chip from a tick, at a rate §5 sets, and a
@@ -847,8 +852,8 @@ ST4's; version 4 is the version stated here.
 | 16 | 4 | where stream D starts |
 
 Stream A begins at offset 20. The three offsets locate the others, so a
-stream's length is the distance to the next one and stream A is padded to
-an even length.
+stream's length is the distance to the next one, and the bytes between the
+last byte stream A uses and stream B's first are padding.
 
 ### A.2 The four streams
 
@@ -872,11 +877,15 @@ leading 1 is written after a `1` marker bit, most significant first, and a
 | match at the last offset | `gamma(length)`, then `length` units copied from the current offset |
 | match at a new offset | two class bits, one value from C or D, then `gamma(length - 1)` |
 
+A match copies one unit at a time, so a distance shorter than the length
+repeats the units the match has already written, and a distance of one unit
+fills the match with that one unit.
+
 The first block is literals and carries no flag bit. After literals, a `0`
-bit starts a match at the last offset and a `1` a match at a new offset, so
-two literal runs never follow each other. After a match, a `0` starts
-literals and a `1` a match at a new offset. The two class bits of A.4
-follow that `1`, so a match at a new offset opens with three bits.
+bit starts a match at the last offset and a `1` the two class bits of A.4,
+which give a match at a new offset or the end of the stream. After a match
+of either kind, a `0` starts literals and a `1` those same two class bits.
+Two literal runs never follow each other.
 
 **The last offset is a count of units, and begins at one.** A decoder that
 has read no new offset yet copies from one unit back - `k` bytes - so a
@@ -964,8 +973,13 @@ bytes never reach the chip.
 | 1 | 0 | R0=142 R1=12 R2=238 R3=14 R4=238 R5=14 R6=28 R7=241 R8=12 R9=0 R10=0 R11=0 R12=0 |
 | 2 | 0 | R0=251 R1=4 R2=238 R3=14 R4=238 R5=14 R6=12 R7=241 R8=13 R9=0 R10=0 R11=0 R12=0 |
 | 3 | 1 | R0=89 R1=2 R2=238 R3=14 R4=238 R5=14 R6=12 R7=248 R8=15 R9=0 R10=0 R11=0 R12=0 |
-| 4 | 0 | the frame 0 row again |
+| 4 | 0 | the call 0 row again |
+| 5 | 0 | the call 1 row again |
+| 6 | 0 | the call 2 row again |
+| 7 | 1 | the call 3 row again |
 
 Call 3 plays frame `O - 1` and reports 1, the tune having gone round; call
-4 plays frame 0 again, because `L` is 0. R7's values carry the host's port
+4 plays frame 0 again, because `L` is 0. Call 7 plays frame `O - 1` on the
+second pass and reports 1 as call 3 did: the report is the frame's, not the
+first pass's. R7's values carry the host's port
 bits: the stream's byte for frame 0 is `$38`, and `$38 | $C0` is 248.
