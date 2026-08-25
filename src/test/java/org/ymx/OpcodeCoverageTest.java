@@ -22,7 +22,8 @@ import org.ym6.YmEffects;
  * and no tune exercises. This holds the answer in the build instead. Every
  * opcode a pinned tune reaches must keep being reached, and the ones no
  * tune reaches are named here with the reason, so the list shrinks when
- * someone adds a fixture rather than being rediscovered.
+ * someone adds a fixture rather than being rediscovered. All eight are
+ * reached now, two of them by dumps {@link org.ymx.rig.BuiltTunes} builds.
  *
  * <p>Each tune is compiled twice, under the default gap model and under the
  * resume model {@code -sidresume} selects, because both are packings a user
@@ -36,14 +37,13 @@ final class OpcodeCoverageTest {
             "RETUNE", "START_RETRIGGER", "START_PCM", "START_PCM_PREEMPT");
 
     /**
-     * The opcodes no pinned tune compiles to, and why. Both need a source
-     * that no YM dump provides: a scan of all 544 files in the collection
-     * reaches neither. They exist only as fixtures built by hand in the
-     * rig's effect stage, and a tune carrying one would let this list
-     * shrink.
+     * The opcodes no pinned tune compiles to, and why. The list is empty:
+     * it held {@code START_RETRIGGER} and {@code START_PCM_PREEMPT}, which
+     * no recorded file in the collection reaches, until two built dumps
+     * carried them. It is kept so a new opcode has somewhere to be named
+     * while nothing exercises it.
      */
-    private static final Set<String> UNREACHED =
-            Set.of("START_RETRIGGER", "START_PCM_PREEMPT");
+    private static final Set<String> UNREACHED = Set.of();
 
     @Test
     void everyOpcodeTheTunesReachKeepsBeingReached() throws IOException {

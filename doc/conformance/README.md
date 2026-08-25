@@ -24,7 +24,9 @@ the document.
 
 The reader produces `decode.py`, `SOURCES.md` and `NOTES.md`, described
 in `TASK.md`. Compare their output against the reference, which
-`ymx/test/rig.sh` regenerates from the player.
+`ymx/test/rig.sh` regenerates from the player. Where each tune comes from
+is [SOURCES.md](SOURCES.md) - a `.ym` under `ym/test` and the options it
+was packed with, which `ConformanceSourcesTest` repacks and compares.
 
 ## What clears the bar
 
@@ -38,12 +40,15 @@ Three tests, all three of which must hold:
    a byte is a sentence the document owes its reader, whether or not the
    guess landed on the reference.
 
-Four runs have been measured. The first failed all three tests. The
-second and third passed the second test and failed the other two, on one
-sentence and one guess each time. The fourth passed the first two: three
-readers produced 53,055 entries with no value, no result and no
-register's presence differing from the player anywhere, and left six
-places where the document made a reader choose.
+Four runs have been measured, against the kit as it then stood: two of
+its tunes have since been replaced by different ones, built from sources
+in the tree, and the entries below are that earlier kit's. The first run
+failed all three tests. The second and third passed the second test and
+failed the other two, on one sentence and one guess each time. The fourth
+passed the first two: three readers produced 53,055 entries with no
+value, no result and no register's presence differing from the player
+anywhere, and left six places where the document made a reader choose.
+The kit now comes to 29,406 entries.
 
 ## What the tunes cover
 
@@ -56,7 +61,7 @@ places where the document made a reader choose.
 | `cut_form` | a loop table, so a stream opens a second section |
 | `wide_ring` | a wide ring at unit size 1, for the word-offset path |
 | `plays_once` | flag bit 0 clear, so a call reports that the run ended |
-| `retrigger` | a retrigger stream and both forms of RETUNE |
+| `retrigger` | a retrigger stream, and a toggle stream retuned while it runs |
 | `resume_model` | a released toggle stream resuming: 37 `RESUME` opcodes from frame 2718 |
 
 ## What it does not cover
@@ -71,9 +76,11 @@ document would need a reference carrying every tick, which this one does
 not.
 
 Every tune is asked for its own length now, so seven of the eight opcodes
-are played: `retrigger.ymx` alone carries 11,520 of them, and
+are played: `retrigger.ymx` alone carries 671 of them, and
 `resume_model.ymx`'s 37 `RESUME` opcodes at frame 2718 are reached.
-`START_PCM_PREEMPT` is carried by no tune here and by none in the tree.
+`START_PCM_PREEMPT` is carried by no tune here. `Digidrum preempt,
+built.ym` under `ym/test` carries it, and no tune in the kit is packed
+from it.
 
 Playing an opcode is not the same as testing it. Seven of the eight write
 no sound register in their own frame, so a reader's output is the same
