@@ -107,6 +107,33 @@ final class BinariesConsistencyTest {
         assertEquals(1, MkSndh.word(stub, MkPrg.STUB_VERSION));
         assertEquals(0, stub.length & 1, "the stub is even-sized: the SNDH"
                 + " after it loads aligned");
+
+        // The player parks the vector of every timer it claims and restores
+        // none of them (YMX.S assumption 5), so a host that wants the machine
+        // back saves all four. A tune on Timer C that leaves its vector parked
+        // stops the system's 200 Hz counter, which the desktop times a double
+        // click off, so this is the one the stub cannot afford to miss.
+        for (int[] timer : new int[][] {{0x110, 'D'}, {0x114, 'C'},
+                {0x120, 'B'}, {0x134, 'A'}}) {
+            assertTrue(occurrences(stub, timer[0]) >= 2,
+                    "the stub reaches MFP timer " + (char) timer[1]
+                            + "'s vector at $" + Integer.toHexString(timer[0])
+                            + " fewer than twice, so it does not both save and"
+                            + " give back what the player parked there");
+        }
+    }
+
+    /** How often a stub reaches one absolute-short address. */
+    private static int occurrences(byte[] stub, int address) {
+        int high = (address >>> 8) & 0xFF;
+        int low = address & 0xFF;
+        int found = 0;
+        for (int at = 0; at + 1 < stub.length; at += 2) {
+            if ((stub[at] & 0xFF) == high && (stub[at + 1] & 0xFF) == low) {
+                found++;
+            }
+        }
+        return found;
     }
 
     /** {@code YMX_FIXED}, computed from the plain-number equates in the

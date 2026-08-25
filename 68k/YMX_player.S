@@ -36,24 +36,33 @@ XBIOS       equ     14
 Supexec     equ     38
 VBL_VECTOR  equ     $70
 ACIA_CTRL   equ     $FFFFFC00       ; the keyboard ACIA, polled directly
+TIMER_D_VEC equ     $110            ; the MFP timer vectors, in MFP order
+TIMER_C_VEC equ     $114
+TIMER_B_VEC equ     $120
+TIMER_A_VEC equ     $134
 ACIA_DATA   equ     $FFFFFC02
 SPACE_MAKE  equ     $39             ; the space bar's make code
+ESC_MAKE    equ     $01             ; and Escape's
 
 ; What play saves and the handback restores, as offsets into `saved` - the
 ; two longs first, so every field sits at its natural alignment.
 SV_VBL      equ     0               ; long  the VBL vector
 SV_USP      equ     4               ; long  the USP
-SV_IERA     equ     8               ; 4 interrupt bytes
-SV_IERB     equ     9
-SV_IMRA     equ     10
-SV_IMRB     equ     11
-SV_TACR     equ     12              ; 7 timer bytes
-SV_TBCR     equ     13
-SV_TCDCR    equ     14
-SV_TADR     equ     15
-SV_TBDR     equ     16
-SV_TCDR     equ     17
-SV_TDDR     equ     18
+SV_VEC_D    equ     8               ; long  the four MFP timer vectors: the
+SV_VEC_C    equ     12              ; long  player parks the vector of every
+SV_VEC_B    equ     16              ; long  timer it claims and restores none
+SV_VEC_A    equ     20              ; long  of them (YMX.S assumption 5)
+SV_IERA     equ     24              ; 4 interrupt bytes
+SV_IERB     equ     25
+SV_IMRA     equ     26
+SV_IMRB     equ     27
+SV_TACR     equ     28              ; 7 timer bytes
+SV_TBCR     equ     29
+SV_TCDCR    equ     30
+SV_TADR     equ     31
+SV_TBDR     equ     32
+SV_TCDR     equ     33
+SV_TDDR     equ     34
 
 ; The session state, as offsets into `state`.
 ST_DONE     equ     0               ; word  nonzero once the tune ended
@@ -159,6 +168,15 @@ play:
 ; the tune did not name. A host that takes the machine over should give
 ; the player a quiet MFP; the player itself claims only what its tune
 ; names. Data registers are saved too: a timer reloads from them.
+; The timer vectors. Stream T may put a channel on any of the four, so all
+; four are saved: a tune on Timer C leaves the system's 200 Hz clock parked
+; on the player's own do-nothing entry, and the desktop counts nothing
+; afterwards - a double click is timed off that counter.
+        move.l  TIMER_D_VEC.w,SV_VEC_D(a5)
+        move.l  TIMER_C_VEC.w,SV_VEC_C(a5)
+        move.l  TIMER_B_VEC.w,SV_VEC_B(a5)
+        move.l  TIMER_A_VEC.w,SV_VEC_A(a5)
+
         move.b  $FFFFFA19.w,SV_TACR(a5)
         move.b  $FFFFFA1B.w,SV_TBCR(a5)
         move.b  $FFFFFA1D.w,SV_TCDCR(a5)
@@ -198,7 +216,9 @@ play:
         move.w  #2,ST_MOUSE(a6)
         bra.s   .wait
 .key:
-        cmp.b   #SPACE_MAKE,d0                  ; space stops
+        cmp.b   #SPACE_MAKE,d0                  ; space stops, and so does
+        beq.s   .stop                           ; Escape
+        cmp.b   #ESC_MAKE,d0
         beq.s   .stop
         move.w  stub_tunes(pc),d1               ; make codes $02-$0A are the
         cmp.w   #1,d1                           ; number keys 1-9: switch,
@@ -242,6 +262,10 @@ play:
         move.b  SV_IERB(a5),$FFFFFA09.w
         move.b  SV_IMRA(a5),$FFFFFA13.w
         move.b  SV_IMRB(a5),$FFFFFA15.w
+        move.l  SV_VEC_D(a5),TIMER_D_VEC.w      ; and the vectors TOS gave us,
+        move.l  SV_VEC_C(a5),TIMER_C_VEC.w      ; so Timer C counts the 200 Hz
+        move.l  SV_VEC_B(a5),TIMER_B_VEC.w      ; the desktop times a double
+        move.l  SV_VEC_A(a5),TIMER_A_VEC.w      ; click off again
         move.w  (sp)+,sr
         rts
 
@@ -291,7 +315,7 @@ m_marker:   dc.b    "YMXDONE.MRK",0
 m_bye:      dc.b    "Done.",13,10,0
         even
 
-saved:      ds.b    20                          ; the SV_ fields
+saved:      ds.b    36                          ; the SV_ fields
         even
 state:      ds.b    8                           ; the ST_ fields
         even
