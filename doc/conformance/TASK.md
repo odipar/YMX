@@ -22,7 +22,8 @@ One entry per player call, in order, at most `<calls>` of them.
 - Registers 0 to 13. Values are what a YM2149 would receive.
 
 Only the call's own writes. Do not model what a timer interrupt would
-write between frames.
+write between frames: the specification's §9.4 puts those outside the
+work, and this is the reader it describes.
 
 ## The tunes
 

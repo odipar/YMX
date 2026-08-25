@@ -16,11 +16,17 @@ The YM formats - YM4 to YM6 - store "special effects" as values the player
 re-derives every frame from spare register bits. YMX resolves them at pack
 time and stores the outcome; a player compares nothing at run time.
 
-Two terms recur. A **player** reads §1, §2 and §6, performs §7, §8 and
-§9.2, and checks §9.1. A
-**writer** - a packer, or a tracker emitting the format directly - is bound
-by every rule in this document; §9.3 lists the rules a player does not
-have to check.
+Three terms recur, for the three things that read or write the format.
+
+| | what it does | what binds it |
+|---|---|---|
+| **writer** | a packer, or a tracker emitting the format directly | every rule here; §9.3 lists the ones a player does not check |
+| **player** | drives a sound chip from the file, frame by frame | §1, §2, §6, performs §7, §8 and §9.2, checks §9.1 |
+| **reader** | produces the values a frame writes, and drives nothing | §1, §2, §7 steps 1 to 3, §8, checks §9.1 (§9.4) |
+
+A player and a reader differ in what they produce, not in how much of the
+file they understand: both decode every stream. §9.4 says what a reader
+may leave unread and why.
 
 The format began as the `.yx6` container of the [ST4](https://github.com/odipar/ST4)
 repository, renumbered; the layout has changed since, and this document
@@ -782,6 +788,30 @@ The actions:
 - Stream T is within §2.3: flagged channels name distinct timers at frame
   0; a change moves only channels with nothing running, among the timers
   claimed at frame 0.
+
+### 9.4 A reader
+
+A **reader** produces the values a frame writes and drives no chip: a
+converter, an analyser, a tool that turns a file back into a register
+dump. It performs §7 steps 1 to 3 and §8, decodes every stream §1.5
+counts, and checks §9.1.
+
+What it leaves unread is what a timer writes between frames. A timer
+stream's values reach the chip from a tick, at a rate §5 sets, and a
+reader has no ticks: it produces one set of values a frame. So a reader
+reads §3's fourth column, which says which opcodes write a sound register
+in their own frame, and needs no other column; and it reads neither §5
+nor §6, which say at what rate a tick lands and which sample byte it
+carries.
+
+A reader still reads M's skip bits and applies them (§2.1). A skip is
+carried in the file, frame by frame, so a reader omits the same volume
+registers a player does without computing when a stream ends.
+
+Two things follow. A reader and a player agree on every value a frame
+writes and on nothing between frames. And a file whose streams a reader
+decodes without complaint may still be one §9.3 forbids: a reader checks
+§9.1 and no more, exactly as a player does.
 
 ---
 

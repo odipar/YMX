@@ -549,6 +549,33 @@ final class SpecConsistencyTest {
                         + " run on across a wrap and §7 step 4 is wrong");
     }
 
+    /**
+     * The three roles, and what a reader may leave unread. §9.4 narrows
+     * what the specification claims: a reader produces a frame's values
+     * and drives nothing, so the rates and the sample table are outside
+     * its work. The conformance kit measures that claim and no wider one,
+     * so the two say the same thing or the kit overstates the document.
+     */
+    @Test
+    void theReaderTheKitMeasuresIsTheReaderTheDocumentDefines() throws IOException {
+        String said = flat();
+        assertTrue(said.contains("| **reader** | produces the values a frame"
+                        + " writes, and drives nothing |"),
+                "SPEC §1's role table no longer names a reader");
+        assertTrue(said.contains("it reads neither §5 nor §6"),
+                "SPEC §9.4 no longer says what a reader leaves unread");
+
+        String kit = Files.readString(
+                Path.of("doc", "conformance", "README.md"));
+        assertTrue(kit.contains("§9.4"),
+                "doc/conformance/README.md does not say which role it tests,"
+                        + " and the kit measures a reader rather than a player");
+        assertTrue(Files.readString(Path.of("doc", "conformance", "TASK.md"))
+                        .contains("§9.4"),
+                "doc/conformance/TASK.md does not tell a reader that what a"
+                        + " timer writes between frames is outside its work");
+    }
+
     private static int word(byte[] file, int at) {
         return ((file[at] & 0xFF) << 8) | (file[at + 1] & 0xFF);
     }
