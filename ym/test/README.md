@@ -15,10 +15,13 @@ bytes to 55 KB).
 The compiled script's opcodes are covered between the two collections. A YM
 dump reaches `START_PCM`, `START_TOGGLE`, `RELEASE`, and, through
 `Synergy Credits`, `HOLD` and the voice-addressed `RETUNE`. No YM file in
-the 544 starts a retrigger stream or preempts a running timer, so
-`START_RETRIGGER`, the live `RETUNE` addressed to voice 3,
-`START_PCM_PREEMPT` and `RESUME` are reached by no tune here and are built
-by hand in the rig's effect stage.
+the 544 starts a retrigger stream or preempts a running timer, measured by
+compiling every one of them, so `START_RETRIGGER` and `START_PCM_PREEMPT`
+are reached by no tune here and are built by hand in the rig's effect
+stage. `OpcodeCoverageTest` holds that list: it names the two, fails if a
+third joins them, and fails again if a tune starts reaching one, so the
+list only shrinks. `RESUME` is reached under `-sidresume`, and the live
+`RETUNE` addressed to voice 3 by no YM source.
 
 Each is packed by `org.ym6.Ymx` at the default options, the entry point the
 tools call, so what is pinned is what a user gets. Packing is deterministic:
