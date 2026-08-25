@@ -11,6 +11,32 @@ patch number the binaries carry of their own. The format version is the
 compatibility gate: tunes packed at one format version play on every
 patch of it.
 
+## 0.5.1
+
+The player is 3,394 bytes at unit size 2, where 0.5.0 carried 3,394: the
+player did not move, and every tune packed at format 0.5 plays unchanged.
+The three SNDH cores are byte for byte what 0.5.0 published. The PRG stub
+is what changed, and it changed twice.
+
+- Escape stops the program, as space already did.
+- The program gives the four MFP timer vectors back. YMX.S's assumption 5
+  has the host own the machine state: the player parks the vector of
+  every timer it claims on an entry with no effect and restores none of
+  them, and names this program as the worked example of doing it. The
+  program saved the VBL vector and every MFP interrupt and timer
+  register, and no timer vector. So a tune on Timer C handed the desktop
+  back with $114 on the player's park entry: the timer ran at 200 Hz and
+  its interrupt did nothing, the system's 200 Hz counter stopped
+  advancing, and a double click, which is timed off that counter, was
+  mistimed from then on. All four vectors are saved now - $110, $114,
+  $120 and $134 - since stream T may put a channel on any of them.
+- The stub is 2,884 bytes where 0.5.0 carried 2,814.
+
+Verified by reading the assembled stub: each of the four addresses is
+reached twice, a save and a give-back, which
+`BinariesConsistencyTest` holds it to. Not verified by running: no
+program has been run under emulation with $114 read back after it exits.
+
 ## 0.5.0
 
 A loop frame in the header, and the sections to reach it. Format version

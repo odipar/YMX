@@ -95,7 +95,7 @@ final class ReleaseNotesTest {
      */
     @Test
     void theSectionNamesTheFormatVersionThisBuildReads() {
-        assertEquals(YmxFormat.versionName(), group(newest(),
+        assertEquals(YmxFormat.versionName(), group(theFormat(),
                 "Format version ([\\d.]+): a tune packed at",
                 "the format version its tunes carry"));
     }
@@ -103,7 +103,7 @@ final class ReleaseNotesTest {
     /** The header the section describes, field by field. */
     @Test
     void theHeaderFiguresAreTheHeaderBothTreesWrite() {
-        String notes = newest();
+        String notes = theFormat();
         assertEquals(YmxFormat.HEADER_SIZE,
                 number(notes, "The header is (\\d+) bytes", "the header size"));
         assertEquals(YmxFormat.OFFSET_SECTION_TABLE - YmxFormat.OFFSET_LOOP_FRAME,
@@ -124,7 +124,7 @@ final class ReleaseNotesTest {
     /** The cap a ring is raised to, and the workspace the rings sit past. */
     @Test
     void theRingCapAndTheWorkspaceFloorAreThePlayersOwn() throws IOException {
-        String notes = newest();
+        String notes = theFormat();
         assertEquals(YmxFormat.MAX_RING_SIZE, number(notes,
                 "up to the cap of ([\\d,]+) bytes a ring", "the ring cap"));
 
@@ -151,7 +151,7 @@ final class ReleaseNotesTest {
      */
     @Test
     void theConditionsTheNotesStateAreThePackersOwn() {
-        String notes = newest();
+        String notes = theFormat();
         String conditions = group(notes,
                 "the frame has to be one the wrap can enter (with the timers[^.]*)\\.",
                 "the conditions a frame is kept under");
@@ -185,7 +185,7 @@ final class ReleaseNotesTest {
      */
     @Test
     void theCycleSentenceResolvesWhatItSaysItDoes() {
-        String notes = newest();
+        String notes = whicheverStates("played [\\d,]+ frames of one tune");
         int longRun = number(notes, "played ([\\d,]+) frames of one tune",
                 "the frames the cycle measurement played");
         int shortRun = number(notes, "the harness's own ([\\d,]+) frames",
@@ -224,6 +224,30 @@ final class ReleaseNotesTest {
      * paragraph reads the same as the one it replaced. */
     private static String newest() {
         return String.join(" ", MkRelease.releaseNotes().split("\\s+"));
+    }
+
+    /**
+     * The section that introduced this format version, which is the newest
+     * one where the release is that format's first and an older one where a
+     * patch has followed it. The format's own figures - the header, the ring
+     * cap, the workspace, the conditions - are stated once, in that section,
+     * and a patch section repeats none of them.
+     */
+    /**
+     * The newest section stating something, which is the newest section
+     * where it changed there and an older one where it did not. A patch
+     * that leaves the player alone restates none of the player's figures,
+     * and the release that measured them keeps them.
+     */
+    private static String whicheverStates(String pattern) {
+        String newest = newest();
+        return Pattern.compile(pattern).matcher(newest).find()
+                ? newest : theFormat();
+    }
+
+    private static String theFormat() {
+        return String.join(" ",
+                MkRelease.notesFor(YmxFormat.versionName() + ".0").split("\\s+"));
     }
 
     /** Every {@code NAME equ NUMBER} in the 68000 player. */
