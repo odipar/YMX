@@ -2,12 +2,12 @@
 
 How a system without a 68000 assembler builds a playable SNDH file, and a
 runnable TOS program, from binaries this repository assembles once.
-`ymx/mkcores.sh` assembles them into `dist/`; `org.ymx.MkSndh` and
-`org.ymx.MkPrg` are the reference combiners, and any tool that follows this
+`ymx/mkcores.sh` assembles them into `dist/`, and `org.ymx.MkSndh` and
+`org.ymx.MkPrg` are the reference combiners. Any tool that follows this
 document produces files of the same layout, played the same by any SNDH
-host - the tag text (title, composer, converter, subtune names) and the
-workspace size above §1's floor are each combiner's own. Big-endian
-throughout; every offset and size in bytes.
+host; what stays each combiner's own is the tag text - title, composer,
+converter, subtune names - and the workspace size above §1's floor.
+Big-endian throughout; every offset and size in bytes.
 
 Two kinds of binary:
 

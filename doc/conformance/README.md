@@ -34,15 +34,15 @@ three one scratch root; two of them wrote a first decoder to the same
 obvious filename under it, and one read the other's. Give each a
 directory nothing else writes to.
 
-Two things reach an implementer that the copied directory does not
-carry, and both belong in its `SOURCES.md`. The first is what the harness
+Two things reach an implementer without being in the copied directory,
+and both belong in its `SOURCES.md`. The first is what the harness
 puts in its context before the task begins. Run from this repository that
 is `CLAUDE.md` and `AGENTS.md`, the index lines of a memory file, and the
 git status with the subject lines of the most recent commits. None of it
 states a field, an offset or an opcode, and the subject lines do name the
 format and say the repository holds an implementation and this kit. An
-exercise run from outside the repository carries none of it, which is how
-to run one where the isolation has to be complete. The second is what an
+exercise run from outside the repository carries none of it; run it there
+when the isolation has to be complete. The second is what an
 implementer already knows: LZ77 coding and Elias gamma are general, and
 recognising them is not reading an implementation.
 
@@ -64,7 +64,25 @@ Three tests, all three of which must hold:
    a byte is a sentence the document owes its implementer, whether or
    not the guess landed on the reference.
 
-Six runs have been measured. The first four ran against an earlier kit:
+## Eight runs
+
+| run | task | output | sources | notes |
+|---:|---|---|---|---|
+| 1 | reader | failed | failed | failed |
+| 2, 3 | reader | failed | passed | failed, one place each |
+| 4 | reader | passed | passed | failed, six places |
+| 5 | reader | passed | two of three | failed, five places |
+| 6 | reader | passed | passed | failed, four places |
+| player 1 | player | passed | passed | failed, nine places |
+| player 2 | player | passed | passed | failed, six places |
+
+The third test is the instrument: a run that fails it hands the document
+the sentences it owes, and the next run measures whether they landed.
+The prose below is the record of each run; the reader runs are here, and
+the player runs follow the tick record they were measured against.
+
+Six runs have been measured at reader level. The first four ran against
+an earlier kit:
 two of its tunes have since been replaced by different ones, built from
 sources in the tree. The first run failed all three tests. The second and
 third passed the second test and failed the other two, on one sentence and
@@ -79,20 +97,19 @@ ten tunes: no value, no result and no register's presence differed
 anywhere. Two of the three passed the second test. The third read another
 implementer's decoder out of a scratch directory the harness gave all
 three, and reported it; its own decoder was decoding every section a run
-earlier, and the leak is the harness's to fix rather than that
-implementer's to answer for.
+earlier, and the fault was the harness's, not that implementer's.
 
-Eight entries were marked "decides output", five distinct places: three in
-Appendix A.3's bitstream - the flag bit against the two class bits, what
-sets the last offset, and what the first block keeps - one on a
-container's output bytes being the stream's values at a unit size above 1,
-and one on which of the end-of-pass state a reader holds.
+Eight entries were marked "decides output", in five distinct places:
+three in Appendix A.3's bitstream - the flag bit against the two class
+bits, what sets the last offset, and what the first block keeps - one on
+whether a container's output bytes are the stream's values at a unit size
+above 1, and one on which of the end-of-pass state a reader holds.
 
 The sixth ran against the document those five were written into, with a
 scratch directory for each implementer. All three passed the first two
 tests: 29,406 entries each, byte for byte the reference, and no
 implementer read another's work or anything else. None of the five came
-back. Five entries were marked "decides output", four distinct places:
+back. Five entries were marked "decides output", in four distinct places:
 Appendix A.4's closing sentence against the formula three lines above it,
 found by two of the three; a reader's skip states before its first call,
 which §7 states in a preamble a reader is not given; §9.4's own pass-end
@@ -129,6 +146,8 @@ their own frame, and the exercise asks for a call's own writes only, so a
 decoder that runs no opcode still matches `MANIFEST.txt` on nearly every
 entry. A tick record separates them - the rate a timer lands at is §5's,
 the byte it carries is §6's, and neither reaches a reader.
+
+### Measured against a machine
 
 The MFP raises no interrupt under the unit-test emulator, so the timers
 are modelled and their handlers called at the addresses the vectors hold.
@@ -175,6 +194,8 @@ The frame period was the first candidate and is not the cause: running
 the model at a PAL ST's own VBL instead of the rate the file states made
 every figure above worse.
 
+### The player-level runs
+
 One run has been measured against this record, the first at player level.
 `TASK-player.md` is its task: it asks for the ticks as well as the calls,
 and fixes as its own the four things about when a tick falls that the
@@ -206,19 +227,19 @@ and where a tick that coincides with a call goes. The document carries
 the seven that were its own now, and `TASK-player.md` carries the two
 that were the task's.
 
-A second player run followed, against the document those nine were
-written into. All three implementers again produced every call and every
-tick of all ten tunes byte for byte, and the marks fell from seventeen to
-eleven. All three found the same sentence: §3.3, rewritten for the first
-run, said `RESUME` "delivers the next tick one period after the count
-reaches its next underflow", which passes over an underflow that §9.2
-does not drop. A fix from one round opening a smaller hole for the next
-to find is how two of the last three rounds have gone, so a round's
-output is not purely additive. The rest of the run named where a PCM
-trigger's read position starts, which prescaler a flag-1 reload
-multiplies by, and three more of the task's own conventions: what a tick
-coinciding with a call sees, what its first period is measured from, and
-the order of a call's own writes.
+A second player run followed, against the document those nine were written
+into. All three implementers again produced every call and every tick of
+all ten tunes byte for byte, and the marks fell from seventeen to eleven.
+All three found the same sentence: §3.3, rewritten for the first run, said
+`RESUME` "delivers the next tick one period after the count reaches its
+next underflow", which passes over an underflow that §9.2 does not drop.
+Two of the last three rounds have gone the same way: a fix from one round
+opened a smaller hole for the next to find, so a round's output is not
+purely additive. The rest of the run named where a PCM trigger's read
+position starts, which prescaler a flag-1 reload multiplies by, and three
+more of the task's own conventions: what a tick coinciding with a call
+sees, what its first period is measured from, and the order of a call's
+own writes.
 
 ## What it does not cover
 

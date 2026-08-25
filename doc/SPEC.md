@@ -16,7 +16,8 @@ The YM formats - YM4 to YM6 - store "special effects" as values the player
 re-derives every frame from spare register bits. YMX resolves them at pack
 time and stores the outcome; a player compares nothing at run time.
 
-Three terms recur, for the three things that read or write the format.
+Three roles read or write the format, and one more word covers the two
+that read:
 
 | | what it does | what binds it |
 |---|---|---|
@@ -84,13 +85,12 @@ The fixed fields occupy bytes 0 to 41 and the section table bytes 42 to
 `41 + 4·S`, so the header is **142 bytes** where `S` is 25 and 170 where
 `S` is 32. `42 + 4·S` is two short of a long boundary at every `S`, so two
 pad bytes follow the header and the first body item is at offset 144, or
-172 where `S` is 32. Everything after the header is
-body: the loop table (§1.4) where the file carries one, then the sections
-(§1.4), then the sample table (§6). Content in the body
-is located only by offset - a section by its table entry, the sample table
-by the offset at byte 24. Every offset counts from the file's first byte,
-the magic at offset 0, and a **long boundary** is an offset divisible by
-four.
+172 where `S` is 32. Everything after the header is body: the loop table
+(§1.4) where the file carries one, then the sections (§1.4), then the
+sample table (§6). Content in the body is located only by offset - a
+section by its table entry, the sample table by the offset at byte 24.
+Every offset counts from the file's first byte, the magic at offset 0, and
+a **long boundary** is an offset divisible by four.
 
 ### 1.2 Flags
 
@@ -135,20 +135,22 @@ any other, so the last of them is frame `O - 1`. Nothing marks an added
 frame, so a reader reads `O` frames and no fewer.
 
 960/24 is the default pair, valid for every tune that leaves channel 3
-idle. Twenty-four covers the base count and what is left over: seven
-extension streams with no channel in use, five with channel 0, three with
-channel 1, one with channel 2. Past that, `C` and `N` move together,
-because `C` divides `N`: 960 does not divide by 26, and a writer picks an
-`N` its `C` divides. 2520 is `2³·3²·5·7`, so it serves a `C` of 28 and of
-30 and not of 32; 2496 is the largest ring a `C` of 32 divides.
+idle. A `C` of 24 covers every base count up to 23, and the difference is
+room for extension streams: seven of them where no channel is flagged
+(base count 17), five where channel 0 is the highest in use, three for
+channel 1, one for channel 2. A longer decode list needs a larger `C`,
+and `N` moves with it, because `C` divides `N`: 960 does not divide by
+26, so a writer picks an `N` its `C` divides. 2520 is `2³·3²·5·7`, which
+serves a `C` of 28 and of 30 but not of 32; 2496 is the largest ring a
+`C` of 32 divides.
 
 ### 1.4 The sections
 
 A section carries one stream's values, packed or stored. `O` is at least
 1, section-table entries 0 to 24 are nonzero, and an entry from 25 up is
-nonzero where the file carries that stream and 0 where it does not
-(§1.5). Section order in
-the file is not significant; a section is located only by its offset.
+nonzero where the file carries that stream and 0 where it does not (§1.5).
+Section order in the file is not significant; a section is located only by
+its offset.
 
 **One set of sections or two.** Where the header's loop table offset is
 0, each stream has one section, covering frames `[0, O)`. Where it is
@@ -161,10 +163,11 @@ first reads its values (§8).
 
 **Packed sections.** A packed section is a complete ST4 container - a
 twenty-byte header whose first long is the signature, then four streams.
-Appendix A states the container and its bitstream in full; the format
-comes from the [ST4](https://github.com/odipar/ST4) repository, and
-Appendix A is what this document is read against. A writer with no ST4
-compressor stores every section instead (below) and emits no container.
+Appendix A states the container and its bitstream in full. The format
+comes from the [ST4](https://github.com/odipar/ST4) repository, and the
+appendix rather than that repository is what an implementation follows.
+A writer with no ST4 compressor stores every section instead (below) and
+emits no container.
 
 **Two fixed parameters.** No back-reference exceeds `N` bytes (§1.3),
 and no operation exceeds 65535 units.
@@ -473,8 +476,8 @@ clock, and cannot be driven from a Timer C interrupt.
 
 - **opcode** (bits 7-5) - one of the eight in §3.
 - **voice** (bits 4-3) - 0, 1, 2 for voices A, B, C. Three voices in a
-  two-bit field, so **3 is no voice**: only `RETUNE` carries 3, and see it
-  in §3. `RELEASE` stops a channel's timer and names no voice, and a writer
+  two-bit field, so **3 is no voice**: only `RETUNE` carries 3 (§3.1).
+  `RELEASE` stops a channel's timer and names no voice, and a writer
   writes its field as 0; every other opcode addresses voice 0, 1 or 2.
 - **low** (bits 2-0) - the MFP prescaler index for an opcode that programs a
   timer, or flags for `HOLD`, `RESUME` and `RELEASE`. A programming opcode's
@@ -581,9 +584,9 @@ arriving code continues the same stream - same voice, same prescaler; the
 opcode's low bits are flags, so it carries no rate. A channel keeps the
 prescaler index of the last opcode that programmed its timer, and that is
 the index `RESUME`'s flag 1 reloads against, as it is the one `HOLD`'s
-flag 1 reloads against. A prescaler changed
-across the gap re-enters through the voice-addressed `RETUNE`, whose
-program ends with the interrupt enabled (§9.2).
+flag 1 reloads against. A prescaler changed across the gap re-enters
+through the voice-addressed `RETUNE`, whose program ends with the
+interrupt enabled (§9.2).
 
 Which `RELEASE` a writer emits: a retrigger stream's release stops its
 timer; a toggle stream's release stops under the default model and
@@ -762,13 +765,12 @@ Where a frame writes one register twice, the action's write follows the
 frame write, and the register holds the action's value.
 
 **What a call reports.** Each call reports one value. A call that plays a
-frame before `O - 1` reports 0. Every call that plays frame `O - 1` reports
-1 where flag bit 0 is set, and 0 where it is clear, on the first pass and
-on every later one. Where flag bit 0 is
-clear, the next call plays no frame, writes no register and reports -1.
-It lands no tick either: the run has ended at it.
-The run has ended at that call: every later call repeats the report, and a
-record of the run ends with that call's entry.
+frame before `O - 1` reports 0. Every call that plays frame `O - 1`
+reports 1 where flag bit 0 is set, and 0 where it is clear, on the first
+pass and on every later one. Where flag bit 0 is clear, the next call
+plays no frame, writes no register, lands no tick and reports -1. The run
+has ended at that call: every later call repeats the report, and a record
+of the run ends with that call's entry.
 
 ---
 
@@ -790,15 +792,14 @@ frame reads.
                                |<-------- O - L ------->|
 ```
 
-On the frame that ends the tune, after its write, actions and refill,
-and as the last thing that call does, every claimed timer is stopped, its
-vector parked on a routine with no
-effect, its interrupt enabled with no tick pending, and the three skip
-states cleared. That is the state frame 0 was played in on the first
-pass, so every pass is identical. The stop being the call's last step,
-that call lands no tick of its own: every timer is stopped before the
-next one would fall due, and nothing of the pass that ended reaches the
-one that follows.
+On the frame that ends the tune, after its write, actions and refill, and
+as the last thing that call does, every claimed timer is stopped, its
+vector parked on a routine with no effect, its interrupt enabled with no
+tick pending, and the three skip states cleared. That is the state frame 0
+was played in on the first pass, so every pass is identical. The stop is
+the call's last step, so that call lands no tick of its own: every timer
+is stopped before the next one would fall due, and nothing of the pass
+that ended reaches the one that follows.
 
 Frame `L` is then reached in one of two ways, and `O - L` against `N`
 selects which.

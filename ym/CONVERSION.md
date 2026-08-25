@@ -1,9 +1,9 @@
 # What a YM conversion costs
 
 A `YM5!` or `YM6!` register dump packed into a `.ymx`. This is what the front
-end changes on the way, what it counts, and what it reports.
-[../README.md](../README.md) is how to run it, [../doc/SPEC.md](../doc/SPEC.md)
-the container it writes.
+end changes on the way, what it counts, and what it reports. See
+[../README.md](../README.md) for how to run it, and
+[../doc/SPEC.md](../doc/SPEC.md) for the container it writes.
 
 ## What the conversion is
 
@@ -42,8 +42,9 @@ already disconnected.
 
 A YM frame starts at most two effects, so a YM tune uses two of the format's
 four timer channels - the packer's default puts them on Timers A and D - and
-the other two channels' streams pack to the format's floor, and the header
-leaves them out of the streams the player decodes. Timer B and Timer C stay
+the other two channels' streams repeat one value and compress to almost
+nothing, and the base count leaves them outside the streams a player
+decodes. Timer B and Timer C stay
 the host's.
 
 ## What a YM file gives up
@@ -54,8 +55,8 @@ the host's.
 | A code with a prescaler or count of 0 | dropped to idle: prescaler 0 is the MFP's stopped state, a count of 0 is 256, and neither is armed here | yes |
 | A SID or buzzer rate above what a real machine can run | dropped to idle | yes |
 | A drum number with no sample behind it | dropped to idle | yes |
-| A drum above the rate ceiling, every trigger taking the exact ratio | bandwidth only: the sample is resampled and each divisor scaled by that ratio | yes |
-| A drum above the rate ceiling, its triggers unable to all take it | the sample halves by a power of two, and a trigger the halved divisor cannot express is dropped to idle | yes |
+| A drum above the rate ceiling, when every trigger takes the exact ratio | bandwidth only: the sample is resampled and each divisor scaled by that ratio | yes |
+| A drum above the rate ceiling, when its triggers cannot all take that ratio | the sample halves by a power of two, and a trigger the halved divisor cannot express is dropped to idle | yes |
 | A tune whose length is not a whole unit | up to unit-1 duplicated safe frames, inaudible | yes |
 | A loop frame the wrap cannot enter | the repeat starts at the next frame it can, or at frame 0 where no frame within a second can be entered | yes |
 | A loop frame further from the end than a ring holds | the rings grow to hold the frames between | yes |
@@ -74,18 +75,18 @@ above it is dropped here.
   code and runs an empty handler. The packer warns and drops it.
 
 * **A drum above the rate ceiling is rescued, not dropped.** The sample is
-  resampled to the highest MFP-representable rate under the ceiling, through
-  the chip's volume curve and with a windowed-sinc filter, so no aliased
-  fold-back brightens it. Every trigger of that drum has its timer divisor
-  scaled by the same exact ratio, so **pitch stays what the dump specified,
-  and duration to within one output sample of it**, and only bandwidth falls,
-  by as little as the ceiling allows. A
-  29 kHz conversion-family drum lands at 25.6 kHz, not at the old half-rate
-  14.6. Where a drum's triggers cannot all take the exact ratio, a
-  power-of-two factor is the fallback, and a trigger whose scaled divisor no
-  prescaler and count pair represents is dropped to idle. No file in `test` or
-  in the corpus takes that path: every drum rescued there takes the ratio.
-  `-drumhz` moves the ceiling; each rescue is a note.
+  resampled to the highest MFP-representable rate under the ceiling,
+  through the chip's volume curve and with a windowed-sinc filter, so no
+  aliased fold-back brightens it. Every trigger of that drum has its timer
+  divisor scaled by the same exact ratio, so **pitch stays what the dump
+  specified, and duration to within one output sample of it**, and only
+  bandwidth falls, by as little as the ceiling allows. A 29 kHz
+  conversion-family drum lands at 25.6 kHz, not at the old half-rate 14.6.
+  Where a drum's triggers cannot all take the exact ratio, a power-of-two
+  factor is the fallback, and a trigger whose scaled divisor no prescaler
+  and count pair represents is dropped to idle. No file in `test` or in
+  the corpus takes that path: every drum rescued there takes the ratio.
+  `-drumhz` moves the ceiling; each rescue is reported.
 
 * **Drum samples become PSG-ready volume values** - the high nibble of an
   8-bit sample, or the low nibble for a 4-bit file. That is exactly the
@@ -123,14 +124,14 @@ above it is dropped here.
   which costs workspace and no file bytes.
 
   Where the largest ring the format allows still will not hold them, the
-  packer takes the first later frame within the budget that a ring does reach.
-  Where the budget holds none, every stream is packed as two sections instead
-  - the frames before `L`, then the
-  frames from `L` on - and the player opens the second at the wrap. That one
-  costs file bytes, since the replayed frames are packed on their own and no
-  match reaches across the cut: on the three tunes in `test` that take it,
-  the file is 14 to 41 per cent larger than the same tune packed with `-l0`.
-  The rings stay the size they were.
+  packer takes the first later frame within the budget that a ring does
+  reach. Where the budget holds none, every stream is packed as two
+  sections instead - the frames before `L`, then the frames from `L` on -
+  and the player opens the second at the wrap. That one costs file bytes,
+  since the replayed frames are packed on their own and no match reaches
+  across the cut: on the three tunes in `test` that take it, the file is
+  14 to 41 per cent larger than the same tune packed with `-l0`. The rings
+  stay the size they were.
 
   A section is a whole number of units, so at `-k2` or `-k4` the cut falls on
   a unit boundary: where no frame near `L` that the wrap can enter falls on
@@ -141,7 +142,7 @@ above it is dropped here.
   own, and `-l0` starts the tune over from the beginning.
 
 * **Samples never loop.** A YM file has no field for a repeating digidrum,
-  so every sample crosses marked one-shot. This costs nothing -
+  so every sample comes across marked one-shot. This costs nothing -
   nothing in a YM dump needs it - but it is the one
   [format](../doc/SPEC.md#6-the-sample-table) feature a YM tune cannot reach.
 
