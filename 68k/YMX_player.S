@@ -36,6 +36,13 @@ XBIOS       equ     14
 Supexec     equ     38
 VBL_VECTOR  equ     $70
 ACIA_CTRL   equ     $FFFFFC00       ; the keyboard ACIA, polled directly
+; The operating system's own Timer C - the 200 Hz tick it measures a
+; double click, a key repeat and the time of day in: a /64 prescaler and
+; 192 counts, since 2457600 / 64 / 192 is 200. This count is written back
+; rather than read back, because a running timer's data register reads as
+; the count it has reached and not as the count it restarts from.
+TIMERC_SYSTEM_DATA equ  192
+
 TIMER_D_VEC equ     $110            ; the MFP timer vectors, in MFP order
 TIMER_C_VEC equ     $114
 TIMER_B_VEC equ     $120
@@ -61,8 +68,7 @@ SV_TBCR     equ     29
 SV_TCDCR    equ     30
 SV_TADR     equ     31
 SV_TBDR     equ     32
-SV_TCDR     equ     33
-SV_TDDR     equ     34
+SV_TDDR     equ     33
 
 ; The session state, as offsets into `state`.
 ST_DONE     equ     0               ; word  nonzero once the tune ended
@@ -182,7 +188,6 @@ play:
         move.b  $FFFFFA1D.w,SV_TCDCR(a5)
         move.b  $FFFFFA1F.w,SV_TADR(a5)
         move.b  $FFFFFA21.w,SV_TBDR(a5)
-        move.b  $FFFFFA23.w,SV_TCDR(a5)
         move.b  $FFFFFA25.w,SV_TDDR(a5)
         clr.b   $FFFFFA19.w                     ; Timer A
         clr.b   $FFFFFA1B.w                     ; Timer B
@@ -253,8 +258,15 @@ play:
         move    a0,usp
         move.b  SV_TADR(a5),$FFFFFA1F.w         ; counts back before controls,
         move.b  SV_TBDR(a5),$FFFFFA21.w         ; so a timer restarts on the
-        move.b  SV_TCDR(a5),$FFFFFA23.w         ; count TOS gave it
         move.b  SV_TDDR(a5),$FFFFFA25.w
+; Timer C's count is not one of the saved fields: a timer's data register
+; reads as the count it has reached, so what a takeover reads back is
+; wherever the count happened to be and writing that back leaves the
+; system's own tick running at some rate of its own. That is what left the
+; desktop unable to time a double click. The count goes back as the value
+; the operating system runs it at; the prescaler comes back with TCDCR
+; below, which does read as what was written to it.
+        move.b  #TIMERC_SYSTEM_DATA,$FFFFFA23.w
         move.b  SV_TACR(a5),$FFFFFA19.w         ; TOS's timers running again
         move.b  SV_TBCR(a5),$FFFFFA1B.w
         move.b  SV_TCDCR(a5),$FFFFFA1D.w
@@ -315,7 +327,7 @@ m_marker:   dc.b    "YMXDONE.MRK",0
 m_bye:      dc.b    "Done.",13,10,0
         even
 
-saved:      ds.b    36                          ; the SV_ fields
+saved:      ds.b    35                          ; the SV_ fields
         even
 state:      ds.b    8                           ; the ST_ fields
         even
