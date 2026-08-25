@@ -418,6 +418,74 @@ final class SpecConsistencyTest {
         assertTrue(!YmxFormat.isStored(0x1234L));
     }
 
+    /**
+     * The numbers Appendix A states about the ST4 container, against the
+     * decoder that reads one. The appendix exists so a reader implements
+     * a packed section without a second document, which only holds while
+     * the values in it are the values the tree decodes.
+     */
+    @Test
+    void theSt4AppendixIsTheContainerTheDecoderReads() throws IOException {
+        String said = flat();
+        assertTrue(said.contains("signature `$53 $34 $04 k`: `'S'`, `'4'`,"
+                        + " format version 4, unit size `k`"),
+                "SPEC Appendix A's signature row has been reworded");
+        assertTrue(said.contains("**The last offset begins at 1.**"),
+                "SPEC Appendix A no longer states the initial last offset,"
+                        + " which a decoder needs before it reads any new"
+                        + " offset and which ST4's own README omits");
+        assertEquals(1, org.st4.St4Optimizer.INITIAL_OFFSET,
+                "Appendix A says the last offset begins at 1");
+        assertTrue(said.contains("No offset reaches further back than 32512"
+                        + " bytes at any `k`"),
+                "SPEC Appendix A's offset bound has been reworded");
+    }
+
+    /**
+     * What a call reports, against the player's own contract. Three
+     * independent readers took this from the harness rather than the
+     * document, because the document did not carry it.
+     */
+    @Test
+    void theCallReportIsStatedAndIsThePlayersOwn() throws IOException {
+        String said = flat();
+        assertTrue(said.contains("**What a call reports.** Each call reports"
+                        + " one value."),
+                "SPEC §7 no longer states what a call reports");
+        assertTrue(said.contains("the call that plays frame `O - 1` reports 1"),
+                "SPEC §7's going-round report has been reworded");
+        assertTrue(said.contains("the next call plays no frame, writes no"
+                        + " register and reports -1"),
+                "SPEC §7's ended report has been reworded");
+    }
+
+    /** The worked file, against the file it works through. */
+    @Test
+    void theWorkedFileIsTheFileInTheTree() throws IOException {
+        String said = flat();
+        // flat() collapses the two spaces the file name carries
+        assertTrue(said.contains("`ym/test/Circus Attractions 2.ymx`, 240"
+                        + " bytes, four frames"),
+                "SPEC Appendix B names another file or another size");
+        byte[] file = Files.readAllBytes(
+                Path.of("ym", "test", "Circus Attractions  2.ymx"));
+        assertEquals(240, file.length,
+                "Appendix B walks through this file byte by byte");
+        assertEquals(4, (int) longAt(file, YmxFormat.OFFSET_FRAMES),
+                "Appendix B says four frames");
+        assertEquals(140, (int) YmxFormat.sectionOffset(
+                        longAt(file, YmxFormat.OFFSET_SECTION_TABLE)),
+                "Appendix B says the first body item is at 140");
+    }
+
+    private static long longAt(byte[] file, int at) {
+        long value = 0;
+        for (int byteAt = 0; byteAt < 4; byteAt++) {
+            value = (value << 8) | (file[at + byteAt] & 0xFF);
+        }
+        return value;
+    }
+
     // ------------------------------------------------------------- the sources
 
     /** {@code doc/SPEC.md} with its whitespace collapsed, so a rewrapped

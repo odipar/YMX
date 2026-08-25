@@ -16,7 +16,8 @@ The YM formats - YM4 to YM6 - store "special effects" as values the player
 re-derives every frame from spare register bits. YMX resolves them at pack
 time and stores the outcome; a player compares nothing at run time.
 
-Two terms recur. A **player** performs §7, §8 and §9.2 and checks §9.1. A
+Two terms recur. A **player** reads §1, §2 and §6, performs §7, §8 and
+§9.2, and checks §9.1. A
 **writer** - a packer, or a tracker emitting the format directly - is bound
 by every rule in this document; §9.3 lists the rules a player does not
 have to check.
@@ -71,7 +72,10 @@ source formats and their tools use:
 | 34 | 4 | byte offset of the **loop table** (§1.4); 0 where the sections cover the whole tune |
 | 38 | 4·S | byte offset of each **section** (§1.4) |
 
-With `S` fixed at 25 the header is **138 bytes**. Everything after it is
+The fixed fields occupy bytes 0 to 37 and the section table bytes 38 to
+137, so with `S` fixed at 25 the header is **138 bytes**. Every body item
+begins on a long boundary, so the first of them is at offset 140 or later.
+Everything after the header is
 body: the loop table (§1.4) where the file carries one, then the sections
 (§1.4), then the sample table (§6). Content in the body
 is located only by offset - a section by its table entry, the sample table
@@ -131,19 +135,22 @@ first reads its values (§8).
 
 **Packed sections.** A packed section is a complete ST4 container - a
 twenty-byte header whose first long is the signature, then four streams.
-The container layout is defined by the
-[ST4](https://github.com/odipar/ST4) repository's specification, the
-normative companion of this document for packed sections. A writer with no ST4 compressor stores every section instead
-(below) and emits no container.
+Appendix A states the container and its bitstream in full; the format
+comes from the [ST4](https://github.com/odipar/ST4) repository, and
+Appendix A is what this document is read against. A writer with no ST4
+compressor stores every section instead (below) and emits no container.
 
 **Two fixed parameters.** No back-reference exceeds `N` bytes (§1.3),
 and no operation exceeds 65535 units.
 
 **Unit size.** Every section in a file is packed at one unit size - 1, 2
 or 4 bytes, recorded with the ST4 format version in the section's
-signature, not in the YMX header. A player must reject a container
-packed at a unit size, or an ST4 version, other than the one it was
-built for (§9.1).
+signature, not in the YMX header. A packed section's first long is
+`$53 $34 $04 k`: `'S'`, `'4'`, ST4 format version 4, and the unit size
+`k`, one of 1, 2 or 4. Version 4 is the version this document defines. A
+player built for one unit size rejects a container whose fourth byte
+differs; a player that decodes all three rejects a file whose sections do
+not share one unit size (§9.1).
 
 **Stored sections.** A section may instead be stored: the bytes at its
 offset are the values, one per frame, with no header and no signature.
@@ -165,8 +172,10 @@ that stream where the file carries a loop table, the same section again
 where it does not. Where `O - L` is at most `N`, refilling stops at `O`
 values and no section is opened twice.
 
-Packed sizes are not stored: ST4 counts output units, so a decoder does
-not need them.
+A section's packed length is not stored: an ST4 decoder stops on the
+container's end marker. The container's own header gives the output size in
+bytes, and that size equals the section's frame count - `O` where the file
+carries no loop table, `L` and `O - L` where it does.
 
 ### 1.5 Three stream counts
 
@@ -177,7 +186,7 @@ Three counts apply:
 | | |
 |---|---|
 | **stored** - always 25 | the size of the section table; all entries nonzero |
-| **decoded** - 17, 19, 21, 23 or 25 | what a player reads per cycle: 17 for a tune that uses no timer channel, then two more per channel, up to and including the **highest** channel in use |
+| **decoded** - 17, 19, 21, 23 or 25 | what a player reads per cycle: 17 where no channel is flagged, and `17 + 2(h + 1)` where `h` is the **highest** flagged channel |
 | **carrying** - fewer still | an idle channel's pair is one value repeated, and compresses to almost nothing |
 
 `C` covers the middle count. It steps by the highest channel in use, not
@@ -229,8 +238,9 @@ masks nothing:
 Two registers have additional rules.
 
 **R7 carries no port bits.** Bits 7-6 of the mixer register are the chip's
-I/O port directions, not sound. The stream carries bits 5-0; a player
-supplies the host's value for bits 7-6. On an ST that value is `$C0` -
+I/O port directions, not sound. The byte written to R7 is
+`(value & $3F) | ports`, where `value` is the stream's byte and `ports` is
+the host's port directions in bits 7-6. On an Atari ST `ports` is `$C0` -
 both ports output, since port A drives the floppy select lines; port bits
 taken from the file would drive the floppy selects with tune data. Bits
 5-0 arrive with every sample-playing voice **disconnected** - no generator
@@ -307,8 +317,8 @@ changed byte takes effect before that frame's actions (§7). A map change
 stops no timer, so a writer changes the entry only of a channel with
 nothing running, and only to a timer claimed at frame 0. A tune that
 never re-assigns repeats the byte, which compresses to nothing. With no
-channel flagged the byte binds nothing: a writer emits one byte,
-conventionally 0, and repeats it.
+channel flagged the byte binds nothing: any value is valid, and a writer
+repeats one byte.
 
 Timer C is the Atari ST's 200 Hz system clock: a tune using it stops that
 clock, and cannot be driven from a Timer C interrupt.
@@ -326,7 +336,8 @@ clock, and cannot be driven from a Timer C interrupt.
 
 - **opcode** (bits 7-5) - one of the eight in §3.
 - **voice** (bits 4-3) - 0, 1, 2 for voices A, B, C. Three voices in a
-  two-bit field, so **3 is no voice**; see `RETUNE` in §3.
+  two-bit field, so **3 is no voice**: only `RETUNE` carries 3, and every
+  other opcode addresses voice 0, 1 or 2. See `RETUNE` in §3.
 - **low** (bits 2-0) - the MFP prescaler index for an opcode that programs a
   timer, or flags for `HOLD`, `RESUME` and `RELEASE`. A programming opcode's
   index is 1 to 7; index 0 is the MFP's stopped state (§5), and no opcode
@@ -338,16 +349,20 @@ clock, and cannot be driven from a Timer C interrupt.
 
 ## 3. The opcodes
 
-| # | opcode | operation |
-|---:|---|---|
-| 0 | `RESUME` | re-enable a released toggle stream's interrupt. Flags: 1 = reload the count, 2 = reload the volume. Phase continued through the gap |
-| 1 | `HOLD` | update a running stream. Flags: 1 = reload the count from P, 2 = reload the toggle stream's volume, 4 = reload the retrigger stream's shape. Emitted only on frames where a value changed |
-| 2 | `RELEASE` | stop this channel's timer. Bit 0 set: disable the interrupt instead, leaving the timer counting |
-| 3 | `START_TOGGLE` | start a toggle stream: select, volume, vector := the loud half, then a full program |
-| 4 | `RETUNE` | a new rate for a running stream, keeping its place in the cycle. See §3.1 |
-| 5 | `START_RETRIGGER` | start a retrigger stream: shape, vector := the retrigger tick, then a full program |
-| 6 | `START_PCM` | a trigger, fresh or repeated: sample table lookup, select, vector, full program |
-| 7 | `START_PCM_PREEMPT` | as `START_PCM`, but first stop the timer of every channel marked in X's low nibble |
+| # | opcode | operation | sound registers written in this frame |
+|---:|---|---|---|
+| 0 | `RESUME` | re-enable a released toggle stream's interrupt. Flags: 1 = reload the count, 2 = reload the volume. Phase continued through the gap | none |
+| 1 | `HOLD` | update a running stream. Flags: 1 = reload the count from P, 2 = reload the toggle stream's volume, 4 = reload the retrigger stream's shape. Emitted only on frames where a value changed | none |
+| 2 | `RELEASE` | stop this channel's timer. Bit 0 set: disable the interrupt instead, leaving the timer counting | none |
+| 3 | `START_TOGGLE` | start a toggle stream: select, volume, vector := the loud half, then a full program | `R(8+v) := 0` |
+| 4 | `RETUNE` | a new rate for a running stream, keeping its place in the cycle. See §3.1 | none |
+| 5 | `START_RETRIGGER` | start a retrigger stream: shape, vector := the retrigger tick, then a full program | none |
+| 6 | `START_PCM` | a trigger, fresh or repeated: sample table lookup, select, vector, full program | none |
+| 7 | `START_PCM_PREEMPT` | as `START_PCM`, but first stop the timer of every channel marked in X's low nibble | none |
+
+Every other write the operations name patches the channel's tick handler.
+The first sound-register write of a stream a frame starts is its first
+tick's, one timer period later.
 
 What each opcode reads besides its action byte:
 
@@ -432,6 +447,10 @@ the two writes one more sample byte over the returned volume.
 ---
 
 ## 4. Timer streams and the code byte
+
+This section binds a writer. The code byte it describes does not appear in
+a file: it is the vocabulary §3's opcodes were resolved from, and a player
+reads the opcodes rather than the codes.
 
 The four **kinds** of timer stream:
 
@@ -519,7 +538,8 @@ that position and continues; the seam costs the marker's one tick of
 silence. A one-shot writes 13 - a mid-scale level - to the volume
 register and stops its timer, so the voice holds that level until it
 rejoins the frame write. `0` is a valid loop point - the sample repeats
-whole - so the no-loop value is one no length can reach.
+whole - so the no-loop value is one past the largest position a sample can
+hold.
 
 A sample number is read from a voice's five-bit volume register (§3.2), so
 a file may carry at most **32** samples.
@@ -543,6 +563,10 @@ register.
 
 ## 7. The frame
 
+A player is init, then one call per frame. What a call produces is the
+frame's sound-register writes, in the order below, and one reported value.
+A player begins frame 0 with the three skip states clear.
+
 One player call per frame, in this order:
 
 1. **Skips.** If M bit 4 is set, set the three skip states from bits 7-5.
@@ -554,8 +578,10 @@ One player call per frame, in this order:
    the A byte, run the opcode. A changed T byte takes effect before the
    first action (§2.3).
 4. **One refill** - decode `C` values into one stream's ring: stream `k`
-   on frames where the frame number modulo `C` equals `k`. A `k` past the
-   decoded streams (§1.5) refills nothing.
+   on the call whose count of calls since init, modulo `C`, equals `k`. The
+   count runs on across a wrap, so the stream refilled after frame `O - 1`
+   is the next in turn from the one refilled on it, for any `L`. A `k` past
+   the decoded streams (§1.5) refills nothing.
 
 Where flag bit 0 is clear, or `O - L` is at most `N`, a stream is decoded
 to `O` values and refilled no further; the last refill before that is a
@@ -575,12 +601,26 @@ between them sends the value to the register the interrupt selected. A
 single `movep.w` cannot be split by a 68000; masking interrupts across the
 frame write is therefore optional.
 
+Where a frame writes one register twice, the action's write follows the
+frame write, and the register holds the action's value.
+
+**What a call reports.** Each call reports one value. Where flag bit 0 is
+set, the call that plays frame `O - 1` reports 1 and every other call
+reports 0. Where flag bit 0 is clear, the call that plays frame `O - 1`
+reports 0; the next call plays no frame, writes no register and reports
+-1, and so does every call after it.
+
 ---
 
 ## 8. Starting over
 
 A tune with flag bit 0 set plays `[0, O)` once and `[L, O)` for ever
 after. `L` is 0 where the whole tune repeats.
+
+Frames are played 0 to `O - 1`, then `L` to `O - 1` on every later pass,
+and frame `f` takes each stream's `f`-th value. The two forms below reach
+that sequence through a ring of `N` bytes. Neither changes which value a
+frame reads.
 
 ```
       0                        L                        O
@@ -647,23 +687,24 @@ a malformed file is undefined behaviour.
 
 Fourteen streams are copied: each value reaches its register unchanged.
 The rest is interpreted - a byte whose meaning is an operation rather than
-a value. Those operations, in full:
+a value. Those operations:
 
 | interpreted | the operation |
 |---|---|
-| M bit 4 with bits 7-5 | the three skip bits take the value in 7-5. On a frame with bit 4 clear they keep the value they had; nothing else changes them |
+| M bit 4 with bits 7-5 | bit 5 sets voice A's skip state, bit 6 voice B's, bit 7 voice C's. On a frame with bit 4 clear they keep the value they had; nothing else changes them |
 | skip bit set for voice v | no write to R8+v occurs in the frame write |
 | a section offset with bit 31 set | the bytes at that offset are the section's values, one per frame: read them, do not decode them |
 | R7 bits 7-6 | the value written there comes from the host. Bits 5-0 come from the stream |
 | R13 = `$FF` | R13 is not written this frame |
 | stream T's byte | compared each frame; a changed map is in force before the frame's actions |
-| X bits 7-4 | the value written to R13 when a retrigger stream starts, and when a `HOLD` with flag 4 runs |
+| X bits 7-4 | the shape a retrigger tick writes to R13 |
+| `START_RETRIGGER`, and `HOLD` with flag 4 | X bits 7-4 become that channel's retrigger shape. Neither writes R13 in the frame |
 | X bits 3-0 with `START_PCM_PREEMPT` | each marked channel's timer is stopped before this channel's timer is programmed |
 | `RELEASE` bit 0 clear | the timer is stopped. Set: the timer's interrupt is disabled and the timer keeps counting; a tick falling due in the gap is dropped |
 | `RETUNE` addressed to voice 3 | the timer is reprogrammed without being stopped, so the count in flight runs to its end |
 | a toggle stream's volume, a PCM stream's sample number | read from the voice's own register stream on the frame the stream starts, and where an opcode's flag re-reads them (§3) |
 | `START_TOGGLE` | R8+v is written 0 among that frame's actions, and the first tick, one timer period later, writes the level |
-| programming a timer | four writes in the order stop, vector, count, run, with no tick of that timer between the first and the last, ending with that interrupt enabled and unmasked |
+| programming a timer | four writes in the order stop, vector, count, run, with no tick of that timer between the first and the last, ending with that interrupt enabled and unmasked. This document names no register and no address: which they are is the host's, and the order is what a player owes a stream |
 | a sample byte with bit 7 set | it is written to the volume register as a level, and the sample ends there |
 | loop point `$FFFF` | on the marker, 13 is written to the volume register and the timer is stopped. Any other value: the read position becomes that offset into the sample and the ticks continue |
 | the frame's order | skip bits, then the fourteen register writes, then the frame's actions in channel order, then one refill |
@@ -698,6 +739,7 @@ The shape:
 
 The values:
 
+- M marks only channels flagged in §1.2.
 - A register value contains only the bits of its mask (§2). R13 carries
   `$FF` on every frame that must not restart the envelope. R7 carries
   bits 5-0, with every generator masked off a voice for as long as a PCM
@@ -735,3 +777,140 @@ The actions:
 - Stream T is within §2.3: flagged channels name distinct timers at frame
   0; a change moves only channels with nothing running, among the timers
   claimed at frame 0.
+
+---
+
+## Appendix A. The ST4 container
+
+A packed section is one ST4 container. This appendix states it in full, so
+a reader implements this document without a second one. The format is
+ST4's; version 4 is the version stated here.
+
+### A.1 The header, twenty bytes
+
+| offset | size | field |
+|---:|---:|---|
+| 0 | 4 | signature `$53 $34 $04 k`: `'S'`, `'4'`, format version 4, unit size `k` |
+| 4 | 4 | output size in bytes, a multiple of `k` |
+| 8 | 4 | where stream B starts, in bytes from the header's first byte |
+| 12 | 4 | where stream C starts |
+| 16 | 4 | where stream D starts |
+
+Stream A begins at offset 20. The three offsets locate the others, so a
+stream's length is the distance to the next one and stream A is padded to
+an even length.
+
+### A.2 The four streams
+
+| stream | contents |
+|---|---|
+| A | the bits: flags, class bits and lengths |
+| B | the literal data, whole units |
+| C | byte offsets, one byte each |
+| D | word offsets, one word each |
+
+Bits are read from stream A most significant first. A length is an
+interlaced Elias gamma value: each binary digit of the value below its
+leading 1 is written after a `1` marker bit, most significant first, and a
+`0` bit ends the value. So 1 is `0`, 2 is `100`, 3 is `110`, 4 is `10100`.
+
+### A.3 The blocks
+
+| block | encoding |
+|---|---|
+| literals | `gamma(length)`, then the next `length` units of stream B |
+| match at the last offset | `gamma(length)`, then `length` units copied from the current offset |
+| match at a new offset | two class bits, one value from C or D, then `gamma(length - 1)` |
+
+The first block is literals and carries no flag bit. After literals, a `0`
+bit starts a match at the last offset and a `1` a match at a new offset, so
+two literal runs never follow each other. After a match, a `0` starts
+literals and a `1` a match at a new offset.
+
+**The last offset begins at 1.** A decoder that has read no new offset yet
+copies from one unit back, so a first block of literals may be followed
+immediately by a match at the last offset.
+
+### A.4 New offsets
+
+| class bits | meaning |
+|---|---|
+| `1 0` | byte offset from stream C, 1 to 256 units back |
+| `1 1` | byte offset from stream C, 257 to 512 units back |
+| `0 0` | word offset from stream D |
+| `0 1` | end of the stream |
+
+A byte offset of `n` units in bank `b` is stored as the byte
+`256·(b + 1) - n`, where `b` is 0 for class `1 0` and 1 for class `1 1`. A
+word offset of `n` units is stored big-endian as `65536 - n·k`, which is
+`-n·k` as a decoder keeps it.
+
+A decoder stops on the end-of-stream class, having written the header's
+output size in bytes. No offset reaches further back than 32512 bytes at
+any `k`, and a match at a new offset is at least 2 units long.
+
+---
+
+## Appendix B. A worked file
+
+`ym/test/Circus Attractions  2.ymx`, 240 bytes, four frames, every section
+stored. Read against §1 and §7 it settles the header's fields, where the
+body begins, how a stored section is read, and what a call reports.
+
+### B.1 The header
+
+```
+   0  59 4D 58 21   'YMX!'
+   4  00 05         format version 0.5
+   6  00 01         flags: bit 0 set, the tune starts over
+   8  00 00 00 04   O = 4 frames
+  12  00 32         50 Hz
+  16  03 C0         N = 960
+  18  00 18         C = 24
+  20  00 1E 84 80   master clock 2000000
+  24  00 00 00 00   no sample table
+  28  00 00         reserved
+  30  00 00 00 00   L = 0, the tune starts over from its first frame
+  34  00 00 00 00   no loop table, so each stream has one section
+  38  80 00 00 8C   stream 0: bit 31 set, stored, at offset 140
+  42  80 00 00 90   stream 1: stored, at offset 144
+  46  80 00 00 94   stream 2: stored, at offset 148
+       ...
+ 134  80 00 00 C0   stream 24: stored, at offset 192
+```
+
+The header ends at byte 137. Bytes 138 and 139 are padding to the next
+long boundary, so the first body item is at 140, as §1.1 has it.
+
+### B.2 Two sections
+
+Every entry has bit 31 set, so every section is stored: the bytes at the
+offset are the values, one per frame, with no container and no signature.
+Four frames, so four bytes each.
+
+```
+ 140  A3 8E FB 59   stream 0, R0: 163, 142, 251, 89
+ 144  02 0C 04 02   stream 1, R1: 2, 12, 4, 2
+ 192  FF FF FF FF   stream 13, R13: $FF on every frame
+```
+
+A file of stored sections reads the same at any unit size, so this one
+plays on a player built for any of the three.
+
+### B.3 What a player produces
+
+The four frames, then the fifth call. R13 carries `$FF` on every frame, so
+no frame writes it (§7 step 2), and streams 14 to 24 are script data whose
+bytes never reach the chip.
+
+| call | reports | writes |
+|---:|---:|---|
+| 0 | 0 | R0=163 R1=2 R2=238 R3=14 R4=238 R5=14 R6=12 R7=248 R8=15 R9=0 R10=0 R11=0 R12=0 |
+| 1 | 0 | R0=142 R1=12 R2=238 R3=14 R4=238 R5=14 R6=28 R7=241 R8=12 R9=0 R10=0 R11=0 R12=0 |
+| 2 | 0 | R0=251 R1=4 R2=238 R3=14 R4=238 R5=14 R6=12 R7=241 R8=13 R9=0 R10=0 R11=0 R12=0 |
+| 3 | 1 | R0=89 R1=2 R2=238 R3=14 R4=238 R5=14 R6=12 R7=248 R8=15 R9=0 R10=0 R11=0 R12=0 |
+| 4 | 0 | the frame 0 row again |
+
+Call 3 plays frame `O - 1` and reports 1, the tune having gone round; call
+4 plays frame 0 again, because `L` is 0. R7's values carry the host's port
+bits: the stream's byte for frame 0 is `$38`, and `$38 | $C0` is 248.
