@@ -18,9 +18,15 @@ document", not "a player can be ported from it".
 Copy `TASK.md`, `tunes/` and `../SPEC.md` into a fresh directory and give
 that directory to an implementer with no access to this repository and no
 access to any implementation of the format or of the compression under
-it. Keep `MANIFEST.txt` and the reference dumps back: an implementer who
-can check an answer is not reading the document, and the exercise
-measures the document.
+it. `TASK.md` tells the implementer to keep out of the YMX repository and
+leaves the path to you, since this checkout is somewhere different on
+every machine: name it when you hand the directory over. Keep
+`MANIFEST.txt` and the reference dumps back: an implementer who can check
+an answer is not reading the document, and the exercise measures the
+document.
+
+`TASK-player.md` is the same exercise at player level, and is copied in
+place of `TASK.md` to run that one.
 
 Where several implementers run at once, each needs scratch space of its
 own as well as its own copy of the directory. The fifth run gave all
