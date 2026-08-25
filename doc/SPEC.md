@@ -251,9 +251,9 @@ file carries a loop table, decoding to the counts §1.4 gives every other
 stream, and delivering one value per frame through a ring of `N` bytes.
 
 `Q`, the long at offset 38, carries one bit per stream, bit `k` for stream
-`k`. A set bit **requires** the stream: a consumer that does not understand
+`k`. A set bit **requires** the stream: a consumer that does not implement
 it rejects the file (§9.1). A clear bit on a stream the file carries makes
-the stream **advisory**: a consumer that does not understand it reads none
+the stream **advisory**: a consumer that does not implement it reads none
 of it, gives it no position in its decode list, and produces the values it
 would produce from a file without it.
 
@@ -295,8 +295,8 @@ it reaches M, X, T and the channel pairs.
 | 27 | reserved |
 | 28 | reserved |
 | 29 | reserved |
-| 30 | private |
-| 31 | private |
+| 30 | custom |
+| 31 | custom |
 
 This version assigns no index, and a file of this version carries no stream
 at a reserved index.
@@ -308,18 +308,18 @@ Assigning an index does not change the format version. A consumer built
 before the assignment rejects a file that requires the index, and reads
 none of a file that leaves it advisory.
 
-A **private** index carries what a writer and its own tools agree it
+A **custom** index carries what a writer and its own tools agree it
 carries. This document assigns nothing from 30 or 31 at any version, so a
-private stream never collides with a registered one. Two private streams at
+custom stream never collides with a registered one. Two custom streams at
 one index are one stream to the format, and no field in the file separates
 them: a consumer that implements its own index 30 reads another writer's
-index 30 as its own. A writer whose private stream would change what plays
+index 30 as its own. A writer whose custom stream would change what plays
 sets its bit, so a consumer that implements nothing at that index rejects
 the file instead. A consumer that implements a different stream at that
-index misreads it, and the format offers no defence.
+index misreads it, and nothing in the file prevents that.
 
 An extension that turns out to be shared is registered from 25 to 29 in a
-later version, and a writer moves it there from its private index.
+later version, and a writer moves it there from its custom index.
 
 ---
 
@@ -423,8 +423,8 @@ Where a source keeps its shape differs by format; the writer resolves it
 into X, and a player derives nothing. A toggle stream's volume and a PCM
 stream's sample number come from the voice's register stream (§3.2); a
 shape has no voice to come from. A tune that arms a retrigger stream
-before any shape is set carries the shape the writer chooses for the
-tune's start.
+before any shape is set carries the shape the writer gives the tune's
+start.
 
 ### 2.3 T - the channel-to-timer map
 
@@ -723,8 +723,8 @@ short one. Otherwise a section that runs out mid-refill is opened again
 and the refills go on (§8).
 
 Before frame 0, a player decodes one group of every stream in its decode
-list, so that frame 0's values are present: `C` values, or `O` where the tune is shorter than
-a group and the refills stop at `O`.
+list, so that frame 0's values are present: `C` values, or `O` where the
+tune is shorter than a group and the refills stop at `O`.
 
 Actions follow the frame write so that their varying cost does not delay
 the register writes. Skips precede it so that a voice released in a frame
@@ -813,11 +813,11 @@ stream crosses on its own refill turn and none crosses before it has read
 - the version is $0006 - 0.6;
 - the stream count `S` is 25 to 32;
 - the required-streams mask names no stream the consumer does not
-  understand: `Q AND NOT understood` is zero, where bit `k` of
-  `understood` is set for each stream `k` the consumer understands. Every
-  consumer of this version understands streams 0 to 24; a consumer that
-  implements no extension stream understands those twenty-five, and
-  testing `Q` against `$01FFFFFF` is that check for it;
+  implement: `Q AND NOT implemented` is zero, where bit `k` of
+  `implemented` is set for each stream `k` the consumer implements. Every
+  consumer of this version implements streams 0 to 24; a consumer that
+  carries no extension stream implements those twenty-five, and testing
+  `Q` against `$01FFFFFF` is that check for it;
 - every section that is a container carries an ST4 signature matching the
   format version and unit size the player was built for - a tune packed
   for a different one is rejected, not garbled. A stored section has no
@@ -834,25 +834,30 @@ a value. Those operations:
 
 | interpreted | the operation |
 |---|---|
-| M bit 4 with bits 7-5 | bit 5 sets voice A's skip state, bit 6 voice B's, bit 7 voice C's. On a frame with bit 4 clear they keep the value they had; nothing else changes them |
+| M bit 4 set, with bits 7-5 | bit 5 sets voice A's skip state, bit 6 voice B's, bit 7 voice C's |
+| M bit 4 clear | the three skip states keep the value they had; nothing else changes them |
 | skip bit set for voice v | no write to R8+v occurs in the frame write |
 | a section offset with bit 31 set | the bytes at that offset are the section's values, one per frame: read them, do not decode them |
-| R7 bits 7-6 | the value written there comes from the host. Bits 5-0 come from the stream |
+| R7 bits 7-6 | the value written there comes from the host |
+| R7 bits 5-0 | the value written there comes from the stream |
 | R13 = `$FF` | R13 is not written this frame |
 | stream T's byte | compared each frame; a changed map is in force before the frame's actions |
 | X bits 7-4 | the shape a retrigger tick writes to R13 |
 | `START_RETRIGGER`, and `HOLD` with flag 4 | X bits 7-4 become that channel's retrigger shape. Neither writes R13 in the frame |
 | X bits 3-0 with `START_PCM_PREEMPT` | each marked channel's timer is stopped before this channel's timer is programmed |
-| `RELEASE` bit 0 clear | the timer is stopped. Set: the timer's interrupt is disabled and the timer keeps counting; a tick falling due in the gap is dropped |
+| `RELEASE` bit 0 clear | the timer is stopped |
+| `RELEASE` bit 0 set | the timer's interrupt is disabled and the timer keeps counting; a tick falling due in the gap is dropped |
 | `RETUNE` addressed to voice 3 | the timer is reprogrammed without being stopped, so the count in flight runs to its end |
 | a toggle stream's volume, a PCM stream's sample number | read from the voice's own register stream on the frame the stream starts, and where an opcode's flag re-reads them (§3) |
 | `START_TOGGLE` | R8+v is written 0 among that frame's actions, and the first tick, one timer period later, writes the level |
 | programming a timer | four writes in the order stop, vector, count, run, with no tick of that timer between the first and the last, ending with that interrupt enabled and unmasked. This document names no register and no address: which they are is the host's, and the order is what a player owes a stream |
 | a sample byte with bit 7 set | it is written to the volume register as a level, and the sample ends there |
-| loop point `$FFFF` | on the marker, 13 is written to the volume register and the timer is stopped. Any other value: the read position becomes that offset into the sample and the ticks continue |
+| loop point `$FFFF`, on the marker | 13 is written to the volume register and the timer is stopped |
+| loop point of any other value, on the marker | the read position becomes that offset into the sample and the ticks continue |
 | the frame's order | skip bits, then the fourteen register writes, then the frame's actions in channel order, then one refill |
 | the frame after the last, flag bit 0 set | every claimed timer is stopped, its vector parked, its interrupt enabled with nothing pending, and every skip bit cleared, before frame `L` is played again |
-| the required-streams mask | a bit outside the streams the consumer understands: the file is rejected. A bit inside it: that stream is read |
+| a required-streams mask bit outside the streams the consumer implements | the file is rejected |
+| a required-streams mask bit inside them | that stream is read |
 | an extension stream's table entry that is 0 | the file does not carry that stream: nothing is decoded there and it takes no position in the decode list |
 | the decode list | streams 0 to the base count less one, then the extension streams the consumer implements and the file carries, in ascending index order |
 | refill turn | on call `n` counted from init, the stream at position `n` modulo `C` of the consumer's decode list is decoded `C` values further, the count running on across a wrap |
@@ -956,7 +961,7 @@ levels it plays are a tick's. `START_TOGGLE`'s `R(8+v) := 0` is one of the
 frame's own writes and stands in the dump, on a skipped voice too; the
 levels the stream plays afterwards are a tick's.
 
-What it leaves unread is what a timer writes between frames. A timer
+It leaves unread what a timer writes between frames. A timer
 stream's values reach the chip from a tick, at a rate §5 sets, and a
 reader has no ticks: it produces one set of values a frame. So a reader
 reads §3's fourth column, which says which opcodes write a sound register

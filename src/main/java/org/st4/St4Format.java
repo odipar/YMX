@@ -163,7 +163,7 @@ public final class St4Format {
      * since no length is stored and each stream runs to the next.
      *
      * @throws IllegalArgumentException with a printable reason if it is not an
-     *     ST4 file this build understands, or if the offsets do not describe
+     *     ST4 file this build reads, or if the offsets do not describe
      *     four streams laid out in order inside it
      */
     public static Container read(byte[] file) {

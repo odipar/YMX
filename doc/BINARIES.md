@@ -244,7 +244,7 @@ tune's header - the maximum back-reference distance, not a combiner
 option. The packer also raises `N` above the ring size it was asked for
 where one pass of a tune needs a longer ring, so the ring size a set was
 packed with is not the `N` its tunes carry: read every tune's header. A
-combiner chooses only the workspace size: anything at or above
+combiner sets only the workspace size: anything at or above
 `F + 25 · max(N)` (§1). `F + 25 · 2520` - the cap on `N` (`SPEC.md`
 §1.3) - covers every legal tune, so a combiner may write that once and
 skip the per-set maximum.

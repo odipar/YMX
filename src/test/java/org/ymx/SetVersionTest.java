@@ -14,7 +14,7 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * {@link SetVersion} against a copy of the real sites: a bump lands at
  * every site, a reworded site is refused with nothing written, and the
- * argument gate refuses what the parse could not read.
+ * argument gate rejects what the parse could not read.
  */
 final class SetVersionTest {
 

@@ -777,10 +777,10 @@ namespace Rig
         /// same register.</summary>
         /// <summary>A file that requires an extension stream, against a
         /// player that implements none. Section 1.6's mask is the whole of
-        /// 0.6's new behaviour and the only thing in the format a build can
-        /// refuse for. The control is the same file with the bit clear, so a
-        /// rejection is the mask and not the shape of a hand-built
-        /// file.</summary>
+        /// 0.6's new behaviour and the only thing in the format a build
+        /// rejects a file for. The control is the same file with the bit
+        /// clear, so a rejection is the mask and not the shape of a
+        /// hand-built file.</summary>
         public static string RunRequiredExtension()
         {
             byte[] plain = StoredYmx(4, 96, 0);
@@ -1173,7 +1173,7 @@ namespace Rig
             failures += Report(RunSndhCorpus(),
                     "the pinned tunes combined (both paths, same chip writes)");
             failures += Report(RunRequiredExtension(),
-                    "a required extension     (the mask refuses, the ceiling holds)");
+                    "a required extension     (the mask rejects, the ceiling holds)");
             failures += Report(RunStoredCut(),
                     "the stored cut           (both tables, values not containers)");
             failures += Report(RunLoopPointResolve(),

@@ -357,8 +357,8 @@ YS_STORED       equ     44              ; word  set when the section is its own
 
 ; The .ymx header, as written by the packer.
 ; The extension streams a file may store past the twenty-five, and the mask
-; a file that stores none carries: this build understands streams 0 to 24 and
-; no extension, so any other mask is a stream it cannot honour.
+; a file that stores none carries: this build implements streams 0 to 24 and
+; no extension, so any other mask names a stream it does not read.
 YMX_EXT_MAX     equ     7
 YMX_REQUIRED_BASE equ   $01FFFFFF
 
@@ -384,9 +384,9 @@ YH_LOOPTAB      equ     34              ; long: the loop table, 0 when none.
                                         ; first plays
 YH_REQUIRED     equ     38              ; long: Q, the required-streams mask.
                                         ; Bit k requires stream k, and a
-                                        ; consumer that does not understand a
+                                        ; consumer that does not implement a
                                         ; required stream rejects the file.
-                                        ; This build understands the
+                                        ; This build implements the
                                         ; twenty-five and no extension, so it
                                         ; takes the one value and no other
 YH_SECTIONS     equ     42              ; one offset per stream: its section,
@@ -461,7 +461,7 @@ YMX_init:
         bhi     .rejected
         cmp.l   #YMX_REQUIRED_BASE,YH_REQUIRED(a0)
         bne     .rejected               ; a required stream this build does
-                                        ; not understand
+                                        ; not implement
 
         move.l  YH_FRAMES(a0),YMX_TOTAL(a3)
         move.w  YH_RING(a0),YMX_N(a3)
