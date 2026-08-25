@@ -26,7 +26,7 @@ namespace Ymx
         /// player, a fixed stub. The format version above is the
         /// compatibility gate; this number never reaches the format
         /// word.</summary>
-        public const int Patch = 0;
+        public const int Patch = 1;
 
         /// <summary>The release's version as prose: the format version,
         /// then the patch, a dot between them.</summary>
