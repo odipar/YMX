@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -430,7 +431,8 @@ final class SpecConsistencyTest {
         assertTrue(said.contains("signature `$53 $34 $04 k`: `'S'`, `'4'`,"
                         + " format version 4, unit size `k`"),
                 "SPEC Appendix A's signature row has been reworded");
-        assertTrue(said.contains("**The last offset begins at 1.**"),
+        assertTrue(said.contains("**The last offset is a count of units, and"
+                        + " begins at one.**"),
                 "SPEC Appendix A no longer states the initial last offset,"
                         + " which a decoder needs before it reads any new"
                         + " offset and which ST4's own README omits");
@@ -454,28 +456,101 @@ final class SpecConsistencyTest {
                 "SPEC §7 no longer states what a call reports");
         assertTrue(said.contains("the call that plays frame `O - 1` reports 1"),
                 "SPEC §7's going-round report has been reworded");
-        assertTrue(said.contains("the next call plays no frame, writes no"
-                        + " register and reports -1"),
-                "SPEC §7's ended report has been reworded");
+        assertTrue(said.contains("The next call plays no frame, writes no"
+                        + " register and reports -1: the run has ended there"),
+                "SPEC §7 no longer says a report of -1 ends the run, which is"
+                        + " the sentence a reader stops on");
     }
 
-    /** The worked file, against the file it works through. */
+    /**
+     * The worked file, against a file that answers to it. A specification
+     * names no file in a source tree (AGENTS.md), so Appendix B describes
+     * its file by shape and this finds one of that shape rather than one
+     * of that name.
+     */
     @Test
-    void theWorkedFileIsTheFileInTheTree() throws IOException {
+    void theWorkedFileIsAFileInTheTree() throws IOException {
         String said = flat();
-        // flat() collapses the two spaces the file name carries
-        assertTrue(said.contains("`ym/test/Circus Attractions 2.ymx`, 240"
-                        + " bytes, four frames"),
-                "SPEC Appendix B names another file or another size");
-        byte[] file = Files.readAllBytes(
-                Path.of("ym", "test", "Circus Attractions  2.ymx"));
-        assertEquals(240, file.length,
-                "Appendix B walks through this file byte by byte");
-        assertEquals(4, (int) longAt(file, YmxFormat.OFFSET_FRAMES),
-                "Appendix B says four frames");
+        assertTrue(said.contains("A file of 240 bytes, four frames, every"
+                        + " section stored."),
+                "SPEC Appendix B describes another file");
+
+        byte[] found = null;
+        try (Stream<Path> walk = Files.list(Path.of("ym", "test"))) {
+            for (Path each : walk.filter(p -> p.toString().endsWith(".ymx"))
+                    .sorted().toList()) {
+                byte[] file = Files.readAllBytes(each);
+                if (file.length == 240 && longAt(file, YmxFormat.OFFSET_FRAMES) == 4) {
+                    found = file;
+                    break;
+                }
+            }
+        }
+        assertTrue(found != null, "Appendix B walks through a 240-byte,"
+                + " four-frame file and ym/test holds none");
+
+        byte[] file = found == null ? new byte[240] : found;
         assertEquals(140, (int) YmxFormat.sectionOffset(
                         longAt(file, YmxFormat.OFFSET_SECTION_TABLE)),
                 "Appendix B says the first body item is at 140");
+        for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
+            assertTrue(YmxFormat.isStored(longAt(file,
+                            YmxFormat.OFFSET_SECTION_TABLE + 4 * stream)),
+                    "Appendix B says every section is stored, and stream "
+                            + stream + " is not");
+        }
+        assertEquals(0, word(file, 28),
+                "Appendix B annotates offset 28 as a sample count of 0");
+    }
+
+    /**
+     * The refill turn, stated twice and checked as one. §7 step 4 gives it
+     * as a count of calls and §9.2 summarises the same rule; the two said
+     * different things for two runs of the specification exercise, because
+     * a reader producing values need build no ring and so never had to
+     * choose. The player settles it: the counter is cleared at init and a
+     * wrap does not touch it.
+     */
+    @Test
+    void theRefillTurnIsOneRuleInBothPlaces() throws IOException {
+        String said = flat();
+        assertTrue(said.contains("stream `k` on the call whose count of calls"
+                        + " since init, modulo `C`, equals `k`"),
+                "SPEC §7 step 4's refill turn has been reworded");
+        assertTrue(said.contains("on call `n` counted from init, stream `n`"
+                        + " modulo `C` is decoded `C` values further, the count"
+                        + " running on across a wrap"),
+                "SPEC §9.2's refill row no longer states §7 step 4's rule."
+                        + " The two said different things once already, and"
+                        + " §9.2 was the one that was wrong");
+
+        List<String> player = Files.readAllLines(Path.of("68k", "YMX.S"));
+        int cleared = 0;
+        boolean inRestart = false;
+        int restartTouches = 0;
+        for (String line : player) {
+            if (line.startsWith("ymx_restart")) {
+                inRestart = true;
+            } else if (inRestart && line.contains("rts")) {
+                inRestart = false;
+            }
+            if (line.contains("clr.w") && line.contains("YMX_SLOT")) {
+                cleared++;
+            }
+            if (inRestart && line.contains("YMX_SLOT")) {
+                restartTouches++;
+            }
+        }
+        assertEquals(1, cleared,
+                "the player clears the refill counter once, at init, which is"
+                        + " what makes the count run on across a wrap");
+        assertEquals(0, restartTouches,
+                "ymx_restart touches the refill counter, so the count does not"
+                        + " run on across a wrap and §7 step 4 is wrong");
+    }
+
+    private static int word(byte[] file, int at) {
+        return ((file[at] & 0xFF) << 8) | (file[at + 1] & 0xFF);
     }
 
     private static long longAt(byte[] file, int at) {
