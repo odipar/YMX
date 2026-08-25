@@ -53,6 +53,18 @@ final class ConformanceSourcesTest {
                         + format(entries) + " entries, which is what"
                         + " MANIFEST.txt's rows add up to");
 
+        int ticks = 0;
+        for (String line : Files.readAllLines(KIT.resolve("MANIFEST-ticks.txt"))) {
+            String[] row = line.trim().split("\\s+");
+            if (row.length == 6 && row[5].length() == 64) {
+                ticks += Integer.parseInt(row[4]);
+            }
+        }
+        assertTrue(readme.contains("come to " + format(ticks) + " ticks"),
+                "doc/conformance/README.md does not say the ten tunes come to "
+                        + format(ticks) + " ticks, which is what"
+                        + " MANIFEST-ticks.txt's rows add up to");
+
         int opcodes = 0;
         Tune tune = YmEffects.tune(Ym6Reader.read(Files.readAllBytes(
                 Path.of("ym", "test", "Sync buzzer, built.ym"))));
