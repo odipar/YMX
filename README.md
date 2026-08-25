@@ -123,7 +123,7 @@ which format a tune came out of.
 ## Tests
 
 ```sh
-mvn test                              # packers, 39 pinned tunes, a rig slice
+mvn test                              # packers, 40 pinned tunes, a rig slice
 ymx/test/rig.sh                       # the player, under emulation
 ymx/test/sweep.sh songs/*.ym          # a YM collection, differentially
 ymx/test/ymr_sweep.sh songs/*.ymr     # the same for .YMR

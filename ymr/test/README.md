@@ -1,6 +1,6 @@
 # The pinned .YMR tunes
 
-Three tunes and the `.ymx` each one packs to, checked the same way the YM
+Four tunes and the `.ymx` each one packs to, checked the same way the YM
 tunes in [../../ym/test](../../ym/test) are: `PinnedCorpusTest` packs them
 again and compares.
 
@@ -9,6 +9,10 @@ They carry what no YM dump in that collection does. `dd.ymr` plays once,
 source in either collection whose header says the tune stops. `deeper.ymr`
 starts over, and its script holds 321 retunes that leave the timer running.
 `signals.ymr` runs 9,792 frames with 336 retrigger-stream starts.
+`looped.ymr` is built rather than recorded: it carries the one sample in
+either collection with a loop point, and its timer is stopped by the song
+part-way through, so a looped sample both holds its voice and gives it
+back.
 
 Each is packed by `org.ymr.Ymr` at the default options, the entry point the
 tools call.
