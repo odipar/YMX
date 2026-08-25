@@ -12,6 +12,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.ymx.MkCores;
+import org.ymx.MkSndh;
+import org.ymx.Tools;
 
 /**
  * Differential tests for the YMX player: does the ST write the right YM
@@ -849,40 +852,15 @@ final class PlayerTests {
         // Subtune 2 is shorter than the window played below, so it
         // reaches its own wrap while the others do not: nothing a wrapped
         // subtune leaves in the workspace survives the switch to the next.
-        int[] lengths = {200, 20, 200};
-        int[][] signatures = new int[3][];
-        for (int i = 0; i < 3; i++) {
-            signatures[i] = new int[lengths[i]];
-        }
-        for (int f = 0; f < lengths[0]; f++) {
-            signatures[0][f] = (3 * f + 1) & 0xFF;
-        }
-        for (int f = 0; f < lengths[1]; f++) {
-            signatures[1][f] = (0x55 + 7 * f) & 0xFF;
-        }
-        for (int f = 0; f < lengths[2]; f++) {
-            signatures[2][f] = (0xA0 + f) & 0xFF;
-        }
+        int[][] signatures = sndhSignatures();
         Files.createDirectories(Rig.SCRATCH);
         List<String> command = new ArrayList<>(List.of("sh",
                 Rig.REPO.resolve("ymx").resolve("mksndh.sh").toString(),
                 "-tRig", Rig.SCRATCH.resolve("sndh_test.sndh").toString()));
         for (int i = 0; i < 3; i++) {
-            int frames = lengths[i];
-            byte[][] values = new byte[16][frames];
-            for (int f = 0; f < frames; f++) {
-                values[2][f] = (byte) signatures[i][f];
-                values[13][f] = (byte) GenYm.NO_ENVELOPE_CHANGE;
-            }
-            for (int f = 5; f < frames; f++) {      // a held SID on voice A,
-                values[1][f] |= 0x10;               // so the tune claims
-                values[6][f] |= 1 << 5;             // channel 0's timer
-                values[14][f] = 100;
-                values[8][f] = 10;
-            }
             String[] extra = i == 2 ? new String[] {"-timersB"} : new String[0];
             Path tune = Rig.SCRATCH.resolve("sndh_tune" + (i + 1) + ".ymx");
-            Files.write(tune, Rig.pack(GenYm.ym6File(frames, values),
+            Files.write(tune, Rig.pack(sndhSource(signatures[i]),
                     960, 24, true, 2, extra));
             command.add(tune.toString());
         }
@@ -909,6 +887,109 @@ final class PlayerTests {
             }
         }
 
+        return checkSndh(blob, signatures);
+    }
+
+    /**
+     * The three subtunes' register-2 values, one per frame. Subtune 2 is
+     * shorter than the window played below, so it reaches its own wrap
+     * while the others do not: nothing a wrapped subtune leaves in the
+     * workspace survives the switch to the next.
+     */
+    private static int[][] sndhSignatures() {
+        int[] lengths = {200, 20, 200};
+        int[][] signatures = new int[3][];
+        for (int i = 0; i < 3; i++) {
+            signatures[i] = new int[lengths[i]];
+        }
+        for (int f = 0; f < lengths[0]; f++) {
+            signatures[0][f] = (3 * f + 1) & 0xFF;
+        }
+        for (int f = 0; f < lengths[1]; f++) {
+            signatures[1][f] = (0x55 + 7 * f) & 0xFF;
+        }
+        for (int f = 0; f < lengths[2]; f++) {
+            signatures[2][f] = (0xA0 + f) & 0xFF;
+        }
+        return signatures;
+    }
+
+    /** One subtune as a YM6 file: its own value in register 2 each frame,
+     * and a held SID on voice A from frame 5, so the tune claims a timer. */
+    private static byte[] sndhSource(int[] signature) {
+        int frames = signature.length;
+        byte[][] values = new byte[16][frames];
+        for (int f = 0; f < frames; f++) {
+            values[2][f] = (byte) signature[f];
+            values[13][f] = (byte) GenYm.NO_ENVELOPE_CHANGE;
+        }
+        for (int f = 5; f < frames; f++) {
+            values[1][f] |= 0x10;
+            values[6][f] |= 1 << 5;
+            values[14][f] = 100;
+            values[8][f] = 10;
+        }
+        return GenYm.ym6File(frames, values);
+    }
+
+    /**
+     * Every core a release publishes, each playing a tune. {@code runSndh}
+     * covers the one core {@code dist/} holds for the default flags; the
+     * twelve a release carries are three unit sizes by the raster monitor
+     * and the frame mask, and eight of them reached the archive without a
+     * tune ever running on one. The monitor paints a colour register and
+     * the mask changes what the frame write sits behind, so neither reaches
+     * the sound chip: every core plays the same values, and this reads them
+     * back the way {@link #runSndh} does.
+     */
+    static String runSndhEveryCore() throws IOException {
+        Path cores = Rig.SCRATCH.resolve("cores");
+        Files.createDirectories(cores);
+        for (boolean perf : new boolean[] {false, true}) {
+            for (boolean nomask : new boolean[] {false, true}) {
+                MkCores.cores(cores, perf, nomask);
+                for (int unit : new int[] {1, 2, 4}) {
+                    String name = "ymxsndh-k" + unit + (perf ? "-perf" : "")
+                            + (nomask ? "-nomask" : "") + Tools.binarySuffix()
+                            + ".bin";
+                    String problem = sndhOnCore(cores.resolve(name), unit,
+                            perf, !nomask);
+                    if (!problem.isEmpty()) {
+                        return name + ": " + problem;
+                    }
+                }
+            }
+        }
+        return "";
+    }
+
+    /** One core, combined with tunes packed at its own unit size and
+     * played. The core is given rather than resolved from {@code dist/},
+     * which is the only way to reach the variants a release carries. */
+    private static String sndhOnCore(Path core, int unit, boolean perf,
+            boolean maskBurst) throws IOException {
+        int[][] signatures = sndhSignatures();
+        List<Path> tunes = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            Path tune = Rig.SCRATCH.resolve("core_tune" + (i + 1) + ".ymx");
+            Files.write(tune, Rig.pack(sndhSource(signatures[i]), 960, 24,
+                    true, unit, i == 2 ? new String[] {"-timersB"}
+                            : new String[0]));
+            tunes.add(tune);
+        }
+        Path out = Rig.SCRATCH.resolve("core_test.sndh");
+        MkSndh.build(new MkSndh.Options(out, tunes, "Rig", null, null,
+                perf, maskBurst), core);
+        return checkSndh(Files.readAllBytes(out), signatures);
+    }
+
+    /**
+     * One built SNDH blob, driven through its three entries: the blob loaded
+     * at an arbitrary even address, every entry preserving d0-a6, each
+     * subtune playing its own data, the machine state handed back at exit,
+     * and init-without-exit recovering by itself.
+     */
+    private static String checkSndh(byte[] blob, int[][] signatures) {
         Sndh player = new Sndh(blob);
         // sentinels for every timer's state: what a claim must hand back,
         // and what an unclaimed timer must never touch
@@ -987,6 +1068,7 @@ final class PlayerTests {
             return problem;
         }
         player.call(4, 0xD0D0D0D0L);
+
         return "";
     }
 
@@ -1112,6 +1194,8 @@ final class PlayerTests {
 
         failures += report(runSndh(),
                 "the SNDH container       (subtunes, handback, re-init)");
+        failures += report(runSndhEveryCore(),
+                "every published core     (3 units x monitor x mask)");
         failures += report(runShapeSource(),
                 "the retrigger shape      (both sources, off the patched tick)");
         for (boolean perf : new boolean[] {false, true}) {
