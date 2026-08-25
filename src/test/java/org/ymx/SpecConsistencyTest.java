@@ -446,6 +446,19 @@ final class SpecConsistencyTest {
         assertTrue(said.contains("No offset reaches further back than 32512"
                         + " bytes at any `k`"),
                 "SPEC Appendix A's offset bound has been reworded");
+        assertTrue(said.contains("has also read streams A, B and C to within"
+                        + " the padding A.1 describes"),
+                "SPEC Appendix A.4 no longer gives a decoder the one check a"
+                        + " container carries. Measured over the kit's 275"
+                        + " packed sections, A, B and C each end within three"
+                        + " bytes of the next stream");
+        assertTrue(said.contains("A byte class counts units where the word"
+                        + " class counts bytes, so no division by `k` applies"
+                        + " to it"),
+                "SPEC Appendix A.4 no longer separates the byte class's units"
+                        + " from the word class's bytes. Read the other way"
+                        + " the closing sentence contradicts the formula three"
+                        + " lines above it");
 
         // The two sentences run four measured as silent: read the other way,
         // each produces a decoder that runs, passes its own size checks, and
@@ -626,6 +639,17 @@ final class SpecConsistencyTest {
         assertTrue(kit.contains("§9.4"),
                 "doc/conformance/README.md does not say which role it tests,"
                         + " and the kit measures a reader rather than a player");
+        assertTrue(flat().contains("Frame `L` is then played as §7 has it:"
+                        + " its own M byte sets the skip states again where it"
+                        + " carries bit 4"),
+                "SPEC §9.4 no longer hands frame `L` back to §7. Read the"
+                        + " other way the pass-end clear overrides step 1 and"
+                        + " frame `L` writes all three volume registers");
+        assertTrue(flat().contains("It begins its first call with all three"
+                        + " clear, as §7 has a player begin frame 0"),
+                "SPEC §9.4 no longer says what a reader's skip states are"
+                        + " before its first call. §7's own sentence is in the"
+                        + " preamble, and a reader is given steps 1 to 3");
         assertTrue(Files.readString(Path.of("doc", "conformance", "TASK.md"))
                         .contains("§9.4"),
                 "doc/conformance/TASK.md does not tell a reader that what a"

@@ -955,11 +955,12 @@ A reader takes frame `f`'s value from each stream directly. §7 step 4 and
 §8's two forms state how a ring of `N` bytes delivers that value, and
 neither changes which value frame `f` reads. From §8 a reader reads the
 order the frames are played in and the state cleared at the end of a
-pass. Of that state a reader holds the three skip states, and clears them
-on the frame that ends the tune, after that frame's own writes: the next
-entry is frame `L`'s, and a voice skipped when the pass ended is written
-there. The timers, their vectors and their interrupts are a player's, and
-a reader holds none of them.
+pass. Of that state a reader holds the three skip states. It begins its
+first call with all three clear, as §7 has a player begin frame 0, and
+clears them again on the frame that ends the tune, after that frame's own
+writes. Frame `L` is then played as §7 has it: its own M byte sets the
+skip states again where it carries bit 4. The timers, their vectors and
+their interrupts are a player's, and a reader holds none of them.
 
 A per-frame register dump written by a reader carries the frame's values
 alone: a voice a timer stream owns holds no level there, because the
@@ -1072,11 +1073,21 @@ A byte offset of `n` units in bank `b` is stored as the byte
 `256·(b + 1) - n`, where `b` is 0 for class `1 0` and 1 for class `1 1`. A
 word offset of `n` units is stored big-endian as `65536 - n·k`, which is
 `-n·k` in sixteen bits. Negate the stored word for the distance in bytes,
-and divide that by `k` for `n`. A byte class stores `n` itself.
+and divide that by `k` for `n`. A byte class counts units where the word
+class counts bytes, so no division by `k` applies to it: recover its `n`
+from the formula above and no other way.
 
 A decoder stops on the end-of-stream class, having written the header's
 output size in bytes. No offset reaches further back than 32512 bytes at
 any `k`, and a match at a new offset is at least 2 units long.
+
+A decoder that has written the output size has also read streams A, B and
+C to within the padding A.1 describes - three bytes at most, since the
+next stream starts on a long boundary. Nothing else in a container tests
+a decoder: a reading of A.3's blocks that is wrong reads the same flag
+bits and the same gamma values, stops on an end-of-stream class, and
+writes the output size in full with the wrong bytes in it. How much of
+those three streams is left over separates the two.
 
 ---
 
