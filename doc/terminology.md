@@ -568,8 +568,8 @@ a YM file - and is not repeated here.
 are the names of the bytes. Together they are a **front end**; it stops at
 a `Tune`, and everything past that point - `EffectScript`, the encoder,
 the player - has no way to ask which format a tune was read out of. A
-second front end for another source format is another such pair, neither
-downstream of the other.
+front end for another source format is another such pair, and neither
+would be downstream of the other.
 
 The packages say the same thing: `org.ym6` is the YM front end, and
 `org.ymx` holds the engine, the format and the tools that work on a `.ymx`

@@ -1,0 +1,101 @@
+package org.ymx;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Stream;
+import org.junit.jupiter.api.Test;
+import org.ym6.Ym6Reader;
+import org.ym6.YmEffects;
+
+/**
+ * Which of SPEC.md §3's eight opcodes the pinned tunes compile to.
+ *
+ * <p>Three audits found the same hole by hand: an opcode the format defines
+ * and no tune exercises. This holds the answer in the build instead. Every
+ * opcode a pinned tune reaches must keep being reached, and the ones no
+ * tune reaches are named here with the reason, so the list shrinks when
+ * someone adds a fixture rather than being rediscovered.
+ *
+ * <p>Each tune is compiled twice, under the default gap model and under the
+ * resume model {@code -sidresume} selects, because both are packings a user
+ * can ask for and the format carries either.
+ */
+final class OpcodeCoverageTest {
+
+    /** SPEC.md §3, in opcode order. */
+    private static final List<String> OPCODES = List.of(
+            "RESUME", "HOLD", "RELEASE", "START_TOGGLE",
+            "RETUNE", "START_RETRIGGER", "START_PCM", "START_PCM_PREEMPT");
+
+    /**
+     * The opcodes no pinned tune compiles to, and why. Both need a source
+     * that no YM dump provides: a scan of all 544 files in the collection
+     * reaches neither. They exist only as fixtures built by hand in the
+     * rig's effect stage, and a tune carrying one would let this list
+     * shrink.
+     */
+    private static final Set<String> UNREACHED =
+            Set.of("START_RETRIGGER", "START_PCM_PREEMPT");
+
+    @Test
+    void everyOpcodeTheTunesReachKeepsBeingReached() throws IOException {
+        Set<String> reached = new LinkedHashSet<>();
+        List<Path> tunes = new ArrayList<>();
+        try (Stream<Path> listing = Files.list(Path.of("ym", "test"))) {
+            listing.filter(p -> p.toString().endsWith(".ym")).sorted()
+                    .forEach(tunes::add);
+        }
+        assertTrue(!tunes.isEmpty(), "no pinned tunes under ym/test");
+
+        for (Path each : tunes) {
+            Tune tune = YmEffects.tune(Ym6Reader.read(Files.readAllBytes(each)));
+            reached.addAll(opcodesOf(tune));
+            reached.addAll(opcodesOf(tune.under(new EffectScript.Semantics(
+                    true, true, false, true, false))));
+        }
+
+        List<String> missing = new ArrayList<>();
+        for (String opcode : OPCODES) {
+            if (!reached.contains(opcode) && !UNREACHED.contains(opcode)) {
+                missing.add(opcode);
+            }
+        }
+        assertTrue(missing.isEmpty(), "the pinned tunes no longer reach "
+                + missing + ". An opcode that was covered has stopped being"
+                + " covered, which is how a fixture goes missing without"
+                + " anyone noticing");
+
+        List<String> nowReached = new ArrayList<>(UNREACHED);
+        nowReached.retainAll(reached);
+        assertTrue(nowReached.isEmpty(), nowReached + " is reached by a pinned"
+                + " tune now and is still listed as unreached. Take it out of"
+                + " UNREACHED: the list is what the corpus cannot do, and it"
+                + " should only shrink");
+
+        assertEquals(OPCODES.size(), reached.size() + UNREACHED.size(),
+                "the opcodes SPEC.md §3 names, those the tunes reach and those"
+                        + " listed as unreached no longer account for each"
+                        + " other");
+    }
+
+    /** The opcodes one tune's compiled script carries. */
+    private static Set<String> opcodesOf(Tune tune) {
+        Set<String> found = new LinkedHashSet<>();
+        for (byte[] actions : EffectScript.compile(tune).actions()) {
+            for (byte action : actions) {
+                if (action != 0) {
+                    found.add(OPCODES.get((action & 0xFF) >> 5));
+                }
+            }
+        }
+        return found;
+    }
+}
