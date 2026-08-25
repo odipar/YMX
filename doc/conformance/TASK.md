@@ -17,8 +17,8 @@ One entry per player call, in order, at most `<calls>` of them.
 
 - `result` is the value that call reports.
 - `w` maps sound-chip register number to the value written to it on that
-  call. **Include only registers actually written** - a register the call
-  leaves alone is absent, not repeated.
+  call. **Include only the registers the call writes** - a register the
+  call leaves alone is absent, not repeated.
 - Registers 0 to 13. Values are what a YM2149 would receive.
 
 Only the call's own writes. Do not model what a timer interrupt would
@@ -27,7 +27,7 @@ work, and this is the reader it describes.
 
 ## The tunes
 
-Each is a `.ymx`. Their shapes differ on purpose; the specification tells
+Each is a `.ymx`, and no two have the same shape. The specification tells
 you how to read each one.
 
 | file | calls to produce |

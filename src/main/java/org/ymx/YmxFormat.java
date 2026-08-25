@@ -232,7 +232,7 @@ public final class YmxFormat {
     /**
      * {@code Q}, the required-streams mask: bit {@code k} for stream
      * {@code k}. A set bit requires the stream, and a consumer that does not
-     * understand it rejects the file; a clear bit on a stream the file
+     * implement it rejects the file; a clear bit on a stream the file
      * carries makes it advisory (SPEC.md §1.6).
      */
     public static final int OFFSET_REQUIRED = 38;

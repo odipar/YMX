@@ -30,7 +30,10 @@ final class HouseStyleTest {
             Path.of("doc", "RELEASES.md"),
             Path.of("README.md"),
             Path.of("ym", "CONVERSION.md"),
-            Path.of("ym", "test", "README.md"));
+            Path.of("ym", "test", "README.md"),
+            Path.of("doc", "conformance", "README.md"),
+            Path.of("doc", "conformance", "TASK.md"),
+            Path.of("doc", "conformance", "SOURCES.md"));
 
     /** Struck in review, lowercase; matched as substrings. */
     private static final List<String> STRUCK = List.of(
@@ -45,8 +48,13 @@ final class HouseStyleTest {
             "consumed",
             "consuming",
             "stand as they were",
+            // a consumer does not understand a stream, it implements it:
+            // the agentive verb and a second vocabulary for one idea
+            "understand",
+            "refuse",
             // the sweep: a trailing clause generalising the sentence
             "whatever",
+            "whichever way",
             "where it sits",
             "stood still",
             // the metaphor in place of the operation
@@ -68,13 +76,18 @@ final class HouseStyleTest {
             "−",
             // the verdict: the sentence grading itself or its subject
             "is deliberate",
+            "by design",
+            "on purpose",
             "asked properly",
             "not a shrug",
             "most of the point",
             "the answer to that",
             "worth reading",
             "the ones that matter",
-            "the whole point");
+            "the whole point",
+            // filler: cut unless the word carries the meaning. "at all"
+            // is not here: as a substring it hits "format allows"
+            "actually");
 
     @Test
     void theDocumentationCarriesNoStruckPhrase() throws IOException {

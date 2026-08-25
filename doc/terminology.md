@@ -227,8 +227,8 @@ channels, numbered 0 to 3, and **the file says which timer each runs on**
 only for a channel the tune uses.
 
 All four timers are reachable. Timer C costs more than the others: it is
-the operating system's 200 Hz clock, so a tune that uses it stops that clock
-and cannot be hosted from a Timer C hook. A YM file never uses it, since
+the operating system's 200 Hz clock, so a tune that uses it stops that
+clock and cannot be hosted from a Timer C hook. A YM file never uses it, since
 a YM frame starts at most two effects.
 
 The MFP's own clock runs at 2,457,600 a second, unrelated to the
@@ -244,8 +244,8 @@ generator's *counter* is a different thing.)
 
 The slowest rate is 48 a second, the fastest 614,400. The YM front end
 rejects anything above 25,600: on an 8 MHz 68000 the interrupt alone would
-take a quarter of the machine. For scale, 69 corpus tunes play samples, mostly
-between 5,000 and 6,100 a second.
+take a quarter of the machine. For scale, 69 corpus tunes play samples,
+mostly between 5,000 and 6,100 a second.
 
 ### Conflicts between the two clocks
 
@@ -336,8 +336,8 @@ That is a default, not a rule. YM6 stores one rate per trigger, so a
 digidrum in a YM file plays at a fixed rate; nothing in this model
 forbids a source that moves a sample's rate under a melody. The split
 does say when a rate may change in a given format: independent means
-**set once** - and movable under a running stream where the source says so -
-derived means **per-frame**, renewed on every frame.
+**set once** - and movable under a running stream where the source says
+so - derived means **per-frame**, renewed on every frame.
 (Not "control-rate": the frame clock already carries the name **control
 rate**, and a policy and a clock should not share a word.)
 
@@ -547,8 +547,8 @@ series of writes.
 
 A front end for another source format maps its own names onto these same
 things, and keeps them on its own side of the `Tune`. What each conversion
-costs is in its own account - [../ym/CONVERSION.md](../ym/CONVERSION.md) for
-a YM file - and is not repeated here.
+costs is in its own account - [../ym/CONVERSION.md](../ym/CONVERSION.md)
+for a YM file - and is not repeated here.
 
 ## The names in the code
 

@@ -68,7 +68,7 @@ The four drop counters are counts of YM effects the front end normalised
 away. Three of them are drops the reference player makes too, so those are
 faithful rather than lossy. The rate ceiling is this converter's own: an
 8 MHz 68000 spends a quarter of itself on a 25,600 Hz interrupt, and a code
-above it is dropped whichever way the reference player went.
+above it is dropped here.
 
 * **Sinus-SID.** ST-Sound, the format author's own player, reads the effect
   code and runs an empty handler. The packer warns and drops it.

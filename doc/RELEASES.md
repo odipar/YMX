@@ -24,16 +24,16 @@ Format version 0.6: a tune packed at 0.5 has to be repacked from its
 - The long at offset 38 is `Q`, the **required-streams mask**, one bit per
   stream, and thirty-two is the stream ceiling at every version because of
   it. A set bit requires the stream: a consumer that does not
-  understand it rejects the file. A clear bit on a stream the file carries
-  makes it advisory, and a consumer that does not understand it reads none
+  implement it rejects the file. A clear bit on a stream the file carries
+  makes it advisory, and a consumer that does not implement it reads none
   of it and produces the values it would produce from a file without it.
   Bits 0 to 24 are set in every file, so a file carrying no extension
   stream holds `$01FFFFFF`.
 - The header is 142 bytes where 0.5 carried 138. The section table follows
   at 42 where it followed at 38, and the first body item is at 144.
 - SPEC.md §1.7 is the registry. This version assigns no index: 25 to 29
-  are the format's to assign later, and 30 and 31 are private at every
-  version, so a private stream never collides with a registered one. An
+  are the format's to assign later, and 30 and 31 are custom at every
+  version, so a custom stream never collides with a registered one. An
   extension that turns out to be shared is registered from 25 to 29 in a
   later version.
 - The refill turn is a position in a consumer's decode list rather than a
@@ -65,7 +65,7 @@ gives the system's own tick back.
   read as what was written to it.
 - The stub is 2,878 bytes where 0.5.1 carried 2,884.
 
-Reported fixed on the machine, which is what 0.5.1 lacked: its own note
+Reported fixed on the machine, which 0.5.1 lacked: its own note
 said no program had been run with $114 read back afterwards, and the
 symptom outlived the release. The same fault, and the same cause, was
 found in the RhYMe tracker's exported player.

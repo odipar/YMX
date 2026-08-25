@@ -161,7 +161,7 @@ namespace Ymx
         public const int OffsetSectionTable = 42;
 
         /// <summary>Q, the required-streams mask: bit k for stream k. A set
-        /// bit requires the stream, and a consumer that does not understand
+        /// bit requires the stream, and a consumer that does not implement
         /// it rejects the file; a clear bit on a stream the file carries
         /// makes it advisory (SPEC.md section 1.6).</summary>
         public const int OffsetRequired = 38;

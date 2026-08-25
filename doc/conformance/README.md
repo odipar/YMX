@@ -5,24 +5,24 @@ each. The kit exists to test [SPEC.md](../SPEC.md) rather than the code:
 hand it to someone who has never seen this repository, and see whether the
 document alone is enough to decode the tunes.
 
-What it tests is the **reader** of SPEC.md §9.4 - something that produces
-the values a frame writes and drives no chip. A reader is one of the
-three roles §1 names, and the narrowest: it needs neither §5's rates nor
-§6's sample table, because both describe what a timer writes between
-frames and a reader produces one set of values a frame. The claim this
-kit measures is therefore "a converter or an analyser can be written from
-the document", not "a player can be ported from it".
+It tests the **reader** of SPEC.md §9.4 - something that produces the
+values a frame writes and drives no chip. A reader is one of the three
+roles §1 names, and the narrowest: it needs neither §5's rates nor §6's
+sample table, because both describe what a timer writes between frames
+and a reader produces one set of values a frame. The claim this kit
+measures is therefore "a converter or an analyser can be written from the
+document", not "a player can be ported from it".
 
 ## Running the exercise
 
 Copy `TASK.md`, `tunes/` and `../SPEC.md` into a fresh directory and give
-that directory to a reader with no access to this repository and no
+that directory to an implementer with no access to this repository and no
 access to any implementation of the format or of the compression under
-it. Keep `MANIFEST.txt` and the reference dumps back: a reader who can
-check an answer is not reading the document, and the exercise measures
-the document.
+it. Keep `MANIFEST.txt` and the reference dumps back: an implementer who
+can check an answer is not reading the document, and the exercise
+measures the document.
 
-The reader produces `decode.py`, `SOURCES.md` and `NOTES.md`, described
+The implementer produces `decode.py`, `SOURCES.md` and `NOTES.md`, described
 in `TASK.md`. Compare their output against the reference, which
 `ymx/test/rig.sh` regenerates from the player. Where each tune comes from
 is [SOURCES.md](SOURCES.md) - a `.ym` under `ym/test` and the options it
@@ -34,21 +34,21 @@ Three tests, all three of which must hold:
 
 1. **Output.** Every reader byte-identical to the reference on every
    tune, including the entry a run ends on.
-2. **Sources.** No reader names an implementation - not a source file
-   here, not one on the web.
+2. **Sources.** No implementer names an implementation - not a source
+   file here, not one on the web.
 3. **Notes.** No entry is marked "decides output". A choice that settles
-   a byte is a sentence the document owes its reader, whether or not the
-   guess landed on the reference.
+   a byte is a sentence the document owes its implementer, whether or
+   not the guess landed on the reference.
 
 Four runs have been measured, against the kit as it then stood: two of
 its tunes have since been replaced by different ones, built from sources
 in the tree, and the entries below are that earlier kit's. The first run
 failed all three tests. The second and third passed the second test and
 failed the other two, on one sentence and one guess each time. The fourth
-passed the first two: three readers produced 53,055 entries with no
+passed the first two: three implementers produced 53,055 entries with no
 value, no result and no register's presence differing from the player
-anywhere, and left six places where the document made a reader choose.
-The kit now comes to 29,406 entries.
+anywhere, and left six places where the document made an implementer
+choose. The kit now comes to 29,406 entries.
 
 ## What the tunes cover
 
@@ -68,12 +68,11 @@ The kit now comes to 29,406 entries.
 
 Seven of the eight opcodes write no sound register in their own frame,
 and the exercise asks for a call's own writes only. So no growth of this
-corpus tests §3's operations: a decoder that runs no opcode at all still
-matches the reference on nearly every entry. That is by design now - §9.4
-puts what a timer writes between frames outside a reader's work - and it
-is the limit of what this kit can claim. A player ported from the
-document would need a reference carrying every tick, which this one does
-not.
+corpus tests §3's operations: a decoder that runs no opcode still matches
+the reference on nearly every entry. §9.4 puts what a timer writes between
+frames outside a reader's work, and that is the limit of what this kit can
+claim. A player ported from the document would need a reference carrying
+every tick, which this one does not.
 
 Every tune is asked for its own length now, so seven of the eight opcodes
 are played: `retrigger.ymx` alone carries 671 of them, and

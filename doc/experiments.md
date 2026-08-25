@@ -154,11 +154,11 @@ Same chip traffic either way, byte for byte - 16,156 PSG writes over 900 VBLs
 of one tune, identical. The flag moves when ticks run, not what reaches the
 chip.
 
-**Where hardware offers an instruction that does the whole operation, it removes
-the race instead of scheduling around it, and usually costs less than the
-mask it replaces.** For any player driving audio-rate interrupts, measure the
-longest interrupt-free span and compare it against the shortest tick period
-it allows.
+**Where hardware offers an instruction that does the whole operation, it
+removes the race instead of scheduling around it, and usually costs less
+than the mask it replaces.** For any player driving audio-rate
+interrupts, measure the longest interrupt-free span and compare it against
+the shortest tick period it allows.
 
 ---
 

@@ -506,9 +506,9 @@ final class PlayerTests {
     /**
      * A file that requires an extension stream, against a player that
      * implements none. §1.6's mask is the whole of 0.6's new behaviour and
-     * the only thing in the format that a build can refuse for: this build
-     * understands streams 0 to 24, so a file whose mask names stream 25 is
-     * one it must reject rather than play.
+     * the only thing in the format a build rejects a file for: this build
+     * implements streams 0 to 24, so a file whose mask names stream 25 is
+     * one it rejects rather than plays.
      *
      * <p>The control is the same file with the bit clear and the stream
      * absent: that one plays, so a rejection here is the mask and not the
@@ -1005,7 +1005,7 @@ final class PlayerTests {
         failures += report(runConformanceKit(),
                 "the conformance kit      (ten tunes, digests of the player)");
         failures += report(runRequiredExtension(),
-                "a required extension     (the mask refuses, the ceiling holds)");
+                "a required extension     (the mask rejects, the ceiling holds)");
         for (boolean perf : new boolean[] {false, true}) {
             // The PERF build stacks a colour band on the way in, so a loop
             // that leaves by a different door than the stop does has to put
