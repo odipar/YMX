@@ -451,11 +451,24 @@ final class SpecConsistencyTest {
         // each produces a decoder that runs, passes its own size checks, and
         // is wrong on almost every entry. 17,443 and 17,598 of 17,685.
         assertTrue(said.contains("After a match of either kind, a `0` starts"
-                        + " literals and a `1` those same two class bits"),
+                        + " literals and a `1` is followed by those same two"
+                        + " class bits"),
                 "SPEC Appendix A.3 no longer says the flag after a match"
                         + " covers both kinds of match. Read the other way a"
                         + " decoder desynchronises silently and its size"
                         + " checks still pass");
+        assertTrue(said.contains("A flag bit is never one of the two class"
+                        + " bits: a new offset costs three bits before its"
+                        + " value"),
+                "SPEC Appendix A.3 no longer separates the flag bit from the"
+                        + " class bits. Read the other way two of A.4's four"
+                        + " classes are unreachable and no section terminates");
+        assertTrue(said.contains("A match at a new offset becomes the last"
+                        + " offset; literals and a match at the last offset"
+                        + " leave it as it was"),
+                "SPEC Appendix A.3 no longer says what sets the last offset,"
+                        + " which the block's name implies and no sentence"
+                        + " otherwise states");
         assertTrue(said.contains("A match copies one unit at a time, so a"
                         + " distance shorter than the length repeats the units"
                         + " the match has already written"),

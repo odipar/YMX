@@ -176,7 +176,9 @@ signature, not in the YMX header. A packed section's first long is
 `k`, one of 1, 2 or 4. Version 4 is the version this document defines. A
 player built for one unit size rejects a container whose fourth byte
 differs; a player that decodes all three rejects a file whose sections do
-not share one unit size (§9.1).
+not share one unit size (§9.1). The unit size binds the packing and not
+the values: a section's decoded bytes are its stream's values in frame
+order at every unit size, as a stored section's bytes are.
 
 **Stored sections.** A section may instead be stored: the bytes at its
 offset are the values, one per frame, with no header and no signature.
@@ -855,7 +857,7 @@ a value. Those operations:
 | loop point `$FFFF`, on the marker | 13 is written to the volume register and the timer is stopped |
 | loop point of any other value, on the marker | the read position becomes that offset into the sample and the ticks continue |
 | the frame's order | skip bits, then the fourteen register writes, then the frame's actions in channel order, then one refill |
-| the frame after the last, flag bit 0 set | every claimed timer is stopped, its vector parked, its interrupt enabled with nothing pending, and every skip bit cleared, before frame `L` is played again |
+| the frame that ends the tune, flag bit 0 set | after that frame's write, actions and refill: every claimed timer is stopped, its vector parked, its interrupt enabled with nothing pending, and every skip bit cleared, before frame `L` is played again |
 | a required-streams mask bit outside the streams the consumer implements | the file is rejected |
 | a required-streams mask bit inside them | that stream is read |
 | an extension stream's table entry that is 0 | the file does not carry that stream: nothing is decoded there and it takes no position in the decode list |
@@ -953,7 +955,11 @@ A reader takes frame `f`'s value from each stream directly. §7 step 4 and
 §8's two forms state how a ring of `N` bytes delivers that value, and
 neither changes which value frame `f` reads. From §8 a reader reads the
 order the frames are played in and the state cleared at the end of a
-pass.
+pass. Of that state a reader holds the three skip states, and clears them
+on the frame that ends the tune, after that frame's own writes: the next
+entry is frame `L`'s, and a voice skipped when the pass ended is written
+there. The timers, their vectors and their interrupts are a player's, and
+a reader holds none of them.
 
 A per-frame register dump written by a reader carries the frame's values
 alone: a voice a timer stream owns holds no level there, because the
@@ -1035,16 +1041,21 @@ A match copies one unit at a time, so a distance shorter than the length
 repeats the units the match has already written, and a distance of one unit
 fills the match with that one unit.
 
-The first block is literals and carries no flag bit. After literals, a `0`
-bit starts a match at the last offset and a `1` the two class bits of A.4,
-which give a match at a new offset or the end of the stream. After a match
-of either kind, a `0` starts literals and a `1` those same two class bits.
-Two literal runs never follow each other.
+A flag bit precedes every block but the first: the stream opens on a
+literals block, encoded as its row gives it, and the bit that follows that
+block is read as the bit after any run of literals. After literals, a `0`
+bit starts a match at the last offset, and a `1` bit is followed by the
+two class bits of A.4, which give a match at a new offset or the end of
+the stream. After a match of either kind, a `0` starts literals and a `1`
+is followed by those same two class bits. A flag bit is never one of the
+two class bits: a new offset costs three bits before its value. Two
+literal runs never follow each other.
 
 **The last offset is a count of units, and begins at one.** A decoder that
 has read no new offset yet copies from one unit back - `k` bytes - so a
 first block of literals may be followed immediately by a match at the last
-offset.
+offset. A match at a new offset becomes the last offset; literals and a
+match at the last offset leave it as it was.
 
 ### A.4 New offsets
 
