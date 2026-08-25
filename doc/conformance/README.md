@@ -114,7 +114,7 @@ four now.
 `MANIFEST.txt` records a call's own writes, which is the reader of §9.4.
 `MANIFEST-ticks.txt` records the same ten tunes with the timers run: the
 same calls, and after each one every tick that falls before the next, in
-time order. The ten come to 292,939 ticks. `ymx/test/rig.sh` regenerates
+time order. The ten come to 286,452 ticks. `ymx/test/rig.sh` regenerates
 both and checks both digests.
 
 That is the record §3, §5 and §6 can be checked against. A reader's
@@ -124,13 +124,80 @@ decoder that runs no opcode still matches `MANIFEST.txt` on nearly every
 entry. A tick record separates them - the rate a timer lands at is §5's,
 the byte it carries is §6's, and neither reaches a reader.
 
-Two things bound what the tick record proves. The MFP raises no interrupt
-under the emulator, so the timers are modelled and their handlers called
-at the addresses the vectors hold: the rates, the tick count and each
-tick's bytes are the machine's, and the interleaving within one frame is
-this record's, since on a machine a tick also lands inside the frame
-handler and here none does. And no run of the exercise has been measured
-against it. It is a reference, not a result.
+The MFP raises no interrupt under the unit-test emulator, so the timers
+are modelled and their handlers called at the addresses the vectors hold.
+`ymx/test/ticks.sh` measures how far that model is from a machine: it
+builds a program for each tune, runs it under Hatari, which does emulate
+the MFP, traces every sound-chip write, and compares the two one register
+at a time.
+
+| tune | register | ticks compared | differ |
+|---|---|---:|---:|
+| `plain_packed`, `unit1`, `unit4` | R10 | 1,764 each | 0 |
+| `ring_form` | R10 | 26,146 | 0 |
+| `wide_ring` | R10 | 5,424 | 0 |
+| `retrigger` | R9 | 20,310 | 0 |
+| `resume_model` | R10 | 35,460 | 2 |
+| `retrigger` | R13 | 7,292 | 86 |
+| `resume_model` | R9 | 27,219 | 2,511 |
+
+So a drum's rate, its count of ticks and every byte it carries are the
+machine's, over tens of thousands of ticks and three unit sizes.
+
+Where the two part company they part company over one thing: which side
+of a frame boundary a tick falls. The values either side are the same.
+On `retrigger` the machine and the model differ by one tick in 246 of
+2,220 frames, and the totals per frame match to within one everywhere;
+the 86 differing writes are all the envelope shape at a frame that
+changes it. On `resume_model` the same one-tick shift accounts for the
+larger figure, because that stream carries a different value on 27,218
+of its 27,219 ticks, so any shift at all shows in every write of the
+frame it moves.
+
+Two causes were measured for that shift, and one of them is fixed. The
+model fires a timer's first tick one period after the frame boundary and
+the machine fires it one period after the action that started it, part
+way into the frame: offsetting the model's start by 2.5% of a frame
+takes `retrigger`'s 86 differences to 9. That offset is not in the model,
+because no figure in the file states it. The second was a fault: a
+released toggle stream keeps its timer running and has only its
+interrupt disabled (§3), and the model read the timer's control register
+without the interrupt registers beside it, so it landed 481 ticks in
+gaps the machine leaves silent. It reads both now.
+
+The frame period was the first candidate and is not the cause: running
+the model at a PAL ST's own VBL instead of the rate the file states made
+every figure above worse.
+
+One run has been measured against this record, the first at player level.
+`TASK-player.md` is its task: it asks for the ticks as well as the calls,
+and fixes as its own the four things about when a tick falls that the
+document leaves to the host. Three implementers worked from `SPEC.md` and
+that task, with the record kept back.
+
+All three produced every call and every tick of all ten tunes, byte for
+byte the record: 29,406 calls and 286,452 ticks each, no value, no
+result, no register and no tick's place differing anywhere. None read an
+implementation.
+
+The record itself was wrong when they started, and they are why it is
+not now. All three landed 157,824 ticks in `resume_model` where it held
+163,830, first differing at frame 2718, where that tune's 37 `RESUME`
+opcodes are. A released stream keeps its timer counting and lands no tick
+(§3): the record stopped the ticks and let the count stand still, so the
+frame that re-enabled the interrupt discharged 287 ticks where 51 were
+due. Three readings of the document against one implementation, and the
+implementation was the one that was wrong.
+
+Seventeen entries were marked "decides output" across the three. Nine
+places were found by all three of them: what the end marker puts on the
+volume register (§6), what `HOLD` and `RESUME` flag 1 do to the count in
+flight (§3), what a toggle stream's phase does across a disabled gap
+(§3.3), where the pass-end teardown falls against the last call's ticks
+(§8), which voice flag 2 reads (§3.2), which timer a tick names (§2.3),
+what the call reporting -1 carries (§7), two timers due at one instant,
+and where a tick that coincides with a call goes. The last two are the
+task's to settle rather than the format's. None is fixed yet.
 
 ## What it does not cover
 
