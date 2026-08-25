@@ -17,7 +17,7 @@
         <errorprone.version>2.36.0</errorprone.version>
         <nullaway.version>0.12.3</nullaway.version>
         <!-- Every package is null-marked and enforced. -->
-        <nullaway.packages>org.st4,org.ymx,org.ym6,org.ymr</nullaway.packages>
+        <nullaway.packages>org.st4,org.ymx,org.ym6</nullaway.packages>
         <nullaway.severity>ERROR</nullaway.severity>
         <!-- CLI arguments for exec:exec@st4 / exec:exec@dst4 (-Dargs="..."). -->
         <args></args>
@@ -84,8 +84,7 @@
             <plugin>
                 <!-- The CLIs, runnable from Maven in a forked JVM so -ea is
                      on (malformed-input validation uses asserts):
-                       mvn -q compile exec:exec@ymx -Dargs="-f input.ym output.ymx"
-                       mvn -q compile exec:exec@ymr -Dargs="-f input.ymr output.ymx" -->
+                       mvn -q compile exec:exec@ymx -Dargs="-f input.ym output.ymx" -->
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.5.0</version>
@@ -98,16 +97,6 @@
                         <configuration>
                             <executable>java</executable>
                             <commandlineArgs>-ea -cp %classpath org.ym6.Ymx ${args}</commandlineArgs>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>ymr</id>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
-                        <configuration>
-                            <executable>java</executable>
-                            <commandlineArgs>-ea -cp %classpath org.ymr.Ymr ${args}</commandlineArgs>
                         </configuration>
                     </execution>
                 </executions>

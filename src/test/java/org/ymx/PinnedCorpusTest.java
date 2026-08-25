@@ -34,10 +34,9 @@ import org.junit.jupiter.api.TestFactory;
  */
 final class PinnedCorpusTest {
 
-    /** The tunes and their pinned output, paired by stem: each front end
-     * keeps its own, beside the account of what its conversion costs. */
-    private static final List<Path> CORPORA =
-            List.of(Path.of("ym", "test"), Path.of("ymr", "test"));
+    /** The tunes and their pinned output, paired by stem, beside the
+     * account of what the conversion costs. */
+    private static final List<Path> CORPORA = List.of(Path.of("ym", "test"));
 
     /** What a packed source is called beside it. */
     private static final String PINNED = ".ymx";
@@ -47,8 +46,7 @@ final class PinnedCorpusTest {
         List<Path> sources = new ArrayList<>();
         for (Path corpus : CORPORA) {
             try (Stream<Path> listing = Files.list(corpus)) {
-                listing.filter(p -> p.toString().endsWith(".ym")
-                                || p.toString().endsWith(".ymr"))
+                listing.filter(p -> p.toString().endsWith(".ym"))
                         .sorted()
                         .forEach(sources::add);
             }
@@ -56,7 +54,7 @@ final class PinnedCorpusTest {
         assertTrue(!sources.isEmpty(), "no tunes in " + CORPORA);
         // The README counts them in the line that says what mvn test covers.
         String readme = Files.readString(Path.of("README.md"));
-        Matcher counted = Pattern.compile("packers, (\\d+) pinned tunes").matcher(readme);
+        Matcher counted = Pattern.compile("the packer, (\\d+) pinned tunes").matcher(readme);
         assertTrue(counted.find(), "README.md no longer says how many tunes are"
                 + " pinned - this test reads the count out of that line");
         assertTrue(Integer.parseInt(counted.group(1)) == sources.size(),
@@ -124,11 +122,7 @@ final class PinnedCorpusTest {
         System.setOut(new PrintStream(OutputStream.nullOutputStream(), true,
                 StandardCharsets.ISO_8859_1));
         try {
-            if (source.toString().endsWith(".ymr")) {
-                org.ymr.Ymr.main(argv);
-            } else {
-                org.ym6.Ymx.main(argv);
-            }
+            org.ym6.Ymx.main(argv);
         } finally {
             System.setOut(spoken);
         }

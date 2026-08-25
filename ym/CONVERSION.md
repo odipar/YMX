@@ -3,8 +3,7 @@
 A `YM5!` or `YM6!` register dump packed into a `.ymx`. This is what the front
 end changes on the way, what it counts, and what it reports.
 [../README.md](../README.md) is how to run it, [../doc/SPEC.md](../doc/SPEC.md)
-the container it writes, and [../ymr/CONVERSION.md](../ymr/CONVERSION.md) the
-same account for a `.YMR`.
+the container it writes.
 
 ## What the conversion is
 

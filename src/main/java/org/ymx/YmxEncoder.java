@@ -134,7 +134,7 @@ public final class YmxEncoder {
     public static Result encode(Tune tune, int ringSize, int chunk,
                                 boolean loops, boolean progress, int unit) {
         // The default map is a YM tune's, and only a YM tune's: it puts
-        // channel 2 on Timer B, where a .ymr needs Timer D. A front end whose
+        // channel 2 on Timer B, where another source may need Timer D. A front end whose
         // format binds its timers passes its own map to the overload below,
         // and both CLIs do; this shorthand is for callers with no such map -
         // which in practice means tests.

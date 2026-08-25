@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>This is the handover point, and it is the first thing in the pipeline
  * that speaks no file format. A front end reads its own format in that
- * format's own words - {@code org.ym6} in YM's, {@code org.ymr} in RhYMe's -
+ * format's own words - {@code org.ym6} in YM's -
  * and stops here, at a record whose every field is a term from
  * {@code doc/terminology.md}. Nothing downstream of this line can ask which
  * format the bytes came from, because no field here records it. A second front
@@ -43,7 +43,8 @@ import org.jspecify.annotations.Nullable;
  * each frame - one value, not one per channel, because the chip has one
  * envelope generator and a shape is not per-voice data. It is a front end's
  * to fill, and the two fill it from different places: a YM6 file keeps a
- * buzzer's shape in the low nibble of the voice its code names, while RhYMe
+ * buzzer's shape in the low nibble of the voice its code names, while a
+ * format that files it elsewhere
  * keeps it where the chip does, in R13. Resolving that here rather than in
  * the compiler keeps the compiler and the player free of a mode -
  * the value is carried, the way every other operand is.
@@ -192,7 +193,7 @@ public record Tune(int frames, int frameRate, long masterClock, boolean loops,
      * holds the chip state a tick longer without being heard.
      *
      * <p>What counts as safe is the SOURCE FORMAT's question - a YM dump and a
-     * .YMR disagree about where a sample's arrival is written, and both have
+     * two formats may disagree about where a sample's arrival is written, and both have
      * to keep away from a frame that restarts the envelope - so the predicate
      * comes in from the front end and only the mechanism is here. The
      * mechanism is the part that must not be written twice: every stream is

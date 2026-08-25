@@ -21,7 +21,7 @@ import org.ymx.YmxFormat;
  * player runs an empty handler.
  *
  * <p>The class is named after the format it writes rather than the one it
- * reads, which reads oddly beside {@code org.ymr.Ymr} in the package next
+ * reads, which reads oddly beside the engine's own names in the package next
  * door. It stays that way because the name is published: the pom's
  * {@code exec:exec@ymx} profile, the READMEs and the test rigs all spell it
  * out on a command line, and a rename would break every one of them to

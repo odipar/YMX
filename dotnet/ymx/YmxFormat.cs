@@ -372,7 +372,7 @@ namespace Ymx
                 throw new IOException(path + " is format version "
                         + YmxFormat.VersionName(version) + ", this build reads "
                         + YmxFormat.VersionName()
-                        + " - repack the tune from its .ym or .ymr source");
+                        + " - repack the tune from its .ym source");
             }
             // A stored section carries no signature, so the unit size comes
             // from the first section that is a container - out of either

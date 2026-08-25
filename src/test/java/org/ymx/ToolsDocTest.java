@@ -34,7 +34,6 @@ final class ToolsDocTest {
     private static Map<String, String> sections() {
         Map<String, String> map = new LinkedHashMap<>();
         map.put("src/main/java/org/ym6/Ymx.java", "### org.ym6.Ymx");
-        map.put("src/main/java/org/ymr/Ymr.java", "### org.ymr.Ymr");
         map.put("src/main/java/org/ymx/MkSndh.java", "### mksndh.sh");
         map.put("src/main/java/org/ymx/MkPrg.java", "### mkprg.sh");
         map.put("src/main/java/org/ymx/MkCores.java", "### mkcores.sh");
@@ -42,20 +41,17 @@ final class ToolsDocTest {
         map.put("src/main/java/org/ymx/SetVersion.java", "### setversion.sh");
         map.put("src/main/java/org/ym6/YmSndh.java", "### ym_sndh.sh");
         map.put("src/main/java/org/ym6/Play.java", "### play.sh");
-        map.put("src/main/java/org/ymr/YmrPlay.java", "### ymr.sh");
         map.put("src/main/java/org/st4/St4.java", "### st4 and dst4");
         map.put("src/main/java/org/st4/Dst4.java", "### st4 and dst4");
         // The C# tree parses the same flags; PlayTools.cs holds the three
         // listening tools in one file, so it binds to their whole chapter.
         map.put("dotnet/ym6/Ymx.cs", "### org.ym6.Ymx");
-        map.put("dotnet/ymr/Ymr.cs", "### org.ymr.Ymr");
         map.put("dotnet/ymx/MkSndh.cs", "### mksndh.sh");
         map.put("dotnet/ymx/MkPrg.cs", "### mkprg.sh");
         map.put("dotnet/ymx/Tools.cs", "### mkcores.sh");
         map.put("dotnet/ymx/MkRelease.cs", "### mkrelease.sh");
         map.put("dotnet/ymx/SetVersion.cs", "### setversion.sh");
         map.put("dotnet/ym6/PlayTools.cs", "## Listening");
-        map.put("dotnet/ymr/YmrPlay.cs", "### ymr.sh");
         map.put("dotnet/st4/St4Cli.cs", "### st4 and dst4");
         return map;
     }
@@ -67,13 +63,11 @@ final class ToolsDocTest {
     private static Map<String, String> twins() {
         Map<String, String> map = new LinkedHashMap<>();
         map.put("src/main/java/org/ym6/Ymx.java", "dotnet/ym6/Ymx.cs");
-        map.put("src/main/java/org/ymr/Ymr.java", "dotnet/ymr/Ymr.cs");
         map.put("src/main/java/org/ymx/MkSndh.java", "dotnet/ymx/MkSndh.cs");
         map.put("src/main/java/org/ymx/MkPrg.java", "dotnet/ymx/MkPrg.cs");
         map.put("src/main/java/org/ymx/MkCores.java", "dotnet/ymx/Tools.cs");
         map.put("src/main/java/org/ymx/MkRelease.java", "dotnet/ymx/MkRelease.cs");
         map.put("src/main/java/org/ymx/SetVersion.java", "dotnet/ymx/SetVersion.cs");
-        map.put("src/main/java/org/ymr/YmrPlay.java", "dotnet/ymr/YmrPlay.cs");
         return map;
     }
 
@@ -91,8 +85,6 @@ final class ToolsDocTest {
                 "src/test/java/org/ymx/rig/Rig.java,dotnet/rig/RigCore.cs");
         map.put("YMX_PACK_OPTIONS",
                 "src/test/java/org/ymx/rig/Sweep.java,dotnet/rig/Sweep.cs");
-        map.put("YMR_FRAME_CAP",
-                "src/test/java/org/ymx/rig/YmrSweep.java,dotnet/rig/YmrSweep.cs");
         map.put("YM_CORPUS", "src/test/java/org/ym6/CorpusNumbersTest.java");
         map.put("YMX_PLAY_FRAMES",
                 "src/test/java/org/ymx/rig/GenData.java,dotnet/rig/GenData.cs");
@@ -182,7 +174,7 @@ final class ToolsDocTest {
                     "the C# tool names section does not list " + name);
             found++;
         }
-        assertTrue(found >= 15, "dotnet/Program.cs dispatches " + found
+        assertTrue(found >= 12, "dotnet/Program.cs dispatches " + found
                 + " tools; the dispatcher has moved");
         // And the other direction: every bare name the section backticks
         // is a case the dispatcher carries. Spans with a dot, dash or

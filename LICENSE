@@ -23,18 +23,18 @@ structure:
    you have used ZX1, via ST4 or YMX. They are:
 
    * The reference decompressors: src/main/java/org/st4/St4Decompressor.java,
-     src/main/java/org/st4/Dst4.java, src/main/java/org/jx1/,
-     dotnet/st4/St4Decompressor.cs, dotnet/st4/Dst4Cli.cs and dotnet/jx1/.
+     src/main/java/org/st4/Dst4.java, dotnet/st4/St4Decompressor.cs
+     and dotnet/st4/Dst4Cli.cs.
    * The ST4 68000 decoders: 68k/ST4.S, 68k/ST4_wrap.S, 68k/ST4_ring.S.
    * The YMX players: 68k/YMX.S, 68k/YMX_sndh.S, 68k/YMX_player.S.
    * The packers, combiners and front ends: src/main/java/org/ymx/,
-     src/main/java/org/ym6/, src/main/java/org/ymr/, dotnet/ymx/,
-     dotnet/ym6/, dotnet/ymr/, dotnet/Program.cs and dotnet/Check.cs.
+     src/main/java/org/ym6/, dotnet/ymx/, dotnet/ym6/,
+     dotnet/Program.cs and dotnet/Check.cs.
    * The rigs and tests: src/test/, dotnet/rig/, 68k/test/ and ymx/test/.
-   * The shell scripts: ym/*.sh, ymr/*.sh and ymx/*.sh.
+   * The shell scripts: ym/*.sh and ymx/*.sh.
    * The prebuilt binaries in dist/ and the ones the releases carry.
 
-   The tunes under ym/test and ymr/test are test input; this licence says
+   The tunes under ym/test are test input; this licence says
    nothing about the music in them.
 
 The YMX format itself may be implemented freely: doc/SPEC.md and
@@ -60,9 +60,6 @@ Attribution
   MinYMiser. The LHA depacker in org.ym6 and dotnet/ym6 is ported from the
   ST-Sound library's LZH code by Arnaud Carré, itself based on LZH code by
   Haruhiko Okumura (1991) and Kerwin F. Medina (1996).
-* The .YMR register-dump format is the RhYMe tracker's export; the .ymr
-  front end reads it, and ymr/CONVERSION.md records what the conversion
-  keeps and loses.
 * SNDH is the Atari ST scene's shared music container; the SNDH files YMX
   builds follow revision 2.2 of its file structure.
 

@@ -11,7 +11,6 @@ defaults quoted below are the constants' own values.
 | script | class | one line |
 |---|---|---|
 | - (`java -cp target/classes org.ym6.Ymx`) | `org.ym6.Ymx` | pack a `.ym` into a `.ymx` |
-| - (`java -cp target/classes org.ymr.Ymr`) | `org.ymr.Ymr` | pack a `.ymr` into a `.ymx` |
 | `ymx/mksndh.sh` | `org.ymx.MkSndh` | combine packed tunes into an SNDH file |
 | `ymx/mkprg.sh` | `org.ymx.MkPrg` | wrap an SNDH file in a runnable program |
 | `ymx/mkcores.sh` | `org.ymx.MkCores` | assemble the prebuilt binaries (needs rmac) |
@@ -19,21 +18,19 @@ defaults quoted below are the constants' own values.
 | `ymx/setversion.sh` | `org.ymx.SetVersion` | rewrite the format version at every site that carries it |
 | `ym/ym_sndh.sh` | `org.ym6.YmSndh` | pack a set of `.ym` dumps and combine, in one command |
 | `ym/play.sh` | `org.ym6.Play` | pack, build a program, run it under Hatari |
-| `ymr/ymr.sh` | `org.ymr.YmrPlay` | the same test drive for a `.ymr` |
 | `ymx/test/rig.sh` | `org.ymx.rig.PlayerTests` | the emulator test battery |
 | `ymx/test/sweep.sh` | `org.ymx.rig.Sweep` | a `.ym` corpus, differentially |
-| `ymx/test/ymr_sweep.sh` | `org.ymx.rig.YmrSweep` | a `.ymr` corpus, differentially |
 | `ymx/test/run.sh` | `org.ymx.rig.GenData` + rmac + Hatari | the real-hardware harness |
 
-The two packers have no wrapper of their own: the play scripts and
-`ym_sndh.sh` run them, and a direct run is
+The packer has no wrapper of its own: the play script and `ym_sndh.sh`
+run it, and a direct run is
 `java -cp target/classes org.ym6.Ymx ...`,
 `mvn -q compile exec:exec@ymx -Dargs="..."`, or
 `dotnet dotnet/bin/Release/net10.0/ymx.dll ymx ...`. A wrong call prints
 the tool's own usage - `mkcores.sh` and `mkrelease.sh` run with no
 arguments - and this document is the same information in one place.
 
-## The packers
+## The packer
 
 ### org.ym6.Ymx
 
@@ -62,24 +59,6 @@ tells them apart - and writes a `.ymx`.
 With a trailing DIRECTORY, every argument before it is an input, each
 packed with the identical configuration into `<dir>/<stem>.ymx` - the set
 one player build can hold as subtunes. The trim options take one tune.
-
-### org.ymr.Ymr
-
-Reads a RhYMe `.YMR` version 1.3 register dump and writes the same `.ymx`.
-The flags shared with the YM packer mean the same things; what a `.YMR`
-does not have, the tool does not offer - no `-drumhz` (a `.YMR` sample has
-no rate of its own), no `-timers` (the timer-to-voice binding is
-normative), no `-sidresume` (a YM argument) and no `-meta` (a `.YMR`
-carries no metadata).
-
-    ymr [-f] [-o] [-lF] [-nN] [-cC] [-kK] input.ymr [output.ymx]
-    ymr [options] one.ymr two.ymr more.ymr output-dir/
-
-| flag | meaning |
-|---|---|
-| `-f` `-o` `-lF` `-nN` `-cC` `-kK` | as the YM packer's |
-| `-minM` `-secS` `-startframeF` `-endframeF` `-framesN` | the trim window, as the YM packer's |
-| `-script` | dump the compiled effect script instead of packing |
 
 ## The combiners
 
@@ -195,15 +174,6 @@ dumps' own headers.
 
 Flags other than `-perf` and `-tTitle` go to the packer unread.
 
-### ymr.sh
-
-`play.sh` with the `.ym` step replaced: the same flags mean the same
-things, and the work directory is named the same way.
-
-    ymr/ymr.sh [-perf] [-nomask] [-nRING] [-cCHUNK] [-kUNIT] [-o] song.ymr...
-
-`-h` and `--help` print the usage; other `-flags` go to the `.ymr` packer.
-
 ## The tests
 
 The three player tests run the 68000 player under emulation and need rmac
@@ -231,16 +201,6 @@ PACKFAIL or SKIP; a non-zero exit on any ISSUE.
     ymx/test/sweep.sh song.ym [more.ym ...]
 
 `YMX_PACK_OPTIONS` adds packer options for a shape no corpus tune reaches.
-
-### ymr_sweep.sh
-
-The same for `.ymr`, against this rig's own decoder and replay of the
-image; without arguments it sweeps `ymr/test/deeper.ymr`.
-
-    ymx/test/ymr_sweep.sh [song.ymr ...]
-
-`YMR_FRAME_CAP` raises the walk's frame cap (default 1200) - the only way
-to reach a long tune's wrap.
 
 ### run.sh
 
@@ -272,22 +232,21 @@ of `dotnet dotnet/bin/Release/net10.0/ymx.dll` names the tool:
 
 | name | the wrapper it serves |
 |---|---|
-| `ymx`, `ymr` | the two packers |
+| `ymx` | the packer |
 | `st4`, `dst4` | the ST4 CLIs |
 | `mksndh`, `mkprg`, `mkcores`, `mkrelease` | the combiners |
+| `ymsndh`, `play` | `ym_sndh.sh`, `play.sh` |
+| `rig`, `sweep`, `gendata` | the test rigs and `run.sh`'s data step |
 | `setversion` | `setversion.sh` |
-| `ymsndh`, `play`, `ymrplay` | `ym_sndh.sh`, `play.sh`, `ymr.sh` |
-| `rig`, `sweep`, `ymrsweep`, `gendata` | the test rigs and `run.sh`'s data step |
 
 ## Environment
 
 | variable | read by | meaning |
 |---|---|---|
-| `HATARI`, `TOS` | play.sh, ymr.sh, run.sh | the emulator and its TOS image |
+| `HATARI`, `TOS` | play.sh, run.sh | the emulator and its TOS image |
 | `UNICORN_LIB` | the rigs | where libunicorn is, when the usual paths and the pip wheel fail |
 | `YMX_NOMASK` | rig.sh | assemble the player with the frame write unmasked |
 | `YMX_PACK_OPTIONS` | sweep.sh | extra packer options for the sweep |
-| `YMR_FRAME_CAP` | ymr_sweep.sh | the .ymr sweep's frame cap |
 | `YM_CORPUS` | mvn test | the directory holding the YM collection the documents count; without it the tests that read those figures back are skipped |
 | `YMX_PLAY_FRAMES` | run.sh | how many frames the real-hardware harness plays; raise it to resolve a smaller cycle difference |
 | `ymx.repo` / `YMX_REPO` | the combiners, the play tools and the rigs | the repository root, when not derivable (the Java property, the C# variable) |

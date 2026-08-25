@@ -191,190 +191,7 @@ final class PlayerTests {
                 Rig.CODE + player.symbol("ymx_retrigger_" + timer) + 4, 1);
     }
 
-    /** Where a retrigger stream reads the shape it restarts: the YM front
-     * end out of the low nibble of the voice the channel runs on, the .ymr
-     * front end out of R13, where RhYMe holds it. The two are told apart by
-     * making them DISAGREE - a voice whose nibble is one value while R13
-     * holds another - and reading the tick's own patched immediate. */
-    static String runShapeSource() {
-        // The flag-clear path, every YM tune. A buzzer on voice B with R9's
-        // nibble at 11, and R13 never written: reading the shadow would
-        // restart 8, the value a tune that has written no shape is taken to
-        // mean.
-        int frames = 16;
-        byte[][] values = new byte[16][frames];
-        for (int frame = 0; frame < frames; frame++) {
-            values[7][frame] = 0x38;
-            values[9][frame] = 0x0B;                // voice B's level, nibble 11
-            values[13][frame] = (byte) GenYm.NO_ENVELOPE_CHANGE;
-        }
-        for (int frame = 4; frame < 12; frame++) {  // sync-buzzer, voice B
-            values[1][frame] = (byte) 0xE0;
-            values[6][frame] |= 6 << 5;
-            values[14][frame] = (byte) 200;
-        }
-        Player player = new Player(Rig.pack(GenYm.ym6File(frames, values),
-                960, 24, true, 1));
-        if (player.init() != 0) {
-            return "shape source: YMX_init rejected the YM tune";
-        }
-        for (int frame = 0; frame < 6; frame++) {
-            player.frame();
-        }
-        int got = patchedShape(player, "a");        // a YM tune's slot 1 is Timer A
-        if (got != 11) {
-            return "shape source: a YM buzzer restarts shape " + got
-                    + ", want 11 - the nibble of the voice it runs on";
-        }
 
-        // The flag-set path. R13 is popped to $0A on the very frame the RTE
-        // arms, while voice B's level is $0C: the burst writes R13 before
-        // the actions run, so the arm must take the NEW shape, 10, and not
-        // the 12 sitting in the volume nibble. Frame 3 then moves the shape
-        // under the running buzzer, which goes through the hold path rather
-        // than the arm.
-        int[][] pops = new int[8][];
-        Arrays.fill(pops, new int[0]);
-        pops[0] = new int[] {5, 7, 10, 14, 15};
-        pops[3] = new int[] {10};
-        byte[] image = Rig.ymrImage(8, pops, Map.of(
-                5, new byte[] {0x38},               // mixer
-                7, new byte[] {0x0C},               // voice B's level: nibble 12
-                10, new byte[] {0x0A, 0x04},        // the shapes: 10, then 4
-                14, new byte[] {3},                 // Timer B runs an RTE
-                15, new byte[] {6, (byte) 200}),    // prescaler 6, count 200
-                0);
-        player = new Player(Rig.packYmr(image, 960, 24));
-        if (player.init() != 0) {
-            return "shape source: YMX_init rejected the .ymr tune";
-        }
-        player.frame();                             // frame 0: R13 := 10, RTE arms
-        got = patchedShape(player, "b");            // channel 1 of a .ymr is Timer B
-        if (got != 10) {
-            return "shape source: a .ymr buzzer arms on shape " + got
-                    + ", want 10 - R13 as this frame wrote it, not the 12 in"
-                    + " the volume nibble";
-        }
-        for (int frame = 1; frame < 4; frame++) {   // frame 3 pops the shape to 4
-            player.frame();
-        }
-        got = patchedShape(player, "b");
-        if (got != 4) {
-            return "shape source: a shape moving under a running buzzer left"
-                    + " the tick on " + got + ", want 4 - the hold path reads"
-                    + " R13 too";
-        }
-
-        // And an RTE that arms before the tune has written any shape: the
-        // spec says to assume 8, which is what RhYMe's own player primes.
-        // Voice C's level is 15 here, so the two sources cannot be confused.
-        pops = new int[8][];
-        Arrays.fill(pops, new int[0]);
-        pops[0] = new int[] {5, 8, 17, 18};
-        image = Rig.ymrImage(8, pops, Map.of(
-                5, new byte[] {0x38},
-                8, new byte[] {0x1F},               // voice C: nibble 15
-                17, new byte[] {3},                 // Timer D runs an RTE
-                18, new byte[] {6, (byte) 200}),
-                0);
-        player = new Player(Rig.packYmr(image, 960, 24));
-        if (player.init() != 0) {
-            return "shape source: YMX_init rejected the unshaped .ymr tune";
-        }
-        player.frame();
-        got = patchedShape(player, "d");            // channel 2 of a .ymr is Timer D
-        if (got != 8) {
-            return "shape source: an RTE armed before any shape restarts " + got
-                    + ", want 8 - the assumed shape, not voice C's nibble";
-        }
-        return "";
-    }
-
-    /** A looped sample, which the player loops rather than stopping: the
-     * file carries the point the sample comes back to and the tick does the
-     * coming back, so the proof is the pointer - play the block out, and the
-     * tick after the marker must be reading the loop start rather than a
-     * stopped timer. */
-    static String runSampleLoop(boolean perf) {
-        int[][] pops = new int[8][];
-        Arrays.fill(pops, new int[0]);
-        pops[0] = new int[] {5, 7, 14, 15, 16};
-        byte[] image = Rig.ymrImage(8, pops, Map.of(
-                5, new byte[] {0x38},               // mixer
-                7, new byte[] {0x0C},               // voice B's level
-                14, new byte[] {2},                 // Timer B runs a Sample
-                15, new byte[] {6, (byte) 200},     // prescaler 6, count 200
-                16, new byte[] {0}),                // sample 0
-                0, new Rig.SampleBlock(new byte[] {1, 2, 3, 4}, true, 1));
-        Player player = new Player(Rig.packYmr(image, 960, 24),
-                1, perf);
-        if (player.init() != 0) {
-            return "sample loop: YMX_init rejected the tune";
-        }
-        player.frame();                             // frame 0 starts the sample
-
-        long table = drumTable(player);
-        long offset = player.uc.value(player.file + table, 4);
-        long loop = player.uc.value(player.file + table + 6, 2);
-        if (loop != 1) {
-            return "sample loop: the file stores loop point " + loop + ", want 1";
-        }
-
-        long code = Rig.CODE + player.symbol("ymx_pcm_b");
-        int register = 9;                           // voice B's volume, which
-        int[] levels = {1, 2, 3, 4};                // the tick selects itself
-        for (int tick = 0; tick < levels.length; tick++) {
-            List<Player.Pair> pairs = invokeIsr(player, code);
-            if (!pairs.equals(List.of(new Player.Pair(register, levels[tick])))) {
-                return "sample loop: tick " + tick + " wrote " + pairs
-                        + ", want level " + levels[tick];
-            }
-        }
-
-        // The marker tick. It has already written the marker as a level -
-        // one sample of silence - but it must NOT stop the timer, and must
-        // leave the pointer on the loop start rather than past the end.
-        int at = player.mfp.size();
-        List<Player.Pair> pairs = invokeIsr(player, code);
-        if (!pairs.equals(List.of(new Player.Pair(register, 0x80)))) {
-            return "sample loop: the marker tick wrote " + pairs
-                    + ", want the marker alone";
-        }
-        long tbcr = 0xFFFFFA1BL;                    // every tick ends with an
-        for (Player.Write write : player.mfp.subList(at, player.mfp.size())) {
-            if (write.address() == tbcr) {          // EOI; only a stop touches
-                return "sample loop: the marker tick programmed " + write
-                        + " - a looping stream stops nothing";   // the control
-            }
-        }
-        // The tick is reached, never returned from - this emulator build
-        // cannot run an rte - so a stack left unbalanced is invisible unless
-        // it is read off directly. The loop leaves the tick by a different
-        // door than the stop does, and the PERF build has a colour band
-        // stacked at that point.
-        long left = player.uc.register(Unicorn.A7);
-        if (left != Rig.STACK_TOP - 512) {
-            return "sample loop: the marker tick reached its rte with the stack "
-                    + (Rig.STACK_TOP - 512 - left) + " bytes off";
-        }
-        long position = player.uc.value(code + player.symbol("ISR_PCM_PTR"), 4);
-        if (position != player.file + offset + 1) {
-            return "sample loop: after the marker the tick reads "
-                    + Long.toHexString(position) + ", want "
-                    + Long.toHexString(player.file + offset + 1)
-                    + " - the loop start";
-        }
-
-        int[] again = {2, 3, 4};                    // round it goes again
-        for (int tick = 0; tick < again.length; tick++) {
-            pairs = invokeIsr(player, code);
-            if (!pairs.equals(List.of(new Player.Pair(register, again[tick])))) {
-                return "sample loop: pass 2 tick " + tick + " wrote " + pairs
-                        + ", want " + again[tick];
-            }
-        }
-        return "";
-    }
 
     /** The loop word is unsigned - a point of $8000 through $FFFE is legal
      * in any sample long enough to hold it - and init resolves it to an
@@ -565,217 +382,13 @@ final class PlayerTests {
         word(out, value);
     }
 
-    /** A rate pop under a running effect, done without stopping it: the opcode
-     * is RETUNE addressed to voice 3, and its difference is only visible in
-     * the MFP traffic - the ordinary retune stops the timer and runs it
-     * again, and this must never write a zero into the timer's nibble. */
-    static String runLiveRetune() {
-        int[][] pops = new int[6][];
-        Arrays.fill(pops, new int[0]);
-        pops[0] = new int[] {5, 7, 14, 15};
-        pops[3] = new int[] {15};                   // the rate alone moves
-        byte[] image = Rig.ymrImage(6, pops, Map.of(
-                5, new byte[] {0x38},
-                7, new byte[] {0x0C},               // voice B's level, unmoved
-                14, new byte[] {1},                 // Timer B runs a PWM
-                15, new byte[] {6, (byte) 200, 5, (byte) 200}),  // 6 -> 5
-                0);
-        Player player = new Player(Rig.packYmr(image, 960, 24));
-        if (player.init() != 0) {
-            return "live retune: YMX_init rejected the tune";
-        }
-        for (int frame = 0; frame < 3; frame++) {
-            player.frame();
-        }
-        player.mfp.clear();
-        player.frame();                             // frame 3: the rate pop
-        long ctrl = 0xFFFFFA1BL;                    // Timer B's control, data
-        long data = 0xFFFFFA21L;
-        List<Player.Write> written = new ArrayList<>();
-        for (Player.Write write : player.mfp) {
-            if (write.address() == ctrl || write.address() == data) {
-                written.add(write);
-            }
-        }
-        if (written.size() != 2 || written.get(0).address() != ctrl
-                || written.get(1).address() != data) {
-            return "live retune: frame 3 touched the MFP as " + written
-                    + ", want the control register then the data register,"
-                    + " once each";
-        }
-        if ((written.get(0).value() & 7) == 0) {
-            return "live retune: the control write stopped the timer, which a"
-                    + " live retune never does";
-        }
-        if ((written.get(0).value() & 7) != 5 || written.get(1).value() != 200) {
-            return "live retune: frame 3 programmed prescaler "
-                    + (written.get(0).value() & 7) + " count "
-                    + written.get(1).value() + ", want 5 and 200";
-        }
-        return "";
-    }
 
-    /** The packer's own report for one .ymr, as the documentation quotes it. */
-    static String packerReport(Path tune) {
-        Path out = Rig.SCRATCH.resolve(stem(tune) + ".ymx");
-        return Rig.run(List.of("java", "-ea", "-cp", Rig.CLASSES.toString(),
-                "org.ymr.Ymr", "-f", tune.toString(), out.toString()));
-    }
 
-    /** Opcode counts from one tune's compiled script: a RETUNE addressed to
-     * voice 3 is the live retune, one to a real voice stops the timer to
-     * reprogram it, and a HOLD with bit 0 reloads the count under a running
-     * one. */
-    static Map<String, Integer> scriptOpcodes(Path tune) {
-        String script = Rig.run(List.of("java", "-ea", "-cp",
-                Rig.CLASSES.toString(), "org.ymr.Ymr", "-script", tune.toString()));
-        Map<String, Integer> counts = new HashMap<>(Map.of(
-                "live retune", 0, "stopping retune", 0, "live reload", 0));
-        Matcher action = Pattern.compile("A[0-3]=([0-9A-F]{2})").matcher(script);
-        while (action.find()) {
-            int value = Integer.parseInt(action.group(1), 16);
-            int opcode = value >> 5;
-            int voice = (value >> 3) & 3;
-            if (opcode == 4) {
-                String which = voice == 3 ? "live retune" : "stopping retune";
-                counts.merge(which, 1, Integer::sum);
-            } else if (opcode == 1 && (value & 1) != 0) {
-                counts.merge("live reload", 1, Integer::sum);
-            }
-        }
-        return counts;
-    }
 
     /** One number under a name: what the packer measured, what the document
      * says. */
     record Measured(String what, long is, long said) {}
 
-    /** The figures ymr/CONVERSION.md quotes, against the tunes it names.
-     * Every one is a measurement, re-measured the way the document says
-     * they were taken: the packer's own report for the byte counts, and the
-     * compiled script for the opcode counts. */
-    static String runConversionNumbers() {
-        String flat;
-        try {
-            flat = String.join(" ", Files.readString(
-                    Rig.REPO.resolve("ymr").resolve("CONVERSION.md")).split("\\s+"));
-        } catch (IOException e) {
-            return "conversion numbers: " + e;
-        }
-
-        List<String> tuneAndLength = said(flat,
-                "`([\\w./-]+\\.ymr)` is ([\\d,]+) frames at (\\d+) Hz",
-                "the tune and its length");
-        List<String> packedSizes = said(flat,
-                "reports ([\\d,]+) bytes of register and script data packed"
-                        + " into ([\\d,]+) \\(([\\d,.]+)%\\) in a"
-                        + " ([\\d,]+)-byte file", "the packed sizes");
-        List<String> ringShape = said(flat,
-                "([\\d,]+) rings of ([\\d,]+) bytes, decoding (\\d+) of the"
-                        + " (\\d+) streams", "the ring shape");
-        List<String> scriptStreams = said(flat,
-                "([\\d,]+) of those ([\\d,]+) packed bytes are the eleven"
-                        + " script streams, which the `\\.YMR` -"
-                        + " ([\\d,]+) bytes", "the script streams");
-        if (tuneAndLength == null || packedSizes == null || ringShape == null
-                || scriptStreams == null) {
-            return reworded;
-        }
-        String tune = tuneAndLength.get(0);
-        List<String> opcodeCounts = said(flat,
-                "on `" + Pattern.quote(tune) + "` the compiled script carries"
-                        + " ([\\d,]+) live reloads and ([\\d,]+) live retunes"
-                        + " against no opcode that stops", "the opcode counts");
-        List<String> otherOpcodes = said(flat,
-                "`([\\w./-]+\\.ymr)` has ([\\d,]+) live retunes and (\\d+)"
-                        + " that stop", "the second tune's opcode counts");
-        if (opcodeCounts == null || otherOpcodes == null) {
-            return reworded;
-        }
-        String other = otherOpcodes.get(0);
-        Path tunePath = Rig.REPO.resolve(tune);
-        Path otherPath = Rig.REPO.resolve(other);
-        if (!Files.exists(tunePath) || !Files.exists(otherPath)) {
-            return "conversion numbers: a named tune is not in the tree";
-        }
-
-        String report = packerReport(tunePath);
-        List<Measured> measured = new ArrayList<>();
-        Matcher got = Pattern.compile("Packed (\\d+) register bytes into (\\d+)"
-                + " \\([\\d,.]+%\\), file (\\d+) bytes").matcher(report);
-        if (!got.find()) {
-            return "conversion numbers: the packer no longer reports its"
-                    + " packed sizes";
-        }
-        measured.add(new Measured("register bytes", Long.parseLong(got.group(1)),
-                number(packedSizes.get(0))));
-        measured.add(new Measured("packed bytes", Long.parseLong(got.group(2)),
-                number(packedSizes.get(1))));
-        measured.add(new Measured("file bytes", Long.parseLong(got.group(3)),
-                number(packedSizes.get(3))));
-
-        Matcher shape = Pattern.compile("Player needs (\\d+) bytes of ring"
-                + "[\\s\\S]*? decodes (\\d+) of the (\\d+) streams").matcher(report);
-        if (!shape.find()) {
-            return "conversion numbers: the packer no longer reports its"
-                    + " ring shape";
-        }
-        measured.add(new Measured("ring bytes", Long.parseLong(shape.group(1)),
-                number(ringShape.get(0)) * number(ringShape.get(1))));
-        measured.add(new Measured("streams decoded", Long.parseLong(shape.group(2)),
-                number(ringShape.get(2))));
-        measured.add(new Measured("streams stored", Long.parseLong(shape.group(3)),
-                number(ringShape.get(3))));
-
-        // the eleven script streams, summed out of the per-stream listing
-        long script = 0;
-        Matcher stream = Pattern.compile("(?m)^\\s+(M|X|T|A[0-3]|P[0-3])"
-                + "\\s+\\d+\\s+->\\s+(\\d+) bytes").matcher(report);
-        while (stream.find()) {
-            script += Long.parseLong(stream.group(2));
-        }
-        measured.add(new Measured("script bytes", script,
-                number(scriptStreams.get(0))));
-        measured.add(new Measured("packed bytes, again", Long.parseLong(got.group(2)),
-                number(scriptStreams.get(1))));
-        try {
-            measured.add(new Measured(".YMR bytes", Files.size(tunePath),
-                    number(scriptStreams.get(2))));
-        } catch (IOException e) {
-            return "conversion numbers: " + e;
-        }
-        long frames = 0;
-        Matcher perStream = Pattern.compile("(?m)^\\s+\\S+\\s+(\\d+)\\s+->")
-                .matcher(report);
-        while (perStream.find()) {
-            frames = Math.max(frames, Long.parseLong(perStream.group(1)));
-        }
-        measured.add(new Measured("source frames", frames,
-                number(tuneAndLength.get(1))));
-
-        Map<String, Integer> opcodes = scriptOpcodes(tunePath);
-        measured.add(new Measured("live reloads", opcode(opcodes, "live reload"),
-                number(opcodeCounts.get(0))));
-        measured.add(new Measured("live retunes", opcode(opcodes, "live retune"),
-                number(opcodeCounts.get(1))));
-        measured.add(new Measured("stopping retunes",
-                opcode(opcodes, "stopping retune"), 0));
-        Map<String, Integer> second = scriptOpcodes(otherPath);
-        measured.add(new Measured(other + " live retunes",
-                opcode(second, "live retune"), number(otherOpcodes.get(1))));
-        measured.add(new Measured(other + " stopping retunes",
-                opcode(second, "stopping retune"), number(otherOpcodes.get(2))));
-
-        StringBuilder wrong = new StringBuilder();
-        for (Measured entry : measured) {
-            if (entry.is() != entry.said()) {
-                wrong.append(wrong.isEmpty() ? "" : "; ").append(entry.what())
-                        .append(' ').append(entry.is()).append(" not ")
-                        .append(entry.said());
-            }
-        }
-        return wrong.isEmpty() ? "" : "conversion numbers: " + wrong;
-    }
 
     // said() reports through this: the sentence a number lives in was
     // reworded away from the pattern that reads it back out.
@@ -992,83 +605,7 @@ final class PlayerTests {
         }
     }
 
-    /**
-     * A looped sample owns its voice until something stops the timer. A
-     * one-shot's voice comes back to the frame write at the sample's computed
-     * end; a looped sample has no such end, so the skip that covers it has to
-     * hold. Both front ends compute that window - {@code YmrEffects.armed}
-     * and {@code EffectScript.duration} - and both once read the sample's
-     * length alone, so a looped sample's voice rejoined the frame write one
-     * pass in while the loop kept writing the same register.
-     *
-     * <p>Two tunes differing only in the sample's loop flag, the timer never
-     * stopped: the one-shot's volume register comes back, the looped one's
-     * does not.
-     */
-    static String runLoopedSample() throws IOException {
-        String problem = sampleVoiceReturns(false, "a one-shot");
-        if (!problem.isEmpty()) {
-            return problem;
-        }
-        return sampleVoiceReturns(true, "a looped sample");
-    }
 
-    /** Whether voice A's volume register is written again after the sample's
-     * one-shot window, which is what the skip lifting looks like from the
-     * chip's side. */
-    private static String sampleVoiceReturns(boolean looped, String what) {
-        int frames = 60;
-        int[][] pops = new int[frames][];
-        Arrays.fill(pops, new int[0]);
-        // frame 0 arms Timer A on sample 0; nothing ever stops it
-        pops[0] = new int[] {5, 6, 11, 12, 13};
-        for (int f = 5; f < frames; f += 5) {   // voice A's level moves, so a
-            pops[f] = new int[] {6};            // frame write would be visible
-        }
-        byte[] volumes = new byte[1 + (frames - 1) / 5];
-        for (int i = 0; i < volumes.length; i++) {
-            volumes[i] = (byte) (i % 16);
-        }
-        byte[] levels = new byte[64];
-        for (int i = 0; i < levels.length; i++) {
-            levels[i] = (byte) (1 + i % 15);
-        }
-        byte[] image = Rig.ymrImage(frames, pops, Map.of(
-                5, new byte[] {0x38},                   // mixer
-                6, volumes,                             // voice A's level
-                11, new byte[] {2},                     // Timer A runs a sample
-                12, new byte[] {7, (byte) 11},          // prescaler 7, count 11
-                13, new byte[] {0}),                    // sample 0
-                0, new Rig.SampleBlock(levels, looped, looped ? 1 : 0));
-
-        Player player = new Player(Rig.packYmr(image, 960, 24));
-        if (player.init() != 0) {
-            return "looped sample: YMX_init rejected " + what;
-        }
-        boolean returned = false;
-        for (int f = 0; f < 40; f++) {
-            Player.Frame frame = player.frame();
-            if (f < 8) {                        // the window is three frames;
-                continue;                       // give the release room
-            }
-            for (Player.Pair pair : frame.writes()) {
-                if (pair.register() == 8) {     // voice A's volume
-                    returned = true;
-                }
-            }
-        }
-        if (looped && returned) {
-            return "looped sample: voice A's volume was written again while the"
-                    + " sample was still looping - the skip lifted on the"
-                    + " one-shot's window";
-        }
-        if (!looped && !returned) {
-            return "looped sample: the control failed - " + what + "'s voice"
-                    + " never came back to the frame write, so this check"
-                    + " would pass whatever the looped case did";
-        }
-        return "";
-    }
 
     /**
      * The three subtunes' register-2 values, one per frame. Subtune 2 is
@@ -1174,7 +711,7 @@ final class PlayerTests {
             }
         }
         if (pinned.isEmpty()) {
-            return "sndh corpus: no pinned .ymx under ym/test or ymr/test";
+            return "sndh corpus: no pinned .ymx under ym/test";
         }
         for (Path tune : pinned) {
             String problem = sndhAgainstPlayer(tune, core);
@@ -1465,32 +1002,22 @@ final class PlayerTests {
                 "every published core     (3 units x monitor x mask)");
         failures += report(runSndhCorpus(),
                 "the pinned tunes combined (both paths, same chip writes)");
-        failures += report(runLoopedSample(),
-                "a looped sample          (the skip holds, the voice does not)");
         failures += report(runConformanceKit(),
                 "the conformance kit      (ten tunes, digests of the player)");
         failures += report(runRequiredExtension(),
                 "a required extension     (the mask refuses, the ceiling holds)");
-        failures += report(runShapeSource(),
-                "the retrigger shape      (both sources, off the patched tick)");
         for (boolean perf : new boolean[] {false, true}) {
             // The PERF build stacks a colour band on the way in, so a loop
             // that leaves by a different door than the stop does has to put
             // it back.
             String build = perf ? ", PERF build" : "";
-            failures += report(runSampleLoop(perf), String.format(
-                    "the sample loop%-9s    (back to the loop, not stopped)", build));
         }
         failures += report(runStoredCut(),
                 "the stored cut           (both tables, values not containers)");
         failures += report(runLoopPointResolve(),
                 "the loop-point resolve   (an unsigned word, $8000 and up)");
-        failures += report(runLiveRetune(),
-                "the live retune          (the timer is never stopped)");
         failures += report(runReadmeSizes(),
                 "the README sizes         (the two byte counts, measured)");
-        failures += report(runConversionNumbers(),
-                "the conversion numbers   (ymr/CONVERSION.md, re-measured)");
 
         for (boolean perf : new boolean[] {false, true}) {
             String problem = Effects.runEffects(perf);
