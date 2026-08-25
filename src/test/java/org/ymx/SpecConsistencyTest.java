@@ -639,8 +639,8 @@ final class SpecConsistencyTest {
         assertTrue(kit.contains("§9.4"),
                 "doc/conformance/README.md does not say which role it tests,"
                         + " and the kit measures a reader rather than a player");
-        assertTrue(flat().contains("It lands no tick either: the run has"
-                        + " ended at it"),
+        assertTrue(flat().contains("plays no frame, writes no register,"
+                        + " lands no tick and reports -1"),
                 "SPEC §7 no longer says whether the call reporting -1 carries"
                         + " ticks");
         assertTrue(flat().contains("A stream's ticks name the timer the map"

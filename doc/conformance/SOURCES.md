@@ -9,7 +9,7 @@ Two of them once had no row. They came from a converter the tree no
 longer carries, so a format change that moved a body byte would have
 stranded them: version 0.6 added four header bytes and left the body
 alone, so they came through it. Both are replaced here by different
-tunes, packed from sources the tree holds and covering what those two
+tunes, packed from sources in the tree and covering what those two
 covered.
 
 | tune | source under `ym/test` | packer options |

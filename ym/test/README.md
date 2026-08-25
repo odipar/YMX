@@ -6,7 +6,7 @@ Thirty-six tunes from a 544-file collection and two built by hand, and the
 packer, the script compiler or ST4 fails here rather than in a shipped
 file. The test says how to repin after an intended change.
 
-They were taken by covering features rather than by sampling: both dialects,
+They were chosen to cover features rather than to sample: both dialects,
 every effect class the collection holds - digidrums, SID voices, and tunes
 with no effect - each distinct drum rate, the tunes that put two and
 three voices on the envelope at once, seven whose header gives a loop frame

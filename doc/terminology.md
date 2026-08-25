@@ -27,13 +27,12 @@ departure. YM names stay in the code that reads YM files; everywhere else
 the names are plain digital ones, so the engine can be read without
 knowing the scene. This file maps one set to the other.
 
-A word in **bold** is a term with a precise meaning here, defined where
-it first appears. Words in quotes, like "digidrum" and "effect", belong
-to the YM format. The new names come from digital systems: counters,
-streams, rates, phases. None come from analogue synthesis, because the
-YM2149 has none of that machinery. A piece of
-music is a **tune**; "song" is what a **tracker** - the program a
-composer writes music in - calls its own file.
+A word in **bold** is a term with a precise meaning here, defined where it
+first appears. Words in quotes, like "digidrum" and "effect", belong to
+the YM format. The new names come from digital systems: counters, streams,
+rates, phases. None come from analogue synthesis, because the YM2149 has
+none of that machinery. A piece of music is a **tune**; "song" is what a
+**tracker** - the program a composer writes music in - calls its own file.
 
 ## The sound chip
 
@@ -228,8 +227,9 @@ only for a channel the tune uses.
 
 All four timers are reachable. Timer C costs more than the others: it is
 the operating system's 200 Hz clock, so a tune that uses it stops that
-clock and cannot be hosted from a Timer C hook. A YM file never uses it, since
-a YM frame starts at most two effects.
+clock and cannot be hosted from a Timer C hook. A converted YM tune never
+lands on it: a YM frame starts at most two effects, so two channels are
+enough, and the packer's default puts those on Timers A and D.
 
 The MFP's own clock runs at 2,457,600 a second, unrelated to the
 YM2149's. A timer divides it twice: by a **prescaler**, one of 4, 10, 16,

@@ -28,8 +28,9 @@ run it, and a direct run is
 `java -cp target/classes org.ym6.Ymx ...`,
 `mvn -q compile exec:exec@ymx -Dargs="..."`, or
 `dotnet dotnet/bin/Release/net10.0/ymx.dll ymx ...`. A wrong call prints
-the tool's own usage - `mkcores.sh` and `mkrelease.sh` run with no
-arguments - and this document is the same information in one place.
+the tool's own usage (`mkcores.sh` and `mkrelease.sh` take no arguments,
+so they just run), and this document collects the same information in
+one place.
 
 ## The packer
 

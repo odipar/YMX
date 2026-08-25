@@ -13,8 +13,9 @@ first: the musicians and coders who worked out what three voices and a noise
 generator could be made to do, and who are the reason there is anything here
 worth streaming. Then the YM format and ST-Sound, by Arnaud Carré, which
 recorded those tunes and gave every file in the collection its shape.
-Grazey, whose long work getting the chiptunes into the open and keeping them
-accessible is why there is a collection here to measure against at all.
+Grazey, whose long work got the chiptunes into the open and keeps them
+accessible: without it there would be no collection here to measure
+against.
 Tat's MinYMiser, which this player is modelled on, and GwEm's maxYMiser,
 which shaped it as well: when a square voice drops out and comes back,
 maxYMiser lets it pick up where it left off rather than start over, and YMX
@@ -23,21 +24,22 @@ Hatari, which every measurement in this repository was taken on. And the
 wider body of Atari work behind all of them. YMX rearranges what those
 established, and could not exist without them.
 
-**It is a tool for the people who make the music.** It was written by odipar
-to put that tool in their hands: a musician writes the tune, the format and
-the player carry it onto a plain 68000 with the RAM a real machine has, and
-the rest of us get to hear what they made. Everything below is in service of
-that.
+**It is a tool for the people who make the music.** It was written by
+odipar to put that tool in their hands: a musician writes the tune with a
+tracker, the tracker writes the format, the player plays it on a plain
+68000 with the RAM a real machine has, and the rest of us get to hear
+what they made. Everything below is in service of that.
 
 ## The format
 
 YMX extends the YM family - its packer reads YM5 and YM6 - into a format a
 68000 plays without ever holding the tune in memory. A `.ymx` file carries
-twenty-five independently compressed streams: fourteen for the YM2149's sound
-registers, one value per frame, and eleven carrying a **compiled effect
-script** that drives the MFP's timers. Each stream decodes through its own
-small ring, refilled one stream per frame, so a tune's cost in RAM follows the
-player's configuration, not the tune's length.
+twenty-five independently compressed streams: fourteen for the sound
+registers of the YM2149, the ST's sound chip, one value per frame, and
+eleven carrying a **compiled effect script** that drives the timers of the
+MFP, the ST's timer chip. Each stream decodes through its own small ring,
+refilled one stream per frame, so a tune's cost in RAM follows the player's
+configuration, not the tune's length.
 
 YMX changes one thing about the YM lineage: where the work happens.
 What those formats call a "special effect" - a SID voice, a digidrum, a
@@ -59,12 +61,12 @@ opcodes and the frame contract. The rest of the documentation is beside it.
 | [doc/experiments.md](doc/experiments.md) | ideas measured against the real corpus, and what the measurements said |
 | [doc/RELEASES.md](doc/RELEASES.md) | what changed in each published set of binaries |
 
-## Test driving one
+## Hearing a tune
 
 ```sh
 mvn -q compile
 ym/play.sh song.ym                  # pack a YM tune, build a player, run it
-ym/play.sh -n2048 -c32 song.ym      # longer calls: cheaper on average
+ym/play.sh -n2048 -c32 song.ym      # bigger rings and refills: cheaper on average
 ym/play.sh -h                       # every flag
 ```
 
@@ -111,11 +113,11 @@ the player byte for byte.
         bsr     YMX_stop                ; chip quiet, timers stopped
 ```
 
-`YMX_SIZE` follows the ring size the tune's own header gives, and the packer
-raises that above the `-n` it was asked for where one pass of a tune needs a
-longer ring: a program reads the header word rather than the flag the tune
-was packed with, or reserves for the format's cap. [68k/YMX.S](68k/YMX.S)
-gives both forms.
+How big is the workspace? The tune's own header says: the packer records
+the ring size it used, which can be larger than the `-n` it was
+asked for when one pass of the tune needs a longer ring. So a program either
+reads that header word, or reserves enough for the format's maximum and
+stops caring. [68k/YMX.S](68k/YMX.S) gives both forms.
 
 <!-- The two byte counts below are measured by the rig (ymx/test/rig.sh),
      which reads them back out of this sentence: keep the shape of it. -->
@@ -201,9 +203,7 @@ The YMX format and its additions are © 2026 Robbert van Dalen. Claude
 (Anthropic's Claude Code) wrote the Java and C# tools, the 68000 player and
 its SNDH core, the tests and the emulation rigs, under Robbert's direction.
 
-The player was inspired by Steven Tattersall's MinYMiser. Sinus-SID is the one
-YM effect this player leaves unplayed. ST-Sound, the format author's own
-player, reads the effect code and runs an empty handler.
+The player was inspired by Steven Tattersall's MinYMiser.
 
 Special thanks to Sandor Drieënhuizen and Wietze Spijkerman for their support,
 proofreading, and ideas.
