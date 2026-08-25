@@ -49,10 +49,11 @@ entry, and the record ends with it: produce no entry for any later call.
 ## Rules
 
 - Work **only** from `SPEC.md`.
-- **Do not read anything under `/Users/rapido/git/YMX`,** and do not read
-  any implementation of this format or of the compression it uses,
-  anywhere - not in that repository, not on the web. This is a test of
-  whether the specification alone is enough.
+- **Do not read the YMX repository,** and do not read any implementation
+  of this format or of the compression it uses, anywhere - not in that
+  repository, not on the web. This is a test of whether the specification
+  alone is enough. Whoever sets the exercise says which directory holds
+  that repository, so you can keep out of it.
 - You have no reference output. You cannot check your answer.
 
 ## Also produce
