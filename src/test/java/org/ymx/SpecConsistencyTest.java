@@ -652,6 +652,19 @@ final class SpecConsistencyTest {
                 "SPEC §8 no longer says whether the call that ends a pass"
                         + " carries ticks. Read the other way a stray tick of"
                         + " the old pass reaches the new one");
+        assertTrue(flat().contains("The read position becomes the sample's"
+                        + " first byte, so its first tick writes byte 0"),
+                "SPEC §3 no longer says where a PCM trigger's read position"
+                        + " starts");
+        assertTrue(flat().contains("A channel keeps the prescaler index of the"
+                        + " last opcode that programmed its timer"),
+                "SPEC §3.3 no longer says which prescaler a flag-1 reload"
+                        + " multiplies its count by");
+        assertTrue(flat().contains("the first underflow after `RESUME` lands"
+                        + " one"),
+                "SPEC §3.3 no longer says which underflow lands the first tick"
+                        + " after a gap. Read as one period past the next"
+                        + " underflow, a resumed stream skips a tick");
         assertTrue(flat().contains("leaves a toggle stream on the half the"
                         + " release left standing"),
                 "SPEC §3.3 no longer says what a dropped tick leaves behind."

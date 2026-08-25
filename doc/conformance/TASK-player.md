@@ -21,29 +21,31 @@ It prints one line of JSON:
 One entry per player call, in order, at most `<calls>` of them.
 
 - `result` is the value that call reports.
-- `w` is the call's own writes, as `TASK.md` describes them: register
-  number to value, only the registers the call writes.
+- `w` is the call's own writes: register number to value, only the
+  registers the call writes, in ascending register order.
 - `t` is every tick that falls after that call and before the next, in
   time order. `n` is the timer, `A` to `D`. A tick's `w` is a list of
   `[register, value]` pairs **in the order it writes them**, because one
   tick may write a register twice.
 - Registers 0 to 13. Values are what a YM2149 would receive.
 
-## The four conventions this record fixes
+## The five conventions this record fixes
 
 The specification states a timer's rate and what each tick carries. It
 does not say where a tick falls against a call, because that is the
-host's. These four settle it, and they are this task's, not the format's:
+host's. These five settle it, and they are this task's, not the format's:
 
 1. A call's own writes come first, then the ticks falling before the next
    call. No tick lands inside a call. A tick due at the exact instant a
-   call begins belongs to that call's window, not the one before it.
+   call begins belongs to that call's window, not the one before it, and
+   runs against the state that call's own writes and actions left.
 2. One call lasts `2457600 / rate` of the MFP clock's cycles, where
    `rate` is the header's frame rate.
-3. A timer started by a call has its first tick one period after that
-   call. A timer already running when a call reprograms it keeps the
-   count in flight and takes the new period after that (§3.1). A timer
-   stopped and started again begins its count over.
+3. A timer started by a call has its first tick one period after the
+   instant that call begins, not one period after it ends. A timer already
+   running when a call reprograms it keeps the count in flight and takes
+   the new period after that (§3.1). A timer stopped and started again
+   begins its count over.
 4. A timer whose interrupt is disabled lands no tick, and its count
    keeps running (§3, `RELEASE` bit 0).
 5. Two ticks due in one cycle are listed in the order an MFP ranks their

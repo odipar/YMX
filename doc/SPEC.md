@@ -495,7 +495,7 @@ clock, and cannot be driven from a Timer C interrupt.
 | 3 | `START_TOGGLE` | start a toggle stream: select, volume, vector := the loud half, then a full program | `R(8+v) := 0`, a skipped voice included |
 | 4 | `RETUNE` | a new rate for a running stream, keeping its place in the cycle. See §3.1 | none |
 | 5 | `START_RETRIGGER` | start a retrigger stream: shape, vector := the retrigger tick, then a full program | none |
-| 6 | `START_PCM` | a trigger, fresh or repeated: sample table lookup, select, vector, full program | none |
+| 6 | `START_PCM` | a trigger, fresh or repeated: sample table lookup, select, vector, full program. The read position becomes the sample's first byte, so its first tick writes byte 0 | none |
 | 7 | `START_PCM_PREEMPT` | as `START_PCM`, but first stop the timer of every channel marked in X's low nibble | none |
 
 Every other write the operations name patches the channel's tick handler.
@@ -567,18 +567,21 @@ carries one voice between one start opcode and the next (§9.3).
 
 `RESUME` implements the alternative gap model: a release disables the
 timer's interrupt, the timer keeps counting, and a re-arrival resumes the
-toggle stream at its current phase. A tick that fell due while disabled
-is not delivered: no interrupt is taken and the tick's handler does not
-run, so it writes no register, reads no sample byte, and leaves a toggle
-stream on the half the release left standing. The count runs on under it,
-and the stream owes no tick for the gap: `RESUME` delivers the next tick
-one period after the count reaches its next underflow, not one for each
-that passed. The model in use is the writer's choice, fixed at pack
-time.
+toggle stream at its current phase. A tick that fell due while disabled is
+not delivered: no interrupt is taken and the tick's handler does not run,
+so it writes no register, reads no sample byte, and leaves a toggle stream
+on the half the release left standing. The count runs on under it, and the
+stream owes no tick for the gap: the underflows that fall inside the gap
+land no tick and none of them is delivered late, and the first underflow
+after `RESUME` lands one. The model in use is the writer's choice, fixed
+at pack time.
 
 `RESUME` is emitted only where the gap was a disabling release and the
 arriving code continues the same stream - same voice, same prescaler; the
-opcode's low bits are flags, so it carries no rate. A prescaler changed
+opcode's low bits are flags, so it carries no rate. A channel keeps the
+prescaler index of the last opcode that programmed its timer, and that is
+the index `RESUME`'s flag 1 reloads against, as it is the one `HOLD`'s
+flag 1 reloads against. A prescaler changed
 across the gap re-enters through the voice-addressed `RETUNE`, whose
 program ends with the interrupt enabled (§9.2).
 
