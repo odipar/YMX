@@ -53,6 +53,7 @@ final class SpecConsistencyTest {
         java.put("sample count", YmxFormat.OFFSET_SAMPLE_COUNT);
         java.put("`L`, the frame", YmxFormat.OFFSET_LOOP_FRAME);
         java.put("loop table", YmxFormat.OFFSET_LOOP_TABLE);
+        java.put("required-streams mask", YmxFormat.OFFSET_REQUIRED);
         java.put("section", YmxFormat.OFFSET_SECTION_TABLE);
 
         for (Map.Entry<String, Integer> field : java.entrySet()) {
@@ -79,6 +80,7 @@ final class SpecConsistencyTest {
                 Map.entry("YH_SAMPLECOUNT", YmxFormat.OFFSET_SAMPLE_COUNT),
                 Map.entry("YH_LOOP", YmxFormat.OFFSET_LOOP_FRAME),
                 Map.entry("YH_LOOPTAB", YmxFormat.OFFSET_LOOP_TABLE),
+                Map.entry("YH_REQUIRED", YmxFormat.OFFSET_REQUIRED),
                 Map.entry("YH_SECTIONS", YmxFormat.OFFSET_SECTION_TABLE));
         offsets.forEach((name, at) -> assertEquals(at.intValue(), equate(asm, name), name));
         assertEquals((int) YmxFormat.MAGIC, equate(asm, "YMX_MAGIC"), "YMX_MAGIC");
@@ -95,7 +97,10 @@ final class SpecConsistencyTest {
         assertEquals(YmxFormat.HEADER_SIZE, number(said,
                 "the header is \\*\\*(\\d+) bytes\\*\\*", "the header size"));
         assertEquals(YmxFormat.STREAMS, number(said,
-                "`S`, the stream count - always \\*\\*(\\d+)\\*\\*", "the stream count"));
+                "`S`, the stream count - \\*\\*(\\d+)\\*\\* to", "the stream count"));
+        assertEquals(YmxFormat.MAX_STREAMS, number(said,
+                "the stream count - \\*\\*\\d+\\*\\* to \\*\\*(\\d+)\\*\\*",
+                "the stream ceiling"));
         assertEquals(2520, number(said,
                 "`N` is capped at \\*\\*(\\d+)\\*\\*", "the ring cap"));
         // 28 divides 2520 ninety times and covers all twenty-five streams; the
@@ -507,7 +512,7 @@ final class SpecConsistencyTest {
     @Test
     void theWorkedFileIsAFileInTheTree() throws IOException {
         String said = flat();
-        assertTrue(said.contains("A file of 240 bytes, four frames, every"
+        assertTrue(said.contains("A file of 244 bytes, four frames, every"
                         + " section stored."),
                 "SPEC Appendix B describes another file");
 
@@ -516,19 +521,19 @@ final class SpecConsistencyTest {
             for (Path each : walk.filter(p -> p.toString().endsWith(".ymx"))
                     .sorted().toList()) {
                 byte[] file = Files.readAllBytes(each);
-                if (file.length == 240 && longAt(file, YmxFormat.OFFSET_FRAMES) == 4) {
+                if (file.length == 244 && longAt(file, YmxFormat.OFFSET_FRAMES) == 4) {
                     found = file;
                     break;
                 }
             }
         }
-        assertTrue(found != null, "Appendix B walks through a 240-byte,"
+        assertTrue(found != null, "Appendix B walks through a 244-byte,"
                 + " four-frame file and ym/test holds none");
 
         byte[] file = found == null ? new byte[240] : found;
-        assertEquals(140, (int) YmxFormat.sectionOffset(
+        assertEquals(144, (int) YmxFormat.sectionOffset(
                         longAt(file, YmxFormat.OFFSET_SECTION_TABLE)),
-                "Appendix B says the first body item is at 140");
+                "Appendix B says the first body item is at 144");
         for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
             assertTrue(YmxFormat.isStored(longAt(file,
                             YmxFormat.OFFSET_SECTION_TABLE + 4 * stream)),
@@ -550,11 +555,13 @@ final class SpecConsistencyTest {
     @Test
     void theRefillTurnIsOneRuleInBothPlaces() throws IOException {
         String said = flat();
-        assertTrue(said.contains("stream `k` on the call whose count of calls"
-                        + " since init, modulo `C`, equals `k`"),
+        assertTrue(said.contains("the stream at position `k` of the"
+                        + " consumer's decode list (§1.5) on the call whose"
+                        + " count of calls since init, modulo `C`, equals `k`"),
                 "SPEC §7 step 4's refill turn has been reworded");
-        assertTrue(said.contains("on call `n` counted from init, stream `n`"
-                        + " modulo `C` is decoded `C` values further, the count"
+        assertTrue(said.contains("on call `n` counted from init, the stream at"
+                        + " position `n` modulo `C` of the consumer's decode"
+                        + " list is decoded `C` values further, the count"
                         + " running on across a wrap"),
                 "SPEC §9.2's refill row no longer states §7 step 4's rule."
                         + " The two said different things once already, and"

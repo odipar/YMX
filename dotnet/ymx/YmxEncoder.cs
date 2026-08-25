@@ -337,6 +337,9 @@ namespace Ymx
             // tune, and otherwise where the second set of them is located from.
             PutLong(file, YmxFormat.OffsetLoopFrame, loopFrame);
             PutLong(file, YmxFormat.OffsetLoopTable, loopTable);
+            // Q: this version carries no extension stream, so the mask names
+            // the twenty-five section 2 defines and nothing above them.
+            PutLong(file, YmxFormat.OffsetRequired, YmxFormat.RequiredBase);
 
             int at = Place(file, YmxFormat.OffsetSectionTable, sections,
                     loopTable == 0 ? YmxFormat.HeaderSize

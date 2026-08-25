@@ -11,6 +11,39 @@ patch number the binaries carry of their own. The format version is the
 compatibility gate: tunes packed at one format version play on every
 patch of it.
 
+## 0.6.0
+
+The player is 3,412 bytes at unit size 2, where 0.5.2 carried 3,394.
+Format version 0.6: a tune packed at 0.5 has to be repacked from its
+`.ym` or `.ymr` source.
+
+- A file may carry **extension streams** past the twenty-five, at indices
+  25 to 31, and thirty-two is the stream ceiling at this version and at
+  every later one. `S`, the stream count at offset 14, is 25 to 32 where
+  it was always 25.
+- The long at offset 38 is `Q`, the **required-streams mask**, one bit per
+  stream, and thirty-two is the stream ceiling at every version because of
+  it. A set bit requires the stream: a consumer that does not
+  understand it rejects the file. A clear bit on a stream the file carries
+  makes it advisory, and a consumer that does not understand it reads none
+  of it and produces the values it would produce from a file without it.
+  Bits 0 to 24 are set in every file, so a file carrying no extension
+  stream holds `$01FFFFFF`.
+- The header is 142 bytes where 0.5 carried 138. The section table follows
+  at 42 where it followed at 38, and the first body item is at 144.
+- SPEC.md §1.7 is the registry. This version assigns no index: 25 to 29
+  are the format's to assign later, and 30 and 31 are private at every
+  version, so a private stream never collides with a registered one. An
+  extension that turns out to be shared is registered from 25 to 29 in a
+  later version.
+- The refill turn is a position in a consumer's decode list rather than a
+  stream index, so a file carrying an extension at index 31 does not force
+  `C` to 32 for every consumer of it.
+
+A file carrying no extension stream is what 0.5 would have written apart
+from the header: 10 of the 10 reference dumps in `doc/conformance` are
+byte for byte what they were.
+
 ## 0.5.2
 
 The player is 3,394 bytes at unit size 2, where 0.5.1 carried 3,394: the

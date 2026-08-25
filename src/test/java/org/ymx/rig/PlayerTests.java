@@ -437,6 +437,7 @@ final class PlayerTests {
         word(out, 1);                               // one sample
         longWord(out, 0);                           // L: back to the beginning
         longWord(out, 0);                           // no loop table
+        longWord(out, org.ymx.YmxFormat.REQUIRED_BASE);     // Q: no extension
         for (int stream = 0; stream < Rig.STREAMS; stream++) {
             longWord(out, 0x80000000 | where[stream]);  // bit 31: stored
         }
@@ -526,6 +527,7 @@ final class PlayerTests {
         word(out, 0);
         longWord(out, loop);                        // L, where it starts over
         longWord(out, table);                       // and the table for [L, O)
+        longWord(out, org.ymx.YmxFormat.REQUIRED_BASE);     // Q: no extension
         for (int stream = 0; stream < Rig.STREAMS; stream++) {
             longWord(out, 0x80000000 | first[stream]);  // bit 31: stored
         }
@@ -886,6 +888,47 @@ final class PlayerTests {
         }
 
         return checkSndh(blob, signatures);
+    }
+
+    /**
+     * A file that requires an extension stream, against a player that
+     * implements none. §1.6's mask is the whole of 0.6's new behaviour and
+     * the only thing in the format that a build can refuse for: this build
+     * understands streams 0 to 24, so a file whose mask names stream 25 is
+     * one it must reject rather than play.
+     *
+     * <p>The control is the same file with the bit clear and the stream
+     * absent: that one plays, so a rejection here is the mask and not the
+     * shape of a hand-built file.
+     */
+    static String runRequiredExtension() {
+        byte[] plain = storedYmx(4, 96, 0);
+        Player accepted = new Player(plain);
+        if (accepted.init() != 0) {
+            return "required extension: the control file was rejected, so"
+                    + " this check would pass whatever the mask did";
+        }
+
+        byte[] required = storedYmx(4, 96, 0);
+        int mask = org.ymx.YmxFormat.OFFSET_REQUIRED;
+        required[mask] |= 0x02;                 // bit 25 of a big-endian
+                                                // long is bit 1 of byte 0
+        Player refused = new Player(required);
+        if (refused.init() == 0) {
+            return "required extension: a file requiring stream 25 was"
+                    + " accepted by a build that implements no extension"
+                    + " stream, so §1.6's mask decides nothing";
+        }
+
+        byte[] wider = storedYmx(4, 96, 0);
+        wider[org.ymx.YmxFormat.OFFSET_STREAM_COUNT + 1] = 33;
+        Player tooMany = new Player(wider);
+        if (tooMany.init() == 0) {
+            return "required extension: a file claiming 33 streams was"
+                    + " accepted, and thirty-two is the ceiling at every"
+                    + " version";
+        }
+        return "";
     }
 
     /**
@@ -1426,6 +1469,8 @@ final class PlayerTests {
                 "a looped sample          (the skip holds, the voice does not)");
         failures += report(runConformanceKit(),
                 "the conformance kit      (ten tunes, digests of the player)");
+        failures += report(runRequiredExtension(),
+                "a required extension     (the mask refuses, the ceiling holds)");
         failures += report(runShapeSource(),
                 "the retrigger shape      (both sources, off the patched tick)");
         for (boolean perf : new boolean[] {false, true}) {

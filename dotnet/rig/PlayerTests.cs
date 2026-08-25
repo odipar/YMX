@@ -486,6 +486,7 @@ namespace Rig
             Word(outStream, 1);             // one sample
             LongWord(outStream, 0);         // L: back to the beginning
             LongWord(outStream, 0);         // no loop table
+            LongWord(outStream, Ymx.YmxFormat.RequiredBase);  // Q: no extension
             for (int stream = 0; stream < Rig.Streams; stream++)
             {
                 LongWord(outStream, unchecked((int) 0x80000000) | where[stream]);
@@ -588,6 +589,7 @@ namespace Rig
             Word(outStream, 0);
             LongWord(outStream, loop);      // L, where it starts over
             LongWord(outStream, table);     // and the table for [L, O)
+            LongWord(outStream, Ymx.YmxFormat.RequiredBase);  // Q: no extension
             for (int stream = 0; stream < Rig.Streams; stream++)
             {
                 LongWord(outStream, unchecked((int) 0x80000000) | first[stream]);
@@ -1169,6 +1171,45 @@ namespace Rig
         /// both once read the sample's length alone, so a looped sample's voice
         /// rejoined the frame write one pass in while the loop kept writing the
         /// same register.</summary>
+        /// <summary>A file that requires an extension stream, against a
+        /// player that implements none. Section 1.6's mask is the whole of
+        /// 0.6's new behaviour and the only thing in the format a build can
+        /// refuse for. The control is the same file with the bit clear, so a
+        /// rejection is the mask and not the shape of a hand-built
+        /// file.</summary>
+        public static string RunRequiredExtension()
+        {
+            byte[] plain = StoredYmx(4, 96, 0);
+            var accepted = new Player(plain);
+            if (accepted.Init() != 0)
+            {
+                return "required extension: the control file was rejected, so"
+                        + " this check would pass whatever the mask did";
+            }
+
+            byte[] required = StoredYmx(4, 96, 0);
+            required[Ymx.YmxFormat.OffsetRequired] |= 0x02;  // bit 25 of a
+                                            // big-endian long is bit 1 of byte 0
+            var refused = new Player(required);
+            if (refused.Init() == 0)
+            {
+                return "required extension: a file requiring stream 25 was"
+                        + " accepted by a build that implements no extension"
+                        + " stream, so section 1.6's mask decides nothing";
+            }
+
+            byte[] wider = StoredYmx(4, 96, 0);
+            wider[Ymx.YmxFormat.OffsetStreamCount + 1] = 33;
+            var tooMany = new Player(wider);
+            if (tooMany.Init() == 0)
+            {
+                return "required extension: a file claiming 33 streams was"
+                        + " accepted, and thirty-two is the ceiling at every"
+                        + " version";
+            }
+            return "";
+        }
+
         public static string RunLoopedSample()
         {
             string problem = SampleVoiceReturns(false, "a one-shot");
@@ -1610,6 +1651,8 @@ namespace Rig
                     "the pinned tunes combined (both paths, same chip writes)");
             failures += Report(RunLoopedSample(),
                     "a looped sample          (the skip holds, the voice does not)");
+            failures += Report(RunRequiredExtension(),
+                    "a required extension     (the mask refuses, the ceiling holds)");
             failures += Report(RunShapeSource(),
                     "the retrigger shape      (both sources, off the patched tick)");
             foreach (bool perf in new[] {false, true})
