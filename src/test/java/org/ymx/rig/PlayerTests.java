@@ -889,6 +889,67 @@ final class PlayerTests {
     }
 
     /**
+     * The conformance kit, against the player it was taken from.
+     * {@code doc/conformance} holds ten tunes and a digest of what the
+     * player writes for each, and the exercise that tests SPEC.md hands a
+     * reader the tunes and keeps the digests back. The kit is only worth
+     * handing over while it still describes this player, so this replays
+     * every tune and checks the digest.
+     *
+     * <p>The dumps themselves are not in the tree: they come to 1.8 MB and
+     * they are derived from a player that is in the tree, so a digest is
+     * what there is to keep.
+     */
+    static String runConformanceKit() throws IOException {
+        Path kit = Rig.REPO.resolve("doc").resolve("conformance");
+        Path manifest = kit.resolve("MANIFEST.txt");
+        if (!Files.exists(manifest)) {
+            return "conformance: doc/conformance/MANIFEST.txt is missing";
+        }
+        int checked = 0;
+        for (String line : Files.readAllLines(manifest)) {
+            String[] row = line.trim().split("\\s+");
+            if (row.length != 5 || row[4].length() != 64) {
+                continue;                       // a heading or a blank line
+            }
+            Path tune = kit.resolve("tunes").resolve(row[0] + ".ymx");
+            if (!Files.exists(tune)) {
+                return "conformance: " + row[0] + " is in the manifest and not"
+                        + " in tunes/";
+            }
+            String dump = RefDump.dump(Files.readAllBytes(tune),
+                    Integer.parseInt(row[1]), Integer.parseInt(row[2]));
+            String got = sha256(dump.getBytes(StandardCharsets.UTF_8));
+            if (!got.equals(row[4])) {
+                return "conformance: " + row[0] + " no longer plays as the"
+                        + " manifest records - the kit describes another"
+                        + " player than this one, so re-take it before the"
+                        + " next exercise";
+            }
+            checked++;
+        }
+        if (checked != 10) {
+            return "conformance: the manifest has " + checked + " tunes, and"
+                    + " doc/conformance/README.md accounts for ten";
+        }
+        return "";
+    }
+
+    private static String sha256(byte[] bytes) {
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(bytes);
+            StringBuilder hex = new StringBuilder();
+            for (byte b : digest) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new AssertionError("SHA-256 is in every JRE", e);
+        }
+    }
+
+    /**
      * A looped sample owns its voice until something stops the timer. A
      * one-shot's voice comes back to the frame write at the sample's computed
      * end; a looped sample has no such end, so the skip that covers it has to
@@ -1363,6 +1424,8 @@ final class PlayerTests {
                 "the pinned tunes combined (both paths, same chip writes)");
         failures += report(runLoopedSample(),
                 "a looped sample          (the skip holds, the voice does not)");
+        failures += report(runConformanceKit(),
+                "the conformance kit      (ten tunes, digests of the player)");
         failures += report(runShapeSource(),
                 "the retrigger shape      (both sources, off the patched tick)");
         for (boolean perf : new boolean[] {false, true}) {
