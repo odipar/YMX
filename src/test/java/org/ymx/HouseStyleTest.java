@@ -30,9 +30,7 @@ final class HouseStyleTest {
             Path.of("doc", "RELEASES.md"),
             Path.of("README.md"),
             Path.of("ym", "CONVERSION.md"),
-            Path.of("ymr", "CONVERSION.md"),
-            Path.of("ym", "test", "README.md"),
-            Path.of("ymr", "test", "README.md"));
+            Path.of("ym", "test", "README.md"));
 
     /** Struck in review, lowercase; matched as substrings. */
     private static final List<String> STRUCK = List.of(

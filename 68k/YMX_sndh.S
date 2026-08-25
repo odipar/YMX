@@ -41,7 +41,7 @@
 ;     the MFP timers the player claims. INIT saves all four timers' state -
 ;     vector, control, data, enable and mask bits - and EXIT hands back
 ;     exactly the claimed ones, so a tune on Timers A and D (a YM tune) or
-;     A, B and D (a .ymr) restores what it used and leaves the rest to the
+;     A, B and D restores what it used and leaves the rest to the
 ;     host. A Timer C tune still cannot be hosted from a Timer C hook;
 ;   - INIT called twice without an EXIT restores first;
 ;   - PLAY before INIT is a no-op; PLAY is driven at the TC tag's rate;

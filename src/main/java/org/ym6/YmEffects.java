@@ -23,8 +23,8 @@ import org.ymx.YmxFormat;
  * with it. Its four drop counters count the YM effects the front end
  * normalized away - counts only a YM reader can produce and only a YM
  * packer's report uses; the {@link Tune} that {@link #tune} builds carries
- * none of it. {@code org.ymr} is the
- * sibling that does the same job for a RhYMe dump, and reading the two side
+ * none of it. A front end for another source does the same job, and
+ * reading two side
  * by side is the quickest way to see which decisions belong to a format and
  * which belong to the engine.
  *

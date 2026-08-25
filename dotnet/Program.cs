@@ -30,9 +30,6 @@ public static class Program
             case "ymx":
                 Ym6.YmxCli.Main(rest);
                 return 0;
-            case "ymr":
-                Ymr.YmrCli.Main(rest);
-                return 0;
             case "mksndh":
                 Ymx.MkSndh.Main(rest);
                 return 0;
@@ -54,17 +51,11 @@ public static class Program
             case "play":
                 Ym6.Play.Main(rest);
                 return 0;
-            case "ymrplay":
-                Ymr.YmrPlay.Main(rest);
-                return 0;
             case "rig":
                 Rig.PlayerTests.Main(rest);
                 return 0;
             case "sweep":
                 Rig.Sweep.Main(rest);
-                return 0;
-            case "ymrsweep":
-                Rig.YmrSweep.Main(rest);
                 return 0;
             case "gendata":
                 Rig.GenData.Main(rest);

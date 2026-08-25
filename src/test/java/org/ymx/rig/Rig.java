@@ -19,8 +19,8 @@ import org.ymx.Tools;
 
 /**
  * What every rig shares: the repository's paths, the assembled player builds
- * with their symbol tables, the packers run as the tools a user runs, and a
- * hand-built .YMR image. The scratch directory caches packs on the tune
+ * with their symbol tables, and the packer run as the tool a user runs.
+ * The scratch directory caches packs on the tune
  * bytes, the options and the compiled packer, so a pack from an earlier
  * build is never read back into a later one.
  */
@@ -161,16 +161,6 @@ final class Rig {
         return readBytes(cached);
     }
 
-    /** The real .ymr packer, so the header flags are the ones it writes. */
-    static byte[] packYmr(byte[] image, int ring, int chunk) {
-        Path cached = SCRATCH.resolve("ymr-" + sha1(image) + "-n" + ring
-                + "-c" + chunk + "-" + packerBuild() + ".ymx");
-        if (!Files.exists(cached)) {
-            packWith("org.ymr.Ymr", image, ".ymr", cached,
-                    List.of("-f", "-n" + ring, "-c" + chunk, "-k1"));
-        }
-        return readBytes(cached);
-    }
 
     private static void packWith(String packer, byte[] source, String suffix,
             Path out, List<String> options) {
@@ -224,75 +214,7 @@ final class Rig {
         }
     }
 
-    /** One sample block of a hand-built .YMR: pre-converted 4-bit levels,
-     * whether it loops, and where it comes back to. */
-    record SampleBlock(byte[] levels, boolean looped, int start) {}
 
-    /**
-     * A .YMR v1.3 register dump with every stream stored uncompressed.
-     * pops[frame] lists the stream indices that frame pops, ascending, and
-     * streams maps a stream index to its entries laid end to end. A ring
-     * size of 0 is the format's own "stored uncompressed", so no ZX1 packer
-     * runs here.
-     */
-    static byte[] ymrImage(int frames, int[][] pops, Map<Integer, byte[]> streams,
-            int loop, SampleBlock... samples) {
-        ByteArrayOutputStream command = new ByteArrayOutputStream();
-        for (int frame = 0; frame < frames; frame++) {
-            int[] popped = pops[frame].clone();
-            Arrays.sort(popped);
-            for (int stream : popped) {
-                command.write(stream);
-            }
-            command.write(0);
-        }
-        Map<Integer, byte[]> present = new HashMap<>(streams);
-        present.put(0, command.toByteArray());
-
-        ByteArrayOutputStream header = new ByteArrayOutputStream();
-        header.writeBytes("YMR!".getBytes(StandardCharsets.US_ASCII));
-        word(header, 0x0103);
-        longWord(header, frames);
-        longWord(header, loop);
-        word(header, 50);
-        word(header, samples.length);
-        longWord(header, 2000000);
-        word(header, 20);
-        longWord(header, 0);
-
-        ByteArrayOutputStream blocks = new ByteArrayOutputStream();
-        for (SampleBlock sample : samples) {
-            longWord(blocks, sample.levels().length);
-            blocks.writeBytes(sample.levels());
-            blocks.write(sample.looped() ? 1 : 0);
-            word(blocks, sample.start());
-            blocks.write(0);
-        }
-
-        int at = 268 + blocks.size();               // the map, then the blocks
-        ByteArrayOutputStream body = new ByteArrayOutputStream();
-        for (int stream = 0; stream < 20; stream++) {
-            byte[] data = present.get(stream);
-            if (data == null || data.length == 0) {
-                header.writeBytes(new byte[12]);    // offset 0: not in the file
-                continue;
-            }
-            longWord(header, at);
-            longWord(header, 0);
-            word(header, 0);
-            word(header, 0);
-            body.writeBytes(data);
-            at += data.length;
-        }
-        if (header.size() != 268) {
-            throw new IllegalStateException("the header is " + header.size() + " bytes");
-        }
-        ByteArrayOutputStream image = new ByteArrayOutputStream();
-        image.writeBytes(header.toByteArray());
-        image.writeBytes(blocks.toByteArray());
-        image.writeBytes(body.toByteArray());
-        return image.toByteArray();
-    }
 
     private static void word(ByteArrayOutputStream out, int value) {
         out.write(value >>> 8);

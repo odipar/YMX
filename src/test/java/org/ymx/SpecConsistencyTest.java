@@ -166,7 +166,7 @@ final class SpecConsistencyTest {
                         .sorted().forEach(packed::add);
             }
         }
-        assertTrue(!packed.isEmpty(), "no packed tunes in ym/test or ymr/test");
+        assertTrue(!packed.isEmpty(), "no packed tunes in ym/test");
         int withLoopFrame = 0;
         int withLoopTable = 0;
         for (Path file : packed) {

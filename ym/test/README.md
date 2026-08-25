@@ -16,10 +16,8 @@ The compiled script's opcodes are covered between the two collections. A YM
 dump reaches `START_PCM`, `START_TOGGLE`, `RELEASE`, and, through
 `Synergy Credits`, `HOLD` and the voice-addressed `RETUNE`. No YM file in
 the 544 starts a retrigger stream or preempts a running timer, so
-`START_RETRIGGER`
-comes from [../../ymr/test](../../ymr/test), as does the live `RETUNE`
-addressed to voice 3, which a YM dump has no way to ask for.
-`START_PCM_PREEMPT` and `RESUME` appear in neither collection and are built
+`START_RETRIGGER`, the live `RETUNE` addressed to voice 3,
+`START_PCM_PREEMPT` and `RESUME` are reached by no tune here and are built
 by hand in the rig's effect stage.
 
 Each is packed by `org.ym6.Ymx` at the default options, the entry point the

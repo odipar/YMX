@@ -15,7 +15,7 @@ patch of it.
 
 The player is 3,412 bytes at unit size 2, where 0.5.2 carried 3,394.
 Format version 0.6: a tune packed at 0.5 has to be repacked from its
-`.ym` or `.ymr` source.
+`.ym` source.
 
 - A file may carry **extension streams** past the twenty-five, at indices
   25 to 31, and thirty-two is the stream ceiling at this version and at

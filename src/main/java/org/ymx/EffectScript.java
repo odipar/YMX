@@ -334,7 +334,8 @@ public final class EffectScript {
      * tune starts in. A tune that repeats plays that pass again.
      */
     public static Result compile(Tune tune) {
-        // The default map is a YM tune's; a .ymr binds its channels to Timers
+        // The default map is a YM tune's; another front end may bind its
+        // channels to other timers
         // A, B and D and passes its own. See YmxEncoder.encode's shorthand.
         return compile(tune, YmxFormat.DEFAULT_TIMERS);
     }
@@ -449,7 +450,7 @@ public final class EffectScript {
     /**
      * Whether a rate pop can move the prescaler with the timer left running.
      *
-     * <p>A source whose own player reprograms live - RhYMe writes the
+     * <p>A source whose own player reprograms live - one that writes the
      * control register and then the data register without stopping - renders
      * a rate change as a bend, not as a restart. The period already in
      * flight runs to its own end at the new prescaler and the reload lands
@@ -816,7 +817,7 @@ public final class EffectScript {
      * of the register ring it is already holding, which saves the
      * file a stream per parameter. So the byte has to carry the value
      * whatever wrote it: a front end for a format that files its parameters
-     * somewhere else has to put them here, and {@code org.ymr} does.
+     * somewhere else has to put them here.
      * Changing where the shape comes from is a format revision, not a
      * refactor.
      */

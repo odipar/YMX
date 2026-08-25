@@ -22,7 +22,6 @@ opcodes and the frame contract. The rest of the documentation is beside it.
 |---|---|
 | [doc/SPEC.md](doc/SPEC.md) | the format specification |
 | [ym/CONVERSION.md](ym/CONVERSION.md) | what a YM file loses on the way in |
-| [ymr/CONVERSION.md](ymr/CONVERSION.md) | what a `.YMR` loses on the way in |
 | [doc/BINARIES.md](doc/BINARIES.md) | the prebuilt binaries, and how a tool combines them without an assembler |
 | [doc/tools.md](doc/tools.md) | every tool's usage, flags and environment |
 | [doc/terminology.md](doc/terminology.md) | the vocabulary all of these use |
@@ -34,7 +33,6 @@ opcodes and the frame contract. The rest of the documentation is beside it.
 ```sh
 mvn -q compile
 ym/play.sh song.ym                  # pack a YM tune, build a player, run it
-ymr/ymr.sh song.ymr                 # the same for a .YMR register dump
 ym/play.sh -n2048 -c32 song.ym      # longer calls: cheaper on average
 ym/play.sh -h                       # every flag
 ```
@@ -46,7 +44,6 @@ To pack without playing:
 
 ```sh
 mvn -q compile exec:exec@ymx -Dargs="song.ym song.ymx"
-mvn -q compile exec:exec@ymr -Dargs="song.ymr song.ymx"
 ```
 
 ## Building a tune into something runnable
@@ -106,27 +103,23 @@ ST4_UNIT    equ     2
 | | |
 |---|---|
 | [`org.ym6.Ymx`](src/main/java/org/ym6/Ymx.java) | the packer: `YM5!`/`YM6!` in, `.ymx` out |
-| [`org.ymr.Ymr`](src/main/java/org/ymr/Ymr.java) | the other packer: `YMR!` in, the same `.ymx` out |
 | [`org.ymx.Tune`](src/main/java/org/ymx/Tune.java) | what a front end produces and the engine works on - no format anywhere in it |
 | [`org.ymx.EffectScript`](src/main/java/org/ymx/EffectScript.java) | the script compiler: a `Tune` in, prepared actions out |
 | [68k/YMX.S](68k/YMX.S) | the player |
 | [68k/YMX_sndh.S](68k/YMX_sndh.S), [68k/YMX_player.S](68k/YMX_player.S) | the SNDH core and the PRG stub, prebuilt by [ymx/mkcores.sh](ymx/mkcores.sh) |
 | [`org.st4`](src/main/java/org/st4) | the ST4 compressor, vendored |
 | [68k/](68k) | all the 68000 sources: the player, its wrappers, the ST4 decoders |
-| [`org.jx1`](src/main/java/org/jx1) | the ZX1 decoder a `.YMR`'s own streams need, vendored |
 | [dotnet/](dotnet) | the C# tree: every tool and rig again, producing the same bytes |
 
-The two front ends are peers. Neither is downstream of the other: both read
-their own format and produce a `Tune`, and no field past that point records
-which format a tune came out of.
+The front end stops at a `Tune`, and no field past that point records what
+format a tune came out of: the engine works on the `Tune` alone.
 
 ## Tests
 
 ```sh
-mvn test                              # packers, 40 pinned tunes, a rig slice
+mvn test                              # the packer, 36 pinned tunes, a rig slice
 ymx/test/rig.sh                       # the player, under emulation
 ymx/test/sweep.sh songs/*.ym          # a YM collection, differentially
-ymx/test/ymr_sweep.sh songs/*.ymr     # the same for .YMR
 ```
 
 The three player tests run the 68000 player under emulation and need rmac
@@ -145,7 +138,7 @@ Every shell script also takes `-dotnet` as its first argument, which runs
 the C# tree in [dotnet/](dotnet) instead of the Java one - the same tools
 and rigs, producing the same bytes, built by the .NET SDK on first use.
 
-The two sweeps are the broadest of these. Each replays a converted tune on the
+The sweep is the broadest of these. It replays a converted tune on the
 real player under emulation and compares every write it makes to the sound
 chip - and which MFP timers it claimed - against an independent model of the
 source file. A disagreement is reported exactly where it happened, which is

@@ -11,7 +11,7 @@ namespace Rig
     /// <summary>
     /// What every rig shares, ported from the Java rig: the repository's
     /// paths, the assembled player builds with their symbol tables, the
-    /// packers run as the tools a user runs, and a hand-built .YMR image.
+    /// packers run as the tools a user runs.
     /// The scratch directory caches packs on the tune bytes, the options and
     /// the built packer, so a pack from an earlier build is never read back
     /// into a later one.
@@ -178,19 +178,6 @@ namespace Rig
 
         private static string? packerBuild;
 
-        /// <summary>The real .ymr packer, so the header flags are the ones
-        /// it writes.</summary>
-        public static byte[] PackYmr(byte[] image, int ring, int chunk)
-        {
-            string cached = Path.Combine(Scratch, "ymr-" + Sha1(image) + "-n"
-                    + ring + "-c" + chunk + "-" + PackerBuild() + ".ymx");
-            if (!File.Exists(cached))
-            {
-                PackWith("ymr", image, ".ymr", cached,
-                        new List<string> {"-f", "-n" + ring, "-c" + chunk, "-k1"});
-            }
-            return File.ReadAllBytes(cached);
-        }
 
         private static void PackWith(string packer, byte[] source, string suffix,
                 string cached, List<string> options)
@@ -253,82 +240,7 @@ namespace Rig
             return new Finished(process.ExitCode, output);
         }
 
-        /// <summary>One sample block of a hand-built .YMR: pre-converted
-        /// 4-bit levels, whether it loops, and where it comes back to.</summary>
-        public sealed record SampleBlock(byte[] Levels, bool Looped, int Start);
 
-        /// <summary>A .YMR v1.3 register dump with every stream stored
-        /// uncompressed. pops[frame] lists the stream indices that frame
-        /// pops, ascending, and streams maps a stream index to its entries
-        /// laid end to end. A ring size of 0 is the format's own "stored
-        /// uncompressed", so no ZX1 packer runs here.</summary>
-        public static byte[] YmrImage(int frames, int[][] pops,
-                Dictionary<int, byte[]> streams, int loop,
-                params SampleBlock[] samples)
-        {
-            var command = new MemoryStream();
-            for (int frame = 0; frame < frames; frame++)
-            {
-                int[] popped = (int[]) pops[frame].Clone();
-                Array.Sort(popped);
-                foreach (int stream in popped)
-                {
-                    command.WriteByte((byte) stream);
-                }
-                command.WriteByte(0);
-            }
-            var present = new Dictionary<int, byte[]>(streams);
-            present[0] = command.ToArray();
-
-            var header = new MemoryStream();
-            header.Write(Encoding.ASCII.GetBytes("YMR!"));
-            Word(header, 0x0103);
-            LongWord(header, frames);
-            LongWord(header, loop);
-            Word(header, 50);
-            Word(header, samples.Length);
-            LongWord(header, 2000000);
-            Word(header, 20);
-            LongWord(header, 0);
-
-            var blocks = new MemoryStream();
-            foreach (SampleBlock sample in samples)
-            {
-                LongWord(blocks, sample.Levels.Length);
-                blocks.Write(sample.Levels);
-                blocks.WriteByte((byte) (sample.Looped ? 1 : 0));
-                Word(blocks, sample.Start);
-                blocks.WriteByte(0);
-            }
-
-            int at = 268 + (int) blocks.Length;     // the map, then the blocks
-            var body = new MemoryStream();
-            for (int stream = 0; stream < 20; stream++)
-            {
-                if (!present.TryGetValue(stream, out byte[]? data)
-                        || data.Length == 0)
-                {
-                    header.Write(new byte[12]);     // offset 0: not in the file
-                    continue;
-                }
-                LongWord(header, at);
-                LongWord(header, 0);
-                Word(header, 0);
-                Word(header, 0);
-                body.Write(data);
-                at += data.Length;
-            }
-            if (header.Length != 268)
-            {
-                throw new InvalidOperationException("the header is "
-                        + header.Length + " bytes");
-            }
-            var image = new MemoryStream();
-            header.WriteTo(image);
-            blocks.WriteTo(image);
-            body.WriteTo(image);
-            return image.ToArray();
-        }
 
         private static void Word(MemoryStream stream, int value)
         {
