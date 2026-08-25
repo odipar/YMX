@@ -196,8 +196,10 @@ In order:
    position-independent SNDH file is relocated.
 
 The program takes the machine over, calls play once per VBL, stops on
-SPACE or when a patched frame count runs out, and switches subtunes on
-the number keys 1-9.
+SPACE or ESCAPE or when a patched frame count runs out, and switches
+subtunes on the number keys 1-9. It hands the machine back as it found
+it: the VBL vector, the MFP's interrupt and timer registers, and all four
+MFP timer vectors, which a player parks and restores none of.
 
 ## 5. From the release to a program, step by step
 
