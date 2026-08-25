@@ -78,7 +78,7 @@ public final class YmxFormat {
      * high byte, the minor in the low, so versions order numerically.
      * There is no version history here to be compatible with;
      * doc/SPEC.md defines the layout. */
-    public static final int VERSION = 0x0006;
+    public static final int VERSION = 0x0007;
 
     /** The released binaries' patch number: it moves when the binaries
      * change and the format does not - an optimized player, a fixed

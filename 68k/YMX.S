@@ -395,7 +395,7 @@ YH_SECTIONS     equ     42              ; one offset per stream: its section,
                                         ; loop table covers the rest
 
 YMX_MAGIC       equ     $594D5821       ; 'YMX!'
-YMX_VERSION     equ     $0006           ; the format version: the major in
+YMX_VERSION     equ     $0007           ; the format version: the major in
                                         ; the high byte, the minor in the
                                         ; low. There is no older version to
                                         ; stay compatible with; doc/SPEC.md

@@ -1,6 +1,6 @@
 # The YMX format - specification
 
-Version 0.6. Big-endian throughout.
+Version 0.7. Big-endian throughout.
 
 YMX is a streaming register-dump format for the YM2149 sound chip in the
 Atari ST, playable by a 68000 without the tune resident in memory. A file
@@ -66,7 +66,7 @@ source formats and their tools use:
 | offset | size | field |
 |---:|---:|---|
 | 0 | 4 | `'YMX!'` - `$594D5821` |
-| 4 | 2 | format version, the major byte then the minor - **$0006**, version 0.6 |
+| 4 | 2 | format version, the major byte then the minor - **$0007**, version 0.7 |
 | 6 | 2 | flags (§1.2) |
 | 8 | 4 | `O`, the frame count |
 | 12 | 2 | frame rate in Hz: how often the player is called |
@@ -839,7 +839,7 @@ stream crosses on its own refill turn and none crosses before it has read
 ### 9.1 What a player checks
 
 - the magic is `'YMX!'`;
-- the version is $0006 - 0.6;
+- the version is $0007 - 0.7;
 - the stream count `S` is 25 to 32;
 - the required-streams mask names no stream the consumer does not
   implement: `Q AND NOT implemented` is zero, where bit `k` of
@@ -1129,7 +1129,7 @@ section is read, and what a call reports.
 
 ```
    0  59 4D 58 21   'YMX!'
-   4  00 06         format version 0.6
+   4  00 07         format version 0.7
    6  00 01         flags: bit 0 set, the tune starts over
    8  00 00 00 04   O = 4 frames
   12  00 32         50 Hz
