@@ -85,8 +85,7 @@ final class PlayerTests {
         List<GenYm.ChipState> expected = GenYm.chipStates(frames, source, loops,
                 carried, played);
 
-        Player player = new Player(packed, Rig.workspaceSize(header(packed,
-                YMX_RING_SIZE, 2)), unit);
+        Player player = new Player(packed, unit);
         if (player.init() != 0) {
             return label + ": YMX_init rejected the file";
         }
@@ -150,7 +149,6 @@ final class PlayerTests {
     }
 
     /** Header offsets the battery reads back out of a packed file. */
-    static final int YMX_RING_SIZE = 16;
     static final int YMX_LOOP_FRAME = 30;
 
     /** One big-endian header field of a packed file. */
@@ -215,7 +213,7 @@ final class PlayerTests {
             values[14][frame] = (byte) 200;
         }
         Player player = new Player(Rig.pack(GenYm.ym6File(frames, values),
-                960, 24, true, 1), Rig.workspaceSize(960));
+                960, 24, true, 1));
         if (player.init() != 0) {
             return "shape source: YMX_init rejected the YM tune";
         }
@@ -245,7 +243,7 @@ final class PlayerTests {
                 14, new byte[] {3},                 // Timer B runs an RTE
                 15, new byte[] {6, (byte) 200}),    // prescaler 6, count 200
                 0);
-        player = new Player(Rig.packYmr(image, 960, 24), Rig.workspaceSize(960));
+        player = new Player(Rig.packYmr(image, 960, 24));
         if (player.init() != 0) {
             return "shape source: YMX_init rejected the .ymr tune";
         }
@@ -278,7 +276,7 @@ final class PlayerTests {
                 17, new byte[] {3},                 // Timer D runs an RTE
                 18, new byte[] {6, (byte) 200}),
                 0);
-        player = new Player(Rig.packYmr(image, 960, 24), Rig.workspaceSize(960));
+        player = new Player(Rig.packYmr(image, 960, 24));
         if (player.init() != 0) {
             return "shape source: YMX_init rejected the unshaped .ymr tune";
         }
@@ -308,7 +306,7 @@ final class PlayerTests {
                 16, new byte[] {0}),                // sample 0
                 0, new Rig.SampleBlock(new byte[] {1, 2, 3, 4}, true, 1));
         Player player = new Player(Rig.packYmr(image, 960, 24),
-                Rig.workspaceSize(960), 1, perf);
+                1, perf);
         if (player.init() != 0) {
             return "sample loop: YMX_init rejected the tune";
         }
@@ -386,7 +384,7 @@ final class PlayerTests {
     static String runLoopPointResolve() {
         int loop = 0x8084;
         byte[] packed = storedYmx(4, loop + 96, loop);
-        Player player = new Player(packed, Rig.workspaceSize(960));
+        Player player = new Player(packed);
         if (player.init() != 0) {
             return "loop resolve: YMX_init rejected the tune";
         }
@@ -463,7 +461,7 @@ final class PlayerTests {
         int loop = 12;
         int ring = 48;
         byte[] file = storedCutYmx(frames, loop, ring, 24);
-        Player player = new Player(file, Rig.workspaceSize(ring), 1);
+        Player player = new Player(file, 1);
         if (player.init() != 0) {
             return "stored cut: YMX_init rejected the file";
         }
@@ -579,8 +577,7 @@ final class PlayerTests {
                 14, new byte[] {1},                 // Timer B runs a PWM
                 15, new byte[] {6, (byte) 200, 5, (byte) 200}),  // 6 -> 5
                 0);
-        Player player = new Player(Rig.packYmr(image, 960, 24),
-                Rig.workspaceSize(960));
+        Player player = new Player(Rig.packYmr(image, 960, 24));
         if (player.init() != 0) {
             return "live retune: YMX_init rejected the tune";
         }

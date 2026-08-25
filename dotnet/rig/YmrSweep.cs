@@ -871,7 +871,7 @@ namespace Rig
                         (flags >> 1) & 15, dump.Used);
             }
 
-            var player = new Player(packed, Rig.WorkspaceSize(ring));
+            var player = new Player(packed);
             if (player.Init() != 0)
             {
                 return "INITFAIL " + name;

@@ -397,7 +397,7 @@ final class Sweep {
         int loopFrame = (int) ((long) (packed[30] & 0xFF) << 24
                 | (packed[31] & 0xFF) << 16 | (packed[32] & 0xFF) << 8
                 | (packed[33] & 0xFF));
-        Player player = new Player(packed, Rig.workspaceSize(ring));
+        Player player = new Player(packed);
         if (player.init() != 0) {
             return "INITFAIL " + name;
         }

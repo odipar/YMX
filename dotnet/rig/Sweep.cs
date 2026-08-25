@@ -456,7 +456,7 @@ namespace Rig
             int loopFrame = (int) ((long) (packed[30] & 0xFF) << 24
                     | (packed[31] & 0xFF) << 16 | (packed[32] & 0xFF) << 8
                     | (packed[33] & 0xFF));
-            var player = new Player(packed, Rig.WorkspaceSize(ring));
+            var player = new Player(packed);
             if (player.Init() != 0)
             {
                 return "INITFAIL " + name;

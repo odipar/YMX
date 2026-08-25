@@ -838,7 +838,7 @@ final class YmrSweep {
                     dump.used);
         }
 
-        Player player = new Player(packed, Rig.workspaceSize(ring));
+        Player player = new Player(packed);
         if (player.init() != 0) {
             return "INITFAIL " + name;
         }

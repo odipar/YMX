@@ -38,9 +38,13 @@ namespace Rig
         public readonly List<int> Palette = new();  // $FFFF8240 words (perf)
         private readonly List<Write> stray = new();
 
-        public Player(byte[] packed, int workspaceSize, int unit,
-                bool perf)
+        /// <summary>The workspace is the file's own: Rig.WorkspaceFor reads
+        /// the ring out of its header, since the packer raises that above the
+        /// size it was asked for. No caller passes a size, so none can pass a
+        /// short one.</summary>
+        public Player(byte[] packed, int unit, bool perf)
         {
+            int workspaceSize = Rig.WorkspaceFor(packed);
             ulong[][] map = {new[] {Rig.Code, 0x4000UL},
                     new[] {Rig.FileAt, 0x30000UL}, new[] {Rig.Work, 0x40000UL},
                     new[] {Rig.StackTop - 0x8000, 0x8000UL},
@@ -68,11 +72,9 @@ namespace Rig
             Uc.Write(Rig.Magic, new byte[] {0x4E, 0x71});
         }
 
-        public Player(byte[] packed, int workspaceSize)
-                : this(packed, workspaceSize, 1, false) { }
+        public Player(byte[] packed) : this(packed, 1, false) { }
 
-        public Player(byte[] packed, int workspaceSize, int unit)
-                : this(packed, workspaceSize, unit, false) { }
+        public Player(byte[] packed, int unit) : this(packed, unit, false) { }
 
         private void Watch(ulong address, int size, long value)
         {

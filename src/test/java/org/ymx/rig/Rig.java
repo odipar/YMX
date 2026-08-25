@@ -44,12 +44,23 @@ final class Rig {
     static final int STREAMS = 25;              // fourteen register, eleven script
     static final int YMX_DEFAULT_MAP = 0x9C;    // the packer's: 0->A 1->D 2->B 3->C
     static final int YMX_FIXED = 58 + STREAMS * 64; // the workspace before the rings
+    static final int OFFSET_RING_SIZE = 16;     // the header's ring word
 
     private Rig() {}
 
-    static int workspaceSize(int ring) {
+    /**
+     * The workspace a packed tune needs, read out of the tune's own header.
+     * The packer raises the ring above the size it was asked for where a
+     * tune that starts over needs it, so the ring a caller passed to
+     * {@link #pack} is not the ring the file carries: sizing from anything
+     * but the header under-reserves, and the player writes past the end.
+     */
+    static int workspaceFor(byte[] packed) {
+        int ring = ((packed[OFFSET_RING_SIZE] & 0xFF) << 8)
+                | (packed[OFFSET_RING_SIZE + 1] & 0xFF);
         return YMX_FIXED + STREAMS * ring;
     }
+
 
     /** One assembled player build and where its labels sit. */
     record Build(byte[] binary, Map<String, Integer> symbols) {}
