@@ -34,14 +34,14 @@ you how to read each one.
 |---|---:|
 | `stored_tiny.ymx` | 40 |
 | `plain_packed.ymx` | 400 |
-| `ring_form.ymx` | 2200 |
-| `cut_form.ymx` | 6000 |
-| `plays_once.ymx` | 4100 |
-| `retrigger.ymx` | 1400 |
-| `resume_model.ymx` | 1400 |
+| `ring_form.ymx` | 2,200 |
+| `cut_form.ymx` | 6,000 |
+| `plays_once.ymx` | 4,100 |
+| `retrigger.ymx` | 9,985 |
+| `resume_model.ymx` | 5,379 |
 | `unit1.ymx` | 400 |
 | `unit4.ymx` | 400 |
-| `wide_ring.ymx` | 1400 |
+| `wide_ring.ymx` | 7,585 |
 
 Produce at most that many entries for each. A call reporting -1 is one
 entry, and the record ends with it: produce no entry for any later call.
