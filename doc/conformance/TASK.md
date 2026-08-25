@@ -43,8 +43,8 @@ you how to read each one.
 | `unit4.ymx` | 400 |
 | `wide_ring.ymx` | 1400 |
 
-Produce at most that many entries for each. Stop earlier only where the
-specification says the run has ended.
+Produce at most that many entries for each. A call reporting -1 is one
+entry, and the record ends with it: produce no entry for any later call.
 
 ## Rules
 

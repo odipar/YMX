@@ -22,7 +22,7 @@ Three terms recur, for the three things that read or write the format.
 |---|---|---|
 | **writer** | a packer, or a tracker emitting the format directly | every rule here; §9.3 lists the ones a player does not check |
 | **player** | drives a sound chip from the file, frame by frame | §1, §2, §6, performs §7, §8 and §9.2, checks §9.1 |
-| **reader** | produces the values a frame writes, and drives nothing | §1, §2, §7 steps 1 to 3, §8, checks §9.1 (§9.4) |
+| **reader** | produces the values a frame writes, and drives nothing | §1, §2, §7 steps 1 to 3, §8's frame sequence, checks §9.1 (§9.4) |
 
 A player and a reader differ in what they produce, not in how much of the
 file they understand: both decode every stream. §9.4 says what a reader
@@ -120,6 +120,10 @@ player may read register `k`'s ring through an assembled-in displacement of
 - `N` is at least `2C`.
 
 At a unit size above 1 (§1.4), `C` and `O` are multiples of the unit size.
+Where a tune's own length falls short of a multiple, a writer raises `O`
+by duplicating a frame near the end, the same frame in every stream, and
+`L` moves with the frame it points at. The added frames are played like
+any other, so the last of them is frame `O - 1`.
 
 960/24 is the default pair, valid for every tune that leaves channel 3
 idle.
@@ -615,11 +619,12 @@ frame write is therefore optional.
 Where a frame writes one register twice, the action's write follows the
 frame write, and the register holds the action's value.
 
-**What a call reports.** Each call reports one value. Where flag bit 0 is
-set, the call that plays frame `O - 1` reports 1 and every other call
-reports 0. Where flag bit 0 is clear, the call that plays frame `O - 1`
-reports 0. The next call plays no frame, writes no register and reports
--1: the run has ended there, and every later call repeats that report.
+**What a call reports.** Each call reports one value. A call that plays a
+frame before `O - 1` reports 0. The call that plays frame `O - 1` reports
+1 where flag bit 0 is set, and 0 where it is clear. Where flag bit 0 is
+clear, the next call plays no frame, writes no register and reports -1.
+The run has ended at that call: every later call repeats the report, and a
+record of the run ends with that call's entry.
 
 ---
 
@@ -792,9 +797,19 @@ The actions:
 ### 9.4 A reader
 
 A **reader** produces the values a frame writes and drives no chip: a
-converter, an analyser, a tool that turns a file back into a register
-dump. It performs §7 steps 1 to 3 and §8, decodes every stream §1.5
-counts, and checks §9.1.
+converter, an analyser, a tool that reports what each frame writes. It
+performs §7 steps 1 to 3, decodes every stream §1.5 counts, and checks
+§9.1.
+
+A reader takes frame `f`'s value from each stream directly. §7 step 4 and
+§8's two forms state how a ring of `N` bytes delivers that value, and
+neither changes which value frame `f` reads. From §8 a reader reads the
+order the frames are played in and the state cleared at the end of a
+pass.
+
+A per-frame register dump written by a reader carries the frame's values
+alone: a voice a timer stream owns holds no level there, because the
+levels it plays are a tick's.
 
 What it leaves unread is what a timer writes between frames. A timer
 stream's values reach the chip from a tick, at a rate §5 sets, and a
@@ -877,12 +892,13 @@ offset.
 | `0 0` | word offset from stream D |
 | `0 1` | end of the stream |
 
+In the table above the left bit is the one stream A delivers first.
+
 A byte offset of `n` units in bank `b` is stored as the byte
 `256·(b + 1) - n`, where `b` is 0 for class `1 0` and 1 for class `1 1`. A
 word offset of `n` units is stored big-endian as `65536 - n·k`, which is
-`-n·k` as a decoder keeps it. So a byte class gives `n` directly and a word
-class gives `n·k`: the stored word divided by `k` is the count of units the
-last offset takes.
+`-n·k` in sixteen bits. Negate the stored word for the distance in bytes,
+and divide that by `k` for `n`. A byte class stores `n` itself.
 
 A decoder stops on the end-of-stream class, having written the header's
 output size in bytes. No offset reaches further back than 32512 bytes at
