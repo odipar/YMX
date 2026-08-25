@@ -34,12 +34,16 @@ Three tests, all three of which must hold:
    tune, including the entry a run ends on.
 2. **Sources.** No reader names an implementation - not a source file
    here, not one on the web.
-3. **Notes.** No entry describes a guess that changed a byte a reader
-   emitted.
+3. **Notes.** No entry is marked "decides output". A choice that settles
+   a byte is a sentence the document owes its reader, whether or not the
+   guess landed on the reference.
 
-Two runs have been measured. The first failed all three; the second
-passed the second and failed the other two on one sentence and one
-guess.
+Four runs have been measured. The first failed all three tests. The
+second and third passed the second test and failed the other two, on one
+sentence and one guess each time. The fourth passed the first two: three
+readers produced 53,055 entries with no value, no result and no
+register's presence differing from the player anywhere, and left six
+places where the document made a reader choose.
 
 ## What the tunes cover
 
@@ -53,7 +57,7 @@ guess.
 | `wide_ring` | a wide ring at unit size 1, for the word-offset path |
 | `plays_once` | flag bit 0 clear, so a call reports that the run ended |
 | `retrigger` | a retrigger stream and both forms of RETUNE |
-| `resume_model` | a tune packed under the resume gap model |
+| `resume_model` | a released toggle stream resuming: 37 `RESUME` opcodes from frame 2718 |
 
 ## What it does not cover
 
@@ -66,9 +70,14 @@ is the limit of what this kit can claim. A player ported from the
 document would need a reference carrying every tick, which this one does
 not.
 
-`START_PCM_PREEMPT` is carried by no tune here. `resume_model.ymx`
-carries 37 `RESUME` opcodes, the first at frame 2718, past the 1400 calls
-this kit asks for; no budget reaches them in a way a reader can show,
-since `RESUME` writes no sound register in its own frame. Nothing
-exercises a channel-3 flag, a T byte that changes, a file mixing stored
-and packed sections, or any rule §9.1 has a player reject.
+Every tune is asked for its own length now, so seven of the eight opcodes
+are played: `retrigger.ymx` alone carries 11,520 of them, and
+`resume_model.ymx`'s 37 `RESUME` opcodes at frame 2718 are reached.
+`START_PCM_PREEMPT` is carried by no tune here and by none in the tree.
+
+Playing an opcode is not the same as testing it. Seven of the eight write
+no sound register in their own frame, so a reader's output is the same
+whether it runs them or not: the count above measures the corpus, not the
+exercise. Nothing exercises a channel-3 flag, a T byte that changes, a
+file mixing stored and packed sections, or any rule §9.1 has a player
+reject.
