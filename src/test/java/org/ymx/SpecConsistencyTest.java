@@ -454,12 +454,28 @@ final class SpecConsistencyTest {
         assertTrue(said.contains("**What a call reports.** Each call reports"
                         + " one value."),
                 "SPEC §7 no longer states what a call reports");
-        assertTrue(said.contains("the call that plays frame `O - 1` reports 1"),
+        assertTrue(said.contains("The call that plays frame `O - 1` reports 1"
+                        + " where flag bit 0 is set, and 0 where it is clear"),
                 "SPEC §7's going-round report has been reworded");
-        assertTrue(said.contains("The next call plays no frame, writes no"
-                        + " register and reports -1: the run has ended there"),
-                "SPEC §7 no longer says a report of -1 ends the run, which is"
-                        + " the sentence a reader stops on");
+        assertTrue(said.contains("A call that plays a frame before `O - 1`"
+                        + " reports 0."),
+                "SPEC §7 no longer states what the calls before the last"
+                        + " report, which is most of a play-once tune");
+        assertTrue(said.contains("The run has ended at that call: every later"
+                        + " call repeats the report, and a record of the run"
+                        + " ends with that call's entry"),
+                "SPEC §7 no longer says a record ends at the -1 call. Two runs"
+                        + " of the exercise ended there, an implementer each"
+                        + " time reading the shorter sentence as licence to"
+                        + " keep collecting");
+
+        String task = String.join(" ", Files.readString(
+                Path.of("doc", "conformance", "TASK.md")).split("\\s+"));
+        assertTrue(task.contains("A call reporting -1 is one entry, and the"
+                        + " record ends with it"),
+                "doc/conformance/TASK.md no longer carries its half of the"
+                        + " rule, so a reader is left to infer where a record"
+                        + " stops");
     }
 
     /**

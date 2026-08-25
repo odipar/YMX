@@ -53,7 +53,7 @@ guess.
 | `wide_ring` | a wide ring at unit size 1, for the word-offset path |
 | `plays_once` | flag bit 0 clear, so a call reports that the run ended |
 | `retrigger` | a retrigger stream and both forms of RETUNE |
-| `resume_model` | a released toggle stream resuming |
+| `resume_model` | a tune packed under the resume gap model |
 
 ## What it does not cover
 
@@ -66,7 +66,9 @@ is the limit of what this kit can claim. A player ported from the
 document would need a reference carrying every tick, which this one does
 not.
 
-`START_PCM_PREEMPT` and `RESUME` are played by no tune here, and by no
-tune in the tree. Nothing exercises a channel-3 flag, a T byte that
-changes, a looped sample, a file mixing stored and packed sections, or
-any rule §9.1 has a player reject.
+`START_PCM_PREEMPT` is carried by no tune here. `resume_model.ymx`
+carries 37 `RESUME` opcodes, the first at frame 2718, past the 1400 calls
+this kit asks for; no budget reaches them in a way a reader can show,
+since `RESUME` writes no sound register in its own frame. Nothing
+exercises a channel-3 flag, a T byte that changes, a file mixing stored
+and packed sections, or any rule §9.1 has a player reject.
