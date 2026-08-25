@@ -591,6 +591,48 @@ final class PlayerTests {
         return "";
     }
 
+    /**
+     * The tick-carrying reference, against the player it was taken from.
+     * {@code MANIFEST-ticks.txt} records what each tune writes with the
+     * timers run, which is the record a player can be checked against and
+     * {@code MANIFEST.txt}'s cannot (SPEC.md §9.4).
+     *
+     * <p>These dumps come to 10 MB, so a digest is what the tree keeps, as
+     * it keeps one for the reader's record.
+     */
+    static String runTickReference() throws IOException {
+        Path kit = Rig.REPO.resolve("doc").resolve("conformance");
+        Path manifest = kit.resolve("MANIFEST-ticks.txt");
+        if (!Files.exists(manifest)) {
+            return "ticks: doc/conformance/MANIFEST-ticks.txt is missing";
+        }
+        int checked = 0;
+        for (String line : Files.readAllLines(manifest)) {
+            String[] row = line.trim().split("\\s+");
+            if (row.length != 6 || row[5].length() != 64) {
+                continue;                       // a heading or a blank line
+            }
+            Path tune = kit.resolve("tunes").resolve(row[0] + ".ymx");
+            if (!Files.exists(tune)) {
+                return "ticks: " + row[0] + " is in the manifest and not in"
+                        + " tunes/";
+            }
+            String dump = TickDump.dump(Files.readAllBytes(tune),
+                    Integer.parseInt(row[1]), Integer.parseInt(row[2]));
+            if (!sha256(dump.getBytes(StandardCharsets.UTF_8)).equals(row[5])) {
+                return "ticks: " + row[0] + " no longer plays as"
+                        + " MANIFEST-ticks.txt records - a rate, a tick's"
+                        + " byte or the order they land in has moved";
+            }
+            checked++;
+        }
+        if (checked != 10) {
+            return "ticks: the manifest has " + checked + " tunes, and the"
+                    + " kit holds ten";
+        }
+        return "";
+    }
+
     private static String sha256(byte[] bytes) {
         try {
             byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
@@ -1004,6 +1046,8 @@ final class PlayerTests {
                 "the pinned tunes combined (both paths, same chip writes)");
         failures += report(runConformanceKit(),
                 "the conformance kit      (ten tunes, digests of the player)");
+        failures += report(runTickReference(),
+                "the tick reference       (ten tunes, every timer tick)");
         failures += report(runRequiredExtension(),
                 "a required extension     (the mask rejects, the ceiling holds)");
         for (boolean perf : new boolean[] {false, true}) {

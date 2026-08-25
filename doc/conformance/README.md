@@ -109,15 +109,30 @@ four now.
 | `retrigger` | a retrigger stream, and a toggle stream retuned while it runs |
 | `resume_model` | a released toggle stream resuming: 37 `RESUME` opcodes from frame 2718 |
 
-## What it does not cover
+## The second reference, which carries the ticks
 
-Seven of the eight opcodes write no sound register in their own frame,
-and the exercise asks for a call's own writes only. So no growth of this
-corpus tests §3's operations: a decoder that runs no opcode still matches
-the reference on nearly every entry. §9.4 puts what a timer writes between
-frames outside a reader's work, and that is the limit of what this kit can
-claim. A player ported from the document would need a reference carrying
-every tick, which this one does not.
+`MANIFEST.txt` records a call's own writes, which is the reader of §9.4.
+`MANIFEST-ticks.txt` records the same ten tunes with the timers run: the
+same calls, and after each one every tick that falls before the next, in
+time order. The ten come to 292,939 ticks. `ymx/test/rig.sh` regenerates
+both and checks both digests.
+
+That is the record §3, §5 and §6 can be checked against. A reader's
+record cannot: seven of the eight opcodes write no sound register in
+their own frame, and the exercise asks for a call's own writes only, so a
+decoder that runs no opcode still matches `MANIFEST.txt` on nearly every
+entry. A tick record separates them - the rate a timer lands at is §5's,
+the byte it carries is §6's, and neither reaches a reader.
+
+Two things bound what the tick record proves. The MFP raises no interrupt
+under the emulator, so the timers are modelled and their handlers called
+at the addresses the vectors hold: the rates, the tick count and each
+tick's bytes are the machine's, and the interleaving within one frame is
+this record's, since on a machine a tick also lands inside the frame
+handler and here none does. And no run of the exercise has been measured
+against it. It is a reference, not a result.
+
+## What it does not cover
 
 Every tune is asked for its own length now, so seven of the eight opcodes
 are played: `retrigger.ymx` alone carries 671 of them, and
