@@ -1,5 +1,21 @@
 # YMX - a streaming YM format for the plain 68000
 
+**AI wrote most of YMX.** Claude wrote the Java and C# tools, the 68000
+player and its SNDH core, the tests, the emulation rigs and most of what is
+written here, under direction. The attribution section below says who did
+what.
+
+What it is built on is human, and older. The Atari ST chiptune scene comes
+first: the musicians and coders who worked out what three voices and a
+noise generator could be made to do, and who are the reason there is
+anything here worth streaming. Then the YM format and ST-Sound, by Arnaud
+Carré, which recorded those tunes and gave every file in the collection its
+shape. Steven Tattersall's MinYMiser, which this player is modelled on, and
+maxYMiser, whose gap model is one of the two YMX carries. Hatari, which
+every measurement in this repository was taken on. And the wider body of
+Atari work behind all of them. YMX rearranges what those established, and
+could not exist without them.
+
 YMX extends the YM family - its packer reads YM5 and YM6 - into a format a
 68000 plays without ever holding the tune in memory. A `.ymx` file carries
 twenty-five independently compressed streams: fourteen for the YM2149's sound
@@ -164,6 +180,10 @@ ST4 is built on [ZX1](https://github.com/einar-saukas/ZX1) by Einar Saukas,
 through [ST1](https://github.com/odipar/ST1). Use it freely, including
 commercially, as long as you indicate somehow in your documentation that you
 have used ZX1, via ST4 or YMX. See [LICENSE](LICENSE).
+
+The YMX format and its additions are © 2026 Robbert van Dalen. Claude
+(Anthropic's Claude Code) wrote the Java and C# tools, the 68000 player and
+its SNDH core, the tests and the emulation rigs, under Robbert's direction.
 
 The player was inspired by Steven Tattersall's MinYMiser. Sinus-SID is the one
 YM effect this player leaves unplayed. ST-Sound, the format author's own

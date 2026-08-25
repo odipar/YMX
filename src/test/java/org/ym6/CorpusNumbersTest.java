@@ -115,6 +115,46 @@ final class CorpusNumbersTest {
         assertEquals(envelope[1], readable.size(), "readable files, as the envelope line has it");
     }
 
+    /**
+     * What the reader turns away, against the collection it is pointed at.
+     * {@code ym/CONVERSION.md} states the cost of taking `YM5!` and `YM6!`
+     * only as a count of files, and a count in prose is a count a test
+     * reads back.
+     */
+    @Test
+    void whatTheReaderTurnsAwayIsWhatTheConversionDocSaysItIs() throws IOException {
+        String corpus = System.getenv("YM_CORPUS");
+        assumeTrue(corpus != null && Files.isDirectory(Path.of(corpus)),
+                "set YM_CORPUS to the directory holding the YM collection");
+        Path collection = Path.of(corpus);
+        int total = 0;
+        int refused = 0;
+        int ym2 = 0;
+        try (Stream<Path> listing = Files.list(collection)) {
+            for (Path each : (Iterable<Path>) listing
+                    .filter(p -> p.toString().endsWith(".ym")).sorted()::iterator) {
+                total++;
+                try {
+                    Ym6Reader.read(Files.readAllBytes(each));
+                } catch (Ym6Reader.FormatException e) {
+                    refused++;
+                    if (String.valueOf(e.getMessage()).contains("\"YM2!\"")) {
+                        ym2++;
+                    }
+                }
+            }
+        }
+        String said = String.join(" ", Files.readString(CONVERSION).split("\\s+"));
+        assertTrue(said.contains(refused + " file of the collection's " + total),
+                "ym/CONVERSION.md does not say the reader turns away " + refused
+                        + " file of " + total);
+        assertTrue(said.contains("the other " + (total - refused) + " read"),
+                "ym/CONVERSION.md does not say the other " + (total - refused)
+                        + " read");
+        assertEquals(0, ym2, "the collection holds no YM2 file, as"
+                + " ym/CONVERSION.md says of the sample bank one would need");
+    }
+
     /** The one figure here that is not a measurement over the collection: how
      * far past its source's loop frame the packer looks for one the wrap can
      * enter. The document states it in seconds, the packer holds it in frames,

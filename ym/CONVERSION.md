@@ -178,4 +178,8 @@ above it is dropped here.
   file; supporting them means embedding the bank in the converter. Not yet.
 * **YM2, YM3 and YM4 files.** The reader takes `YM5!` and `YM6!` only, and
   reports which it found. An LHA-archived `.ym` it does read: the wrapper is
-  unpacked first, and every file in `test` is one.
+  unpacked first, and every file in `test` is one. What the rest costs is
+  1 file of the collection's 544, a `YM3!`; the other 543 read. The
+  collection holds no `YM2!` at all, so the sample bank a YM2 conversion
+  would have to carry - Mad Max's forty, held in that player rather than
+  in the file - would serve nothing that is here to convert.
