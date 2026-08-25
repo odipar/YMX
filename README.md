@@ -1,20 +1,35 @@
 # YMX - a streaming YM format for the plain 68000
 
+## Read this first
+
 **AI wrote most of YMX.** Claude wrote the Java and C# tools, the 68000
 player and its SNDH core, the tests, the emulation rigs and most of what is
 written here, under direction. The attribution section below says who did
-what.
+what. If you would rather not use software written that way, this is not
+the repository for you, and nothing here is meant to talk you out of that.
 
 What it is built on is human, and older. The Atari ST chiptune scene comes
-first: the musicians and coders who worked out what three voices and a
-noise generator could be made to do, and who are the reason there is
-anything here worth streaming. Then the YM format and ST-Sound, by Arnaud
-Carré, which recorded those tunes and gave every file in the collection its
-shape. Steven Tattersall's MinYMiser, which this player is modelled on, and
-maxYMiser, whose gap model is one of the two YMX carries. Hatari, which
-every measurement in this repository was taken on. And the wider body of
-Atari work behind all of them. YMX rearranges what those established, and
-could not exist without them.
+first: the musicians and coders who worked out what three voices and a noise
+generator could be made to do, and who are the reason there is anything here
+worth streaming. Then the YM format and ST-Sound, by Arnaud Carré, which
+recorded those tunes and gave every file in the collection its shape.
+Grazey, whose long work getting the chiptunes into the open and keeping them
+accessible is why there is a collection here to measure against at all.
+Tat's MinYMiser, which this player is modelled on, and GwEm's maxYMiser,
+which shaped it as well: when a square voice drops out and comes back,
+maxYMiser lets it pick up where it left off rather than start over, and YMX
+will play a tune that way too, because that is how its composer heard it.
+Hatari, which every measurement in this repository was taken on. And the
+wider body of Atari work behind all of them. YMX rearranges what those
+established, and could not exist without them.
+
+**It is a tool for the people who make the music.** It was written by odipar
+to put that tool in their hands: a musician writes the tune, the format and
+the player carry it onto a plain 68000 with the RAM a real machine has, and
+the rest of us get to hear what they made. Everything below is in service of
+that.
+
+## The format
 
 YMX extends the YM family - its packer reads YM5 and YM6 - into a format a
 68000 plays without ever holding the tune in memory. A `.ymx` file carries
