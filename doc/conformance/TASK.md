@@ -36,8 +36,8 @@ you how to read each one.
 | `plain_packed.ymx` | 400 |
 | `ring_form.ymx` | 2,200 |
 | `cut_form.ymx` | 6,000 |
-| `plays_once.ymx` | 4,100 |
-| `retrigger.ymx` | 9,985 |
+| `plays_once.ymx` | 4,001 |
+| `retrigger.ymx` | 3,001 |
 | `resume_model.ymx` | 5,379 |
 | `unit1.ymx` | 400 |
 | `unit4.ymx` | 400 |
