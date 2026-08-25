@@ -441,6 +441,22 @@ final class SpecConsistencyTest {
         assertTrue(said.contains("No offset reaches further back than 32512"
                         + " bytes at any `k`"),
                 "SPEC Appendix A's offset bound has been reworded");
+
+        // The two sentences run four measured as silent: read the other way,
+        // each produces a decoder that runs, passes its own size checks, and
+        // is wrong on almost every entry. 17,443 and 17,598 of 17,685.
+        assertTrue(said.contains("After a match of either kind, a `0` starts"
+                        + " literals and a `1` those same two class bits"),
+                "SPEC Appendix A.3 no longer says the flag after a match"
+                        + " covers both kinds of match. Read the other way a"
+                        + " decoder desynchronises silently and its size"
+                        + " checks still pass");
+        assertTrue(said.contains("A match copies one unit at a time, so a"
+                        + " distance shorter than the length repeats the units"
+                        + " the match has already written"),
+                "SPEC Appendix A.3 no longer says a match may overlap what it"
+                        + " writes. 2,721 of the corpus's 8,031 matches carry"
+                        + " a distance shorter than their length");
     }
 
     /**
@@ -454,9 +470,13 @@ final class SpecConsistencyTest {
         assertTrue(said.contains("**What a call reports.** Each call reports"
                         + " one value."),
                 "SPEC §7 no longer states what a call reports");
-        assertTrue(said.contains("The call that plays frame `O - 1` reports 1"
-                        + " where flag bit 0 is set, and 0 where it is clear"),
-                "SPEC §7's going-round report has been reworded");
+        assertTrue(said.contains("Every call that plays frame `O - 1` reports"
+                        + " 1 where flag bit 0 is set, and 0 where it is clear,"
+                        + " on the first pass and on every later one"),
+                "SPEC §7's going-round report no longer says every pass over"
+                        + " the last frame reports it. Three readers of run"
+                        + " four took the definite singular for the first pass"
+                        + " alone");
         assertTrue(said.contains("A call that plays a frame before `O - 1`"
                         + " reports 0."),
                 "SPEC §7 no longer states what the calls before the last"
