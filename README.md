@@ -138,7 +138,7 @@ ST4_UNIT    equ     2
 | [`org.ymx.EffectScript`](src/main/java/org/ymx/EffectScript.java) | the script compiler: a `Tune` in, prepared actions out |
 | [68k/YMX.S](68k/YMX.S) | the player |
 | [68k/YMX_sndh.S](68k/YMX_sndh.S), [68k/YMX_player.S](68k/YMX_player.S) | the SNDH core and the PRG stub, prebuilt by [ymx/mkcores.sh](ymx/mkcores.sh) |
-| [`org.st4`](src/main/java/org/st4) | the ST4 compressor, vendored |
+| [`org.st4`](src/main/java/org/st4) | the ST4 compressor, a copy carried here |
 | [68k/](68k) | all the 68000 sources: the player, its wrappers, the ST4 decoders |
 | [dotnet/](dotnet) | the C# tree: every tool and rig again, producing the same bytes |
 
@@ -180,7 +180,8 @@ how most of the bugs in this player were found.
 YMX began as the `.yx6` container from the
 [ST4](https://github.com/odipar/ST4) repository, adopted whole and
 renumbered. ST4 is the compression format underneath, and stays there; this
-repository vendors the parts it needs and has its own life-cycle.
+repository keeps a copy of the parts it needs, and ST4 goes on being
+developed in its own.
 
 The results of the experiments that shaped the player came across too, in
 [doc/experiments.md](doc/experiments.md). What stayed behind is their full

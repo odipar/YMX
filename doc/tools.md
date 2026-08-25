@@ -230,7 +230,7 @@ verdict - it must reach DONE, and no line may report BAD.
 
 ### st4 and dst4
 
-The vendored compressor's own command line, for packing and unpacking
+The ST4 compressor's own command line, for packing and unpacking
 plain ST4 containers outside a `.ymx`:
 
     st4 [-f] [-kK] [-mN] [-lN] input [output.st4]
