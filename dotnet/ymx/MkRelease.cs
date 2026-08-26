@@ -51,17 +51,24 @@ namespace Ymx
             return variants;
         }
 
-        private const string UsageText = "usage: mkrelease.sh [-publish] [stagedir]";
+        private const string UsageText =
+                "usage: mkrelease.sh [-publish] [stagedir]\n"
+                + "       mkrelease.sh -notes";
 
         public static void Main(string[] args)
         {
             bool publish = false;
+            bool notesOnly = false;
             int i = 0;
             for (; i < args.Length; i++)
             {
                 if (args[i] == "-publish")
                 {
                     publish = true;
+                }
+                else if (args[i] == "-notes")
+                {
+                    notesOnly = true;
                 }
                 else if (args[i].StartsWith('-'))
                 {
@@ -75,6 +82,15 @@ namespace Ymx
             if (args.Length - i > 1)
             {
                 throw Tools.Fail(UsageText);
+            }
+            if (notesOnly)
+            {
+                if (publish || i < args.Length)
+                {
+                    throw Tools.Fail(UsageText);
+                }
+                RepostNotes();
+                return;
             }
             string dir = Path.GetFullPath(i < args.Length ? args[i]
                     : Path.Combine(Tools.Repo(), "dist", "release"));
@@ -168,15 +184,114 @@ namespace Ymx
         /// stays where it is, so a run whose HEAD has moved past it stops
         /// instead of posting notes naming a commit the tag does not
         /// reach.</summary>
+        /// <summary>
+        /// The page's text: this release's section of doc/RELEASES.md, then
+        /// the line naming the commit the binaries were assembled at. Both
+        /// the publish and the notes-only path read it here, so the page
+        /// reads the same however it was written.
+        /// </summary>
+        internal static string Notes(string commit)
+        {
+            return Reflow(ReleaseNotes())
+                    + "\n\nPrebuilt SNDH cores and the PRG stub, assembled at "
+                    + commit
+                    + ". doc/BINARIES.md is the combine contract; MANIFEST.txt"
+                    + " lists sizes and SHA-256 digests.";
+        }
+
+        /// <summary>
+        /// The section as a release page wants it: one line to a paragraph,
+        /// one to a list item. doc/RELEASES.md wraps at the width the
+        /// repository holds to, and the page renders every one of those
+        /// breaks, so a wrap that reads straight in the file reads ragged
+        /// there. Table rows and fenced blocks keep the lines they were
+        /// written with.
+        /// </summary>
+        internal static string Reflow(string section)
+        {
+            var outText = new StringBuilder();
+            var line = new StringBuilder();
+            bool fenced = false;
+            foreach (string raw in section.Split("\n"))
+            {
+                string text = raw.Trim();
+                bool fence = text.StartsWith("```");
+                if (fenced || fence || text.StartsWith("|"))
+                {
+                    if (line.Length > 0)
+                    {
+                        outText.Append(line).Append('\n');
+                        line.Clear();
+                    }
+                    outText.Append(raw).Append('\n');
+                    if (fence)
+                    {
+                        fenced = !fenced;
+                    }
+                    continue;
+                }
+                if (text.Length == 0)
+                {
+                    if (line.Length > 0)
+                    {
+                        outText.Append(line).Append('\n');
+                        line.Clear();
+                    }
+                    outText.Append('\n');
+                    continue;
+                }
+                if (text.StartsWith("- ") || text.StartsWith("#"))
+                {
+                    if (line.Length > 0)
+                    {
+                        outText.Append(line).Append('\n');
+                        line.Clear();
+                    }
+                }
+                else if (line.Length > 0)
+                {
+                    line.Append(' ');
+                }
+                line.Append(text);
+            }
+            if (line.Length > 0)
+            {
+                outText.Append(line);
+            }
+            return outText.ToString().Trim();
+        }
+
+        /// <summary>
+        /// Rewrite a published release's notes, and nothing else: no asset
+        /// is replaced and the tag stays where it is. The commit the notes
+        /// name is the tag's own rather than HEAD, so the page keeps saying
+        /// where its binaries came from however far main has moved since -
+        /// a reworded section is the page changing, not the release.
+        /// </summary>
+        private static void RepostNotes()
+        {
+            string tag = Tag();
+            if (Tools.Status(Tools.Repo(),
+                    new List<string> {"gh", "release", "view", tag}) != 0)
+            {
+                throw Tools.Fail("mkrelease: there is no release " + tag
+                        + " to write notes for - publish it first");
+            }
+            string tagged = Tools.Output(Tools.Repo(), new List<string>
+                    {"gh", "api", "repos/{owner}/{repo}/commits/" + tag,
+                    "--jq", ".sha"});
+            Tools.RunLoudly(Tools.Repo(),
+                    EditCommand(tag, Notes(ShortSha(tagged))));
+            Console.WriteLine("notes rewritten for " + tag + " at "
+                    + ShortSha(tagged));
+        }
+
         private static void Publish(string dir, string commit)
         {
             string tag = Tag();
             string head = Tools.Output(Tools.Repo(),
                     new List<string> {"git", "rev-parse", "HEAD"});
-            string notes = ReleaseNotes() + "\n\nPrebuilt SNDH cores and the"
-                    + " PRG stub, assembled at " + commit + ". doc/BINARIES.md"
-                    + " is the combine contract; MANIFEST.txt lists sizes and"
-                    + " SHA-256 digests.";
+            string notes = Notes(commit);
             if (Tools.Status(Tools.Repo(),
                     new List<string> {"gh", "release", "view", tag}) != 0)
             {

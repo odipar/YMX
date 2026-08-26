@@ -3,6 +3,7 @@
 #
 #   ymx/mkrelease.sh [stagedir]              # assemble and verify only
 #   ymx/mkrelease.sh -publish [stagedir]     # and publish a GitHub release
+#   ymx/mkrelease.sh -notes                  # rewrite a published page's notes
 #
 # Stages every core variant - three unit sizes by the perf and mask flags -
 # plus the PRG stub, verified against the descriptors the combiners read,
@@ -29,7 +30,13 @@
 #
 # A new release is tagged at the staged commit, the one its notes name. An
 # existing tag stays where it is: a run from another commit stops rather
-# than posting notes naming a commit the tag does not reach. A patch is
+# than posting notes naming a commit the tag does not reach.
+#
+# -notes is the way to reword a page that is already out. It posts this
+# release's section again and touches nothing else - no asset, no tag - and
+# the commit it names is the tag's own, so the page keeps saying where its
+# binaries came from however far main has moved. Nothing is staged or
+# assembled, so it does not need rmac. A patch is
 # published beside the patch before it, and the superseded release is
 # deleted by hand - nothing here removes a published release.
 #

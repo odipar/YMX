@@ -182,10 +182,12 @@ notes, so a release with no account of what it changes is not
 published.
 
     ymx/mkrelease.sh [-publish] [stagedir]
+    ymx/mkrelease.sh -notes
 
 | flag | meaning |
 |---|---|
 | `-publish` | create or update the GitHub release `binaries-v<release>` through `gh`, replacing its assets |
+| `-notes` | post this release's section again, and nothing else |
 
 A new release is tagged at the staged commit, the one its notes name. An
 existing tag stays where it is, so a run from another commit stops rather
