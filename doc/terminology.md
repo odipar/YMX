@@ -133,8 +133,10 @@ where a stream ends. A stored sample is a source, not the delivery. The
 per-frame instruction data YMX packs beside the music is stored like a
 stream but never reaches a register.
 
-A **tick** is one step of a stream's clock, and one register write. Every
-stream is ticked; the two kinds differ in whose clock does it:
+A **tick** is one step of a stream's clock, and one register write - the
+one exception is a one-shot sample's marker tick, which writes its voice
+twice (the marker byte, then the parked level). Every stream is ticked;
+the two kinds differ in whose clock does it:
 
 - a **frame stream** is ticked by the player's own call, one value per
   frame. This is the music: fourteen streams, one per sound register.
@@ -289,7 +291,7 @@ rate, though nothing in the mechanism requires that.
 **SID voice**. Named after the Commodore 64's chip, not for how it works
 but for one sound that chip is known for: pulse-width modulation. Here
 the character comes from switching a voice's volume between a set level
-and off, very fast, chopping the signal already coming out of it.
+and off at a timer's rate, chopping the signal already coming out of it.
 
 **buzzer**. The envelope generator making a note rather than a volume
 shape: a repeating shape and a short period, fast enough to be heard as a
@@ -657,7 +659,7 @@ point, that would be a wavetable in the ordinary sense.
 | **stream** | values arriving at one register at a steady speed: a target, a source, a rate |
 | **frame stream** | ticked by the player's own call, one value per frame. The music |
 | **timer stream** | ticked by a timer of its own, many values per frame. The YM format's "effect" |
-| **tick** | one step of a stream's clock, and one register write |
+| **tick** | one step of a stream's clock, and one register write; the one-shot marker tick alone writes two |
 | **effect code** | the YM file's way of starting one: a trigger on that frame, never "still running" |
 | **rate** | how often a timer stream writes. Stored as prescaler and timer count |
 | **set once** | the rate is fixed when the stream starts |

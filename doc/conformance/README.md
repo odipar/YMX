@@ -76,8 +76,9 @@ Three tests, all three of which must hold:
 | player 1 | player | passed | passed | failed, nine places |
 | player 2 | player | passed | passed | failed, six places |
 
-The third test is the instrument: a run that fails it hands the document
-the sentences it owes, and the next run measures whether they landed.
+The third test is the one that finds defects: a run that fails it lists
+the sentences the document owes its implementers, and the next run
+measures whether they landed.
 The prose below is the record of each run; the reader runs are here, and
 the player runs follow the tick record they were measured against.
 
@@ -207,14 +208,14 @@ byte the record: 29,406 calls and 286,452 ticks each, no value, no
 result, no register and no tick's place differing anywhere. None read an
 implementation.
 
-The record itself was wrong when they started, and they are why it is
-not now. All three landed 157,824 ticks in `resume_model` where it held
+The record was wrong when they started, and their agreement located the
+fault. All three landed 157,824 ticks in `resume_model` where it held
 163,830, first differing at frame 2718, where that tune's 37 `RESUME`
 opcodes are. A released stream keeps its timer counting and lands no tick
 (§3): the record stopped the ticks and let the count stand still, so the
 frame that re-enabled the interrupt discharged 287 ticks where 51 were
-due. Three readings of the document against one implementation, and the
-implementation was the one that was wrong.
+due. Three independent readings agreed against one implementation, and
+the implementation was at fault.
 
 Seventeen entries were marked "decides output" across the three. Nine
 places were found by all three of them: what the end marker puts on the
