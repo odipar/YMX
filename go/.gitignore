@@ -1,1 +1,12 @@
+# Build output. "go build ./cmd/ymx" with no -o writes the binary here,
+# named for the command, so each one is named rather than globbed: a
+# pattern wide enough to catch them would catch source too.
 bin/
+/st4
+/dst4
+/ymx
+/ym-to-ymx
+/mksndh
+/mkprg
+/ymsndh
+/play
