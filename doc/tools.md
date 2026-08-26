@@ -22,6 +22,7 @@ defaults quoted below are the constants' own values.
 | `ymx/test/sweep.sh` | `org.ymx.rig.Sweep` | a `.ym` corpus, differentially |
 | `ymx/test/run.sh` | `org.ymx.rig.GenData` + rmac + Hatari | the real-hardware harness |
 | `ymx/test/ticks.sh` | `org.ymx.rig.TickDump` + Hatari | the tick reference against a real MFP |
+| `ymx/test/cost.sh` | `ymx/test/cost.py` + Hatari | what a play call costs, in cycles |
 
 The packer has no wrapper of its own: the play script and `ym_sndh.sh`
 run it, and a direct run is
@@ -203,6 +204,21 @@ PACKFAIL or SKIP; a non-zero exit on any ISSUE.
     ymx/test/sweep.sh song.ym [more.ym ...]
 
 `YMX_PACK_OPTIONS` adds packer options for a shape no corpus tune reaches.
+
+### cost.sh
+
+What a play call costs. The `-perf` player paints the background red for
+the length of a frame's work and each tick handler paints its own colour
+inside that span, so a Hatari run tracing palette writes records every
+call's duration. This builds such a program per tune, runs it, and reads
+the spans back: one line per tune giving the average, the p99 and the
+worst call, with the tick and timer-burn figures beside them.
+`doc/performance.md` carries what it measured and the method in full.
+
+    ymx/test/cost.sh tune.ymx [more.ymx ...]
+
+`HATARI=` and `TOS=` point at your own install, and `VBLS=` sets how long
+each tune plays.
 
 ### ticks.sh
 

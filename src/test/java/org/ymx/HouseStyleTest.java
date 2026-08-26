@@ -27,6 +27,7 @@ final class HouseStyleTest {
             Path.of("doc", "tools.md"),
             Path.of("doc", "terminology.md"),
             Path.of("doc", "experiments.md"),
+            Path.of("doc", "performance.md"),
             Path.of("doc", "RELEASES.md"),
             Path.of("README.md"),
             Path.of("ym", "CONVERSION.md"),

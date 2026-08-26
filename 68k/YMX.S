@@ -1,5 +1,5 @@
 ; -----------------------------------------------------------------------------
-; YMX.S - streaming YM chiptune player for the plain 68000 (Atari ST)
+; YMX.S - streaming YM chiptune player for the Atari ST
 ;
 ; By Robbert van Dalen. Plays a .ymx file: twenty-five streams - fourteen frame
 ; streams, one per sound register, and eleven carrying the compiled effect
@@ -1355,7 +1355,8 @@ ymx_pcm\{chan}:
         .if YMX_PERF
         move.l  a0,-(sp)
         lea     ymx_perf_acc(pc),a0
-        add.w   #21,(a0)                ; ~a PCM tick, in 10-cycle quanta
+        add.w   #18,(a0)                ; ~a PCM tick, in 10-cycle quanta -
+                                        ; measured, doc/performance.md
         movea.l (sp)+,a0
         move.w  (sp)+,$FFFF8240.w
         .endif
@@ -1370,8 +1371,8 @@ ymx_pcmend\{chan}:                       ; of stopping
         .if YMX_PERF
         move.l  a0,-(sp)
         lea     ymx_perf_acc(pc),a0
-        add.w   #23,(a0)
-        movea.l (sp)+,a0
+        add.w   #20,(a0)                ; the end tick: the plain one and
+        movea.l (sp)+,a0                ; the loop cell's move
         move.w  (sp)+,$FFFF8240.w
         .endif
         bra.s   ymx_park\{chan}          ; the end tick has already written the
@@ -1383,8 +1384,8 @@ ymx_pcmend\{chan}:                       ; of stopping
         .if YMX_PERF                    ; the script compiled this frame in
         move.l  a0,-(sp)                ; advance: skip and mixer follow at
         lea     ymx_perf_acc(pc),a0     ; the next frame boundary
-        add.w   #23,(a0)
-        movea.l (sp)+,a0
+        add.w   #20,(a0)                ; and the stop: the park and the
+        movea.l (sp)+,a0                ; timer's control byte
         move.w  (sp)+,$FFFF8240.w
         .endif
 ymx_park\{chan}:
