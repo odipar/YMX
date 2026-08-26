@@ -32,9 +32,16 @@ namespace Ymx
         /// for the calls.</summary>
         public const int StubFlagVbl = 2;
 
+        /// <summary>
+        /// Flag bit 2: clear the screen before the banner. A -perf build
+        /// paints the background colour, and the desktop's own pixels stand
+        /// in front of it: the bars then show in the borders alone.
+        /// </summary>
+        public const int StubFlagClear = 4;
+
         public sealed record Options(string Output, List<string> Tunes,
                 string? Title, string? Composer, List<string>? Names,
-                bool Perf, bool MaskBurst, bool Marker);
+                bool Perf, bool MaskBurst, bool Marker, bool Vbl);
 
         public static string Build(Options options)
         {
@@ -73,7 +80,8 @@ namespace Ymx
             }
             int subtunes = Subtunes(file);
             byte[] prg = Wrap(ReadStub(ResolveStub()), file, subtunes,
-                    subtunes == 1 ? Frames(file) : 0, options.Marker);
+                    subtunes == 1 ? Frames(file) : 0, options.Marker,
+                    options.Vbl, options.Perf);
             try
             {
                 File.WriteAllBytes(output, prg);
@@ -91,7 +99,7 @@ namespace Ymx
         /// descriptor patched, the SNDH file, and the empty relocation
         /// table - a zero long.</summary>
         internal static byte[] Wrap(byte[] stub, byte[] sndh, int subtunes,
-                int frames, bool marker)
+                int frames, bool marker, bool vbl, bool perf)
         {
             var program = new MemoryStream();
             int text = stub.Length + sndh.Length;
@@ -118,8 +126,16 @@ namespace Ymx
                         + " which is a 50 Hz clock, so this set needs a host of"
                         + " its own");
             }
-            PutWord(patched, StubFlags,
-                    (marker ? StubFlagMarker : 0) | (timerC ? StubFlagVbl : 0));
+            if (vbl && rate != 50)
+            {
+                throw Tools.Fail("mkprg: -vbl ticks from the VBL, which is a"
+                        + " 50 Hz clock, and this set plays at " + rate + " Hz."
+                        + " Drop -vbl and the stub ticks from Timer C, which"
+                        + " carries any rate");
+            }
+            PutWord(patched, StubFlags, (marker ? StubFlagMarker : 0)
+                    | (timerC || vbl ? StubFlagVbl : 0)
+                    | (perf ? StubFlagClear : 0));
             PutWord(patched, StubRate, rate);
             program.Write(patched);
             program.Write(sndh);
@@ -302,14 +318,15 @@ namespace Ymx
         }
 
         private const string UsageText =
-                "usage: mkprg.sh [-m] [-perf] [-nomask] [-tTitle] [-cComposer]"
-                + " [-Nnamesfile] output.prg tunes.ymx...|set.sndh";
+                "usage: mkprg.sh [-m] [-perf] [-nomask] [-vbl] [-tTitle]"
+                + " [-cComposer] [-Nnamesfile] output.prg tunes.ymx...|set.sndh";
 
         public static void Main(string[] args)
         {
             bool marker = false;
             bool perf = false;
             bool maskBurst = true;
+            bool vbl = false;
             string? title = null;
             string? composer = null;
             List<string>? names = null;
@@ -328,6 +345,10 @@ namespace Ymx
                 else if (a == "-nomask")
                 {
                     maskBurst = false;
+                }
+                else if (a == "-vbl")
+                {
+                    vbl = true;
                 }
                 else if (a.StartsWith("-t"))
                 {
@@ -379,7 +400,7 @@ namespace Ymx
             try
             {
                 Build(new Options(output, tunes, title, composer, names, perf,
-                        maskBurst, marker));
+                        maskBurst, marker, vbl));
             }
             catch (ArgumentException e)
             {

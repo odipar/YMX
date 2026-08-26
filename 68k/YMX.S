@@ -961,6 +961,16 @@ YMX_play:
                                         ; host that plays mid-screen - or a
                                         ; machine whose counter never moves -
                                         ; stops rather than hanging.
+                                        ;
+                                        ; The wait cannot be skipped for a
+                                        ; host that ticks from a timer, which
+                                        ; is where it pins the bar: the player
+                                        ; is not told which clock calls it,
+                                        ; and reading the counter cannot tell
+                                        ; a timer host in a border from a VBL
+                                        ; host, whose bar is invisible without
+                                        ; the wait. -vbl picks the clock
+                                        ; instead, and the bar then holds.
         move.w  #$700,$FFFF8240.w       ; this frame's work, red - first,
         .endif                          ; so the monitor never delays the
                                         ; burst; the timers' bar follows

@@ -109,7 +109,12 @@ main:
         trap    #GEMDOS
         lea     12(sp),sp
 
-        lea     m_banner(pc),a0
+        btst    #2,stub_flags+1(pc)             ; a -perf build owns the
+        beq.s   .kept                           ; screen: the monitor paints
+        lea     m_clear(pc),a0                  ; the background colour, and
+        bsr     puts                            ; pixels left standing on the
+.kept:                                          ; screen hide the bars behind
+        lea     m_banner(pc),a0                 ; them
         bsr     puts
         move.w  stub_tunes(pc),d0               ; the subtune line's count
         cmp.w   #1,d0                           ; digit, poked at run time -
@@ -404,6 +409,7 @@ puts:
         addq.l  #6,sp
         rts
 
+m_clear:    dc.b    27,"E",0                ; VT52: clear the screen, home
 m_banner:   dc.b    "YMX player - streaming through ST4",13,10,0
 m_playing:  dc.b    "Playing. SPACE stops.",13,10,0
 m_tunes:    dc.b    "Playing. SPACE stops.",13,10      ; a line of its own: the

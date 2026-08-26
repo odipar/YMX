@@ -304,6 +304,7 @@ namespace Ym6
             string once = "";
             bool perf = false;
             bool maskBurst = true;
+            bool vbl = false;
             var extra = new List<string>();
             int i = 0;
             for (; i < args.Length && args[i].StartsWith('-'); i++)
@@ -316,6 +317,10 @@ namespace Ym6
                 else if (a == "-nomask")
                 {
                     maskBurst = false;
+                }
+                else if (a == "-vbl")
+                {
+                    vbl = true;
                 }
                 else if (a == "-o")
                 {
@@ -395,7 +400,8 @@ namespace Ym6
             Console.WriteLine("play.sh: packing " + string.Join(" ", yms));
             List<string> packed = Packing.Pack(yms, work, flags);
             MkPrg.Build(new MkPrg.Options(Path.Combine(work, "PLAY.PRG"), packed,
-                    set.Title, set.Composer, set.Names, perf, maskBurst, true));
+                    set.Title, set.Composer, set.Names, perf, maskBurst, true,
+                    vbl));
 
             string marker = Path.Combine(work, "YMXDONE.MRK");
             File.Delete(marker);

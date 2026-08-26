@@ -135,13 +135,23 @@ concatenated. Takes packed tunes (combined into an SNDH file first) or a
 ready `.sndh`; both argument orders work, and the `.prg` argument names
 the output.
 
-    ymx/mkprg.sh [-m] [-perf] [-nomask] [-tTitle] [-cComposer] [-Nnamesfile]
-                 output.prg tunes.ymx...|set.sndh
+    ymx/mkprg.sh [-m] [-perf] [-nomask] [-vbl] [-tTitle] [-cComposer]
+                 [-Nnamesfile] output.prg tunes.ymx...|set.sndh
 
 | flag | meaning |
 |---|---|
 | `-m` | drop `YMXDONE.MRK` on exit, for scripted runs |
+| `-vbl` | tick from the VBL rather than Timer C: 50 Hz sets only |
 | `-perf` `-nomask` `-tTitle` `-cComposer` `-Nnamesfile` | as mksndh.sh's |
+
+The stub ticks from Timer C, which counts the MFP's own crystal and so
+runs a little against the screen: a play call walks a third of a scanline
+a frame. `-vbl` ticks from the VBL instead, which is the screen, so the
+call holds one place on it - what a demo wants when it draws to the
+music, and what makes a `-perf` bar stand still. The VBL is a 50 Hz
+clock, so `-vbl` on a set at any other rate stops the build. A set that
+claims Timer C for an effect channel ticks from the VBL whether or not
+`-vbl` is given, since Timer C is then the tune's.
 
 ### mkcores.sh
 
@@ -204,12 +214,14 @@ Pack, build a program with the exit marker, and run it under Hatari. SPACE
 in the emulator window stops; everything built lands in a work directory
 next to the first tune, named after it and the shape.
 
-    ym/play.sh [-perf] [-nomask] [-nRING] [-cCHUNK] [-kUNIT] [-o] song.ym...
+    ym/play.sh [-perf] [-nomask] [-vbl] [-nRING] [-cCHUNK] [-kUNIT] [-o]
+               song.ym...
 
 | flag | meaning |
 |---|---|
 | `-perf` | build with the raster monitor |
 | `-nomask` | build with the frame write unmasked |
+| `-vbl` | tick from the VBL rather than Timer C, as mkprg.sh's |
 | `-nN` `-cC` `-kK` `-o` | passed to the packer, as its own |
 | `-h`, `--help` | print the usage and stop |
 

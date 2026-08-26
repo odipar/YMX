@@ -43,6 +43,9 @@ namespace Ym6
             + "\n"
             + "the SNDH file and the program\n"
             + "  -perf           build with the raster monitor\n"
+            + "  -vbl            .prg only: tick from the VBL instead of Timer\n"
+            + "                  C, so a -perf bar holds one place on the\n"
+            + "                  screen. 50 Hz tunes only\n"
             + "  -nomask         build with the frame write unmasked\n"
             + "  -tTitle         the SNDH TITL tag (default: the dump's own)\n"
             + "  -cComposer      the COMM tag - note -c is the chunk size when\n"
@@ -67,6 +70,7 @@ namespace Ym6
             bool perf = false;
             bool maskBurst = true;
             bool marker = false;
+            bool vbl = false;
 
             int i = 0;
             for (; i < args.Length && args[i].StartsWith('-'); i++)
@@ -79,6 +83,10 @@ namespace Ym6
                 else if (flag == "-nomask")
                 {
                     maskBurst = false;
+                }
+                else if (flag == "-vbl")
+                {
+                    vbl = true;
                 }
                 else if (flag == "-m")
                 {
@@ -121,6 +129,13 @@ namespace Ym6
                         + " write, and '" + kind + "' is not one of .ymx, .sndh"
                         + " or .prg");
             }
+            if (vbl && kind != ".prg")
+            {
+                throw Tools.Fail("ym-to-ymx: -vbl picks the tick source of a"
+                        + " program this tool builds, so it needs a .prg"
+                        + " output. An SNDH file names its timer in a tag and"
+                        + " the host that reads it decides");
+            }
             if (kind == ".ymx" && yms.Count > 1)
             {
                 throw Tools.Fail("ym-to-ymx: a .ymx holds one tune. Name a .sndh"
@@ -150,7 +165,7 @@ namespace Ym6
             {
                 MkPrg.Build(new MkPrg.Options(output, packed, title ?? set.Title,
                         composer ?? set.Composer, names ?? set.Names, perf,
-                        maskBurst, marker));
+                        maskBurst, marker, vbl));
             }
         }
     }

@@ -38,11 +38,19 @@ public final class MkPrg {
      * for an effect channel and the host may not use it for the calls. */
     public static final int STUB_FLAG_VBL = 2;
 
+    /**
+     * Flag bit 2: clear the screen before the banner. A -perf build paints
+     * the background colour, and the desktop's own pixels stand in front of
+     * it: the bars then show in the borders alone.
+     */
+    public static final int STUB_FLAG_CLEAR = 4;
+
     private MkPrg() {}
 
     public record Options(Path output, List<Path> tunes, @Nullable String title,
                           @Nullable String composer, @Nullable List<String> names,
-                          boolean perf, boolean maskBurst, boolean marker) {}
+                          boolean perf, boolean maskBurst, boolean marker,
+                          boolean vbl) {}
 
     public static Path build(Options options) {
         Path output = options.output().toAbsolutePath();
@@ -76,7 +84,8 @@ public final class MkPrg {
         }
         int subtunes = subtunes(file);
         byte[] prg = wrap(readStub(resolveStub()), file, subtunes,
-                subtunes == 1 ? frames(file) : 0, options.marker());
+                subtunes == 1 ? frames(file) : 0, options.marker(),
+                options.vbl(), options.perf());
         try {
             Files.write(output, prg);
         } catch (IOException e) {
@@ -93,7 +102,7 @@ public final class MkPrg {
      * in the stub or a position-independent SNDH needs relocating.
      */
     static byte[] wrap(byte[] stub, byte[] sndh, int subtunes, int frames,
-                       boolean marker) {
+                       boolean marker, boolean vbl, boolean perf) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         int text = stub.length + sndh.length;
         out.write(0x60);                          // PRG magic $601A
@@ -118,8 +127,15 @@ public final class MkPrg {
                     + " which is a 50 Hz clock, so this set needs a host of"
                     + " its own");
         }
-        putWord(patched, STUB_FLAGS,
-                (marker ? STUB_FLAG_MARKER : 0) | (timerC ? STUB_FLAG_VBL : 0));
+        if (vbl && rate != 50) {
+            throw Tools.fail("mkprg: -vbl ticks from the VBL, which is a"
+                    + " 50 Hz clock, and this set plays at " + rate + " Hz."
+                    + " Drop -vbl and the stub ticks from Timer C, which"
+                    + " carries any rate");
+        }
+        putWord(patched, STUB_FLAGS, (marker ? STUB_FLAG_MARKER : 0)
+                | (timerC || vbl ? STUB_FLAG_VBL : 0)
+                | (perf ? STUB_FLAG_CLEAR : 0));
         putWord(patched, STUB_RATE, rate);
         out.writeBytes(patched);
         out.writeBytes(sndh);
@@ -263,13 +279,14 @@ public final class MkPrg {
     }
 
     private static final String USAGE =
-            "usage: mkprg.sh [-m] [-perf] [-nomask] [-tTitle] [-cComposer] [-Nnamesfile]"
-            + " output.prg tunes.ymx...|set.sndh";
+            "usage: mkprg.sh [-m] [-perf] [-nomask] [-vbl] [-tTitle] [-cComposer]"
+            + " [-Nnamesfile] output.prg tunes.ymx...|set.sndh";
 
     public static void main(String[] args) {
         boolean marker = false;
         boolean perf = false;
         boolean maskBurst = true;
+        boolean vbl = false;
         @Nullable String title = null;
         @Nullable String composer = null;
         @Nullable List<String> names = null;
@@ -282,6 +299,8 @@ public final class MkPrg {
                 perf = true;
             } else if (a.equals("-nomask")) {
                 maskBurst = false;
+            } else if (a.equals("-vbl")) {
+                vbl = true;
             } else if (a.startsWith("-t")) {
                 title = a.substring(2);
             } else if (a.startsWith("-c")) {
@@ -316,7 +335,7 @@ public final class MkPrg {
         }
         try {
             build(new Options(output, tunes, title, composer, names, perf,
-                    maskBurst, marker));
+                    maskBurst, marker, vbl));
         } catch (IllegalArgumentException e) {
             throw Tools.fail("mkprg: " + e.getMessage());
         }
