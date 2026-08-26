@@ -80,6 +80,7 @@ ST_DONE     equ     0               ; word  nonzero once the tune ended
 ST_PLAYED   equ     2               ; long  frames played since init
 ST_MOUSE    equ     6               ; word  mouse packet bytes to skip
 ST_ACCUM    equ     8               ; word  the rate, accumulated mod 200
+ST_BUSY     equ     10              ; word  nonzero while a call is running
 
 stub:
         bra.w   main
@@ -206,6 +207,7 @@ play:
         clr.l   ST_PLAYED(a6)
         clr.w   ST_MOUSE(a6)
         clr.w   ST_ACCUM(a6)
+        clr.w   ST_BUSY(a6)
         moveq   #1,d0                           ; subtune 1
         bsr     sndh_call_init
         lea     vbl_idle(pc),a0                 ; the VBL is parked; the tick
@@ -214,8 +216,15 @@ play:
 ; Timer C is free of the tune, so it carries the calls - the SNDH host
 ; convention. The system's own 200 Hz (/64, 192 counts), this handler on
 ; its vector, and the rate accumulated against 200, so a 50 Hz tune plays
-; every fourth tick and a 60 Hz one lands 60 calls in every 200 with no
-; drift. The handback below already restores everything this touches.
+; every fourth tick and a 60 Hz one lands 60 calls in every 200, exactly:
+; the accumulator is integer arithmetic and loses no call.
+;
+; Timer C counts the MFP's own 2.4576 MHz crystal, which the video clock
+; does not track. 200 Hz against a 50.0527 Hz PAL frame walks the calls
+; a third of a scanline a frame, measured at 169 cycles, and a -perf
+; build paints that walk. A host that wants the calls at a fixed place
+; on the screen drives them from the VBL below. The handback below
+; already restores everything this touches.
         lea     tc_handler(pc),a1
         move.l  a1,TIMER_C_VEC.w
         move.b  #TIMERC_SYSTEM_DATA,$FFFFFA23.w
@@ -340,25 +349,43 @@ tick:
 ; The Timer C tick, 200 a second. The in-service bit is cleared before the
 ; play call, and the level dropped to the session's, so the file's own
 ; timers - Timer D sits below Timer C in the MFP's order - preempt the
-; frame write here exactly as they preempt it under a VBL host. A re-fire
-; cannot land inside its own call: the next tick is 5 ms out and a call is
-; a fraction of that.
+; frame write here exactly as they preempt it under a VBL host.
+;
+; That leaves Timer C free to fire again inside the call it is running.
+; The next tick is 5 ms out and a call is a fraction of that, so it takes
+; a tune whose own timers eat most of the machine - dense digidrums at a
+; high rate - to stretch one call past the next tick. The player holds
+; one tune's state and reads it again from the top, so a second call
+; inside the first would decode from a ring the first is still filling.
+;
+; ST_BUSY marks a call in progress. A tick that finds it set returns
+; without playing and without accumulating, so the tune plays that frame
+; late rather than twice: a machine that cannot keep up loses frames at
+; the rate it is short by. The flag is set at level 6, before the level
+; drops, and cleared with the level raised again, so a tick reads it
+; either side of a call and never in the middle of one.
 tc_handler:
         movem.l d1/a6,-(sp)
         move.b  #$DF,$FFFFFA11.w                ; Timer C served (SEI mode)
         lea     state(pc),a6
+        tst.w   ST_BUSY(a6)                     ; a call is still running:
+        bne.s   .running                        ; this tick goes
         move.w  ST_ACCUM(a6),d1
         add.w   stub_rate(pc),d1
         cmp.w   #200,d1
         blo.s   .keep
+        move.w  #1,ST_BUSY(a6)                  ; still at level 6 here
         move.w  #$2300,sr                       ; the file's timers preempt
 .calls:
         sub.w   #200,d1
         bsr.s   tick
         cmp.w   #200,d1                         ; a rate above 200 lands more
         bhs.s   .calls                          ; than one call on a tick
+        move.w  #$2700,sr                       ; the flag drops masked
+        clr.w   ST_BUSY(a6)
 .keep:
         move.w  d1,ST_ACCUM(a6)
+.running:
         movem.l (sp)+,d1/a6
         rte
 
@@ -387,7 +414,7 @@ m_bye:      dc.b    "Done.",13,10,0
 
 saved:      ds.b    35                          ; the SV_ fields
         even
-state:      ds.b    10                          ; the ST_ fields
+state:      ds.b    12                          ; the ST_ fields
         even
             ds.b    $800
 stack_top:

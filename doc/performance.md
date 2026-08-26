@@ -151,7 +151,7 @@ taken again.
 |---|---:|
 | player, unit size 2 | 3,412 |
 | ST4 decoder | 288 |
-| PRG stub | 2,992 |
+| PRG stub | 3,018 |
 | workspace, `N` = 960 | 25,658 |
 | workspace, `N` = 1776 | 46,058 |
 | workspace, `N` = 2520 (the cap) | 64,658 |
@@ -162,6 +162,32 @@ decodes seventeen, a YM tune twenty-one, so between 3.8 and 7.7 KB of a
 default workspace is ring nothing reads. The packed file is resident too -
 streaming means the decoded frames are not held, not that the file is
 absent.
+
+## The tick source and the screen
+
+The PRG stub drives play from Timer C, as an SNDH host does. Timer C
+counts the MFP's own 2.4576 MHz crystal: /64 and 192 counts is 200.000
+Hz, and a 50 Hz tune plays every fourth tick. The PAL frame is 160,256
+cycles, which is 50.0527 Hz on the video clock, and the two clocks are
+separate parts. The play call therefore walks against the screen:
+
+| tick source | drift of the call against the frame |
+|---|---|
+| Timer C, 200 Hz accumulated | +169 cycles a frame, a third of a scanline |
+| the VBL | none: the call is the frame |
+
+Measured by tracing the `-perf` build's red mark under Hatari over 280
+calls of one tune, both builds the same binary with the stub's VBL flag
+the only difference. The Timer C figure is the crystals' own ratio -
+160,425 cycles a play against the frame's 160,256 is 169 - and the
+measurement returns 169.0. Nothing is lost or doubled: the accumulator
+is integer arithmetic against 200.
+
+A `-perf` build paints this. The red bar walks down the screen a third
+of a scanline a frame and wraps every 948 frames, near 19 seconds. Under
+the VBL it stands still. For music the difference is 0.1 per cent of
+tempo, below hearing. A demo that wants the play call at a fixed place
+on the screen drives it from the VBL.
 
 ## What moves these numbers
 
