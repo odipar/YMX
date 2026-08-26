@@ -56,7 +56,7 @@ public final class MkRelease {
 
     private static final String USAGE =
             "usage: mkrelease.sh [-publish] [stagedir]\n"
-            + "       mkrelease.sh -notes";
+            + "       mkrelease.sh -notes [release]";
 
     public static void main(String[] args) {
         boolean publish = false;
@@ -77,10 +77,12 @@ public final class MkRelease {
             throw Tools.fail(USAGE);
         }
         if (notesOnly) {
-            if (publish || i < args.length) {
+            if (publish) {
                 throw Tools.fail(USAGE);
             }
-            repostNotes();
+            // A release names itself, so an older page can be rewritten from
+            // its own section without staging anything.
+            repostNotes(i < args.length ? args[i] : YmxFormat.releaseName());
             return;
         }
         Path dir = (i < args.length ? Path.of(args[i])
@@ -191,9 +193,23 @@ public final class MkRelease {
      * same however it was written.
      */
     static String notes(String commit) {
-        return reflow(releaseNotes())
+        return notes(YmxFormat.releaseName(), commit, true);
+    }
+
+    /**
+     * A release's page, out of its own section: the notes reflowed, and one
+     * line saying where the binaries came from.
+     *
+     * <p>{@code carriesZip} is a fact about the release rather than about
+     * this build. Releases before 0.8.2 published their binaries as loose
+     * files, so naming a zip on one of those pages would point a reader at
+     * an asset that is not there.</p>
+     */
+    static String notes(String release, String commit, boolean carriesZip) {
+        return reflow(notesFor(release))
                 + "\n\nPrebuilt SNDH cores and the PRG stub, assembled at "
-                + commit + ", in " + binariesZipName()
+                + commit
+                + (carriesZip ? ", in ymx-binaries-v" + release + ".zip" : "")
                 + ". doc/BINARIES.md is the combine contract; MANIFEST.txt"
                 + " lists sizes and SHA-256 digests.";
     }
@@ -254,8 +270,8 @@ public final class MkRelease {
      * binaries came from however far main has moved since - a reworded
      * section is the page changing, not the release.
      */
-    private static void repostNotes() {
-        String tag = tag();
+    private static void repostNotes(String release) {
+        String tag = "binaries-v" + release;
         if (Tools.status(Tools.repo(),
                 List.of("gh", "release", "view", tag)) != 0) {
             throw Tools.fail("mkrelease: there is no release " + tag
@@ -263,7 +279,12 @@ public final class MkRelease {
         }
         String tagged = Tools.output(Tools.repo(), List.of("gh", "api",
                 "repos/{owner}/{repo}/commits/" + tag, "--jq", ".sha"));
-        Tools.run(Tools.repo(), editCommand(tag, notes(shortSha(tagged))));
+        boolean carriesZip = !Tools.output(Tools.repo(), List.of("gh",
+                "release", "view", tag, "--json", "assets", "--jq",
+                ".assets[].name | select(. == \"ymx-binaries-v" + release
+                        + ".zip\")")).isBlank();
+        Tools.run(Tools.repo(), editCommand(tag,
+                notes(release, shortSha(tagged), carriesZip)));
         System.out.println("notes rewritten for " + tag + " at "
                 + shortSha(tagged));
     }
