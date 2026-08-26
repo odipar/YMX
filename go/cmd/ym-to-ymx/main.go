@@ -30,9 +30,13 @@ const usageText = `usage: ym-to-ymx [options] output.{ymx|sndh|prg} tune.ym [mor
 packing
   -f              overwrite the output
   -o              play once: stop at the end instead of starting over
+  -lF             start over from frame F; -l0 from the beginning
   -nN             ring size per stream, bytes (default 960)
   -cC             values decoded per call (default 24)
   -kK             ST4 unit size 1, 2 or 4 (default: the tune's own shape)
+  -minM -secS     trim: drop everything before M:S
+  -startframeF -endframeF -framesN
+                  the same window in frames
   -drumhzH        the drum rate ceiling (default 25600)
   -timersT        which MFP timer each channel runs on (default AD)
   -sidresume      the resume gap model, for maxYMiser tunes
@@ -79,10 +83,20 @@ func main() {
 			marker = true
 		case a == "-sidresume":
 			options.SidResume = true
+		case strings.HasPrefix(a, "-timers"):
+			options.TimerMap = parseTimers(a[len("-timers"):])
 		case strings.HasPrefix(a, "-drumhz"):
 			options.DrumHz = number(a[len("-drumhz"):])
-		case strings.HasPrefix(a, "-timers"):
-			options.TimerMap = timers(a[len("-timers"):])
+		case strings.HasPrefix(a, "-startframe"):
+			options.StartFrame = number(a[len("-startframe"):])
+		case strings.HasPrefix(a, "-endframe"):
+			options.EndFrame = number(a[len("-endframe"):])
+		case strings.HasPrefix(a, "-frames"):
+			options.FrameCount = number(a[len("-frames"):])
+		case strings.HasPrefix(a, "-min"):
+			options.StartMin = number(a[len("-min"):])
+		case strings.HasPrefix(a, "-sec"):
+			options.StartSec = number(a[len("-sec"):])
 		case strings.HasPrefix(a, "-t") && len(a) > 2:
 			title = a[2:]
 		case strings.HasPrefix(a, "-N") && len(a) > 2:
@@ -99,6 +113,8 @@ func main() {
 			options.Chunk = number(a[2:])
 		case strings.HasPrefix(a, "-k"):
 			options.Unit = number(a[2:])
+		case strings.HasPrefix(a, "-l"):
+			options.LoopFrame = number(a[2:])
 		default:
 			fail(usageText)
 		}
@@ -236,24 +252,16 @@ func number(text string) int {
 	return value
 }
 
-// timers reads the four-letter map naming the MFP timer each channel runs on.
-func timers(text string) int {
-	if len(text) == 0 || len(text) > ymx.Channels {
-		fail("ym-to-ymx: -timers takes one letter per channel, A B C or D")
-	}
-	assignments := ymx.DefaultTimers
-	for channel, letter := range strings.ToUpper(text) {
-		timer := strings.IndexRune("ABCD", letter)
-		if timer < 0 {
-			fail("ym-to-ymx: -timers takes one letter per channel, A B C or D")
-		}
-		assignments &^= 3 << (2 * channel)
-		assignments |= timer << (2 * channel)
-	}
-	return assignments
-}
-
 func fail(message string) {
 	fmt.Fprintln(os.Stderr, message)
 	os.Exit(1)
+}
+
+// parseTimers reads the timer map, failing the way this command fails.
+func parseTimers(spec string) int {
+	assignments, err := pack.ParseTimers(spec)
+	if err != nil {
+		fail(err.Error())
+	}
+	return assignments
 }

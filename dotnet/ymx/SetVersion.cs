@@ -43,6 +43,15 @@ namespace Ymx
             new Site("dotnet/ymx/YmxFormat.cs",
                     "public const int Patch = \\d+;",
                     "public const int Patch = {2};"),
+            new Site("go/internal/ymx/format.go",
+                    "const ReleaseMajor = \\d+",
+                    "const ReleaseMajor = {3}"),
+            new Site("go/internal/ymx/format.go",
+                    "const ReleaseMinor = \\d+",
+                    "const ReleaseMinor = {4}"),
+            new Site("go/internal/ymx/format.go",
+                    "const Patch = \\d+",
+                    "const Patch = {2}"),
         };
 
         /// <summary>The format version: the word a header carries and a
@@ -69,6 +78,9 @@ namespace Ymx
             new Site("doc/SPEC.md",
                     "the version is \\$[0-9A-F]{4} - \\d+\\.\\d+;",
                     "the version is ${0:X4} - {1};"),
+            new Site("go/internal/ymx/format.go",
+                    "const Version = 0x[0-9A-Fa-f]{4}",
+                    "const Version = 0x{0:X4}"),
         };
 
         internal const string UsageText =

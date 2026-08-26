@@ -11,17 +11,13 @@ import (
 	"github.com/odipar/ymx/internal/ymx"
 )
 
-const usage = "usage: ymx [-f] [-o] [-nN] [-cC] [-kK] [-drumhzH] input.ym" +
-	" [output.ymx]"
+const usage = "usage: ymx [-f] [-o] [-lF] [-nN] [-cC] [-kK]" +
+	" [-minM] [-secS] [-startframeF] [-endframeF] [-framesN]" +
+	" [-drumhzH] [-timersT] [-sidresume] input.ym [output.ymx]"
 
 func main() {
 	force := false
-	startsOver := true
-	ring := ymx.DefaultRingSize
-	chunk := ymx.DefaultChunk
-	unit := 0 // 0 until chosen: -kK, or the tune's own shape
-	drumHz := 0
-	timerMap := ymx.DefaultTimers
+	o := pack.Defaults()
 
 	args := os.Args[1:]
 	for len(args) > 0 && strings.HasPrefix(args[0], "-") {
@@ -30,19 +26,33 @@ func main() {
 		case a == "-f":
 			force = true
 		case a == "-o":
-			startsOver = false
-		case strings.HasPrefix(a, "-drumhz"):
-			drumHz = number(a[len("-drumhz"):])
+			o.Loops = false
+		case a == "-sidresume":
+			o.SidResume = true
 		case strings.HasPrefix(a, "-timers"):
-			timerMap = timers(a[len("-timers"):])
+			o.TimerMap = parseTimers(a[len("-timers"):])
+		case strings.HasPrefix(a, "-drumhz"):
+			o.DrumHz = number(a[len("-drumhz"):])
+		case strings.HasPrefix(a, "-startframe"):
+			o.StartFrame = number(a[len("-startframe"):])
+		case strings.HasPrefix(a, "-endframe"):
+			o.EndFrame = number(a[len("-endframe"):])
+		case strings.HasPrefix(a, "-frames"):
+			o.FrameCount = number(a[len("-frames"):])
+		case strings.HasPrefix(a, "-min"):
+			o.StartMin = number(a[len("-min"):])
+		case strings.HasPrefix(a, "-sec"):
+			o.StartSec = number(a[len("-sec"):])
 		case strings.HasPrefix(a, "-n"):
-			ring = number(a[2:])
+			o.Ring = number(a[2:])
 		case strings.HasPrefix(a, "-c"):
-			chunk = number(a[2:])
+			o.Chunk = number(a[2:])
 		case strings.HasPrefix(a, "-k"):
-			unit = number(a[2:])
+			o.Unit = number(a[2:])
+		case strings.HasPrefix(a, "-l"):
+			o.LoopFrame = number(a[2:])
 		default:
-			fail(usage)
+			fail("Invalid parameter " + a)
 		}
 		args = args[1:]
 	}
@@ -65,9 +75,6 @@ func main() {
 		}
 	}
 
-	o := pack.Defaults()
-	o.Ring, o.Chunk, o.Unit = ring, chunk, unit
-	o.Loops, o.DrumHz, o.TimerMap = startsOver, drumHz, timerMap
 	packed, err := pack.Pack(input, o)
 	if err != nil {
 		fail(inputName + ": " + err.Error())
@@ -98,24 +105,16 @@ func number(text string) int {
 	return value
 }
 
-// timers reads the four-letter map naming the MFP timer each channel runs on.
-func timers(text string) int {
-	if len(text) == 0 || len(text) > ymx.Channels {
-		fail("ymx: -timers takes one letter per channel, A B C or D")
-	}
-	assignments := ymx.DefaultTimers
-	for channel, letter := range strings.ToUpper(text) {
-		timer := strings.IndexRune("ABCD", letter)
-		if timer < 0 {
-			fail("ymx: -timers takes one letter per channel, A B C or D")
-		}
-		assignments &^= 3 << (2 * channel)
-		assignments |= timer << (2 * channel)
-	}
-	return assignments
-}
-
 func fail(message string) {
 	fmt.Fprintln(os.Stderr, message)
 	os.Exit(1)
+}
+
+// parseTimers reads the timer map, failing the way this command fails.
+func parseTimers(spec string) int {
+	assignments, err := pack.ParseTimers(spec)
+	if err != nil {
+		fail(err.Error())
+	}
+	return assignments
 }

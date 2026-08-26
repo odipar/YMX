@@ -15,16 +15,33 @@ import (
 // Options is what a caller may choose. Unit 0 means the packer picks: two
 // where a frame near the end is safe to duplicate, and one where none is.
 type Options struct {
-	Ring      int
-	Chunk     int
-	Unit      int
-	Loops     bool
+	Ring  int
+	Chunk int
+	Unit  int
+	Loops bool
+	// DrumHz is the ceiling a sample's tick rate is held to. Zero is not a
+	// ceiling but a division by zero, so a caller building Options by hand
+	// takes this from Defaults rather than leaving it unset.
 	DrumHz    int
 	TimerMap  int
 	SidResume bool
 
 	// Progress draws the parse's percentage where something is watching.
 	Progress bool
+
+	// The trim window: everything before and after is dropped, so a moment
+	// deep in a long tune plays immediately. StartFrame of -1 takes the
+	// window's start from StartMin and StartSec; EndFrame and FrameCount of
+	// -1 leave the end where the dump put it.
+	StartMin   int
+	StartSec   int
+	StartFrame int
+	EndFrame   int
+	FrameCount int
+
+	// LoopFrame says where the tune starts over, in the frames of the tune
+	// being packed, and -1 leaves the header's own.
+	LoopFrame int
 }
 
 // Defaults are the shape the packer uses where the caller names none.
@@ -34,8 +51,14 @@ func Defaults() Options {
 		Chunk:    ymx.DefaultChunk,
 		Unit:     0,
 		Loops:    true,
+		DrumHz:   ymx.MaxTimerHz,
 		TimerMap: ymx.DefaultTimers,
 		Progress: true,
+
+		StartFrame: -1,
+		EndFrame:   -1,
+		FrameCount: -1,
+		LoopFrame:  -1,
 	}
 }
 
@@ -55,12 +78,17 @@ func Pack(input []byte, o Options) (*Packed, error) {
 
 	// The reader and the engine keep their own vocabularies; the dump
 	// crosses into the engine's here and nowhere else.
+	var notes []string
 	crossed := &ymx.Song{
 		Format: song.Format, Frames: song.Frames, PlayerHz: song.PlayerHz,
 		MasterClock: song.MasterClock, LoopFrame: song.LoopFrame,
 		Attributes: song.Attributes, Drums: song.Drums, Name: song.Name,
 		Author: song.Author, Comment: song.Comment, Registers: song.Registers,
 	}
+	if err := trim(crossed, o, &notes); err != nil {
+		return nil, err
+	}
+
 	effects := ymx.ExtractUpTo(crossed, o.DrumHz)
 	tune, err := ymx.BuildTuneOver(crossed, effects)
 	if err != nil {
@@ -70,7 +98,18 @@ func Pack(input []byte, o Options) (*Packed, error) {
 		tune = tune.Under(tune.Semantics.Resuming())
 	}
 
-	var notes []string
+	// -lF says where the tune starts over, in the frames of the tune being
+	// packed: a trim has already moved what F counts from. The packer
+	// answers for the frame either way, whether the header gave it or the
+	// caller did.
+	if o.LoopFrame >= 0 {
+		if o.LoopFrame >= tune.Frames {
+			return nil, fmt.Errorf("-l%d is past the tune's %d frames",
+				o.LoopFrame, tune.Frames)
+		}
+		tune = tune.StartingOverAt(o.LoopFrame)
+	}
+
 	unit := o.Unit
 	safe := safeToDuplicate(crossed)
 	switch {
@@ -107,6 +146,48 @@ func appendNote(notes []string, note string) []string {
 		return notes
 	}
 	return append(notes, note)
+}
+
+// trim drops everything before and after the window, in place, and says what
+// it kept. The loop frame is a frame number, so it rebases on the first kept
+// frame; one outside the window is no longer a frame of this tune, and the
+// excerpt starts over from its own first frame.
+func trim(song *ymx.Song, o Options, notes *[]string) error {
+	start := o.StartFrame
+	if start < 0 {
+		start = (o.StartMin*60 + o.StartSec) * song.PlayerHz
+	}
+	end := song.Frames
+	if o.EndFrame >= 0 && o.EndFrame < end {
+		end = o.EndFrame
+	}
+	if o.FrameCount >= 0 && start+o.FrameCount < end {
+		end = start + o.FrameCount
+	}
+	if start == 0 && end == song.Frames {
+		return nil
+	}
+	if start < 0 || start >= end {
+		return fmt.Errorf("empty trim window: frames %d..%d of %d",
+			start, end, song.Frames)
+	}
+	for r := range song.Registers {
+		song.Registers[r] = song.Registers[r][start:end]
+	}
+	kept := int64(0)
+	if song.LoopFrame >= int64(start) && song.LoopFrame < int64(end) {
+		kept = song.LoopFrame - int64(start)
+	}
+	if song.LoopFrame != 0 && kept == 0 {
+		*notes = append(*notes, fmt.Sprintf("Frame %d, which the header loops"+
+			" from, is outside the kept window: the excerpt starts over from"+
+			" its own first frame", song.LoopFrame))
+	}
+	song.Frames = end - start
+	song.LoopFrame = kept
+	*notes = append(*notes, fmt.Sprintf("Trimmed to frames %d-%d: %d frames",
+		start, end-1, end-start))
+	return nil
 }
 
 // padTo stretches the tune to a whole number of units, and says what it

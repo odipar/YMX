@@ -90,7 +90,7 @@ final class ReleaseNotesTest {
 
     /**
      * The format version the section names, against the one this build
-     * reads. {@code ymx/setversion.sh} rewrites twelve sites and this page
+     * reads. {@code ymx/setversion.sh} rewrites sixteen sites and this page
      * is not one of them - an older section states the version its release
      * carried and stands - so the newest section's own version is held
      * here.

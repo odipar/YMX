@@ -21,7 +21,15 @@ YMX_DIR=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$YMX_DIR/.." && pwd)
 
 # -dotnet as the first argument runs the C# tree (dotnet/) instead of the
-# Java one; both produce the same bytes.
+# Java one, and -go the Go tree (go/); all three produce the same bytes.
+# The Go one is what a release ships, and needs no build step.
+if [ "$1" = "-go" ]; then
+    shift
+    # Built rather than "go run": the tool has to see the paths the
+    # caller typed, and go run would hand it the go tree's directory.
+    (cd "$REPO/go" && go build -o "$REPO/go/bin/play" ./cmd/play)
+    YMX_REPO="$REPO" exec "$REPO/go/bin/play" "$@"
+fi
 if [ "$1" = "-dotnet" ]; then
     shift
     DLL="$REPO/dotnet/bin/Release/net10.0/ymx.dll"

@@ -25,7 +25,8 @@ final class SetVersionTest {
             "src/main/java/org/ymx/YmxFormat.java",
             "dotnet/ymx/YmxFormat.cs",
             "68k/YMX.S",
-            "doc/SPEC.md");
+            "doc/SPEC.md",
+            "go/internal/ymx/format.go");
 
     private static void copySites(Path scratch) throws IOException {
         for (String file : FILES) {
@@ -54,6 +55,8 @@ final class SetVersionTest {
         assertTrue(Files.readString(scratch.resolve(FILES.get(0)))
                 .contains("PATCH = " + YmxFormat.PATCH + ";"),
                 "-format leaves the release's patch alone");
+        assertTrue(Files.readString(scratch.resolve(FILES.get(4)))
+                .contains("const Version = 0x010C"), "the Go constant");
     }
 
     /**
