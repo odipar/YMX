@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -17,14 +18,14 @@ namespace Ym6
     /// </summary>
     public sealed record TuneSet(List<string> Names, string? Composer, string Title)
     {
-        public static TuneSet Of(List<string> tunes)
+        public static TuneSet Of(string command, List<string> tunes)
         {
             var names = new List<string>();
             string? composer = null;
             bool agree = true;
             foreach (string tune in tunes)
             {
-                Ym6Reader.Song song = ReadSong(tune);
+                Ym6Reader.Song song = ReadSong(command, tune);
                 string name = song.Name.Trim();
                 if (SaysNothing(name))
                 {
@@ -46,19 +47,31 @@ namespace Ym6
         }
 
         /// <summary>The rate every tune must share: one SNDH declares one.</summary>
-        public static int PlayerHz(string tune)
+        public static int PlayerHz(string command, string tune)
         {
-            return ReadSong(tune).PlayerHz;
+            return ReadSong(command, tune).PlayerHz;
         }
 
-        private static Ym6Reader.Song ReadSong(string tune)
+        /// <summary>One dump. Where the file does not open, the message
+        /// names the command; where it opens and the reader rejects it, the
+        /// message names the file.</summary>
+        private static Ym6Reader.Song ReadSong(string command, string tune)
         {
+            byte[] file;
             try
             {
-                return Ym6Reader.Read(File.ReadAllBytes(tune));
+                file = File.ReadAllBytes(tune);
             }
             catch (Exception e) when (e is IOException
-                    || e is Ym6Reader.FormatException)
+                    || e is UnauthorizedAccessException)
+            {
+                throw Tools.Fail(command + ": cannot read " + tune);
+            }
+            try
+            {
+                return Ym6Reader.Read(file);
+            }
+            catch (Ym6Reader.FormatException e)
             {
                 throw Tools.Fail(tune + ": " + e.Message);
             }
@@ -80,24 +93,51 @@ namespace Ym6
     /// <summary>
     /// The packing step both the SNDH and the Hatari front ends need, ported
     /// from org.ym6.Packing: every .ym through the packer with one
-    /// configuration, into one directory, the per-stream table swallowed.
+    /// configuration, into one directory. A caller who asked for this pack
+    /// reads the per-stream table; one on its way somewhere else drops it.
     /// </summary>
     public static class Packing
     {
-        public static List<string> Pack(List<string> yms, string work,
-                List<string> flags)
+        /// <summary>Packs for a caller who asked for this pack: the
+        /// per-stream table is what they are reading.</summary>
+        public static List<string> Pack(string command, List<string> yms,
+                string work, List<string> flags)
         {
-            return Pack(yms, work, flags, false);
+            return Pack(command, yms, work, flags, false, false);
         }
 
-        public static List<string> Pack(List<string> yms, string work,
-                List<string> flags, bool fresh)
+        /// <summary>Packs on the way to something else, with the table
+        /// dropped.</summary>
+        public static List<string> Pack(string command, List<string> yms,
+                string work, List<string> flags, bool fresh)
+        {
+            return Pack(command, yms, work, flags, fresh, true);
+        }
+
+        public static List<string> Pack(string command, List<string> yms,
+                string work, List<string> flags, bool fresh, bool quiet)
         {
             if (fresh && Directory.Exists(work))
             {
-                Directory.Delete(work, true);
+                try
+                {
+                    Directory.Delete(work, true);
+                }
+                catch (Exception e) when (e is IOException
+                        || e is UnauthorizedAccessException)
+                {
+                    throw Tools.Fail(command + ": cannot clear " + work);
+                }
             }
-            Directory.CreateDirectory(work);
+            try
+            {
+                Directory.CreateDirectory(work);
+            }
+            catch (Exception e) when (e is IOException
+                    || e is UnauthorizedAccessException)
+            {
+                throw Tools.Fail(command + ": cannot make " + work);
+            }
 
             var argv = new List<string> {"-f"};
             argv.AddRange(flags);
@@ -116,17 +156,25 @@ namespace Ym6
                 argv.AddRange(yms);
                 argv.Add(work);         // the trailing directory: a set
             }
-            Quietly(() => YmxCli.Main(argv.ToArray()));
+            if (quiet)
+            {
+                Quietly(() => YmxCli.Main(argv.ToArray()));
+            }
+            else
+            {
+                YmxCli.Main(argv.ToArray());
+            }
             return packed;
         }
 
-        /// <summary>Runs the packer with its per-stream table swallowed:
-        /// eighteen lines of ratios per tune is noise when a build script is
-        /// on its way somewhere else.</summary>
+        /// <summary>Runs the packer with its per-stream table dropped. The
+        /// table is one line of ratios per stream per tune, which a build
+        /// script on its way to an SNDH file does not need in its log.</summary>
         private static void Quietly(Action packer)
         {
             TextWriter original = Console.Out;
-            Console.SetOut(new LineFilter(original));
+            var filter = new LineFilter(original);
+            Console.SetOut(filter);
             try
             {
                 packer();
@@ -134,6 +182,7 @@ namespace Ym6
             finally
             {
                 Console.Out.Flush();
+                filter.Drain();
                 Console.SetOut(original);
             }
         }
@@ -169,7 +218,34 @@ namespace Ym6
                 }
             }
 
+            /// <summary>A flush can land mid-line. Text that cannot grow
+            /// into a table line goes straight out; the rest is held until
+            /// its newline, so no flush carries half a table line past the
+            /// match. The Java tree had this the other way round, and every
+            /// line reached the screen in fragments.</summary>
             public override void Flush()
+            {
+                string held = line.ToString();
+                if (held.Length > 0 && !OpensTableLine(held))
+                {
+                    output.Write(held);
+                    line.Clear();
+                }
+                output.Flush();
+            }
+
+            /// <summary>Whether text could still grow into a line this
+            /// drops.</summary>
+            private static bool OpensTableLine(string text)
+            {
+                return text.Length < 2 ? "  ".StartsWith(text,
+                        StringComparison.Ordinal)
+                        : text.StartsWith("  ", StringComparison.Ordinal);
+            }
+
+            /// <summary>Writes what is left, newline or not: the last of the
+            /// output.</summary>
+            internal void Drain()
             {
                 if (line.Length > 0)
                 {
@@ -216,6 +292,9 @@ namespace Ym6
             {
                 throw Tools.Fail(UsageText);
             }
+            // The packer's flags are read before anything is made, so a flag
+            // it does not have stops the run with no work directory left.
+            YmxCli.CheckFlags(packerFlags);
             string output = args[i++];
             var yms = new List<string>();
             for (; i < args.Length; i++)
@@ -224,10 +303,11 @@ namespace Ym6
             }
 
             string work = Path.Combine(Tools.DirectoryOf(output), ".ym_work");
-            TuneSet set = TuneSet.Of(yms);
+            TuneSet set = TuneSet.Of("ymsndh", yms);
             // a fresh work directory each run: yesterday's leftovers are not
             // this set's subtunes
-            List<string> packed = Packing.Pack(yms, work, packerFlags, true);
+            List<string> packed = Packing.Pack("ymsndh", yms, work, packerFlags,
+                    true);
             MkSndh.Build(MkSndh.Options.Of(output, packed,
                     !string.IsNullOrEmpty(title) ? title : set.Title,
                     set.Composer, set.Names, perf, true));
@@ -336,7 +416,9 @@ namespace Ym6
                 }
                 else if (a.StartsWith("-k"))
                 {
-                    unit = "-k" + a[2..];
+                    // Parsed, so -k01 and -k1 name one work directory and an
+                    // empty value is reported as the number it is not.
+                    unit = "-k" + Number(a[2..]);
                 }
                 else
                 {
@@ -391,9 +473,9 @@ namespace Ym6
             }
             flags.AddRange(extra);
 
-            TuneSet set = TuneSet.Of(yms);
+            TuneSet set = TuneSet.Of("play.sh", yms);
             Console.WriteLine("play.sh: packing " + string.Join(" ", yms));
-            List<string> packed = Packing.Pack(yms, work, flags);
+            List<string> packed = Packing.Pack("play.sh", yms, work, flags);
             MkPrg.Build(new MkPrg.Options(Path.Combine(work, "PLAY.PRG"), packed,
                     set.Title, set.Composer, set.Names, perf, maskBurst, true));
 
@@ -410,7 +492,8 @@ namespace Ym6
 
         private static int Number(string text)
         {
-            if (!int.TryParse(text, out int value))
+            if (text.Length == 0 || !int.TryParse(text, NumberStyles.AllowLeadingSign,
+                    CultureInfo.InvariantCulture, out int value))
             {
                 throw Tools.Fail("play.sh: not a number: " + text);
             }

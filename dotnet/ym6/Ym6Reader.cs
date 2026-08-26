@@ -182,10 +182,18 @@ namespace Ym6
             at += bytes;
         }
 
+        /// <summary>US-ASCII, with a byte over 0x7F read as U+FFFD, the
+        /// replacement character. Encoding.ASCII puts '?' there, and the
+        /// message quoting a bad file's first bytes then differs from the
+        /// other trees.</summary>
+        private static readonly Encoding Ascii7 = Encoding.GetEncoding(
+                "us-ascii", EncoderFallback.ReplacementFallback,
+                new DecoderReplacementFallback("\uFFFD"));
+
         private string Ascii(int bytes)
         {
             Need(bytes, "header field");
-            string text = Encoding.ASCII.GetString(data, at, bytes);
+            string text = Ascii7.GetString(data, at, bytes);
             at += bytes;
             return text;
         }

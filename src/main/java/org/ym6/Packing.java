@@ -26,12 +26,19 @@ public final class Packing {
 
     private Packing() {}
 
+    /** Packs for a caller who reads the per-stream table. */
     public static List<Path> pack(List<Path> yms, Path work, List<String> flags) {
-        return pack(yms, work, flags, false);
+        return pack(yms, work, flags, false, false);
+    }
+
+    /** Packs on the way to something else, with the table dropped. */
+    public static List<Path> pack(List<Path> yms, Path work, List<String> flags,
+                                  boolean fresh) {
+        return pack(yms, work, flags, fresh, true);
     }
 
     public static List<Path> pack(List<Path> yms, Path work, List<String> flags,
-                                  boolean fresh) {
+                                  boolean fresh, boolean quiet) {
         try {
             if (fresh && Files.exists(work)) {
                 try (var walk = Files.walk(work)) {
@@ -61,23 +68,36 @@ public final class Packing {
             }
             argv.add(work.toString());          // the trailing directory: a set
         }
-        quietly(() -> Ymx.main(argv.toArray(new String[0])));
+        String[] packerArgs = argv.toArray(new String[0]);
+        if (quiet) {
+            quietly(() -> Ymx.main(packerArgs));
+        } else {
+            Ymx.main(packerArgs);
+        }
         return packed;
     }
 
     /**
-     * Runs the packer with its per-stream table swallowed: eighteen lines of
-     * ratios per tune is what you want when packing one tune on purpose, and
-     * noise when a build script is on its way somewhere else.
+     * Runs the packer with its per-stream table dropped. The table is one line
+     * of ratios per stream per tune, which a build script on its way to an
+     * SNDH file does not need in its log.
      */
-    private static void quietly(Runnable packer) {
+    static void quietly(Runnable packer) {
         PrintStream original = System.out;
-        System.setOut(new PrintStream(new LineFilter(original), true,
+        LineFilter filter = new LineFilter(original);
+        // Autoflush off. With it on, a PrintStream flushes its sink after
+        // every byte array it writes and tests for no newline first, and
+        // printf writes one piece of the format at a time - so a table line
+        // reached the filter as fourteen fragments, each of them out before a
+        // whole line was there to match. The finally drains the filter before
+        // the restore, and the progress meter flushes for itself.
+        System.setOut(new PrintStream(filter, false,
                 StandardCharsets.ISO_8859_1));
         try {
             packer.run();
         } finally {
             System.out.flush();
+            filter.drain();
             System.setOut(original);
         }
     }
@@ -105,8 +125,30 @@ public final class Packing {
             }
         }
 
+        /**
+         * A flush can land mid-line: the progress meter draws with carriage
+         * returns and flushes for itself. Text that cannot grow into a table
+         * line goes straight out; the rest is held until its newline, so no
+         * flush carries half a table line past the match.
+         */
         @Override
         public void flush() {
+            String text = line.toString(StandardCharsets.ISO_8859_1);
+            if (!text.isEmpty() && !opensTableLine(text)) {
+                out.print(text);
+                line.reset();
+            }
+            out.flush();
+        }
+
+        /** Whether text could still grow into a line this drops. */
+        private static boolean opensTableLine(String text) {
+            return text.length() < 2 ? "  ".startsWith(text)
+                    : text.startsWith("  ");
+        }
+
+        /** Writes what is left, newline or not: the last of the output. */
+        void drain() {
             if (line.size() > 0) {
                 out.print(line.toString(StandardCharsets.ISO_8859_1));
                 line.reset();

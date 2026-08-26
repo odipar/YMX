@@ -345,6 +345,27 @@ splits matches so no operation exceeds N units. Run them as
 `dotnet dotnet/bin/Release/net10.0/ymx.dll st4 ...` or from the Java tree
 with `java -cp target/classes org.st4.St4 ...`.
 
+## Holding the three trees together
+
+    ymx/parity.sh [-quick]
+
+Runs one command line through the Java, C# and Go trees and compares stdout,
+stderr, the exit status and every file the run leaves. Each case runs three
+times, once per tree, each in a directory of its own, and the directory is
+hashed whole - so a file written under a different name is a difference and
+not a pass.
+
+The trees agreed on the bytes they packed long before they agreed on
+anything else. What drifted was around them: a flag one tree parsed and
+another took for a file name, a value that packed a file in one tree and
+stopped the run in the next, a fault named in two trees and thrown as a
+stack trace in the third. A sweep over output files alone sees none of it.
+
+`YM_CORPUS` names the directory holding the `.ym` collection, and the other
+two trees have to be built first. `-quick` is four tunes and the cases that
+have caught something; the default is eight tunes and every case.
+`ParityTest` runs `-quick` and is skipped where `YM_CORPUS` is unset.
+
 ## The C# tool names
 
 `-dotnet` reaches these through the wrappers; directly, the first argument

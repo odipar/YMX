@@ -123,7 +123,8 @@ namespace Ymx
                 {
                     tunes.Add(File.ReadAllBytes(tune));
                 }
-                catch (IOException)
+                catch (Exception e) when (e is IOException
+                        || e is UnauthorizedAccessException)
                 {
                     throw Tools.Fail("mksndh: cannot read " + tune);
                 }
@@ -140,7 +141,8 @@ namespace Ymx
             {
                 File.WriteAllBytes(output, file);
             }
-            catch (IOException)
+            catch (Exception e) when (e is IOException
+                    || e is UnauthorizedAccessException)
             {
                 throw Tools.Fail("mksndh: cannot write " + output);
             }
@@ -401,7 +403,8 @@ namespace Ymx
                 }
                 return false;
             }
-            catch (IOException)
+            catch (Exception e) when (e is IOException
+                    || e is UnauthorizedAccessException)
             {
                 return true;
             }
@@ -436,7 +439,8 @@ namespace Ymx
             {
                 core = File.ReadAllBytes(path);
             }
-            catch (IOException)
+            catch (Exception e) when (e is IOException
+                    || e is UnauthorizedAccessException)
             {
                 throw Tools.Fail("mksndh: cannot read the core " + path);
             }
@@ -541,7 +545,7 @@ namespace Ymx
             }
             if (string.IsNullOrEmpty(title))
             {
-                title = Regex.Replace(Path.GetFileName(output), "(?i)\\.sndh$", "");
+                title = Path.GetFileNameWithoutExtension(output);
             }
             Options options = Options.Of(output, tunes, title, composer, names,
                     perf, maskBurst);
@@ -568,7 +572,8 @@ namespace Ymx
             {
                 return new List<string>(File.ReadAllLines(file, Encoding.Latin1));
             }
-            catch (IOException)
+            catch (Exception e) when (e is IOException
+                    || e is UnauthorizedAccessException)
             {
                 throw Tools.Fail("mksndh: cannot read names from " + file);
             }

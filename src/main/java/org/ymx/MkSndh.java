@@ -2,12 +2,15 @@ package org.ymx;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Combines a prebuilt SNDH core with packed tunes into an SNDH v2.2 file -
@@ -83,12 +86,7 @@ public final class MkSndh {
         int claimed = 0;
         int n = 0;
         for (Path tune : options.tunes()) {
-            YmxHeader header;
-            try {
-                header = YmxHeader.read(tune);
-            } catch (IOException e) {
-                throw Tools.fail("mksndh: " + e.getMessage());
-            }
+            YmxHeader header = header(tune);
             if (!header.anyUnit() && header.unit() != word(core, CORE_UNIT)) {
                 throw new IllegalArgumentException(tune + " is packed at unit "
                         + header.unit() + ", the core serves unit "
@@ -224,7 +222,7 @@ public final class MkSndh {
             tag(out, "COMM", clean(options.composer()));
         }
         tag(out, "CONV", "Converted from YM by YMX (ZX1 through ST4)");
-        tag(out, String.format("##%02d", n), "");
+        tag(out, String.format(Locale.ROOT, "##%02d", n), "");
         tag(out, "TC" + rate, "");
         tag(out, "FLAG", flag(claimed));
         if ((out.size() & 1) != 0) {
@@ -339,41 +337,71 @@ public final class MkSndh {
         return core;
     }
 
-    /** The unit size the set's core must serve: the first tune's, or the
-     * packer's default of 2 where every tune reads the same at any unit. */
-    /** Whether a prebuilt binary is missing or older than a source it was
+    /**
+     * Whether a prebuilt binary is missing or older than a source it was
      * assembled from, so the resolvers reassemble rather than combine
-     * against the repository's past. */
+     * against the repository's past. A source this checkout does not carry
+     * counts as older than the binary: a binaries release holds the cores
+     * without the 68000 sources they came from.
+     */
     static boolean stale(Path binary, String... sources) {
+        if (!Files.isRegularFile(binary)) {
+            return true;
+        }
+        FileTime built;
         try {
-            if (!Files.isRegularFile(binary)) {
-                return true;
-            }
-            java.nio.file.attribute.FileTime built = Files.getLastModifiedTime(binary);
-            for (String source : sources) {
-                Path path = Tools.repo().resolve("68k").resolve(source);
-                if (Files.getLastModifiedTime(path).compareTo(built) > 0) {
-                    return true;
-                }
-            }
-            return false;
+            built = Files.getLastModifiedTime(binary);
         } catch (IOException e) {
             return true;
         }
-    }
-
-    private static int unitOf(List<Path> tunes) {
-        for (Path tune : tunes) {
+        for (String source : sources) {
+            Path path = Tools.repo().resolve("68k").resolve(source);
             try {
-                YmxHeader header = YmxHeader.read(tune);
-                if (!header.anyUnit()) {
-                    return header.unit();
+                if (Files.getLastModifiedTime(path).compareTo(built) > 0) {
+                    return true;
                 }
             } catch (IOException e) {
-                throw Tools.fail("mksndh: " + e.getMessage());
+                continue;
+            }
+        }
+        return false;
+    }
+
+    /** The unit size the set's core must serve: the first tune's, or the
+     * packer's default of 2 where every tune reads the same at any unit. */
+    private static int unitOf(List<Path> tunes) {
+        for (Path tune : tunes) {
+            YmxHeader header = header(tune);
+            if (!header.anyUnit()) {
+                return header.unit();
             }
         }
         return 2;
+    }
+
+    /** A tune's header, with the two failures named apart: a file that
+     * cannot be read, and a file that is read and is not a .ymx. */
+    private static YmxHeader header(Path tune) {
+        try {
+            return YmxHeader.read(tune);
+        } catch (IOException e) {
+            if (readable(tune)) {
+                throw Tools.fail("mksndh: " + e.getMessage());
+            }
+            throw Tools.fail("mksndh: cannot read " + tune);
+        }
+    }
+
+    /** Whether the file's bytes come out: a missing path, a directory or a
+     * file the caller may not open all give false. An empty file gives
+     * true, and its header carries the message. */
+    private static boolean readable(Path tune) {
+        try (InputStream in = Files.newInputStream(tune)) {
+            in.read();
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     /** The core, its descriptor checked against what the caller asked for. */
@@ -459,7 +487,7 @@ public final class MkSndh {
             tunes.add(Path.of(args[i]));
         }
         if (title == null || title.isEmpty()) {
-            title = output.getFileName().toString().replaceAll("(?i)\\.sndh$", "");
+            title = stem(output);
         }
         Options options = new Options(output, tunes, title, composer, names,
                 perf, maskBurst);
@@ -472,6 +500,15 @@ public final class MkSndh {
         } catch (IllegalArgumentException e) {
             throw Tools.fail("mksndh: " + e.getMessage());
         }
+    }
+
+    /** The output's stem: its file name up to the last dot. An output
+     * named tune.bin gives tune, one named my.set.sndh gives my.set, and
+     * one named tune gives tune. */
+    private static String stem(Path output) {
+        String name = output.getFileName().toString();
+        int dot = name.lastIndexOf('.');
+        return dot < 0 ? name : name.substring(0, dot);
     }
 
     static List<String> readNames(Path file) {

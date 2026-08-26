@@ -47,7 +47,15 @@ namespace Ymx
         {
             string output = Path.GetFullPath(options.Output);
             string work = Path.Combine(Tools.DirectoryOf(output), ".prg_work");
-            Directory.CreateDirectory(work);
+            try
+            {
+                Directory.CreateDirectory(work);
+            }
+            catch (Exception e) when (e is IOException
+                    || e is UnauthorizedAccessException)
+            {
+                throw Tools.Fail("mkprg: cannot build in " + work);
+            }
 
             string sndh;
             if (options.Tunes.Count == 1 && options.Tunes[0].ToLowerInvariant()
@@ -74,7 +82,8 @@ namespace Ymx
             {
                 file = File.ReadAllBytes(sndh);
             }
-            catch (IOException)
+            catch (Exception e) when (e is IOException
+                    || e is UnauthorizedAccessException)
             {
                 throw Tools.Fail("mkprg: cannot read " + sndh);
             }
@@ -85,7 +94,8 @@ namespace Ymx
             {
                 File.WriteAllBytes(output, prg);
             }
-            catch (IOException)
+            catch (Exception e) when (e is IOException
+                    || e is UnauthorizedAccessException)
             {
                 throw Tools.Fail("mkprg: cannot write " + output);
             }
@@ -285,7 +295,8 @@ namespace Ymx
             {
                 stub = File.ReadAllBytes(path);
             }
-            catch (IOException)
+            catch (Exception e) when (e is IOException
+                    || e is UnauthorizedAccessException)
             {
                 throw Tools.Fail("mkprg: cannot read the stub " + path);
             }
@@ -392,7 +403,8 @@ namespace Ymx
                     tunes.Add(args[i]);
                 }
             }
-            else if (args.Length - i == 2)
+            else if (args.Length - i == 2
+                    && args[i + 1].ToLowerInvariant().EndsWith(".prg"))
             {
                 tunes.Add(args[i]);
                 output = args[i + 1];

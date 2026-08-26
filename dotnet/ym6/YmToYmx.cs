@@ -33,7 +33,8 @@ namespace Ym6
             + "  -lF             start over from frame F; -l0 from the beginning\n"
             + "  -nN             ring size per stream, bytes (default 960)\n"
             + "  -cC             values decoded per call (default 24)\n"
-            + "  -kK             ST4 unit size 1, 2 or 4 (default 2)\n"
+            + "  -kK             ST4 unit size 1, 2 or 4 (default: the tune's"
+            + " own shape)\n"
             + "  -minM -secS     trim: drop everything before M:S\n"
             + "  -startframeF -endframeF -framesN\n"
             + "                  the same window in frames\n"
@@ -84,13 +85,17 @@ namespace Ym6
                 {
                     marker = true;
                 }
+                else if (flag.StartsWith("-timers"))
+                {
+                    packerFlags.Add(flag);      // the packer's, not a title
+                }
                 else if (flag.StartsWith("-t") && flag.Length > 2)
                 {
                     title = flag[2..];
                 }
                 else if (flag.StartsWith("-N") && flag.Length > 2)
                 {
-                    names = new List<string>(File.ReadAllLines(flag[2..]));
+                    names = MkSndh.ReadNames(flag[2..]);
                 }
                 else if (flag.StartsWith("-c") && flag.Length > 2
                         && !char.IsDigit(flag[2]))
@@ -133,10 +138,18 @@ namespace Ym6
                 YmxCli.Main(argv.ToArray());
                 return;
             }
+            // The packer guards the .ymx it writes; the SNDH file and the
+            // program are written here, so the guard is here too.
+            if (!packerFlags.Contains("-f") && File.Exists(output))
+            {
+                throw Tools.Fail("ym-to-ymx: already existing output file "
+                        + output);
+            }
 
             string work = Path.Combine(Tools.DirectoryOf(output), ".ym_work");
-            TuneSet set = TuneSet.Of(yms);
-            List<string> packed = Packing.Pack(yms, work, packerFlags, true);
+            TuneSet set = TuneSet.Of("ym-to-ymx", yms);
+            List<string> packed = Packing.Pack("ym-to-ymx", yms, work,
+                    packerFlags, true);
 
             using var binaries = Embedded.Stage(packed, perf, maskBurst,
                     kind == ".prg");

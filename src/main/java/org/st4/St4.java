@@ -3,6 +3,7 @@ package org.st4;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 
 /**
  * Command-line ST4 packer: ZX1's blocks at a chosen unit granularity, with the
@@ -95,7 +96,10 @@ public final class St4 {
         }
 
         int padded = Units.paddedLength(input.length, unit);
-        System.out.printf("Packed %d bytes%s into %d (%.1f%%): A %d, B %d, C %d, D %d, "
+        // Locale.ROOT, not the JVM's default: a dot in the ratio and ASCII
+        // digits in the counts.
+        System.out.printf(Locale.ROOT,
+                "Packed %d bytes%s into %d (%.1f%%): A %d, B %d, C %d, D %d, "
                 + "%d operations%n",
                 input.length, padded == input.length ? "" : " padded to " + padded,
                 result.packedSize(), 100.0 * result.packedSize() / input.length,
@@ -103,7 +107,8 @@ public final class St4 {
                 result.byteOffsets().length, result.wordOffsets().length,
                 result.operations());
         if (result.longestOp() > maxOpLength) {
-            System.out.printf("Warning: longest operation is %d units, over the -l%d limit: "
+            System.out.printf(Locale.ROOT,
+                    "Warning: longest operation is %d units, over the -l%d limit: "
                     + "a literal run, which the format cannot split%n",
                     result.longestOp(), maxOpLength);
         }

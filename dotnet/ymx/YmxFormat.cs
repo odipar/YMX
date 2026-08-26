@@ -368,7 +368,16 @@ namespace Ymx
 
         public static YmxHeader Read(string path)
         {
-            byte[] file = File.ReadAllBytes(path);
+            byte[] file;
+            try
+            {
+                file = File.ReadAllBytes(path);
+            }
+            catch (Exception e) when (e is IOException
+                    || e is UnauthorizedAccessException)
+            {
+                throw new IOException("cannot read " + path);
+            }
             if (file.Length < YmxFormat.HeaderSize
                     || Word(file, YmxFormat.OffsetMagic) != (YmxFormat.Magic >>> 16)
                     || Word(file, YmxFormat.OffsetMagic + 2)

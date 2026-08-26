@@ -65,8 +65,8 @@ public final class MkPrg {
         }
 
         Path sndh;
-        if (options.tunes().size() == 1 && options.tunes().get(0).toString()
-                .toLowerCase(java.util.Locale.ROOT).endsWith(".sndh")) {
+        if (options.tunes().size() == 1
+                && suffixed(options.tunes().get(0).toString(), ".sndh")) {
             sndh = options.tunes().get(0);
         } else {
             @Nullable String title = options.title();
@@ -84,6 +84,12 @@ public final class MkPrg {
             file = Files.readAllBytes(sndh);
         } catch (IOException e) {
             throw Tools.fail("mkprg: cannot read " + sndh);
+        }
+        // A header runs from the tags to 'HDNS'. Without that terminator the
+        // file is truncated or is not an SNDH file, and a tag scan runs past
+        // the header into whatever follows it.
+        if (headerEnd(file) == file.length) {
+            throw Tools.fail("mkprg: corrupted SNDH header");
         }
         int subtunes = subtunes(file);
         byte[] prg = wrap(readStub(resolveStub()), file, subtunes,
@@ -217,11 +223,8 @@ public final class MkPrg {
     /** A tag's position inside the SNDH header before 'HDNS', or -1. */
     private static int position(byte[] sndh, String tag) {
         byte[] wanted = tag.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
-        for (int at = 12; at + wanted.length < sndh.length; at++) {
-            if (sndh[at] == 'H' && sndh[at + 1] == 'D' && sndh[at + 2] == 'N'
-                    && sndh[at + 3] == 'S') {
-                break;
-            }
+        int end = headerEnd(sndh);
+        for (int at = 12; at + wanted.length <= end; at++) {
             boolean hit = true;
             for (int i = 0; i < wanted.length; i++) {
                 if (sndh[at + i] != wanted[i]) {
@@ -234,6 +237,21 @@ public final class MkPrg {
             }
         }
         return -1;
+    }
+
+    /**
+     * Where the header's tags end: the position of the 'HDNS' terminator, or
+     * the end of the file when it carries none, so a tag scan stays inside the
+     * bytes either way.
+     */
+    private static int headerEnd(byte[] sndh) {
+        for (int at = 12; at + 4 <= sndh.length; at++) {
+            if (sndh[at] == 'H' && sndh[at + 1] == 'D' && sndh[at + 2] == 'N'
+                    && sndh[at + 3] == 'S') {
+                return at;
+            }
+        }
+        return sndh.length;
     }
 
     /** The stub from dist/ - assembled on the spot, once, when missing. */
@@ -326,16 +344,18 @@ public final class MkPrg {
             throw Tools.fail(USAGE);
         }
 
-        // Both argument orders: the .prg names the output wherever it stands,
-        // so `mkprg.sh song.ymx SONG.PRG` keeps working.
+        // Both argument orders: the .prg names the output, first or last,
+        // so `mkprg.sh song.ymx SONG.PRG` keeps working. Two arguments with
+        // no .prg among them name no output: the tool prints the usage text
+        // rather than writing a program over the second file.
         Path output;
         List<Path> tunes = new ArrayList<>();
-        if (args[i].toLowerCase(java.util.Locale.ROOT).endsWith(".prg")) {
+        if (suffixed(args[i], ".prg")) {
             output = Path.of(args[i++]);
             for (; i < args.length; i++) {
                 tunes.add(Path.of(args[i]));
             }
-        } else if (args.length - i == 2) {
+        } else if (args.length - i == 2 && suffixed(args[i + 1], ".prg")) {
             tunes.add(Path.of(args[i]));
             output = Path.of(args[i + 1]);
         } else {
@@ -350,5 +370,11 @@ public final class MkPrg {
         } catch (IllegalArgumentException e) {
             throw Tools.fail("mkprg: " + e.getMessage());
         }
+    }
+
+    /** Whether a name ends in a suffix, the name in any case and the
+     * suffix in lower case. */
+    private static boolean suffixed(String name, String suffix) {
+        return name.toLowerCase(java.util.Locale.ROOT).endsWith(suffix);
     }
 }

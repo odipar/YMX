@@ -37,17 +37,23 @@ final class GoToolsTest {
 
     /**
      * Flags one of these commands reads. The C# writes them as switch cases
-     * and StartsWith tests; the Go as equality and HasPrefix tests. Both
-     * spell the flag itself in a string literal, which is what this reads.
+     * and StartsWith tests, the Go as equality and HasPrefix tests, the Java
+     * as switch cases and equals tests. All three spell the flag itself in a
+     * string literal, which is what this reads.
+     *
+     * <p>The equality test matches whatever is being compared, not only a
+     * variable named {@code a}: the C# asks {@code args[0] == "-meta"}, and a
+     * pattern that wanted a bare name missed both {@code -meta} and
+     * {@code -script} for as long as the Go tree lacked them.</p>
      */
     private static Set<String> flags(String source) {
         Set<String> found = new LinkedHashSet<>();
         Matcher matcher = Pattern.compile(
                 "case \"(-[a-zA-Z]+)\""
-                + "|StartsWith\\(\"(-[a-zA-Z]+)\""
-                + "|HasPrefix\\(a, \"(-[a-zA-Z]+)\""
-                + "|a == \"(-[a-zA-Z]+)\""
-                + "|flag == \"(-[a-zA-Z]+)\"").matcher(source);
+                + "|[sS]tartsWith\\(\"(-[a-zA-Z]+)\""
+                + "|HasPrefix\\([a-zA-Z]+, \"(-[a-zA-Z]+)\""
+                + "|== \"(-[a-zA-Z]+)\""
+                + "|equals\\(\"(-[a-zA-Z]+)\"\\)").matcher(source);
         while (matcher.find()) {
             for (int group = 1; group <= matcher.groupCount(); group++) {
                 if (matcher.group(group) != null) {
@@ -98,6 +104,87 @@ final class GoToolsTest {
                     "the Go packer does not leave " + unset.split(":")[0]
                             + " at -1, which is how it says the caller named none");
         }
+    }
+
+    /**
+     * The packer reads the same flags in all three trees. The twins test
+     * above holds Go to the C#; this holds both to the Java, which is where
+     * every one of these tools was written first.
+     */
+    @Test
+    void theThreeTreesGiveThePackerTheSameFlags() throws IOException {
+        Set<String> java = flags(Files.readString(
+                Path.of("src", "main", "java", "org", "ym6", "Ymx.java")));
+        Set<String> cs = flags(Files.readString(Path.of("dotnet/ym6/Ymx.cs")));
+        Set<String> go = flags(Files.readString(Path.of("go/cmd/ymx/main.go")));
+        assertEquals(java, cs, "the C# packer's flags against the Java one's");
+        assertEquals(java, go, "the Go packer's flags against the Java one's");
+    }
+
+    /**
+     * Every command that packs writes the per-stream report. A sweep compares
+     * the files three trees write and never what they printed, so a report
+     * that drifted drifted unseen: the Go play path wrote none at all, and
+     * the C# one swallowed the table on its way to a program.
+     */
+    @Test
+    void theGoCommandsThatPackWriteTheReport() throws IOException {
+        for (String command : new String[] {"play", "ymx"}) {
+            String source = Files.readString(
+                    Path.of("go", "cmd", command, "main.go"));
+            assertTrue(source.contains("pack.Report("),
+                    "go/cmd/" + command + " writes no pack report");
+            assertTrue(source.contains("pack.Banner()"),
+                    "go/cmd/" + command + " names no packer");
+        }
+    }
+
+    /**
+     * A command packing on its way to an SNDH file writes the report without
+     * the per-stream lines, as the other two trees do. Go selects those lines
+     * rather than matching them back out of the formatted text: the report is
+     * a function here, so there is a seam where the other trees have only a
+     * command's main and a regular expression over its output.
+     */
+    @Test
+    void theGoSndhPathReportsQuietly() throws IOException {
+        String source = Files.readString(
+                Path.of("go", "cmd", "ymsndh", "main.go"));
+        assertTrue(source.contains("pack.ReportQuietly("),
+                "go/cmd/ymsndh writes no report");
+        assertTrue(!source.contains("pack.Report(os.Stdout"),
+                "go/cmd/ymsndh writes the per-stream table into a build log");
+    }
+
+    /**
+     * ym-to-ymx takes both sides of that split from the extension it was
+     * given: a .ymx output is the pack itself and carries the table, and a
+     * .sndh or .prg is on the way to a file that plays.
+     */
+    @Test
+    void theGoYmToYmxReportsBothWays() throws IOException {
+        String source = Files.readString(
+                Path.of("go", "cmd", "ym-to-ymx", "main.go"));
+        assertTrue(source.contains("pack.Report(os.Stdout"),
+                "go/cmd/ym-to-ymx writes no table for a .ymx output");
+        assertTrue(source.contains("pack.ReportQuietly(os.Stdout"),
+                "go/cmd/ym-to-ymx writes the table on the way to a program");
+    }
+
+    /**
+     * A half rounds up in all three trees. Java's {@code %.1f} takes a half
+     * up where Go and .NET take it to the even digit, so 528 bytes of 8448
+     * read 6.2% in two trees and 6.3% in the third until both were made to
+     * round Java's way.
+     */
+    @Test
+    void theOtherTreesRoundAHalfTheWayJavaDoes() throws IOException {
+        assertTrue(Files.readString(Path.of("go", "internal", "pack",
+                        "report.go")).contains("math.Round("),
+                "the Go report leaves a half to the even digit");
+        assertTrue(Files.readString(Path.of("dotnet", "ym6", "Ymx.cs"))
+                        .contains("MidpointRounding.AwayFromZero"),
+                "the C# report leaves a half to the even digit");
     }
 
     /**

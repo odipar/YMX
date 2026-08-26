@@ -13,6 +13,14 @@ import (
 const usageText = "usage: mkprg.sh [-m] [-perf] [-nomask] [-tTitle]" +
 	" [-cComposer] [-Nnamesfile] output.prg tunes.ymx...|set.sndh"
 
+// The prefix on every error this command prints, as the other trees' is.
+// sndhCombine is the prefix the SNDH combine puts on its own messages, and a
+// message that carries either one prints unchanged.
+const (
+	prefix      = "mkprg: "
+	sndhCombine = "mksndh: "
+)
+
 func main() {
 	title, composer := "", ""
 	var names []string
@@ -36,7 +44,7 @@ flags:
 		case strings.HasPrefix(a, "-N"):
 			read, err := ymx.SndhReadNames(a[2:])
 			if err != nil {
-				fail(err.Error())
+				failBuild(err)
 			}
 			names = read
 		default:
@@ -67,8 +75,19 @@ flags:
 		Output: output, Tunes: tunes, Title: title, Composer: composer,
 		Names: names, Perf: perf, MaskBurst: maskBurst, Marker: marker,
 	}); err != nil {
-		fail(err.Error())
+		failBuild(err)
 	}
+}
+
+// failBuild prints an error from the build, with this command's prefix in
+// front of a message that carries none. The usage text goes through fail.
+func failBuild(err error) {
+	message := err.Error()
+	if !strings.HasPrefix(message, prefix) &&
+		!strings.HasPrefix(message, sndhCombine) {
+		message = prefix + message
+	}
+	fail(message)
 }
 
 func suffixOf(name string) string {
