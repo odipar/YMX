@@ -10,6 +10,9 @@ defaults quoted below are the constants' own values.
 
 | script | class | one line |
 |---|---|---|
+| `ym-to-ymx` (a standalone executable) | `Ym6.YmToYmx` | a `.ym` in, a `.ymx`, SNDH file or TOS program out |
+| `ymx/ymxplay.sh`, `ymx/ymxplay.cmd` | - | the same, then Hatari plays it |
+| `ymx/publish.sh` | `dotnet publish` | build `ym-to-ymx` for each platform |
 | - (`java -cp target/classes org.ym6.Ymx`) | `org.ym6.Ymx` | pack a `.ym` into a `.ymx` |
 | `ymx/mksndh.sh` | `org.ymx.MkSndh` | combine packed tunes into an SNDH file |
 | `ymx/mkprg.sh` | `org.ymx.MkPrg` | wrap an SNDH file in a runnable program |
@@ -32,6 +35,45 @@ run it, and a direct run is
 the tool's own usage (`mkcores.sh` and `mkrelease.sh` take no arguments,
 so a bare call runs them), and this document collects the same
 information in one place.
+
+## From a YM dump, without a repository
+
+### ym-to-ymx
+
+One command from a YM dump to something that plays. Each release carries
+it as a standalone executable for Windows, macOS and Linux: it needs no
+JVM, no .NET SDK and no checkout, because the SNDH cores and the PRG stub
+travel inside it.
+
+    ym-to-ymx [options] output.{ymx|sndh|prg} tune.ym [more.ym ...]
+
+The output's extension says what to write: a `.ymx` is the packed tune and
+takes one input, a `.sndh` is a file any SNDH host plays, and a `.prg` is a
+TOS program. Every option the packer and the combiners take is here, so
+`-h` is the whole list. Where two tools spelled a flag the same way, the
+packer keeps it: `-c24` is the chunk size and `-cName` the composer, told
+apart by the digit.
+
+### ymxplay.sh, ymxplay.cmd
+
+Hear a tune: build a program from it with `ym-to-ymx`, then play it under
+Hatari. `ymxplay.sh` is macOS and Linux, `ymxplay.cmd` Windows, and each
+travels beside the executable in a release.
+
+    ./ymxplay.sh [ym-to-ymx options] tune.ym [more.ym ...]
+
+`HATARI` names the emulator and `TOS` its ROM image. Every argument goes
+to `ym-to-ymx`, so `HATARI_OPTS` is where the emulator's own options go.
+
+### publish.sh
+
+Builds `ym-to-ymx` for each platform, self-contained and one file each,
+with this release's cores embedded and the launcher beside it. Needs the
+.NET SDK, and stages the release's binaries first when `dist/release` is
+not there yet.
+
+    ymx/publish.sh [outdir]
+    RIDS="linux-x64" ymx/publish.sh
 
 ## The packer
 

@@ -10,12 +10,22 @@ public static class Program
 {
     public static int Main(string[] args)
     {
+        // Published under a tool's own name, the executable is that tool and
+        // every argument is its own: `ym-to-ymx -f out.prg tune.ym` rather
+        // than `ymx ym-to-ymx -f ...`. Built as the one assembly, the first
+        // argument names the tool, which is what the shell scripts pass.
+        string? self = Environment.ProcessPath;
+        if (self != null && System.IO.Path.GetFileNameWithoutExtension(self)
+                == "ym-to-ymx")
+        {
+            Ym6.YmToYmx.Main(args);
+            return 0;
+        }
         if (args.Length == 0)
         {
             Console.Error.WriteLine("usage: ymx <tool> [arguments...]\n"
-                    + "tools: st4 dst4 ymx ymr mksndh mkprg mkcores mkrelease"
-                    + " setversion ymsndh play ymrplay rig sweep ymrsweep"
-                    + " gendata");
+                    + "tools: ym-to-ymx st4 dst4 ymx mksndh mkprg mkcores"
+                    + " mkrelease setversion ymsndh play rig sweep gendata");
             return 1;
         }
         string[] rest = args[1..];
@@ -26,6 +36,9 @@ public static class Program
                 return 0;
             case "dst4":
                 St4.Dst4Cli.Main(rest);
+                return 0;
+            case "ym-to-ymx":
+                Ym6.YmToYmx.Main(rest);
                 return 0;
             case "ymx":
                 Ym6.YmxCli.Main(rest);

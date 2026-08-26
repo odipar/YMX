@@ -13,4 +13,14 @@
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
+  <!-- The SNDH cores and the PRG stub, carried in the assembly so a
+       published ym-to-ymx combines without a repository beside it. dist/ is
+       what ymx/mkcores.sh assembles into and is not in the tree, so a build
+       made before that ran carries none and the combiners fall back to
+       resolving them - which is what the shell scripts do anyway. -->
+  <ItemGroup>
+    <EmbeddedResource Include="../dist/release/*.bin" Condition="Exists('../dist/release')" />
+    <EmbeddedResource Include="../dist/*.bin" Condition="!Exists('../dist/release')" />
+  </ItemGroup>
+
 </Project>
