@@ -151,8 +151,51 @@ final class MkReleaseTest {
                 "an older release's zip is uploaded");
     }
 
-    /** The C# tree builds the same three commands: the string literals
-     * of each method, in order, against the Java ones. */
+    /**
+     * The notes carry the section and the commit its binaries came from,
+     * and both the publish and the -notes path read them from here. A
+     * -notes run names the tag's own commit rather than HEAD, which is
+     * what lets a page be reworded after main has moved on.
+     */
+    @Test
+    void theNotesCarryTheSectionAndTheCommitTheyName() {
+        String notes = MkRelease.notes("abc1234");
+        assertTrue(notes.startsWith("The player is "),
+                "the notes do not open with this release's section: "
+                        + notes.substring(0, Math.min(60, notes.length())));
+        assertTrue(notes.contains("assembled at abc1234."),
+                "the notes name no commit");
+        assertTrue(notes.contains("MANIFEST.txt"),
+                "the notes point at no digest list");
+        assertTrue(MkRelease.notes("deadbee").contains("assembled at deadbee."),
+                "the commit is not the one the caller passed");
+    }
+
+    /**
+     * A page renders every newline the notes carry, so the section reaches
+     * it one line to a paragraph and one to a list item, however
+     * doc/RELEASES.md wrapped it.
+     */
+    @Test
+    void theSectionReachesThePageUnwrapped() {
+        for (String line : MkRelease.reflow(MkRelease.releaseNotes()).split("\n")) {
+            if (line.isEmpty() || line.startsWith("|") || line.startsWith("```")) {
+                continue;
+            }
+            assertTrue(line.length() > 74 || !line.startsWith("  "),
+                    "a wrapped continuation reached the page: \"" + line + '"');
+        }
+        assertTrue(MkRelease.reflow("one\ntwo\n\n- a\n  b\n- c")
+                        .equals("one two\n\n- a b\n- c"),
+                "reflow joined the wrong lines: "
+                        + MkRelease.reflow("one\ntwo\n\n- a\n  b\n- c"));
+        assertTrue(MkRelease.reflow("| a | b |\n| - | - |")
+                        .equals("| a | b |\n| - | - |"),
+                "reflow ran a table's rows together");
+    }
+
+    /** The C# tree builds the same commands: the string literals of each
+     * method, in order, against the Java ones. */
     @Test
     void bothTreesBuildTheSameCommands() throws IOException {
         String java = Files.readString(
@@ -161,7 +204,9 @@ final class MkReleaseTest {
         String[][] methods = {
                 {"List<String> createCommand(", "List<string> CreateCommand("},
                 {"List<String> editCommand(", "List<string> EditCommand("},
-                {"List<String> uploadCommand(", "List<string> UploadCommand("}};
+                {"List<String> uploadCommand(", "List<string> UploadCommand("},
+                {"String notes(String commit)", "string Notes(string commit)"},
+                {"String reflow(String section)", "string Reflow(string section)"}};
         for (String[] method : methods) {
             assertEquals(literals(java, method[0]), literals(cs, method[1]),
                     method[0] + " and " + method[1]

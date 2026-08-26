@@ -50,14 +50,19 @@ public final class MkRelease {
 
     private MkRelease() {}
 
-    private static final String USAGE = "usage: mkrelease.sh [-publish] [stagedir]";
+    private static final String USAGE =
+            "usage: mkrelease.sh [-publish] [stagedir]\n"
+            + "       mkrelease.sh -notes";
 
     public static void main(String[] args) {
         boolean publish = false;
+        boolean notesOnly = false;
         int i = 0;
         for (; i < args.length; i++) {
             if (args[i].equals("-publish")) {
                 publish = true;
+            } else if (args[i].equals("-notes")) {
+                notesOnly = true;
             } else if (args[i].startsWith("-")) {
                 throw Tools.fail(USAGE);
             } else {
@@ -66,6 +71,13 @@ public final class MkRelease {
         }
         if (args.length - i > 1) {
             throw Tools.fail(USAGE);
+        }
+        if (notesOnly) {
+            if (publish || i < args.length) {
+                throw Tools.fail(USAGE);
+            }
+            repostNotes();
+            return;
         }
         Path dir = (i < args.length ? Path.of(args[i])
                 : Tools.repo().resolve("dist").resolve("release")).toAbsolutePath();
@@ -146,10 +158,7 @@ public final class MkRelease {
         String tag = tag();
         String head = Tools.output(Tools.repo(),
                 List.of("git", "rev-parse", "HEAD"));
-        String notes = releaseNotes() + "\n\nPrebuilt SNDH cores and the PRG"
-                + " stub, assembled at " + commit + ". doc/BINARIES.md is the"
-                + " combine contract; MANIFEST.txt lists sizes and SHA-256"
-                + " digests.";
+        String notes = notes(commit);
         if (Tools.status(Tools.repo(),
                 List.of("gh", "release", "view", tag)) != 0) {
             Tools.run(Tools.repo(), createCommand(tag, head, notes));
@@ -167,6 +176,90 @@ public final class MkRelease {
         }
         Tools.run(Tools.repo(), uploadCommand(dir, tag));
         System.out.println("published " + tag + " at " + commit);
+    }
+
+    /**
+     * The page's text: this release's section of doc/RELEASES.md, then the
+     * line naming the commit the binaries were assembled at. Both the
+     * publish and the notes-only path read it here, so the page reads the
+     * same however it was written.
+     */
+    static String notes(String commit) {
+        return reflow(releaseNotes())
+                + "\n\nPrebuilt SNDH cores and the PRG stub, assembled at "
+                + commit
+                + ". doc/BINARIES.md is the combine contract; MANIFEST.txt"
+                + " lists sizes and SHA-256 digests.";
+    }
+
+    /**
+     * The section as a release page wants it: one line to a paragraph, one
+     * to a list item. doc/RELEASES.md wraps at the width the repository
+     * holds to, and the page renders every one of those breaks, so a wrap
+     * that reads straight in the file reads ragged there. Table rows and
+     * fenced blocks keep the lines they were written with.
+     */
+    static String reflow(String section) {
+        StringBuilder out = new StringBuilder();
+        StringBuilder line = new StringBuilder();
+        boolean fenced = false;
+        for (String raw : section.split("\n", -1)) {
+            String text = raw.strip();
+            boolean fence = text.startsWith("```");
+            if (fenced || fence || text.startsWith("|")) {
+                if (line.length() > 0) {
+                    out.append(line).append('\n');
+                    line.setLength(0);
+                }
+                out.append(raw).append('\n');
+                if (fence) {
+                    fenced = !fenced;
+                }
+                continue;
+            }
+            if (text.isEmpty()) {
+                if (line.length() > 0) {
+                    out.append(line).append('\n');
+                    line.setLength(0);
+                }
+                out.append('\n');
+                continue;
+            }
+            if (text.startsWith("- ") || text.startsWith("#")) {
+                if (line.length() > 0) {
+                    out.append(line).append('\n');
+                    line.setLength(0);
+                }
+            } else if (line.length() > 0) {
+                line.append(' ');
+            }
+            line.append(text);
+        }
+        if (line.length() > 0) {
+            out.append(line);
+        }
+        return out.toString().strip();
+    }
+
+    /**
+     * Rewrite a published release's notes, and nothing else: no asset is
+     * replaced and the tag stays where it is. The commit the notes name is
+     * the tag's own rather than HEAD, so the page keeps saying where its
+     * binaries came from however far main has moved since - a reworded
+     * section is the page changing, not the release.
+     */
+    private static void repostNotes() {
+        String tag = tag();
+        if (Tools.status(Tools.repo(),
+                List.of("gh", "release", "view", tag)) != 0) {
+            throw Tools.fail("mkrelease: there is no release " + tag
+                    + " to write notes for - publish it first");
+        }
+        String tagged = Tools.output(Tools.repo(), List.of("gh", "api",
+                "repos/{owner}/{repo}/commits/" + tag, "--jq", ".sha"));
+        Tools.run(Tools.repo(), editCommand(tag, notes(shortSha(tagged))));
+        System.out.println("notes rewritten for " + tag + " at "
+                + shortSha(tagged));
     }
 
     /** The command that creates the release: {@code --target} tags the
