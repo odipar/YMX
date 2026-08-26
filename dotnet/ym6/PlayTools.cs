@@ -138,14 +138,15 @@ namespace Ym6
             }
         }
 
-        /// <summary>Drops the packer's per-stream lines - "  R0", "  E2",
-        /// "  T1" - and passes everything else straight through.</summary>
+        /// <summary>Drops the packer's per-stream lines - a register's
+        /// "  R0", the script's "  A3" and "  P3", "  M" and "  X" - and
+        /// passes everything else straight through.</summary>
         private sealed class LineFilter : TextWriter
         {
             private readonly TextWriter output;
             private readonly StringBuilder line = new();
             private static readonly Regex PerStream =
-                    new Regex("^ {2}[RTE]\\d.*$");
+                    new Regex("^ {2}(?:[REAP]\\d+|[MXT]) +.*$");
 
             internal LineFilter(TextWriter output)
             {

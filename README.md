@@ -59,7 +59,26 @@ opcodes and the frame contract. The rest of the documentation is beside it.
 | [doc/experiments.md](doc/experiments.md) | ideas measured against the real corpus, and what the measurements said |
 | [doc/RELEASES.md](doc/RELEASES.md) | what changed in each published set of binaries |
 
-## Hearing a tune
+## From a YM dump, with nothing installed
+
+Each release carries **`ym-to-ymx`**, one standalone executable per
+platform, at
+[github.com/odipar/YMX/releases](https://github.com/odipar/YMX/releases).
+No JVM, no .NET, no checkout: the player binaries travel inside it.
+
+```sh
+ym-to-ymx tune.prg song.ym          # a TOS program that plays the tune
+ym-to-ymx tune.sndh song.ym         # an SNDH file any host plays
+ym-to-ymx tune.ymx song.ym          # just the packed tune
+ym-to-ymx -h                        # every option
+./ymxplay.sh song.ym                # the same, then Hatari plays it
+```
+
+The output's extension picks what is written. `ymxplay.sh` and
+`ymxplay.cmd` travel beside it; `HATARI` names the emulator and `TOS` its
+ROM image.
+
+## Hearing a tune from the repository
 
 ```sh
 mvn -q compile

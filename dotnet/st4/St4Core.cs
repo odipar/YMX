@@ -176,7 +176,11 @@ namespace St4
         public ProgressMeter(long total, bool enabled)
         {
             this.total = total;
-            this.enabled = enabled;
+            // A meter redraws one line with a carriage return, which is a
+            // display and not output: piped or redirected it is a wall of
+            // percentages in whatever reads it, so it draws only where
+            // something is watching.
+            this.enabled = enabled && !Console.IsOutputRedirected;
             started = Nanos();
         }
 

@@ -99,7 +99,7 @@ public final class Packing {
             if (b == '\n') {
                 String text = line.toString(StandardCharsets.ISO_8859_1);
                 line.reset();
-                if (!text.matches("^ {2}[RTE]\\d.*\\R?")) {
+                if (!text.matches("^ {2}(?:[REAP]\\d+|[MXT]) +.*\\R?")) {
                     out.print(text);
                 }
             }
