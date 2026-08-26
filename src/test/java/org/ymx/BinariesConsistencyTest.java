@@ -104,7 +104,9 @@ final class BinariesConsistencyTest {
                 dir.resolve("ymxprg" + Tools.binarySuffix() + ".bin"));
         assertEquals('Y', stub[MkPrg.STUB_MAGIC]);
         assertEquals('P', stub[MkPrg.STUB_MAGIC + 3]);
-        assertEquals(1, MkSndh.word(stub, MkPrg.STUB_VERSION));
+        assertEquals(2, MkSndh.word(stub, MkPrg.STUB_VERSION));
+        assertEquals(50, MkSndh.word(stub, MkPrg.STUB_RATE),
+                "the stub's unpatched rate word is the 50 Hz default");
         assertEquals(0, stub.length & 1, "the stub is even-sized: the SNDH"
                 + " after it loads aligned");
 
@@ -127,12 +129,22 @@ final class BinariesConsistencyTest {
         // restarts from, so a takeover that reads one back and writes it
         // again leaves the system's 200 Hz tick at a rate of its own, and
         // the desktop cannot time a double click. $FFFFFA23 is therefore
-        // reached exactly once, by the write.
-        assertEquals(1, occurrences(stub, 0xFA23),
-                "the stub reaches Timer C's data register other than once."
-                        + " It reads as a live count, so the takeover must not"
-                        + " save it and the handback must write the system's"
-                        + " own value");
+        // reached exactly twice - the tick source arming it and the
+        // handback re-arming it for the system - and both writes carry the
+        // system's own 192, which the immediate before each reach shows.
+        assertEquals(2, occurrences(stub, 0xFA23),
+                "the stub reaches Timer C's data register other than twice."
+                        + " It reads as a live count, so nothing may save it:"
+                        + " the tick source writes 192 and the handback"
+                        + " writes 192, and no other reach is right");
+        for (int at = 0; at + 3 < stub.length; at += 2) {
+            if (((stub[at + 2] & 0xFF) == 0xFA) && ((stub[at + 3] & 0xFF) == 0x23)
+                    && (stub[at - 1] & 0xFF) != 0xFA) {
+                assertEquals(192, stub[at + 1] & 0xFF,
+                        "a write to Timer C's data register carries a count"
+                                + " other than the system's 192");
+            }
+        }
     }
 
     /** How often a stub reaches one absolute-short address. */

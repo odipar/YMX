@@ -11,6 +11,29 @@ patch number the binaries carry of their own. The format version is the
 compatibility gate: tunes packed at one format version play on every
 patch of it.
 
+## 0.7.1
+
+The player is 3,412 bytes at unit size 2, where 0.7.0 carried 3,412 -
+the player is untouched, and this patch is the PRG stub's alone, which
+grows from 2,878 bytes to 2,992.
+
+The stub is now an SNDH host of the ordinary kind: it drives play from
+Timer C at the system's own 200 Hz, accumulating the tune's rate against
+200, where every stub before it called play once per VBL and played
+every tune at 50 Hz, its header unread. A 200 Hz tune through
+`mkprg.sh` played four times slow; it now plays 400 frames in two
+seconds, measured under Hatari with one frame write per frame. Where a
+set claims Timer C for an effect channel, the stub ticks from the VBL as
+before, and the combiner rejects such a set at any rate but 50.
+
+With the rate word the stub descriptor moves to version 2: a word at
+offset 18, patched by the combiner from the SNDH file's own timer tag,
+and flag bit 1 marking the VBL fallback. `doc/BINARIES.md` section 5
+states the host's side in full - what the timer tags ask of a host, why
+`TC` is the tag this recipe writes, and what the stub does about it.
+
+The banner no longer carries a version of its own.
+
 ## 0.7.0
 
 The player is 3,412 bytes at unit size 2, where 0.6.0 carried 3,412.

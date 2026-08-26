@@ -18,13 +18,18 @@
 ;   12  .l  0                  frames of subtune 1 when it plays once and
 ;                              stands alone, patched by the tool; 0 = play on
 ;   16  .w  0                  flags, patched by the tool: bit 0 = drop
-;                              YMXDONE.MRK on exit
+;                              YMXDONE.MRK on exit, bit 1 = tick from the
+;                              VBL because the set claims Timer C
+;   18  .w  50                 the tune rate in Hz, patched by the tool
+;                              from the SNDH file's own timer tag
 ;
 ; Nothing in here is absolute, so the PRG's relocation table is empty. The
-; session: takeover, one play call per VBL, a stop on SPACE or when a
-; patched frame count runs out, the number keys 1-9 switching subtunes.
-; Flag bit 0 is for scripted runs - ym/play.sh watches for the marker file
-; so it can close the emulator by itself.
+; session: takeover, play driven from Timer C at the system's own 200 Hz
+; with the rate divided out - the SNDH convention, doc/BINARIES.md section
+; 5 - or from the VBL where the set claims Timer C for an effect channel.
+; A stop on SPACE or when a patched frame count runs out, the number keys
+; 1-9 switching subtunes. Flag bit 0 is for scripted runs - ym/play.sh
+; watches for the marker file so it can close the emulator by itself.
 ; -----------------------------------------------------------------------------
 
 GEMDOS      equ     1
@@ -74,18 +79,21 @@ SV_TDDR     equ     33
 ST_DONE     equ     0               ; word  nonzero once the tune ended
 ST_PLAYED   equ     2               ; long  frames played since init
 ST_MOUSE    equ     6               ; word  mouse packet bytes to skip
+ST_ACCUM    equ     8               ; word  the rate, accumulated mod 200
 
 stub:
         bra.w   main
         dc.b    'YMXP'
 stub_version:
-        dc.w    1
+        dc.w    2
 stub_tunes:
         dc.w    1
 stub_frames:
         dc.l    0
 stub_flags:
         dc.w    0
+stub_rate:
+        dc.w    50
 
 main:
         move.l  4(sp),a5                        ; the basepage TOS gave us
@@ -197,11 +205,29 @@ play:
         clr.w   ST_DONE(a6)
         clr.l   ST_PLAYED(a6)
         clr.w   ST_MOUSE(a6)
+        clr.w   ST_ACCUM(a6)
         moveq   #1,d0                           ; subtune 1
         bsr     sndh_call_init
-        lea     handler(pc),a0
+        lea     vbl_idle(pc),a0                 ; the VBL is parked; the tick
+        btst    #1,stub_flags+1(pc)             ; source below carries play
+        bne     .tick_vbl
+; Timer C is free of the tune, so it carries the calls - the SNDH host
+; convention. The system's own 200 Hz (/64, 192 counts), this handler on
+; its vector, and the rate accumulated against 200, so a 50 Hz tune plays
+; every fourth tick and a 60 Hz one lands 60 calls in every 200 with no
+; drift. The handback below already restores everything this touches.
+        lea     tc_handler(pc),a1
+        move.l  a1,TIMER_C_VEC.w
+        move.b  #TIMERC_SYSTEM_DATA,$FFFFFA23.w
+        or.b    #$50,$FFFFFA1D.w                ; TCDCR's C half: /64, run
+        bset    #5,$FFFFFA09.w                  ; its interrupt enabled and
+        bset    #5,$FFFFFA15.w                  ; unmasked
+        bra     .tick_go
+.tick_vbl:
+        lea     handler(pc),a0                  ; the set claims Timer C for
+.tick_go:                                       ; itself: the VBL calls play
         move.l  a0,VBL_VECTOR.w
-        move.w  #$2300,sr                       ; VBL and the file's timers
+        move.w  #$2300,sr                       ; the tick and the file's timers
 
 .wait:
         tst.w   ST_DONE(a6)                     ; the handler counts the end
@@ -292,9 +318,9 @@ sndh_call_exit:
         jsr     4(a0)                           ; +4: exit
         rts
 
-; The VBL: one play call per frame, and for a play-once tune the frame count
-; the tool patched in marks when the music has ended.
-handler:
+; One play call, and for a play-once tune the frame count the tool patched
+; in marks when the music has ended. Both tick sources come through here.
+tick:
         movem.l d0-d7/a0-a6,-(sp)
         lea     state(pc),a6
         tst.w   ST_DONE(a6)
@@ -309,6 +335,38 @@ handler:
         move.w  #1,ST_DONE(a6)
 .done:
         movem.l (sp)+,d0-d7/a0-a6
+        rts
+
+; The Timer C tick, 200 a second. The in-service bit is cleared before the
+; play call, and the level dropped to the session's, so the file's own
+; timers - Timer D sits below Timer C in the MFP's order - preempt the
+; frame write here exactly as they preempt it under a VBL host. A re-fire
+; cannot land inside its own call: the next tick is 5 ms out and a call is
+; a fraction of that.
+tc_handler:
+        movem.l d1/a6,-(sp)
+        move.b  #$DF,$FFFFFA11.w                ; Timer C served (SEI mode)
+        lea     state(pc),a6
+        move.w  ST_ACCUM(a6),d1
+        add.w   stub_rate(pc),d1
+        cmp.w   #200,d1
+        blo.s   .keep
+        move.w  #$2300,sr                       ; the file's timers preempt
+.calls:
+        sub.w   #200,d1
+        bsr.s   tick
+        cmp.w   #200,d1                         ; a rate above 200 lands more
+        bhs.s   .calls                          ; than one call on a tick
+.keep:
+        move.w  d1,ST_ACCUM(a6)
+        movem.l (sp)+,d1/a6
+        rte
+
+; The VBL: one call per frame where the set claims Timer C, and parked
+; where it does not.
+handler:
+        bsr     tick
+vbl_idle:
         rte                                     ; ours alone: no TOS behind us
 
 puts:
@@ -318,7 +376,7 @@ puts:
         addq.l  #6,sp
         rts
 
-m_banner:   dc.b    "YMX player v1.0 - streaming through ST4",13,10,0
+m_banner:   dc.b    "YMX player - streaming through ST4",13,10,0
 m_playing:  dc.b    "Playing. SPACE stops.",13,10,0
 m_tunes:    dc.b    "Playing. SPACE stops.",13,10      ; a line of its own: the
             dc.b    "1-"                               ; console is 40 columns
@@ -329,7 +387,7 @@ m_bye:      dc.b    "Done.",13,10,0
 
 saved:      ds.b    35                          ; the SV_ fields
         even
-state:      ds.b    8                           ; the ST_ fields
+state:      ds.b    10                          ; the ST_ fields
         even
             ds.b    $800
 stack_top:

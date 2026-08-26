@@ -22,9 +22,15 @@ namespace Ymx
         public const int StubTunes = 10;
         public const int StubFrames = 12;
         public const int StubFlags = 16;
+        public const int StubRate = 18;
 
         /// <summary>Stub flag bit 0: drop YMXDONE.MRK on exit.</summary>
         public const int StubFlagMarker = 1;
+
+        /// <summary>Stub flag bit 1: tick from the VBL, because the set
+        /// claims Timer C for an effect channel and the host may not use it
+        /// for the calls.</summary>
+        public const int StubFlagVbl = 2;
 
         public sealed record Options(string Output, List<string> Tunes,
                 string? Title, string? Composer, List<string>? Names,
@@ -103,7 +109,18 @@ namespace Ymx
             byte[] patched = (byte[]) stub.Clone();
             PutWord(patched, StubTunes, subtunes);
             PutLongIn(patched, StubFrames, frames);
-            PutWord(patched, StubFlags, marker ? StubFlagMarker : 0);
+            int rate = Rate(sndh);
+            bool timerC = ClaimsTimerC(sndh);
+            if (timerC && rate != 50)
+            {
+                throw Tools.Fail("mkprg: the set claims Timer C and plays at "
+                        + rate + " Hz. The stub's fallback ticks from the VBL,"
+                        + " which is a 50 Hz clock, so this set needs a host of"
+                        + " its own");
+            }
+            PutWord(patched, StubFlags,
+                    (marker ? StubFlagMarker : 0) | (timerC ? StubFlagVbl : 0));
+            PutWord(patched, StubRate, rate);
             program.Write(patched);
             program.Write(sndh);
             PutLong(program, 0);                // no fixups
@@ -117,6 +134,52 @@ namespace Ymx
             return (sndh[at + 2] - '0') * 10 + (sndh[at + 3] - '0');
         }
 
+        /// <summary>The rate the timer tag gives, for the host to call play
+        /// at. The five tags name the timer a desktop host should tick from
+        /// and this tool reads only the rate, as the reference hosts do;
+        /// which timer the stub uses is settled by the FLAG~ letters
+        /// instead.</summary>
+        internal static int Rate(byte[] sndh)
+        {
+            foreach (string tag in new[] { "TA", "TB", "TC", "TD", "!V" })
+            {
+                int at = Position(sndh, tag);
+                if (at < 0)
+                {
+                    continue;
+                }
+                int rate = 0;
+                for (int i = at + 2; sndh[i] >= '0' && sndh[i] <= '9'; i++)
+                {
+                    rate = rate * 10 + sndh[i] - '0';
+                }
+                if (rate > 0)
+                {
+                    return rate;
+                }
+            }
+            return 50;
+        }
+
+        /// <summary>Whether FLAG~ marks Timer C as one the subtunes
+        /// claim.</summary>
+        internal static bool ClaimsTimerC(byte[] sndh)
+        {
+            int at = Position(sndh, "FLAG~");
+            if (at < 0)
+            {
+                return false;
+            }
+            for (int i = at + 5; i < sndh.Length && sndh[i] != 0; i++)
+            {
+                if (sndh[i] == 'c')
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         /// <summary>FRMS's first long: subtune 1's frame count, 0 when it
         /// plays on.</summary>
         internal static int Frames(byte[] sndh)
@@ -126,8 +189,21 @@ namespace Ymx
                     | sndh[at + 3];
         }
 
-        /// <summary>A tag's position inside the SNDH header, before 'HDNS'.</summary>
+        /// <summary>A required tag's position; a missing one stops the
+        /// tool.</summary>
         private static int Find(byte[] sndh, string tag)
+        {
+            int at = Position(sndh, tag);
+            if (at < 0)
+            {
+                throw Tools.Fail("mkprg: the SNDH header carries no " + tag + " tag");
+            }
+            return at;
+        }
+
+        /// <summary>A tag's position inside the SNDH header before 'HDNS',
+        /// or -1.</summary>
+        private static int Position(byte[] sndh, string tag)
         {
             byte[] wanted = Encoding.Latin1.GetBytes(tag);
             for (int at = 12; at + wanted.Length < sndh.Length; at++)
@@ -151,7 +227,7 @@ namespace Ymx
                     return at;
                 }
             }
-            throw Tools.Fail("mkprg: the SNDH header carries no " + tag + " tag");
+            return -1;
         }
 
         /// <summary>The stub from dist/ - assembled on the spot, once, when
@@ -184,16 +260,16 @@ namespace Ymx
             {
                 throw Tools.Fail("mkprg: cannot read the stub " + path);
             }
-            if (stub.Length < 18 || stub[StubMagic] != 'Y'
+            if (stub.Length < 20 || stub[StubMagic] != 'Y'
                     || stub[StubMagic + 1] != 'M' || stub[StubMagic + 2] != 'X'
                     || stub[StubMagic + 3] != 'P')
             {
                 throw new ArgumentException(path + " is not a PRG stub");
             }
-            if (MkSndh.Word(stub, StubVersion) != 1)
+            if (MkSndh.Word(stub, StubVersion) != 2)
             {
                 throw new ArgumentException(path + " is stub descriptor version "
-                        + MkSndh.Word(stub, StubVersion) + ", this tool writes 1");
+                        + MkSndh.Word(stub, StubVersion) + ", this tool writes 2");
             }
             if ((stub.Length & 1) != 0)
             {

@@ -22,15 +22,21 @@ import java.util.List;
 public final class MkPrg {
 
     /** The stub descriptor: 'YMXP' at this offset, then version, subtunes
-     * and flags, words, with the frame count a long between them. */
+     * and flags, words, with the frame count a long between them and the
+     * tune rate a word after the flags. */
     public static final int STUB_MAGIC = 4;
     public static final int STUB_VERSION = 8;
     public static final int STUB_TUNES = 10;
     public static final int STUB_FRAMES = 12;
     public static final int STUB_FLAGS = 16;
+    public static final int STUB_RATE = 18;
 
     /** Stub flag bit 0: drop YMXDONE.MRK on exit, for scripted runs. */
     public static final int STUB_FLAG_MARKER = 1;
+
+    /** Stub flag bit 1: tick from the VBL, because the set claims Timer C
+     * for an effect channel and the host may not use it for the calls. */
+    public static final int STUB_FLAG_VBL = 2;
 
     private MkPrg() {}
 
@@ -104,7 +110,17 @@ public final class MkPrg {
         byte[] patched = stub.clone();
         putWord(patched, STUB_TUNES, subtunes);
         putLongIn(patched, STUB_FRAMES, frames);
-        putWord(patched, STUB_FLAGS, marker ? STUB_FLAG_MARKER : 0);
+        int rate = rate(sndh);
+        boolean timerC = claimsTimerC(sndh);
+        if (timerC && rate != 50) {
+            throw Tools.fail("mkprg: the set claims Timer C and plays at "
+                    + rate + " Hz. The stub's fallback ticks from the VBL,"
+                    + " which is a 50 Hz clock, so this set needs a host of"
+                    + " its own");
+        }
+        putWord(patched, STUB_FLAGS,
+                (marker ? STUB_FLAG_MARKER : 0) | (timerC ? STUB_FLAG_VBL : 0));
+        putWord(patched, STUB_RATE, rate);
         out.writeBytes(patched);
         out.writeBytes(sndh);
         putLong(out, 0);                          // no fixups
@@ -117,6 +133,41 @@ public final class MkPrg {
         return (sndh[at + 2] - '0') * 10 + (sndh[at + 3] - '0');
     }
 
+    /** The rate the timer tag gives, for the host to call play at. The
+     * five tags name the timer a desktop host should tick from and this
+     * tool reads only the rate, as the reference hosts do; which timer the
+     * stub uses is settled by the FLAG~ letters instead. */
+    static int rate(byte[] sndh) {
+        for (String tag : new String[] {"TA", "TB", "TC", "TD", "!V"}) {
+            int at = position(sndh, tag);
+            if (at < 0) {
+                continue;
+            }
+            int rate = 0;
+            for (int i = at + 2; sndh[i] >= '0' && sndh[i] <= '9'; i++) {
+                rate = rate * 10 + sndh[i] - '0';
+            }
+            if (rate > 0) {
+                return rate;
+            }
+        }
+        return 50;
+    }
+
+    /** Whether FLAG~ marks Timer C as one the subtunes claim. */
+    static boolean claimsTimerC(byte[] sndh) {
+        int at = position(sndh, "FLAG~");
+        if (at < 0) {
+            return false;
+        }
+        for (int i = at + 5; i < sndh.length && sndh[i] != 0; i++) {
+            if (sndh[i] == 'c') {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** FRMS's first long: subtune 1's frame count, 0 when it plays on. */
     static int frames(byte[] sndh) {
         int at = find(sndh, "FRMS") + 4;
@@ -124,8 +175,17 @@ public final class MkPrg {
                 | ((sndh[at + 2] & 0xFF) << 8) | (sndh[at + 3] & 0xFF);
     }
 
-    /** A tag's position inside the SNDH header, before 'HDNS'. */
+    /** A required tag's position; a missing one stops the tool. */
     private static int find(byte[] sndh, String tag) {
+        int at = position(sndh, tag);
+        if (at < 0) {
+            throw Tools.fail("mkprg: the SNDH header carries no " + tag + " tag");
+        }
+        return at;
+    }
+
+    /** A tag's position inside the SNDH header before 'HDNS', or -1. */
+    private static int position(byte[] sndh, String tag) {
         byte[] wanted = tag.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
         for (int at = 12; at + wanted.length < sndh.length; at++) {
             if (sndh[at] == 'H' && sndh[at + 1] == 'D' && sndh[at + 2] == 'N'
@@ -143,7 +203,7 @@ public final class MkPrg {
                 return at;
             }
         }
-        throw Tools.fail("mkprg: the SNDH header carries no " + tag + " tag");
+        return -1;
     }
 
     /** The stub from dist/ - assembled on the spot, once, when missing. */
@@ -168,13 +228,13 @@ public final class MkPrg {
         } catch (IOException e) {
             throw Tools.fail("mkprg: cannot read the stub " + path);
         }
-        if (stub.length < 18 || stub[STUB_MAGIC] != 'Y' || stub[STUB_MAGIC + 1] != 'M'
+        if (stub.length < 20 || stub[STUB_MAGIC] != 'Y' || stub[STUB_MAGIC + 1] != 'M'
                 || stub[STUB_MAGIC + 2] != 'X' || stub[STUB_MAGIC + 3] != 'P') {
             throw new IllegalArgumentException(path + " is not a PRG stub");
         }
-        if (MkSndh.word(stub, STUB_VERSION) != 1) {
+        if (MkSndh.word(stub, STUB_VERSION) != 2) {
             throw new IllegalArgumentException(path + " is stub descriptor version "
-                    + MkSndh.word(stub, STUB_VERSION) + ", this tool writes 1");
+                    + MkSndh.word(stub, STUB_VERSION) + ", this tool writes 2");
         }
         if ((stub.length & 1) != 0) {
             throw new IllegalArgumentException(path + " is odd-sized: the SNDH"

@@ -302,10 +302,10 @@ public final class MkRelease {
                 || stub[MkPrg.STUB_MAGIC + 3] != 'P') {
             throw new IllegalArgumentException(name + " is not a PRG stub");
         }
-        if (MkSndh.word(stub, MkPrg.STUB_VERSION) != 1) {
+        if (MkSndh.word(stub, MkPrg.STUB_VERSION) != 2) {
             throw new IllegalArgumentException(name
                     + " carries stub descriptor version "
-                    + MkSndh.word(stub, MkPrg.STUB_VERSION) + ", not 1");
+                    + MkSndh.word(stub, MkPrg.STUB_VERSION) + ", not 2");
         }
         if (!zeroLong(stub, MkPrg.STUB_FRAMES)) {
             throw new IllegalArgumentException(name + " carries a frame count;"
