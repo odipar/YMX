@@ -27,10 +27,13 @@ word below says which, so a combiner verifies rather than parses names.
 Every variant is published at
 [github.com/odipar/YMX/releases](https://github.com/odipar/YMX/releases)
 under the tag `binaries-v<release>`, staged by `ymx/mkrelease.sh`:
-twelve cores - three unit sizes by the four flag combinations - the
-stub, one `ym-to-ymx` zip per platform, and a `MANIFEST.txt` of sizes
-and SHA-256 digests with the source commit, the release version and the
-format version. The zips hold a standalone `ym-to-ymx` and the script
+`ymx-binaries-v<release>.zip`, holding twelve cores - three unit sizes
+by the four flag combinations - and the stub; one `ym-to-ymx` zip per
+platform; and a `MANIFEST.txt` of sizes and SHA-256 digests with the
+source commit, the release version and the format version. The manifest
+is published both inside the binaries zip and beside it, so its digests
+can be read before anything is downloaded. The zips hold a standalone
+`ym-to-ymx` and the script
 that runs it under Hatari; the executable carries these same cores and
 this same stub, so a machine with no SDK packs and combines without
 following the recipe below. The release notes
@@ -259,9 +262,10 @@ were already restored.
 
 The whole build for a system with no assembler and no JVM.
 
-1. **Fetch** the release `binaries-v<release>` - the newest patch of the
-   tunes' format version - and check each file's SHA-256 against
-   `MANIFEST.txt`.
+1. **Fetch** `ymx-binaries-v<release>.zip` from the release
+   `binaries-v<release>` - the newest patch of the tunes' format version -
+   unpack it, and check each file's SHA-256 against the `MANIFEST.txt`
+   inside it.
 2. **Pick the core** for the unit size the tunes are packed at - the
    fourth byte of any packed section's ST4 signature (`SPEC.md` §1.4) -
    and for the flags wanted. Verify its descriptor (§1): `'YMXC'`,

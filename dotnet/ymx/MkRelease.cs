@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -157,10 +158,11 @@ namespace Ymx
             {
                 throw Tools.Fail("mkrelease: " + e.Message);
             }
+            string zipped = BinariesZip(dir);
             int tools = Standalone(dir).Count;
-            Console.WriteLine(dir + ": " + (Matrix().Count + 1) + " binaries, "
-                    + tools + (tools == 1 ? " standalone tool"
-                            : " standalone tools")
+            Console.WriteLine(dir + ": " + (Matrix().Count + 1) + " binaries in "
+                    + Path.GetFileName(zipped) + ", " + tools
+                    + (tools == 1 ? " standalone tool" : " standalone tools")
                     + " and MANIFEST.txt, release " + YmxFormat.ReleaseName());
 
             if (publish)
@@ -194,7 +196,7 @@ namespace Ymx
         {
             return Reflow(ReleaseNotes())
                     + "\n\nPrebuilt SNDH cores and the PRG stub, assembled at "
-                    + commit
+                    + commit + ", in " + BinariesZipName()
                     + ". doc/BINARIES.md is the combine contract; MANIFEST.txt"
                     + " lists sizes and SHA-256 digests.";
         }
@@ -339,19 +341,16 @@ namespace Ymx
                     "--notes", notes};
         }
 
-        /// <summary>The command that replaces every asset: each core, the
-        /// stub, each standalone zip and the manifest, out of the staging
-        /// directory.</summary>
+        /// <summary>The command that replaces every asset: the binaries zip,
+        /// each standalone zip and the manifest, out of the staging
+        /// directory. The manifest goes up on its own as well as inside the
+        /// zip, so its digests can be read off the release page without
+        /// downloading anything.</summary>
         internal static List<string> UploadCommand(string dir, string tag)
         {
             var upload = new List<string> {"gh", "release", "upload", tag,
                     "--clobber"};
-            foreach (Variant variant in Matrix())
-            {
-                upload.Add(Path.Combine(dir, variant.FileName()));
-            }
-            upload.Add(Path.Combine(dir,
-                    "ymxprg" + Tools.BinarySuffix() + ".bin"));
+            upload.Add(Path.Combine(dir, BinariesZipName()));
             foreach (string zip in Standalone(dir))
             {
                 upload.Add(zip);
@@ -389,6 +388,69 @@ namespace Ymx
                 throw Tools.Fail("mkrelease: cannot carry " + built + ": "
                         + e.Message);
             }
+        }
+
+        /// <summary>The timestamp every entry in the binaries zip carries:
+        /// the earliest a zip can record. A zip stamped with the clock
+        /// differs on every run, and two releases built from one commit
+        /// would not compare.</summary>
+        private static readonly DateTimeOffset ZipTime =
+                new DateTimeOffset(1980, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
+        /// <summary>The binaries zip's name, which carries the release
+        /// suffix.</summary>
+        internal static string BinariesZipName()
+        {
+            return "ymx-binaries" + Tools.BinarySuffix() + ".zip";
+        }
+
+        /// <summary>
+        /// Every file a combiner needs, in one zip: the twelve cores, the
+        /// stub and MANIFEST.txt. A combiner fetches one file and has the
+        /// whole set, and the manifest travels beside the binaries it lists
+        /// rather than being fetched separately to check them.
+        /// <para>Entries are stored rather than deflated and stamped
+        /// <see cref="ZipTime"/>, so staging one commit twice writes the same
+        /// zip both times. The two trees frame their containers differently,
+        /// so the zips they write are not the same file; a stored entry
+        /// carries the bytes it was given, so what a combiner unpacks is the
+        /// same from either, and MANIFEST.txt lists those bytes rather than
+        /// the zip.</para>
+        /// </summary>
+        /// <returns>the zip, in the staging directory</returns>
+        internal static string BinariesZip(string dir)
+        {
+            var carried = new List<string>();
+            foreach (Variant variant in Matrix())
+            {
+                carried.Add(Path.Combine(dir, variant.FileName()));
+            }
+            carried.Add(Path.Combine(dir,
+                    "ymxprg" + Tools.BinarySuffix() + ".bin"));
+            carried.Add(Path.Combine(dir, "MANIFEST.txt"));
+
+            string zip = Path.Combine(dir, BinariesZipName());
+            try
+            {
+                File.Delete(zip);
+                using var file = File.Create(zip);
+                using var archive = new ZipArchive(file, ZipArchiveMode.Create);
+                foreach (string carriedFile in carried)
+                {
+                    ZipArchiveEntry entry = archive.CreateEntry(
+                            Path.GetFileName(carriedFile),
+                            CompressionLevel.NoCompression);
+                    entry.LastWriteTime = ZipTime;
+                    using Stream into = entry.Open();
+                    into.Write(File.ReadAllBytes(carriedFile));
+                }
+            }
+            catch (IOException e)
+            {
+                throw Tools.Fail("mkrelease: cannot write " + zip + ": "
+                        + e.Message);
+            }
+            return zip;
         }
 
         /// <summary>The zips staging left in the directory, in name

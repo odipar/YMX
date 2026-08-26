@@ -1,18 +1,24 @@
 package org.ymx;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -110,6 +116,68 @@ final class MkReleaseTest {
                 MkRelease.editCommand(MkRelease.tag(), "the notes"));
     }
 
+    /** The names staging leaves for the zip to carry, in the order it does. */
+    private static List<String> carried() {
+        List<String> names = new ArrayList<>();
+        for (MkRelease.Variant variant : MkRelease.matrix()) {
+            names.add(variant.name());
+        }
+        names.add("ymxprg" + Tools.binarySuffix() + ".bin");
+        names.add("MANIFEST.txt");
+        return names;
+    }
+
+    private static Map<String, byte[]> entries(Path zip) throws IOException {
+        Map<String, byte[]> read = new LinkedHashMap<>();
+        try (ZipInputStream in =
+                new ZipInputStream(Files.newInputStream(zip))) {
+            for (ZipEntry entry; (entry = in.getNextEntry()) != null;) {
+                read.put(entry.getName(), in.readAllBytes());
+            }
+        }
+        return read;
+    }
+
+    /**
+     * The zip carries every file a combiner needs and nothing else, each with
+     * the bytes staging wrote. A release page that lost one core to a
+     * mistyped name would look complete until somebody unzipped it.
+     */
+    @Test
+    void theBinariesZipCarriesEveryStagedBinary(@TempDir Path dir)
+            throws IOException {
+        List<String> names = carried();
+        for (String name : names) {
+            Files.writeString(dir.resolve(name), "the bytes of " + name,
+                    StandardCharsets.ISO_8859_1);
+        }
+        Map<String, byte[]> read = entries(MkRelease.binariesZip(dir));
+        assertEquals(names, new ArrayList<>(read.keySet()),
+                "the zip's entries, in staging's order");
+        for (String name : names) {
+            assertArrayEquals(Files.readAllBytes(dir.resolve(name)),
+                    read.get(name), name);
+        }
+    }
+
+    /**
+     * Two runs over one set of binaries give one zip, byte for byte. The
+     * entries are stored and stamped with a fixed time for this: a zip that
+     * carried the clock would differ on every run, and two stagings of one
+     * commit could not be compared.
+     */
+    @Test
+    void theBinariesZipIsTheSameOnEveryRun(@TempDir Path dir)
+            throws IOException {
+        for (String name : carried()) {
+            Files.writeString(dir.resolve(name), "the bytes of " + name,
+                    StandardCharsets.ISO_8859_1);
+        }
+        byte[] first = Files.readAllBytes(MkRelease.binariesZip(dir));
+        byte[] again = Files.readAllBytes(MkRelease.binariesZip(dir));
+        assertArrayEquals(first, again, "the binaries zip is not reproducible");
+    }
+
     @Test
     void theUploadCommandCarriesEveryStagedFile() {
         Path dir = Path.of("dist", "release");
@@ -117,9 +185,10 @@ final class MkReleaseTest {
         assertEquals(List.of("gh", "release", "upload",
                         "binaries-v" + YmxFormat.releaseName(), "--clobber"),
                 upload.subList(0, 5));
-        assertEquals(MkRelease.matrix().size() + 2
-                        + MkRelease.standalone(dir).size(), upload.size() - 5,
-                "every core, the stub, each standalone tool and the manifest");
+        assertEquals(2 + MkRelease.standalone(dir).size(), upload.size() - 5,
+                "the binaries zip, each standalone tool and the manifest");
+        assertTrue(upload.get(5).endsWith(MkRelease.binariesZipName()),
+                upload.get(5));
         assertTrue(upload.get(upload.size() - 1).endsWith("MANIFEST.txt"),
                 upload.get(upload.size() - 1));
     }
@@ -164,11 +233,13 @@ final class MkReleaseTest {
         assertTrue(notes.startsWith("The player is "),
                 "the notes do not open with this release's section: "
                         + notes.substring(0, Math.min(60, notes.length())));
-        assertTrue(notes.contains("assembled at abc1234."),
+        assertTrue(notes.contains("assembled at abc1234, in "),
                 "the notes name no commit");
+        assertTrue(notes.contains(MkRelease.binariesZipName()),
+                "the notes do not say which asset holds the binaries");
         assertTrue(notes.contains("MANIFEST.txt"),
                 "the notes point at no digest list");
-        assertTrue(MkRelease.notes("deadbee").contains("assembled at deadbee."),
+        assertTrue(MkRelease.notes("deadbee").contains("assembled at deadbee, "),
                 "the commit is not the one the caller passed");
     }
 

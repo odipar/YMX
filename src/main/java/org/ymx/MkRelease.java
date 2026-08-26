@@ -6,8 +6,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.zip.CRC32;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 /**
  * Stages a release of the prebuilt player binaries: every core variant -
@@ -132,9 +136,11 @@ public final class MkRelease {
         } catch (IllegalArgumentException e) {
             throw Tools.fail("mkrelease: " + e.getMessage());
         }
+        Path zip = binariesZip(dir);
         int tools = standalone(dir).size();
-        System.out.println(dir + ": " + (matrix().size() + 1) + " binaries, "
-                + tools + (tools == 1 ? " standalone tool" : " standalone tools")
+        System.out.println(dir + ": " + (matrix().size() + 1) + " binaries in "
+                + zip.getFileName() + ", " + tools
+                + (tools == 1 ? " standalone tool" : " standalone tools")
                 + " and MANIFEST.txt, release " + YmxFormat.releaseName());
 
         if (publish) {
@@ -187,7 +193,7 @@ public final class MkRelease {
     static String notes(String commit) {
         return reflow(releaseNotes())
                 + "\n\nPrebuilt SNDH cores and the PRG stub, assembled at "
-                + commit
+                + commit + ", in " + binariesZipName()
                 + ". doc/BINARIES.md is the combine contract; MANIFEST.txt"
                 + " lists sizes and SHA-256 digests.";
     }
@@ -278,16 +284,14 @@ public final class MkRelease {
         return List.of("gh", "release", "edit", tag, "--notes", notes);
     }
 
-    /** The command that replaces every asset: each core, the stub, each
-     * standalone zip and the manifest, out of the staging directory. */
+    /** The command that replaces every asset: the binaries zip, each
+     * standalone zip and the manifest, out of the staging directory. The
+     * manifest goes up on its own as well as inside the zip, so its digests
+     * can be read off the release page without downloading anything. */
     static List<String> uploadCommand(Path dir, String tag) {
         List<String> upload = new ArrayList<>(List.of("gh", "release", "upload",
                 tag, "--clobber"));
-        for (Variant variant : matrix()) {
-            upload.add(dir.resolve(variant.name()).toString());
-        }
-        upload.add(dir.resolve("ymxprg" + Tools.binarySuffix() + ".bin")
-                .toString());
+        upload.add(dir.resolve(binariesZipName()).toString());
         for (Path zip : standalone(dir)) {
             upload.add(zip.toString());
         }
@@ -318,6 +322,66 @@ public final class MkRelease {
             throw Tools.fail("mkrelease: cannot carry " + built + ": "
                     + e.getMessage());
         }
+    }
+
+    /**
+     * The timestamp every entry in the binaries zip carries: the earliest a
+     * zip can record. A zip stamped with the clock differs on every run, and
+     * two releases built from one commit would not compare.
+     */
+    private static final LocalDateTime ZIP_TIME =
+            LocalDateTime.of(1980, 1, 1, 0, 0, 0);
+
+    /** The binaries zip's name, which carries the release suffix. */
+    static String binariesZipName() {
+        return "ymx-binaries" + Tools.binarySuffix() + ".zip";
+    }
+
+    /**
+     * Every file a combiner needs, in one zip: the twelve cores, the stub and
+     * MANIFEST.txt. A combiner fetches one file and has the whole set, and
+     * the manifest travels beside the binaries it lists rather than being
+     * fetched separately to check them.
+     *
+     * <p>Entries are stored rather than deflated and stamped
+     * {@link #ZIP_TIME}, so staging one commit twice writes the same zip
+     * both times. The two trees frame their containers differently, so the
+     * zips they write are not the same file; a stored entry carries the
+     * bytes it was given, so what a combiner unpacks is the same from
+     * either, and MANIFEST.txt lists those bytes rather than the zip.</p>
+     *
+     * @return the zip, in the staging directory
+     */
+    static Path binariesZip(Path dir) {
+        List<Path> carried = new ArrayList<>();
+        for (Variant variant : matrix()) {
+            carried.add(dir.resolve(variant.name()));
+        }
+        carried.add(dir.resolve("ymxprg" + Tools.binarySuffix() + ".bin"));
+        carried.add(dir.resolve("MANIFEST.txt"));
+
+        Path zip = dir.resolve(binariesZipName());
+        try (ZipOutputStream out =
+                new ZipOutputStream(Files.newOutputStream(zip))) {
+            for (Path file : carried) {
+                byte[] bytes = Files.readAllBytes(file);
+                CRC32 crc = new CRC32();
+                crc.update(bytes);
+                ZipEntry entry = new ZipEntry(file.getFileName().toString());
+                entry.setMethod(ZipEntry.STORED);
+                entry.setSize(bytes.length);
+                entry.setCompressedSize(bytes.length);
+                entry.setCrc(crc.getValue());
+                entry.setTimeLocal(ZIP_TIME);
+                out.putNextEntry(entry);
+                out.write(bytes);
+                out.closeEntry();
+            }
+        } catch (IOException e) {
+            throw Tools.fail("mkrelease: cannot write " + zip + ": "
+                    + e.getMessage());
+        }
+        return zip;
     }
 
     /** The zips staging left in the directory, in name order. */
