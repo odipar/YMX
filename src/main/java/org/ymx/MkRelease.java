@@ -88,6 +88,7 @@ public final class MkRelease {
             MkCores.cores(dir, (flags & 1) != 0, (flags & 2) != 0);
         }
         MkCores.stub(dir);
+        carryStandalone(dir);
 
         StringBuilder manifest = new StringBuilder();
         manifest.append("YMX player binaries - release ")
@@ -108,6 +109,10 @@ public final class MkRelease {
             verifyStub(stub);
             manifest.append(entry("ymxprg" + Tools.binarySuffix() + ".bin",
                     stub, "-  -"));
+            for (Path zip : standalone(dir)) {
+                manifest.append(entry(zip.getFileName().toString(),
+                        Files.readAllBytes(zip), "-  -"));
+            }
             Files.writeString(dir.resolve("MANIFEST.txt"), manifest.toString(),
                     StandardCharsets.ISO_8859_1);
         } catch (IOException e) {
@@ -115,8 +120,10 @@ public final class MkRelease {
         } catch (IllegalArgumentException e) {
             throw Tools.fail("mkrelease: " + e.getMessage());
         }
-        System.out.println(dir + ": " + (matrix().size() + 1)
-                + " binaries and MANIFEST.txt, release " + YmxFormat.releaseName());
+        int tools = standalone(dir).size();
+        System.out.println(dir + ": " + (matrix().size() + 1) + " binaries, "
+                + tools + (tools == 1 ? " standalone tool" : " standalone tools")
+                + " and MANIFEST.txt, release " + YmxFormat.releaseName());
 
         if (publish) {
             try {
@@ -178,8 +185,8 @@ public final class MkRelease {
         return List.of("gh", "release", "edit", tag, "--notes", notes);
     }
 
-    /** The command that replaces every asset: each core, the stub and the
-     * manifest, out of the staging directory. */
+    /** The command that replaces every asset: each core, the stub, each
+     * standalone zip and the manifest, out of the staging directory. */
     static List<String> uploadCommand(Path dir, String tag) {
         List<String> upload = new ArrayList<>(List.of("gh", "release", "upload",
                 tag, "--clobber"));
@@ -188,8 +195,54 @@ public final class MkRelease {
         }
         upload.add(dir.resolve("ymxprg" + Tools.binarySuffix() + ".bin")
                 .toString());
+        for (Path zip : standalone(dir)) {
+            upload.add(zip.toString());
+        }
         upload.add(dir.resolve("MANIFEST.txt").toString());
         return upload;
+    }
+
+    /**
+     * The standalone {@code ym-to-ymx} zips this release carries, one per
+     * platform: the executable and its launcher, for a machine with no SDK.
+     * {@code ymx/publish.sh} builds them into {@code dist/standalone}, and
+     * staging copies in each one whose name carries this release's suffix.
+     * A release staged without them carries none and publishes anyway - a
+     * combiner reads the cores, not the tool.
+     */
+    private static void carryStandalone(Path dir) {
+        Path built = Tools.repo().resolve("dist").resolve("standalone");
+        if (!Files.isDirectory(built)) {
+            return;
+        }
+        try (java.util.stream.Stream<Path> listing = Files.list(built)) {
+            for (Path zip : listing.toList()) {
+                if (matches(zip)) {
+                    Files.copy(zip, dir.resolve(zip.getFileName()));
+                }
+            }
+        } catch (IOException e) {
+            throw Tools.fail("mkrelease: cannot carry " + built + ": "
+                    + e.getMessage());
+        }
+    }
+
+    /** The zips staging left in the directory, in name order. */
+    static List<Path> standalone(Path dir) {
+        List<Path> zips = new ArrayList<>();
+        try (java.util.stream.Stream<Path> listing = Files.list(dir)) {
+            listing.filter(MkRelease::matches).sorted().forEach(zips::add);
+        } catch (IOException e) {
+            return List.of();
+        }
+        return zips;
+    }
+
+    /** Whether a file is a standalone tool zip for this release. */
+    private static boolean matches(Path zip) {
+        String name = zip.getFileName().toString();
+        return name.startsWith("ym-to-ymx-")
+                && name.endsWith(Tools.binarySuffix() + ".zip");
     }
 
     /** A commit as the notes spell it: the first seven characters of

@@ -34,6 +34,13 @@ states the host's side in full - what the timer tags ask of a host, why
 
 The banner no longer carries a version of its own.
 
+The release carries a standalone `ym-to-ymx` for Windows, macOS and
+Linux, one zip per platform, each with the script that runs it under
+Hatari. The executable turns a YM dump into a `.ymx`, an SNDH file or a
+TOS program, carries this release's own cores and stub, and needs
+neither a repository nor an SDK. `ymx/publish.sh` builds the zips and
+`ymx/mkrelease.sh` attaches them.
+
 ## 0.7.0
 
 The player is 3,412 bytes at unit size 2, where 0.6.0 carried 3,412.

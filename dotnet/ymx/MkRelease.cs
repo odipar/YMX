@@ -105,6 +105,7 @@ namespace Ymx
                 MkCores.Cores(dir, (flags & 1) != 0, (flags & 2) != 0);
             }
             MkCores.Stub(dir);
+            CarryStandalone(dir);
 
             var manifest = new StringBuilder();
             manifest.Append("YMX player binaries - release ")
@@ -128,6 +129,11 @@ namespace Ymx
                 VerifyStub(stub);
                 manifest.Append(Entry("ymxprg" + Tools.BinarySuffix() + ".bin",
                         stub, "-  -"));
+                foreach (string zip in Standalone(dir))
+                {
+                    manifest.Append(Entry(Path.GetFileName(zip),
+                            File.ReadAllBytes(zip), "-  -"));
+                }
                 File.WriteAllText(Path.Combine(dir, "MANIFEST.txt"),
                         manifest.ToString(), Encoding.Latin1);
             }
@@ -135,9 +141,11 @@ namespace Ymx
             {
                 throw Tools.Fail("mkrelease: " + e.Message);
             }
-            Console.WriteLine(dir + ": " + (Matrix().Count + 1)
-                    + " binaries and MANIFEST.txt, release "
-                    + YmxFormat.ReleaseName());
+            int tools = Standalone(dir).Count;
+            Console.WriteLine(dir + ": " + (Matrix().Count + 1) + " binaries, "
+                    + tools + (tools == 1 ? " standalone tool"
+                            : " standalone tools")
+                    + " and MANIFEST.txt, release " + YmxFormat.ReleaseName());
 
             if (publish)
             {
@@ -217,7 +225,8 @@ namespace Ymx
         }
 
         /// <summary>The command that replaces every asset: each core, the
-        /// stub and the manifest, out of the staging directory.</summary>
+        /// stub, each standalone zip and the manifest, out of the staging
+        /// directory.</summary>
         internal static List<string> UploadCommand(string dir, string tag)
         {
             var upload = new List<string> {"gh", "release", "upload", tag,
@@ -228,8 +237,60 @@ namespace Ymx
             }
             upload.Add(Path.Combine(dir,
                     "ymxprg" + Tools.BinarySuffix() + ".bin"));
+            foreach (string zip in Standalone(dir))
+            {
+                upload.Add(zip);
+            }
             upload.Add(Path.Combine(dir, "MANIFEST.txt"));
             return upload;
+        }
+
+        /// <summary>
+        /// The standalone <c>ym-to-ymx</c> zips this release carries, one
+        /// per platform: the executable and its launcher, for a machine with
+        /// no SDK. <c>ymx/publish.sh</c> builds them into
+        /// <c>dist/standalone</c>, and staging copies in each one whose name
+        /// carries this release's suffix. A release staged without them
+        /// carries none and publishes anyway - a combiner reads the cores,
+        /// not the tool.
+        /// </summary>
+        private static void CarryStandalone(string dir)
+        {
+            string built = Path.Combine(Tools.Repo(), "dist", "standalone");
+            if (!Directory.Exists(built))
+            {
+                return;
+            }
+            try
+            {
+                foreach (string zip in Directory.GetFiles(built,
+                        "ym-to-ymx-*" + Tools.BinarySuffix() + ".zip"))
+                {
+                    File.Copy(zip, Path.Combine(dir, Path.GetFileName(zip)));
+                }
+            }
+            catch (IOException e)
+            {
+                throw Tools.Fail("mkrelease: cannot carry " + built + ": "
+                        + e.Message);
+            }
+        }
+
+        /// <summary>The zips staging left in the directory, in name
+        /// order.</summary>
+        internal static List<string> Standalone(string dir)
+        {
+            try
+            {
+                var zips = new List<string>(Directory.GetFiles(dir,
+                        "ym-to-ymx-*" + Tools.BinarySuffix() + ".zip"));
+                zips.Sort(StringComparer.Ordinal);
+                return zips;
+            }
+            catch (IOException)
+            {
+                return new List<string>();
+            }
         }
 
         /// <summary>A commit as the notes spell it: the first seven

@@ -55,7 +55,8 @@ namespace Ym6
                 }
                 return;
             }
-            Console.WriteLine("YMX: YM chiptune packer v1.0 by Robbert van Dalen,"
+            Console.WriteLine("YMX: YM chiptune packer v"
+                    + YmxFormat.ReleaseName() + " by Robbert van Dalen,"
                     + " streaming ST4");
 
             int ringSize = YmxFormat.DefaultRingSize;

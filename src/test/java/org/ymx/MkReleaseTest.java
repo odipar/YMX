@@ -14,6 +14,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /** The release stager's own checks, on synthetic cores. */
 final class MkReleaseTest {
@@ -110,15 +111,44 @@ final class MkReleaseTest {
 
     @Test
     void theUploadCommandCarriesEveryStagedFile() {
-        List<String> upload = MkRelease.uploadCommand(
-                Path.of("dist", "release"), MkRelease.tag());
+        Path dir = Path.of("dist", "release");
+        List<String> upload = MkRelease.uploadCommand(dir, MkRelease.tag());
         assertEquals(List.of("gh", "release", "upload",
                         "binaries-v" + YmxFormat.releaseName(), "--clobber"),
                 upload.subList(0, 5));
-        assertEquals(MkRelease.matrix().size() + 2, upload.size() - 5,
-                "every core, the stub and the manifest");
+        assertEquals(MkRelease.matrix().size() + 2
+                        + MkRelease.standalone(dir).size(), upload.size() - 5,
+                "every core, the stub, each standalone tool and the manifest");
         assertTrue(upload.get(upload.size() - 1).endsWith("MANIFEST.txt"),
                 upload.get(upload.size() - 1));
+    }
+
+    /**
+     * A staged standalone tool is uploaded, and one named for another
+     * release is not: the release suffix keeps an older zip out.
+     */
+    @Test
+    void theUploadCommandCarriesThisReleasesToolsAlone(@TempDir Path dir)
+            throws IOException {
+        String suffix = Tools.binarySuffix();
+        Files.writeString(dir.resolve("ym-to-ymx-osx-arm64" + suffix + ".zip"), "");
+        Files.writeString(dir.resolve("ym-to-ymx-win-x64" + suffix + ".zip"), "");
+        Files.writeString(dir.resolve("ym-to-ymx-win-x64-v0.0.1.zip"), "");
+        Files.writeString(dir.resolve("ymxsndh-k2" + suffix + ".bin"), "");
+
+        List<String> staged = MkRelease.standalone(dir).stream()
+                .map(p -> p.getFileName().toString()).toList();
+        assertEquals(List.of("ym-to-ymx-osx-arm64" + suffix + ".zip",
+                        "ym-to-ymx-win-x64" + suffix + ".zip"), staged,
+                "this release's zips, in name order");
+
+        List<String> upload = MkRelease.uploadCommand(dir, MkRelease.tag());
+        for (String zip : staged) {
+            assertTrue(upload.stream().anyMatch(a -> a.endsWith(zip)),
+                    zip + " is not uploaded");
+        }
+        assertTrue(upload.stream().noneMatch(a -> a.endsWith("v0.0.1.zip")),
+                "an older release's zip is uploaded");
     }
 
     /** The C# tree builds the same three commands: the string literals

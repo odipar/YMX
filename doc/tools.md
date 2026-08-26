@@ -68,9 +68,12 @@ to `ym-to-ymx`, so `HATARI_OPTS` is where the emulator's own options go.
 ### publish.sh
 
 Builds `ym-to-ymx` for each platform, self-contained and one file each,
-with this release's cores embedded and the launcher beside it. Needs the
-.NET SDK, and stages the release's binaries first when `dist/release` is
-not there yet.
+with this release's cores embedded, and zips each one with its launcher
+for `mkrelease.sh` to attach. Needs the .NET SDK, and stages the
+release's binaries first when `dist/release` is not there yet. Every zip
+of this release goes at the start of a run, and each platform's
+directory before its build, so what a run leaves behind is what that run
+built.
 
     ymx/publish.sh [outdir]
     RIDS="linux-x64" ymx/publish.sh
@@ -154,9 +157,13 @@ it for every variant.
 
 Stages every core variant - three unit sizes by the `-perf` and `-nomask`
 flags - plus the stub, verifies each descriptor, and writes MANIFEST.txt
-with sizes and SHA-256 digests. Publishing reads this release's section
-of `doc/RELEASES.md` and posts it as the release notes, so a release
-with no account of what it changes is not published.
+with sizes and SHA-256 digests. It also carries in the standalone
+`ym-to-ymx` zips `publish.sh` left in `dist/standalone`, digests them
+into the same manifest and attaches them, so `publish.sh` runs after a
+staging run and before the publishing one. Publishing reads this
+release's section of `doc/RELEASES.md` and posts it as the release
+notes, so a release with no account of what it changes is not
+published.
 
     ymx/mkrelease.sh [-publish] [stagedir]
 

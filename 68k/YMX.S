@@ -183,12 +183,17 @@
 ;      marks each time round, and YMX_init is only needed to start it again
 ;      from a stop
 ;   5. the HOST owns the machine state - the player saves and restores none
-;      of it. A host needing the machine back afterwards saves, around
-;      init..stop, exactly what the player touches: the vectors $134 and
-;      $110, TACR, TADR, TDDR, TCDCR's low (Timer D) nibble, bit 5 of IERA
-;      and IMRA, bit 4 of IERB and IMRB. A demo that has already taken the
-;      machine over saves nothing. YMX_player.S is the worked example of
-;      doing that
+;      of it. Which timers a tune claims is stream T's, read at init, so a
+;      host cannot know them beforehand and saves for all four, around
+;      init..stop: the vectors $134, $120, $114 and $110; TACR, TBCR and
+;      both nibbles of TCDCR; bits 5 and 0 of IERA and IMRA; bits 5 and 4
+;      of IERB and IMRB. A data register is not in that list: it reads as
+;      the timer's live count and writes as its reload value, so saving
+;      one and writing it back sets a rate nobody asked for. A host that
+;      needs a timer's rate back writes the value it knows - Timer C's is
+;      the system's 200 Hz clock, 192 counts at /64. A demo that has
+;      already taken the machine over saves nothing. YMX_player.S is the
+;      worked example of doing that, and YMX_sndh.S is the other
 ; -----------------------------------------------------------------------------
 
 ; YMX_PERF equ 1 turns on the raster monitor: the frame's work paints the
@@ -692,6 +697,24 @@ YMX_init:
         moveq   #0,d0
         move.b  (a0),d0
         move.w  d0,YMX_TMAP(a3)         ; kept, so a change shows up
+
+; An earlier init's claims go back before the new map lands, whether or not
+; this tune uses the same channels: init twice without a stop and no timer
+; of ours is left running. The order is load-bearing. ymx_handback reaches
+; a timer through the descriptor's row, and ymx_assign overwrites exactly
+; those fields, so a channel released afterwards would hand back the timer
+; it moved TO and leave the one it moved FROM counting, enabled, its vector
+; still in this blob.
+        move.w  sr,-(sp)
+        ori.w   #$0700,sr
+        lea     ymx_desc_0(pc),a5
+        moveq   #YMX_CHANNELS-1,d2
+.release:
+        bsr     ymx_handback
+        lea     CH_SIZE(a5),a5
+        dbra    d2,.release
+        move.w  (sp)+,sr
+
         bsr     ymx_assign
 
 ; Claim a timer for each timer channel the header flags: park our handler
@@ -710,11 +733,6 @@ YMX_init:
         move.w  sr,-(sp)
         ori.w   #$0700,sr
 .claim:
-        bsr     ymx_handback            ; an earlier init's claim on this
-                                        ; channel goes back first, whether
-                                        ; or not this tune uses it again:
-                                        ; init twice without a stop and no
-                                        ; timer of ours is left running
         moveq   #0,d1
         lsr.w   #1,d0
         bcc.s   .idle

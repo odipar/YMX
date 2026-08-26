@@ -75,7 +75,8 @@ public final class Ymx {
             script.notes().forEach(n -> System.out.println("note: " + n));
             return;
         }
-        System.out.println("YMX: YM chiptune packer v1.0 by Robbert van Dalen, "
+        System.out.println("YMX: YM chiptune packer v"
+                + YmxFormat.releaseName() + " by Robbert van Dalen, "
                 + "streaming ST4");
 
         int ringSize = YmxFormat.DEFAULT_RING_SIZE;
