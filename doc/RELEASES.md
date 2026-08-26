@@ -163,28 +163,24 @@ The player is 3,412 bytes at unit size 2, where 0.5.2 carried 3,394.
 Format version 0.6: a tune packed at 0.5 has to be repacked from its
 `.ym` source.
 
-- A file may carry **extension streams** past the twenty-five, at indices
-  25 to 31, and thirty-two is the stream ceiling at this version and at
-  every later one. `S`, the stream count at offset 14, is 25 to 32 where
-  it was always 25.
+- A file may carry **extension streams** at indices 25 to 31. `S`, the
+  stream count at offset 14, is 25 to 32 where it was always 25.
 - The long at offset 38 is `Q`, the **required-streams mask**, one bit per
   stream, and thirty-two is the stream ceiling at every version because of
-  it. A set bit requires the stream: a consumer that does not
-  implement it rejects the file. A clear bit on a stream the file carries
-  makes it advisory, and a consumer that does not implement it reads none
-  of it and produces the values it would produce from a file without it.
-  Bits 0 to 24 are set in every file, so a file carrying no extension
-  stream holds `$01FFFFFF`.
+  it. A set bit requires the stream: a consumer that does not implement it
+  rejects the file. A clear bit makes it advisory: a consumer that does
+  not implement it reads none of it and produces the values it would
+  produce from a file without it. Bits 0 to 24 are set in every file, so a
+  file carrying no extension stream holds `$01FFFFFF`.
 - The header is 142 bytes where 0.5 carried 138. The section table follows
   at 42 where it followed at 38, and the first body item is at 144.
 - SPEC.md §1.7 is the registry. This version assigns no index: 25 to 29
-  are the format's to assign later, and 30 and 31 are custom at every
-  version, so a custom stream never collides with a registered one. An
-  extension that turns out to be shared is registered from 25 to 29 in a
-  later version.
-- The refill turn is a position in a consumer's decode list rather than a
-  stream index, so a file carrying an extension at index 31 does not force
-  `C` to 32 for every consumer of it.
+  are the format's to assign later, 30 and 31 are custom at every version.
+  An extension that turns out to be shared is registered from 25 to 29 in
+  a later version.
+- The refill turn is a position in a consumer's decode list, not a stream
+  index, so a file carrying an extension at index 31 does not force `C` to
+  32 for every consumer of it.
 
 A file carrying no extension stream is what 0.5 would have written apart
 from the header: 10 of the 10 reference dumps in `doc/conformance` are
@@ -192,29 +188,29 @@ byte for byte what they were.
 
 ## 0.5.2
 
-The player is 3,394 bytes at unit size 2, where 0.5.1 carried 3,394: the
-player did not move, and every tune packed at format 0.5 plays unchanged.
-The three SNDH cores are byte for byte what 0.5.0 published. The PRG stub
-gives the system's own tick back.
+The player is 3,394 bytes at unit size 2, where 0.5.1 carried 3,394, and
+every tune packed at format 0.5 plays unchanged. The three SNDH cores are
+byte for byte what 0.5.0 published. The PRG stub gives the system's own
+tick back.
 
 - After a program ran, the desktop could no longer time a double click.
-  0.5.1 read that as parked timer vectors and gave those back, which was
-  a real omission and not this fault. The cause is Timer C's count. A
-  timer's data register reads as the count it has reached, not as the
-  count it restarts from, so a takeover that reads $FFFFFA23 and writes
-  it back at the end leaves the operating system's 200 Hz tick running to
-  the count the timer had reached. The desktop measures a double click, a
-  key repeat and the time of day in that tick.
+  The cause is Timer C's count. A timer's data register reads as the count
+  it has reached, not the count it restarts from, so a takeover that reads
+  $FFFFFA23 and writes it back at the end leaves the operating system's
+  200 Hz tick running to the count the timer had reached. The desktop
+  measures a double click, a key repeat and the time of day in that tick.
+- 0.5.1 read the symptom as parked timer vectors and gave those back. That
+  was a real omission, and not this fault.
 - The count is written rather than read now: 192, which with the /64
   prescaler the control register restores is 2457600 / 64 / 192, or
-  200 Hz. The prescaler needs no such care, since a control register does
-  read as what was written to it.
+  200 Hz. The prescaler needs no such care: a control register does read
+  as what was written to it.
 - The stub is 2,878 bytes where 0.5.1 carried 2,884.
 
-Reported fixed on the machine, which 0.5.1 lacked: its own note
-said no program had been run with $114 read back afterwards, and the
-symptom outlived the release. The same fault, and the same cause, was
-found in the RhYMe tracker's exported player.
+Fixed on the machine, which 0.5.1 was not: its own note said no program
+had been run with $114 read back afterwards, and the symptom outlived the
+release. The same fault, and the same cause, was found in the RhYMe
+tracker's exported player.
 
 ## 0.5.1
 
@@ -293,22 +289,21 @@ source.
 
 ## 0.4.1
 
-The player, optimized. Every tune packed at format 0.4 plays unchanged -
+The player, optimized. Every tune packed at format 0.4 plays unchanged:
 the format did not move.
 
 - 3,256 bytes at unit size 2, where 0.4 carried 3,324.
-- Cheaper by about 94 cycles a frame, and the measurement resolves to
-  within about 24 of that: `ymx/test/run.sh` under Hatari 2.6.1 on a
-  cycle-exact 8 MHz ST with TOS 2.06 played 1,700 frames of one tune in
-  89 ticks of the 200 Hz clock where 0.4 took 93, three runs each, with
-  the same chip-write checksum.
+- Cheaper by about 94 cycles a frame, measured to within about 24:
+  `ymx/test/run.sh` under Hatari 2.6.1 on a cycle-exact 8 MHz ST with TOS
+  2.06 played 1,700 frames of one tune in 89 ticks of the 200 Hz clock
+  where 0.4 took 93, three runs each, with the same chip-write checksum.
 - The frame write counts its register selects through one step register,
   the channel-to-timer map is read through a displacement the init
   patches, the sample tick steps its pointer through its own patched
   address, and init sets up its streams in registers.
 - `YMX_SUPER_HOST` is gone: the sample tick no longer borrows an address
-  register, so the flag chose nothing. A build line that defines it
-  still assembles.
+  register, so the flag chose nothing. A build line that defines it still
+  assembles.
 
 ## 0.4
 
