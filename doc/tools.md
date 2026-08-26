@@ -67,16 +67,30 @@ to `ym-to-ymx`, so `HATARI_OPTS` is where the emulator's own options go.
 
 ### publish.sh
 
-Builds `ym-to-ymx` for each platform, self-contained and one file each,
-with this release's cores embedded, and zips each one with its launcher
-for `mkrelease.sh` to attach. Needs the .NET SDK, and stages the
-release's binaries first when `dist/release` is not there yet. Every zip
-of this release goes at the start of a run, and each platform's
-directory before its build, so what a run leaves behind is what that run
-built.
+Builds `ym-to-ymx` for each platform, one static file each with this
+release's cores embedded, and zips each one with its launcher for
+`mkrelease.sh` to attach. It stages the release's binaries first when
+`dist/release` is not there yet, copies them where `//go:embed` takes
+them, and removes every zip of this release at the start of a run and
+each platform's directory before its build, so what a run leaves behind
+is what that run built.
 
     ymx/publish.sh [outdir]
-    RIDS="linux-x64" ymx/publish.sh
+    TARGETS="linux-x64" ymx/publish.sh
+
+| platform | |
+|---|---|
+| `win-x64` `win-arm64` | Windows |
+| `osx-x64` `osx-arm64` | macOS |
+| `linux-x64` `linux-arm64` | Linux |
+
+It builds them from `go/`, and needs Go. That is why there are six: `go
+build` cross-compiles to any target from any host with nothing installed
+for it, so one machine covers all of them. The C# tree writes the same
+bytes and is the reference the Go tree is held to, but it reaches three
+of these from one machine at ten times the size: NativeAOT does not
+compile across operating systems, and a self-contained single file
+carries a runtime.
 
 ## The packer
 

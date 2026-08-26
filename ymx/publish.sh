@@ -1,21 +1,28 @@
 #!/bin/sh
 # The standalone ym-to-ymx executables: one per platform, each carrying the
-# .NET runtime and the SNDH cores and PRG stub, so a machine with neither a
-# repository nor an SDK can turn a YM dump into something that plays.
+# SNDH cores and the PRG stub, so a machine with neither a repository nor a
+# toolchain can turn a YM dump into something that plays.
 #
-#   ymx/publish.sh [outdir]        # the three platforms below
-#   RIDS="linux-x64" ymx/publish.sh
+#   ymx/publish.sh [outdir]           # the six platforms below
+#   TARGETS="linux-x64" ymx/publish.sh
+#
+# They are built from go/, which is why there are six of them. go build
+# cross-compiles to any target from any host with nothing installed for it,
+# so one machine covers Windows, macOS and Linux on both architectures. The
+# .NET tree builds the same bytes and is still the reference the Go tree is
+# held to, but it reaches three of these from here at ten times the size:
+# NativeAOT does not compile across operating systems, and a self-contained
+# single file carries a runtime.
 #
 # The binaries come from dist/release, which ymx/mkrelease.sh stages, so a
 # published executable carries this release's own cores. Every zip of this
 # release is removed at the start, and each platform's directory before its
-# build, so what a run leaves behind is what that run built. Needs the .NET
-# SDK.
+# build, so what a run leaves behind is what that run built. Needs Go.
 set -e
 cd "$(dirname "$0")/.."
 REPO=$(pwd)
 OUT=${1:-dist/standalone}
-RIDS=${RIDS:-"win-x64 osx-arm64 linux-x64"}
+TARGETS=${TARGETS:-"win-x64 win-arm64 osx-x64 osx-arm64 linux-x64 linux-arm64"}
 
 # the cores the executable embeds: this release's, all twelve and the stub
 if [ ! -d dist/release ]; then
@@ -31,30 +38,45 @@ if [ -z "$VERSION" ]; then
     exit 1
 fi
 
+# What //go:embed takes: this release's binaries and nothing else, so an
+# executable cannot carry an older release's core by accident.
+CORES=go/internal/cores/data
+rm -f "$CORES"/*.bin
+cp dist/release/*.bin "$CORES"/
+
 # Every zip of this release goes first. One from an earlier run holds the
 # cores dist/release carried then, and staging has replaced those; mkrelease
 # reads the names alone and cannot tell the two apart.
 mkdir -p "$OUT"
 rm -f "$OUT"/ym-to-ymx-*-v"$VERSION".zip
 
-for rid in $RIDS; do
-    case "$rid" in
-        win-*) exe=ym-to-ymx.exe; launcher=ymxplay.cmd ;;
-        *)     exe=ym-to-ymx;     launcher=ymxplay.sh  ;;
+for target in $TARGETS; do
+    case "$target" in
+        win-*)   os=windows; exe=ym-to-ymx.exe; launcher=ymxplay.cmd ;;
+        osx-*)   os=darwin;  exe=ym-to-ymx;     launcher=ymxplay.sh  ;;
+        linux-*) os=linux;   exe=ym-to-ymx;     launcher=ymxplay.sh  ;;
+        *) echo "publish: $target is not a platform this builds" >&2; exit 1 ;;
     esac
-    # dotnet publish leaves what it finds, and this directory is where a
-    # built tool gets tried out, so the build starts from an empty one
-    rm -rf "$OUT/$rid"
-    dotnet publish dotnet -c Release -r "$rid" --self-contained true \
-        -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true \
-        -p:AssemblyName=ym-to-ymx -p:DebugType=none \
-        -o "$OUT/$rid" >/dev/null
-    cp "ymx/$launcher" "$OUT/$rid/"
-    echo "$OUT/$rid/$exe: $(wc -c < "$OUT/$rid/$exe" | tr -d ' ') bytes"
+    case "$target" in
+        *-x64)   arch=amd64 ;;
+        *-arm64) arch=arm64 ;;
+        *) echo "publish: $target names no architecture" >&2; exit 1 ;;
+    esac
+
+    # The directory is where a built tool gets tried out, so the build starts
+    # from an empty one.
+    rm -rf "$OUT/$target"
+    mkdir -p "$OUT/$target"
+    # CGO off is what makes the binary static and the cross-build work at
+    # all; -s -w drop the symbol and debug tables, which nothing here reads.
+    (cd go && CGO_ENABLED=0 GOOS=$os GOARCH=$arch \
+        go build -ldflags="-s -w" -o "$REPO/$OUT/$target/$exe" ./cmd/ym-to-ymx)
+    cp "ymx/$launcher" "$OUT/$target/"
+    echo "$OUT/$target/$exe: $(wc -c < "$OUT/$target/$exe" | tr -d ' ') bytes"
 
     # the two files by name: a glob carries whatever else sits there
-    zip="ym-to-ymx-$rid-v$VERSION.zip"
-    (cd "$OUT/$rid" && zip -q -X "../$zip" "$exe" "$launcher")
+    zip="ym-to-ymx-$target-v$VERSION.zip"
+    (cd "$OUT/$target" && zip -q -X "../$zip" "$exe" "$launcher")
     echo "$OUT/$zip: $(wc -c < "$OUT/$zip" | tr -d ' ') bytes"
 done
-echo "$OUT: $(echo $RIDS | wc -w | tr -d ' ') platforms"
+echo "$OUT: $(echo $TARGETS | wc -w | tr -d ' ') platforms"

@@ -11,8 +11,8 @@
 # contract another system follows.
 #
 # It also carries in the standalone ym-to-ymx zips that ymx/publish.sh
-# builds into dist/standalone, one per platform, taking those named for
-# this release. publish.sh embeds the staged binaries and reads the
+# builds into dist/standalone, one per platform - six of them - taking
+# those named for this release. publish.sh embeds the staged binaries and reads the
 # release version out of dist/release/MANIFEST.txt, so it runs after a
 # staging run and before the publishing one:
 #
