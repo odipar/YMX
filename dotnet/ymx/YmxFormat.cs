@@ -21,18 +21,28 @@ namespace Ymx
         /// numerically.</summary>
         public const int Version = 0x0007;
 
-        /// <summary>The released binaries' patch number: it moves when
-        /// the binaries change and the format does not - an optimized
-        /// player, a fixed stub. The format version above is the
-        /// compatibility gate; this number never reaches the format
-        /// word.</summary>
-        public const int Patch = 2;
+        /// <summary>
+        /// The binaries' own version, which moves when they change and
+        /// stands when they do not. It is three plain numbers rather than
+        /// a packed word because it reaches no file: the format version
+        /// above is the compatibility gate a header carries and a player
+        /// checks, and this one names a set of binaries. The two moved
+        /// together until 0.8, so a release before it reads as its format
+        /// version and a patch.
+        /// </summary>
+        public const int ReleaseMajor = 0;
 
-        /// <summary>The release's version as prose: the format version,
-        /// then the patch, a dot between them.</summary>
+        /// <summary>The release's minor number. See ReleaseMajor.</summary>
+        public const int ReleaseMinor = 8;
+
+        /// <summary>The release's patch number. See ReleaseMajor.</summary>
+        public const int Patch = 0;
+
+        /// <summary>The release's version as prose,
+        /// major.minor.patch.</summary>
         public static string ReleaseName()
         {
-            return VersionName() + "." + Patch;
+            return ReleaseMajor + "." + ReleaseMinor + "." + Patch;
         }
 
         /// <summary>A version word as prose: VersionName(0x0102) reads

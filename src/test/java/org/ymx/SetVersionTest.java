@@ -1,6 +1,7 @@
 package org.ymx;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -37,7 +38,7 @@ final class SetVersionTest {
     @Test
     void aBumpRewritesEverySite(@TempDir Path scratch) throws IOException {
         copySites(scratch);
-        SetVersion.set(scratch, "1.12");
+        SetVersion.set(scratch, "1.12", true);
         assertTrue(Files.readString(scratch.resolve(FILES.get(0)))
                 .contains("VERSION = 0x010C;"), "the Java constant");
         assertTrue(Files.readString(scratch.resolve(FILES.get(1)))
@@ -51,22 +52,44 @@ final class SetVersionTest {
         assertTrue(spec.contains("the version is $010C - 1.12;"),
                 "SPEC §9.1's bullet");
         assertTrue(Files.readString(scratch.resolve(FILES.get(0)))
-                .contains("PATCH = 0;"), "the Java patch, defaulted");
-        assertTrue(Files.readString(scratch.resolve(FILES.get(1)))
-                .contains("Patch = 0;"), "the C# patch, defaulted");
+                .contains("PATCH = " + YmxFormat.PATCH + ";"),
+                "-format leaves the release's patch alone");
     }
 
+    /**
+     * The release moves on its own, and the format word stays where it
+     * was. The two were one number until 0.8, and a tune packed at a
+     * format version has to keep playing across every release of it.
+     */
     @Test
-    void aPatchIsWrittenWhereTheVersionGivesOne(@TempDir Path scratch)
+    void aReleaseMovesWithoutTouchingTheFormat(@TempDir Path scratch)
             throws IOException {
         copySites(scratch);
-        SetVersion.set(scratch, "0.4.7");
-        assertTrue(Files.readString(scratch.resolve(FILES.get(0)))
-                .contains("PATCH = 7;"), "the Java patch");
-        assertTrue(Files.readString(scratch.resolve(FILES.get(1)))
-                .contains("Patch = 7;"), "the C# patch");
-        assertTrue(Files.readString(scratch.resolve(FILES.get(2)))
-                .contains("equ     $0004"), "the format version, unmoved");
+        String before = Files.readString(scratch.resolve(FILES.get(2)));
+        SetVersion.set(scratch, "0.9.3", false);
+        String java = Files.readString(scratch.resolve(FILES.get(0)));
+        assertTrue(java.contains("RELEASE_MAJOR = 0;"), "the Java major");
+        assertTrue(java.contains("RELEASE_MINOR = 9;"), "the Java minor");
+        assertTrue(java.contains("PATCH = 3;"), "the Java patch");
+        String cs = Files.readString(scratch.resolve(FILES.get(1)));
+        assertTrue(cs.contains("ReleaseMajor = 0;"), "the C# major");
+        assertTrue(cs.contains("ReleaseMinor = 9;"), "the C# minor");
+        assertTrue(cs.contains("Patch = 3;"), "the C# patch");
+        assertEquals(before, Files.readString(scratch.resolve(FILES.get(2))),
+                "a release bump wrote to the player's format equate");
+        assertTrue(java.contains("VERSION = 0x%04X;".formatted(YmxFormat.VERSION)),
+                "a release bump moved the format constant");
+    }
+
+    /** A patch is the release's, so -format refuses one. */
+    @Test
+    void theFormatTakesNoPatch(@TempDir Path scratch) throws IOException {
+        copySites(scratch);
+        IllegalArgumentException refused = assertThrows(
+                IllegalArgumentException.class,
+                () -> SetVersion.set(scratch, "0.9.3", true));
+        assertTrue(String.valueOf(refused.getMessage()).contains("-release"),
+                String.valueOf(refused.getMessage()));
     }
 
     @Test
@@ -79,7 +102,7 @@ final class SetVersionTest {
         byte[] player = Files.readAllBytes(scratch.resolve(FILES.get(2)));
         IllegalArgumentException refused = assertThrows(
                 IllegalArgumentException.class,
-                () -> SetVersion.set(scratch, "0.5"));
+                () -> SetVersion.set(scratch, "0.5", true));
         assertTrue(String.valueOf(refused.getMessage())
                 .contains("the site has moved"), String.valueOf(refused));
         assertArrayEquals(player, Files.readAllBytes(scratch.resolve(FILES.get(2))),
@@ -92,13 +115,13 @@ final class SetVersionTest {
                 "١.٢", "1. 2", ".4", "1.2."}) {
             IllegalArgumentException refused = assertThrows(
                     IllegalArgumentException.class,
-                    () -> SetVersion.set(scratch, bad), "\"" + bad + "\"");
+                    () -> SetVersion.set(scratch, bad, true), "\"" + bad + "\"");
             assertTrue(String.valueOf(refused.getMessage()).startsWith("usage:"),
                     "\"" + bad + "\" refused with: " + refused.getMessage());
         }
         IllegalArgumentException outOfRange = assertThrows(
                 IllegalArgumentException.class,
-                () -> SetVersion.set(scratch, "256.0"));
+                () -> SetVersion.set(scratch, "256.0", true));
         assertTrue(String.valueOf(outOfRange.getMessage()).contains("0 to 255"),
                 String.valueOf(outOfRange.getMessage()));
     }

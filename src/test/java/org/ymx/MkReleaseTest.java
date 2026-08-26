@@ -33,12 +33,13 @@ final class MkReleaseTest {
     }
 
     /** The names, the tag and the manifest carry the release version -
-     * the format version and the patch. Spelled out of the constants
-     * rather than through the helpers, so a helper that drops the patch
-     * fails here. */
+     * the binaries' own three numbers, not the format version. Spelled
+     * out of the constants rather than through the helpers, so a helper
+     * that drops one of them fails here. */
     @Test
     void everyPublishedNameCarriesTheReleaseVersion() {
-        String release = YmxFormat.versionName() + "." + YmxFormat.PATCH;
+        String release = YmxFormat.RELEASE_MAJOR + "." + YmxFormat.RELEASE_MINOR
+                + "." + YmxFormat.PATCH;
         assertEquals("ymxsndh-k2-v" + release + ".bin",
                 new MkRelease.Variant(2, false, false).name());
         assertEquals("binaries-v" + release, MkRelease.tag());

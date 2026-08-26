@@ -18,7 +18,7 @@ defaults quoted below are the constants' own values.
 | `ymx/mkprg.sh` | `org.ymx.MkPrg` | wrap an SNDH file in a runnable program |
 | `ymx/mkcores.sh` | `org.ymx.MkCores` | assemble the prebuilt binaries (needs rmac) |
 | `ymx/mkrelease.sh` | `org.ymx.MkRelease` | stage and publish the binaries release |
-| `ymx/setversion.sh` | `org.ymx.SetVersion` | rewrite the format version at every site that carries it |
+| `ymx/setversion.sh` | `org.ymx.SetVersion` | rewrite the format version, or the release version, at every site it reaches |
 | `ym/ym_sndh.sh` | `org.ym6.YmSndh` | pack a set of `.ym` dumps and combine, in one command |
 | `ym/play.sh` | `org.ym6.Play` | pack, build a program, run it under Hatari |
 | `ymx/test/rig.sh` | `org.ymx.rig.PlayerTests` | the emulator test battery |
@@ -197,22 +197,28 @@ deleted by hand: the tool removes no published release.
 
 ### setversion.sh
 
-Rewrites the version at every site that carries it: the format constants
-in `org.ymx.YmxFormat`, `dotnet/ymx/YmxFormat.cs` and `68k/YMX.S`,
-SPEC.md's three mentions, and the two patch constants. The format
-version word is the major in the high byte, the minor in the low, so
-versions order numerically; the patch is the released binaries' own
-number, which never reaches that word. A site whose surrounding text no
-longer matches fails loudly, and the consistency tests read the same
-sites back.
+Rewrites one of the two versions at every site it reaches.
 
-    ymx/setversion.sh MAJOR.MINOR[.PATCH]
+    ymx/setversion.sh -format MAJOR.MINOR
+    ymx/setversion.sh -release MAJOR.MINOR[.PATCH]
 
-The patch defaults to 0, so a format bump clears it. After a bump: write
-this release's section in `doc/RELEASES.md`, reassemble the cores
-(`mkcores.sh`), repin the corpus (`mvn test -Dymx.pin=refresh`) and
-publish (`mkrelease.sh -publish`). A patch alone - the binaries changed,
-the format did not - needs no repin.
+| flag | what it moves |
+|---|---|
+| `-format` | the compatibility gate: the constants in `org.ymx.YmxFormat`, `dotnet/ymx/YmxFormat.cs` and `68k/YMX.S`, and SPEC.md's three mentions |
+| `-release` | the binaries' own version: three numbers in each tree |
+
+The format version word is the major in the high byte, the minor in the
+low, so versions order numerically. It is in every header and the player
+checks it, so moving it stops every tune already packed from playing. The
+release version reaches no file and moving it breaks nothing. A site
+whose surrounding text no longer matches fails loudly, and the
+consistency tests read the same sites back.
+
+A release patch defaults to 0, so `-release 0.9` clears it. After
+`-format`: write this release's section in `doc/RELEASES.md`, reassemble
+the cores (`mkcores.sh`), repin the corpus (`mvn test
+-Dymx.pin=refresh`) and publish (`mkrelease.sh -publish`). `-release`
+needs no repin, the tunes being untouched.
 
 ## Listening
 

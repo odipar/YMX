@@ -21,6 +21,32 @@ namespace Ymx
         /// name.</summary>
         private sealed record Site(string File, string Pattern, string Template);
 
+        /// <summary>The release's own version: three numbers, in both
+        /// trees.</summary>
+        private static readonly List<Site> ReleaseSites = new()
+        {
+            new Site("src/main/java/org/ymx/YmxFormat.java",
+                    "public static final int RELEASE_MAJOR = \\d+;",
+                    "public static final int RELEASE_MAJOR = {3};"),
+            new Site("src/main/java/org/ymx/YmxFormat.java",
+                    "public static final int RELEASE_MINOR = \\d+;",
+                    "public static final int RELEASE_MINOR = {4};"),
+            new Site("src/main/java/org/ymx/YmxFormat.java",
+                    "public static final int PATCH = \\d+;",
+                    "public static final int PATCH = {2};"),
+            new Site("dotnet/ymx/YmxFormat.cs",
+                    "public const int ReleaseMajor = \\d+;",
+                    "public const int ReleaseMajor = {3};"),
+            new Site("dotnet/ymx/YmxFormat.cs",
+                    "public const int ReleaseMinor = \\d+;",
+                    "public const int ReleaseMinor = {4};"),
+            new Site("dotnet/ymx/YmxFormat.cs",
+                    "public const int Patch = \\d+;",
+                    "public const int Patch = {2};"),
+        };
+
+        /// <summary>The format version: the word a header carries and a
+        /// player checks.</summary>
         private static readonly List<Site> Sites = new()
         {
             new Site("src/main/java/org/ymx/YmxFormat.java",
@@ -43,23 +69,27 @@ namespace Ymx
             new Site("doc/SPEC.md",
                     "the version is \\$[0-9A-F]{4} - \\d+\\.\\d+;",
                     "the version is ${0:X4} - {1};"),
-            new Site("src/main/java/org/ymx/YmxFormat.java",
-                    "public static final int PATCH = \\d+;",
-                    "public static final int PATCH = {2};"),
-            new Site("dotnet/ymx/YmxFormat.cs",
-                    "public const int Patch = \\d+;",
-                    "public const int Patch = {2};"),
         };
+
+        internal const string UsageText =
+                "usage: setversion.sh -format MAJOR.MINOR\n"
+                + "       setversion.sh -release MAJOR.MINOR[.PATCH]";
 
         public static void Main(string[] args)
         {
-            if (args.Length != 1)
+            if (args.Length != 2)
             {
-                throw Tools.Fail("usage: setversion.sh MAJOR.MINOR[.PATCH]");
+                throw Tools.Fail(UsageText);
+            }
+            bool format = args[0] == "-format";
+            bool release = args[0] == "-release";
+            if (!format && !release)
+            {
+                throw Tools.Fail(UsageText);
             }
             try
             {
-                Set(Tools.Repo(), args[0]);
+                Set(Tools.Repo(), args[1], format);
             }
             catch (ArgumentException e)
             {
@@ -67,33 +97,43 @@ namespace Ymx
             }
         }
 
-        /// <summary>Rewrites every site under the repo to the version,
-        /// given as MAJOR.MINOR[.PATCH] - the patch defaults to 0. Every
-        /// site is matched before the first write, so a refusal leaves
-        /// every file as it was.</summary>
-        public static void Set(string repo, string version)
+        /// <summary>
+        /// Rewrites one version under the repo, given as
+        /// MAJOR.MINOR[.PATCH] - the patch defaults to 0. The flag picks
+        /// which: the format version a header carries and a player checks,
+        /// or the binaries' own. The two are set apart because moving the
+        /// format one is a break for every tune already packed, and moving
+        /// the release one is not. Every site is matched before the first
+        /// write, so a refusal leaves every file as it was.
+        /// </summary>
+        public static void Set(string repo, string version, bool format)
         {
             if (!Regex.IsMatch(version,
                     "^[0-9]{1,3}\\.[0-9]{1,3}(\\.[0-9]{1,4})?\\z"))
             {
-                throw new ArgumentException(
-                        "usage: setversion.sh MAJOR.MINOR[.PATCH]");
+                throw new ArgumentException(UsageText);
             }
             string[] parts = version.Split('.');
             int major = int.Parse(parts[0]);
             int minor = int.Parse(parts[1]);
             int patch = parts.Length > 2 ? int.Parse(parts[2]) : 0;
+            if (format && parts.Length > 2)
+            {
+                throw new ArgumentException("setversion: the format version"
+                        + " is MAJOR.MINOR - a patch is the release's, and"
+                        + " -release sets it");
+            }
             if (major > 255 || minor > 255)
             {
-                throw new ArgumentException("setversion: each half of the"
-                        + " format version is a byte, 0 to 255");
+                throw new ArgumentException("setversion: each half of a"
+                        + " version is a byte, 0 to 255");
             }
             int word = (major << 8) | minor;
             string name = major + "." + minor;
 
             var texts = new Dictionary<string, string>();
             var order = new List<string>();
-            foreach (Site site in Sites)
+            foreach (Site site in (format ? Sites : ReleaseSites))
             {
                 if (!texts.TryGetValue(site.File, out string? text))
                 {
@@ -109,7 +149,8 @@ namespace Ymx
                             + site.Pattern + "\" - the site has moved");
                 }
                 texts[site.File] = text.Replace(found[0].Value,
-                        string.Format(site.Template, word, name, patch));
+                        string.Format(site.Template, word, name, patch,
+                                major, minor));
             }
             foreach (string file in order)
             {
@@ -122,10 +163,9 @@ namespace Ymx
                     throw new ArgumentException("setversion: " + file + ": "
                             + e.Message);
                 }
-                Console.WriteLine(file + ": " + (file.EndsWith("YmxFormat.java")
-                        || file.EndsWith("YmxFormat.cs")
-                        ? "version " + name + "." + patch
-                        : "format version " + name));
+                Console.WriteLine(file + ": " + (format
+                        ? "format version " + name
+                        : "release " + name + "." + patch));
             }
         }
 
