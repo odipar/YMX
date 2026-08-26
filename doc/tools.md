@@ -143,6 +143,22 @@ the output.
 | `-m` | drop `YMXDONE.MRK` on exit, for scripted runs |
 | `-perf` `-nomask` `-tTitle` `-cComposer` `-Nnamesfile` | as mksndh.sh's |
 
+The program picks its own clock when it runs, off the machine it finds:
+
+| the machine refreshes at | the tune's rate | the calls come from |
+|---|---|---|
+| the tune's rate | any | the VBL |
+| any other rate | any | Timer C |
+
+The VBL is the screen's own, so a call on it holds one place on the
+screen and nothing walks - what a demo wants when it draws to the music,
+and what makes a `-perf` bar stand still. Timer C counts the MFP's
+crystal, which the video clock does not track, so it carries any rate at
+a third of a scanline a frame of drift. A 50 Hz tune on a PAL machine
+takes the VBL; the same tune on a 60 Hz machine takes Timer C. A set that
+claims Timer C for an effect channel leaves none to tick from and takes
+the VBL either way.
+
 ### mkcores.sh
 
 Runs rmac to assemble the three SNDH cores for one flag combination and,

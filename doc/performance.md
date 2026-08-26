@@ -151,7 +151,7 @@ taken again.
 |---|---:|
 | player, unit size 2 | 3,412 |
 | ST4 decoder | 288 |
-| PRG stub | 2,984 |
+| PRG stub | 3,038 |
 | workspace, `N` = 960 | 25,658 |
 | workspace, `N` = 1776 | 46,058 |
 | workspace, `N` = 2520 (the cap) | 64,658 |
@@ -218,6 +218,27 @@ The wait sits before the red mark, so it costs the figures above
 nothing: red to yellow is still the frame's own work. It does burn the
 machine while it spins - up to 30,052 cycles was measured - which a
 `-perf` build does and a plain one does not.
+
+The wait cannot be skipped for a timer host alone. The player is not told
+which clock calls it, and the counter cannot tell a timer host that landed
+in a border from a VBL host, whose bar is invisible without the wait: a
+build that stopped waiting once it had seen the display running painted a
+bar in 1 frame of 499 under the VBL, because one call delayed into the
+display turned the wait off for good.
+
+None of it arises where the VBL carries the calls, which is what the PRG
+stub picks whenever the machine refreshes at the tune's own rate. The
+same program, the same tune, with only the rate word patched:
+
+| the tune's rate against a 50 Hz screen | drift of the call | the stub picked |
+|---|---:|---|
+| 50 Hz, the screen's own | -0.6 cycles a frame | the VBL |
+| 60 Hz | -63.7 cycles a frame | Timer C |
+
+A `-perf` build also clears the screen before its banner, since the
+monitor paints the background colour and the pixels the desktop left
+behind stand in front of it: without the clear the bars show in the
+borders alone.
 
 ## What moves these numbers
 

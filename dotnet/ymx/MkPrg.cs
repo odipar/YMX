@@ -32,6 +32,13 @@ namespace Ymx
         /// for the calls.</summary>
         public const int StubFlagVbl = 2;
 
+        /// <summary>
+        /// Flag bit 2: clear the screen before the banner. A -perf build
+        /// paints the background colour, and the desktop's own pixels stand
+        /// in front of it: the bars then show in the borders alone.
+        /// </summary>
+        public const int StubFlagClear = 4;
+
         public sealed record Options(string Output, List<string> Tunes,
                 string? Title, string? Composer, List<string>? Names,
                 bool Perf, bool MaskBurst, bool Marker);
@@ -118,8 +125,9 @@ namespace Ymx
                         + " which is a 50 Hz clock, so this set needs a host of"
                         + " its own");
             }
-            PutWord(patched, StubFlags,
-                    (marker ? StubFlagMarker : 0) | (timerC ? StubFlagVbl : 0));
+            PutWord(patched, StubFlags, (marker ? StubFlagMarker : 0)
+                    | (timerC ? StubFlagVbl : 0)
+                    | (PaintsRaster(sndh) ? StubFlagClear : 0));
             PutWord(patched, StubRate, rate);
             program.Write(patched);
             program.Write(sndh);
@@ -163,6 +171,27 @@ namespace Ymx
 
         /// <summary>Whether FLAG~ marks Timer C as one the subtunes
         /// claim.</summary>
+        /// <summary>
+        /// Whether the core inside this SNDH file is a raster-monitor one,
+        /// read off the core's own descriptor rather than the option that
+        /// asked for one: the file may be a set a caller combined earlier,
+        /// and then the option says nothing about what is inside it.
+        /// </summary>
+        internal static bool PaintsRaster(byte[] sndh)
+        {
+            for (int at = 0; at + 4 <= sndh.Length; at += 2)
+            {
+                if (sndh[at] == 'Y' && sndh[at + 1] == 'M'
+                        && sndh[at + 2] == 'X' && sndh[at + 3] == 'C')
+                {
+                    int flags = at - MkSndh.CoreMagic + MkSndh.CoreFlags;
+                    return flags >= 0 && flags + 1 < sndh.Length
+                            && (MkSndh.Word(sndh, flags) & 1) != 0;
+                }
+            }
+            return false;
+        }
+
         internal static bool ClaimsTimerC(byte[] sndh)
         {
             int at = Position(sndh, "FLAG~");

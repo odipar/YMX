@@ -10,9 +10,15 @@
 #
 # The tunes are combined into an SNDH container first (ymx/mksndh.sh - the
 # canonical form of the player) and the PRG is a thin stub in front of
-# those same bytes: takeover, one play call per VBL, SPACE to quit, number
-# keys to switch subtunes. -m makes the program drop YMXDONE.MRK as it
-# exits, which is how ym/play.sh closes the emulator by itself.
+# those same bytes: takeover, SPACE to quit, number keys to switch subtunes.
+# -m makes the program drop YMXDONE.MRK as it exits, which is how
+# ym/play.sh closes the emulator by itself.
+#
+# The program picks the clock that carries the calls when it runs. Where
+# the machine refreshes at the tune's own rate the VBL carries them and
+# every call lands at one place on the screen; otherwise Timer C does, at
+# the system's 200 Hz with the rate accumulated against it, which carries
+# any rate at a third of a scanline a frame of drift.
 #
 # No assembler runs here: org.ymx.MkPrg prepends the prebuilt stub from
 # dist/ - doc/BINARIES.md is the contract. rmac is needed only the first

@@ -179,8 +179,27 @@ Position-independent, raw, even-sized. Fixed layout at its start:
 | 8 | 2 | descriptor version - **2** |
 | 10 | 2 | subtunes - patched by the combiner |
 | 12 | 4 | frames of subtune 1 when it plays once and stands alone - patched; 0 = play on |
-| 16 | 2 | flags - patched: bit 0 = drop `YMXDONE.MRK` on exit, bit 1 = tick from the VBL because the set claims Timer C |
+| 16 | 2 | flags - patched; the bits are below |
 | 18 | 2 | the tune rate in Hz - patched from the SNDH file's own timer tag; the assembler leaves 50 |
+
+The flags word:
+
+| bit | set by the combiner when | the stub then |
+|---:|---|---|
+| 0 | a scripted run asked for it | drops `YMXDONE.MRK` as it exits |
+| 1 | the set claims Timer C, or the caller asked for the VBL | ticks play from the VBL rather than Timer C |
+| 2 | the core is a `-perf` one | clears the screen before its banner |
+
+Bit 1 carries two cases because the stub does one thing for both. A set
+that claims Timer C leaves the stub no timer to tick from; a caller that
+asks for the VBL wants the play call at a fixed place on the screen,
+which Timer C cannot give, since it counts a crystal the video clock does
+not track. The VBL is a 50 Hz clock either way, so a set at any other
+rate stops the combine.
+
+Bit 2 is the raster monitor's: it paints the background colour, and the
+pixels the desktop left on the screen stand in front of it, so the bars
+show in the borders alone until the screen is cleared.
 
 The stub reaches the SNDH file at its own last byte: the file is appended
 directly after it, at an even position - the reason the stub must be

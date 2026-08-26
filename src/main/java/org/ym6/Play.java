@@ -87,8 +87,8 @@ public final class Play {
             yms.add(Path.of(args[i]));
         }
         if (yms.isEmpty()) {
-            throw Tools.fail("usage: play.sh [-perf] [-nomask] [-nRING] [-cCHUNK]"
-                    + " [-kUNIT] [-o] song.ym...");
+            throw Tools.fail("usage: play.sh [-perf] [-nomask] [-nRING]"
+                    + " [-cCHUNK] [-kUNIT] [-o] song.ym...");
         }
         for (Path ym : yms) {
             if (!Files.isRegularFile(ym)) {
