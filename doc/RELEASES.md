@@ -11,74 +11,37 @@ patch number the binaries carry of their own. The format version is the
 compatibility gate: tunes packed at one format version play on every
 patch of it.
 
+A section leads with the player's size, the stub's, and the format
+version, and then itemises what changed - one item to a change, at the
+level of what it means for someone using the binaries. The page is read
+by someone deciding whether to take the release, not by someone
+reviewing it: the commits carry the reasoning and the measurements, and
+the section carries the list.
+
 ## 0.7.2
 
 The player is 3,434 bytes at unit size 2, where 0.7.1 carried 3,412, and
-the PRG stub 3,038 where it carried 2,992. The format is 0.7 still: a
-tune packed for 0.7.1 plays here untouched.
+the PRG stub 3,038 where it carried 2,992. Format 0.7 still: a tune
+packed for 0.7.1 plays here untouched.
 
-**A tick that lands inside a play call is dropped.** Timer C's handler in
-the stub clears the in-service bit and drops to level 3 before calling
-play, so the file's own timers preempt the frame write. That also left
-Timer C free to fire inside the call it was running, and the player holds
-one tune's state: a second call inside the first decoded from a ring the
-first was still filling. Measured with a stub whose call burns past the
-tick interval, one tune, two builds differing only in the guard: without
-it the tune stopped after 21 calls, with it the tune played all 413 of a
-620-frame run at the rate the machine could carry. ST_BUSY marks a call
-in progress, set at level 6 before the level drops and cleared with it
-raised again, and a tick that finds it set returns without playing and
-without accumulating.
-
-**A claim goes back through the timer it was taken on.** YMX_init called
-ymx_assign before the claim loop's ymx_handback, and ymx_assign copies
-the new timer's row over the fields ymx_handback reaches a timer through.
-Init twice without a stop, with a channel moved from one timer to
-another, and the release handed back the timer it moved to while the one
-it moved from kept counting, its vector still in the blob. Every channel
-is now released before the new map lands.
-
-**The player's assumptions name all four timers.** Assumption 5 listed
-the vectors and control bits of Timer A and Timer D. Stream T maps a
-channel onto any of the four, so a host saving what the list named, then
-playing a tune on Timer C, left the system's 200 Hz clock disabled. Both
-hosts in this tree already saved all four; the list now says so, and says
-why no data register is in it.
-
-**The stub hands the machine back as it found it.** It saved TADR, TBDR
-and TDDR and wrote them back, but a data register reads as the count the
-timer has reached and not the value it reloads from. Timer C's count was
-already written back as the system's own 192; Timer D's is now written
-back as the serial divider's 2, measured under Hatari as the value TOS
-writes at boot. At exit the MFP reads TCDR $C0, TDDR $02, TCDCR $51.
-
-**The PCM tick estimate was a sixth high.** The raster monitor's yellow
-bar adds a fixed number of 10-cycle quanta per tick, and the PCM tick's
-was 21 against a measured 164 cycles where the other two sat near their
-own measurements. It is 18 now, and the end tick 20. Only the six -perf
-cores carry the accumulator, so only those six changed bytes for it.
-
-**The program picks the clock that suits the tune.** It reads the
-resolution at $FF8260 and the sync bit at $FF820A, and the VBL carries
-the calls where the machine refreshes at the tune's own rate, Timer C
-where it does not. A 50 Hz tune on a PAL machine plays with every call at
-one place on the screen; the same tune on a 60 Hz machine plays from
-Timer C at its own rate rather than 20 per cent fast. Measured on both,
-with the US and UK EmuTOS ROMs: 0 Timer C ticks and a bar that never
-moves on the 50 Hz machine, 3,466 ticks and every gap between calls
-exactly four of them on the 60 Hz one.
-
-**A -perf build clears the screen** before its banner, descriptor flag
-bit 2, read off the core's own descriptor rather than the option that
-asked for it. The monitor paints the background colour, and the pixels
-the desktop left behind stood in front of it, so the bars showed in the
-borders alone.
-
-**The release carries the tool.** A standalone `ym-to-ymx` for Windows,
-macOS and Linux, one zip per platform, each with the script that runs it
-under Hatari. It turns a YM dump into a `.ymx`, an SNDH file or a TOS
-program, carries these binaries inside it, and needs neither a
-repository nor an SDK.
+- A tick that arrives while a play call is still running is dropped
+  rather than run inside it. A machine too slow for its tune loses
+  frames instead of the player losing its place.
+- A channel moved from one timer to another hands back the timer it was
+  taken on, not the one it moved to.
+- The player's assumptions name all four MFP timers. A host that saved
+  only the two the old list named, then played a tune on Timer C, left
+  the system's 200 Hz clock disabled.
+- The stub no longer restores timer data registers it cannot read back,
+  and hands the MFP over as it found it.
+- The raster monitor's PCM tick estimate was a sixth high. The six
+  -perf cores change bytes for it; the other six and the stub do not.
+- The program picks the clock that suits the tune: the VBL where the
+  machine refreshes at the tune's own rate, Timer C where it does not.
+- A -perf build clears the screen, so the bars show across it rather
+  than in the borders alone.
+- The release carries a standalone ym-to-ymx for Windows, macOS and
+  Linux, each zipped with the script that runs it under Hatari.
 
 ## 0.7.1
 
