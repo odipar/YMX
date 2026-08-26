@@ -6,10 +6,12 @@ release it is staging and publishes it as the release notes, so the
 release page says why the release exists. A release without a section
 here is not published.
 
-A release version is the format version the binaries read, then the
-patch number the binaries carry of their own. The format version is the
-compatibility gate: tunes packed at one format version play on every
-patch of it.
+A release version is the binaries' own, and moves when they change. The
+format version is a separate number, the compatibility gate a header
+carries and a player checks: tunes packed at one format version play on
+every release that reads it. The two were one number until 0.8, so a
+release before it reads as its format version and a patch, and 0.7.2's
+binaries and 0.8's read the same 0.7 files.
 
 A section leads with the player's size, the stub's, and the format
 version, and then itemises what changed - one item to a change, at the
@@ -17,6 +19,22 @@ level of what it means for someone using the binaries. The page is read
 by someone deciding whether to take the release, not by someone
 reviewing it: the commits carry the reasoning and the measurements, and
 the section carries the list.
+
+## 0.8.0
+
+The player is 3,434 bytes at unit size 2, where 0.7.2 carried 3,434, and
+the PRG stub 3,038 where it carried 3,038. Format 0.7 still: a tune
+packed for any earlier release plays here untouched.
+
+- The release version is the binaries' own now, and the format version is
+  a separate number. They were one until here, which is why this release
+  is 0.8.0 and not 0.7.3, and why it reads the same 0.7 files 0.7.2 did.
+- `ymx/setversion.sh` takes `-format` or `-release`, so the number that
+  breaks every packed tune cannot be moved by reaching for the one that
+  breaks nothing.
+- The binaries are byte-identical to 0.7.2's. Nothing in the player, the
+  stub or the packer changed; this release renames what was already
+  there.
 
 ## 0.7.2
 

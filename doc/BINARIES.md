@@ -16,14 +16,13 @@ Two kinds of binary:
 | `ymxsndh-k1-v<release>.bin`, `-k2`, `-k4` | an **SNDH core**: the player and its SNDH glue, one per ST4 unit size |
 | `ymxprg-v<release>.bin` | the **PRG stub**: a TOS program that drives an appended SNDH file |
 
-Every name ends with the release version - the format version of the
-tunes the binary serves, then the release's own patch number, which
-moves when the binaries change and the format does not. A file name
-therefore states which release it came from, and the core's descriptor
-carries the format version alone (§1), which a combiner matches. A
-`-perf` or `-nomask` in the name marks a core assembled with the raster
-monitor in, or with the frame write unmasked; the flags word below says
-which, so a combiner verifies rather than parses names.
+Every name ends with the release version, the binaries' own, which moves
+when they change. It is not the format version: a name says which
+release a file came from, and the format that file reads is in the core's
+descriptor (§1), which a combiner matches, and in MANIFEST.txt, which
+names both. A `-perf` or `-nomask` in the name marks a core assembled
+with the raster monitor in, or with the frame write unmasked; the flags
+word below says which, so a combiner verifies rather than parses names.
 
 Every variant is published at
 [github.com/odipar/YMX/releases](https://github.com/odipar/YMX/releases)

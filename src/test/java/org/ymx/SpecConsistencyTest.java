@@ -360,13 +360,14 @@ final class SpecConsistencyTest {
         assertTrue(patch.find(), "YmxFormat.cs no longer declares Patch");
         assertEquals(YmxFormat.PATCH, Integer.parseInt(patch.group(1)),
                 "the C# Patch differs from the Java one");
-        assertEquals(name + "." + YmxFormat.PATCH, YmxFormat.releaseName(),
-                "the release name is the format version plus the patch");
+        assertEquals(YmxFormat.RELEASE_MAJOR + "." + YmxFormat.RELEASE_MINOR
+                        + "." + YmxFormat.PATCH, YmxFormat.releaseName(),
+                "the release name is the binaries' own three numbers");
     }
 
     /** The prose around the two constants, and terminology.md's row for
      * the release version, name no version: {@code ymx/setversion.sh}
-     * rewrites eight sites, and a version spelled outside them goes
+     * rewrites twelve sites, and a version spelled outside them goes
      * stale at the next bump with nothing to catch it. */
     @Test
     void theProseAroundTheConstantsNamesNoVersion() throws IOException {
@@ -406,7 +407,7 @@ final class SpecConsistencyTest {
         Matcher version = Pattern.compile("\\d+\\.\\d+").matcher(text);
         String found = version.find() ? version.group() : "";
         assertTrue(found.isEmpty(), what + " names version " + found
-                + " - ymx/setversion.sh rewrites eight sites and this is not"
+                + " - ymx/setversion.sh rewrites twelve sites and this is not"
                 + " one of them, so say what the version is made of rather"
                 + " than which one it is");
     }

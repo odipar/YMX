@@ -34,13 +34,17 @@ class YmxBannerTest {
         }
     }
 
-    /** And the release name is the one the binaries carry. */
+    /**
+     * And the release name is the binaries' own three numbers, which the
+     * format version no longer decides: a banner reading the format
+     * version would name a number that stands still across releases.
+     */
     @Test
     void theBannerNamesThisRelease() {
-        assertEquals(YmxFormat.versionName() + "." + 1,
-                YmxFormat.releaseName().replaceAll("\\.\\d+$", ".1"),
-                "the release name is the format version and a patch");
-        assertTrue(YmxFormat.releaseName().startsWith(YmxFormat.versionName()),
-                "the release name opens with the format version");
+        assertEquals(YmxFormat.RELEASE_MAJOR + "." + YmxFormat.RELEASE_MINOR
+                        + "." + YmxFormat.PATCH, YmxFormat.releaseName(),
+                "the release name is not the three numbers it is built from");
+        assertTrue(YmxFormat.releaseName().matches("\\d+\\.\\d+\\.\\d+"),
+                "the release name reads " + YmxFormat.releaseName());
     }
 }

@@ -80,16 +80,25 @@ public final class YmxFormat {
      * doc/SPEC.md defines the layout. */
     public static final int VERSION = 0x0007;
 
-    /** The released binaries' patch number: it moves when the binaries
-     * change and the format does not - an optimized player, a fixed
-     * stub. The format version above is the compatibility gate; this
-     * number never reaches the format word. */
-    public static final int PATCH = 2;
+    /**
+     * The binaries' own version, which moves when they change and stands
+     * when they do not. It is three plain numbers rather than a packed
+     * word because it reaches no file: the format version above is the
+     * compatibility gate a header carries and a player checks, and this
+     * one names a set of binaries. The two moved together until 0.8, so
+     * a release before it reads as its format version and a patch.
+     */
+    public static final int RELEASE_MAJOR = 0;
 
-    /** The release's version as prose: the format version, then the
-     * patch, a dot between them. */
+    /** The release's minor number. See {@link #RELEASE_MAJOR}. */
+    public static final int RELEASE_MINOR = 8;
+
+    /** The release's patch number. See {@link #RELEASE_MAJOR}. */
+    public static final int PATCH = 0;
+
+    /** The release's version as prose, major.minor.patch. */
     public static String releaseName() {
-        return versionName() + "." + PATCH;
+        return RELEASE_MAJOR + "." + RELEASE_MINOR + "." + PATCH;
     }
 
     /** A version word as prose: {@code versionName(0x0102)} reads "1.2". */
