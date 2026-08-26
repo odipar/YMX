@@ -1,0 +1,8 @@
+The prebuilt 68000 binaries a standalone build carries.
+
+ymx/publish.sh copies dist/release/*.bin here before it builds, so the
+executable needs neither a repository nor an SDK. A tree whose dist/ was
+empty carries none, and the combiners then resolve them as they always
+have, through YMX_CORE, YMX_STUB and YMX_REPO.
+
+The .bin files are build output and are not committed.

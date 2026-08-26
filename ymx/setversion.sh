@@ -11,9 +11,9 @@
 # from playing. The release version is the binaries' own, three plain
 # numbers that reach no file, and moving it breaks nothing.
 #
-# -format patches six sites: the Java, C# and 68k constants and SPEC.md's
-# three mentions. -release patches six more, the three numbers in each
-# tree. A site whose surrounding text no longer matches fails loudly, and
+# -format patches seven sites: the Java, C#, Go and 68k constants and
+# SPEC.md's three mentions. -release patches nine more, the three numbers
+# in each of the three trees. A site whose surrounding text no longer matches fails loudly, and
 # the consistency tests read the same sites back. A release patch defaults
 # to 0, so -release 0.9 clears it.
 #

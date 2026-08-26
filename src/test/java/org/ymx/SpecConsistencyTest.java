@@ -407,7 +407,7 @@ final class SpecConsistencyTest {
         Matcher version = Pattern.compile("\\d+\\.\\d+").matcher(text);
         String found = version.find() ? version.group() : "";
         assertTrue(found.isEmpty(), what + " names version " + found
-                + " - ymx/setversion.sh rewrites twelve sites and this is not"
+                + " - ymx/setversion.sh rewrites sixteen sites and this is not"
                 + " one of them, so say what the version is made of rather"
                 + " than which one it is");
     }

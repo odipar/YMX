@@ -11,9 +11,9 @@ import java.util.regex.Pattern;
 
 /**
  * {@code ymx/setversion.sh} - rewrite one of the two versions at every
- * site it reaches. The format version reaches six: the Java, C# and 68k
- * constants and SPEC.md's three mentions. The release version reaches six
- * more, three numbers in each tree. The two are set apart because moving
+ * site it reaches. The format version reaches seven: the Java, C#, Go and
+ * 68k constants and SPEC.md's three mentions. The release version reaches
+ * nine more, three numbers in each of the three trees. The two are set apart because moving
  * the format one stops every tune already packed from playing and moving
  * the release one breaks nothing.
  *
@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
  * skipped, and nothing is written unless every site matched.
  * {@code SpecConsistencyTest} reads the same sites back against
  * {@link YmxFormat#VERSION} and {@link YmxFormat#PATCH}, and holds the
- * prose around the constants to naming no version, so these twelve are
+ * prose around the constants to naming no version, so these sixteen are
  * the whole list.</p>
  */
 public final class SetVersion {
@@ -52,7 +52,16 @@ public final class SetVersion {
                     "public const int ReleaseMinor = %5$d;"),
             new Site("dotnet/ymx/YmxFormat.cs",
                     "public const int Patch = \\d+;",
-                    "public const int Patch = %3$d;"));
+                    "public const int Patch = %3$d;"),
+            new Site("go/internal/ymx/format.go",
+                    "const ReleaseMajor = \\d+",
+                    "const ReleaseMajor = %4$d"),
+            new Site("go/internal/ymx/format.go",
+                    "const ReleaseMinor = \\d+",
+                    "const ReleaseMinor = %5$d"),
+            new Site("go/internal/ymx/format.go",
+                    "const Patch = \\d+",
+                    "const Patch = %3$d"));
 
     /** The format version: the word a header carries and a player checks. */
     private static final List<Site> SITES = List.of(
@@ -75,7 +84,10 @@ public final class SetVersion {
                     + " - **$%04X**, version %2$s"),
             new Site("doc/SPEC.md",
                     "the version is \\$[0-9A-F]{4} - \\d+\\.\\d+;",
-                    "the version is $%04X - %2$s;"));
+                    "the version is $%04X - %2$s;"),
+            new Site("go/internal/ymx/format.go",
+                    "const Version = 0x[0-9A-Fa-f]{4}",
+                    "const Version = 0x%04X"));
 
     static final String USAGE = "usage: setversion.sh -format MAJOR.MINOR\n"
             + "       setversion.sh -release MAJOR.MINOR[.PATCH]";

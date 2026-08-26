@@ -196,11 +196,11 @@ final class ToolsDocTest {
                 Path.of("src", "main", "java", "org", "ymx", "SetVersion.java")));
         List<String[]> cs = sites(Files.readString(
                 Path.of("dotnet", "ymx", "SetVersion.cs")));
-        assertTrue(java.size() == 12, "SetVersion.java carries " + java.size()
-                + " sites; doc/tools.md and SetVersion's doc enumerate twelve -"
-                + " six the format version reaches, being three constants and"
-                + " SPEC.md's three mentions, and six the release version"
-                + " does, being three numbers in each tree");
+        assertTrue(java.size() == 16, "SetVersion.java carries " + java.size()
+                + " sites; doc/tools.md and SetVersion's doc enumerate sixteen"
+                + " - seven the format version reaches, being four constants"
+                + " and SPEC.md's three mentions, and nine the release version"
+                + " does, being three numbers in each of the three trees");
         assertTrue(java.size() == cs.size(), "SetVersion.java carries "
                 + java.size() + " sites and SetVersion.cs " + cs.size());
         for (int at = 0; at < java.size(); at++) {
