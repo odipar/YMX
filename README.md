@@ -1,4 +1,4 @@
-# YMX - a streaming YM format for the plain 68000
+# YMX - a streaming YM format for the Atari ST
 
 ## Read this first
 
@@ -11,24 +11,21 @@ the repository for you, and nothing here is meant to talk you out of that.
 What it is built on is human, and older. The Atari ST chiptune scene comes
 first: the musicians and coders who worked out what three voices and a noise
 generator could be made to do, and who are the reason there is anything here
-worth streaming. Then the YM format and ST-Sound, by Arnaud Carré, which
-recorded those tunes and gave every file in the collection its shape.
-Grazey, whose long work got the chiptunes into the open and keeps them
-accessible: without it there would be no collection here to measure
-against.
-Tat's MinYMiser, which this player is modelled on, and GwEm's maxYMiser,
-which shaped it as well: when a square voice drops out and comes back,
-maxYMiser lets it pick up where it left off rather than start over, and YMX
-will play a tune that way too, because that is how its composer heard it.
-Hatari, which every measurement in this repository was taken on. And the
-wider body of Atari work behind all of them. YMX rearranges what those
-established, and could not exist without them.
+worth streaming. Arnaud Carré's YM format and ST-Sound recorded those tunes
+and gave every file in the collection its shape. Grazey's long work got the
+chiptunes into the open and keeps them there, which is why there is a
+collection here to measure against. GwEm's maxYMiser is still the most
+advanced tracker and player the ST has, and this player's timer code is
+close to maxYMiser's. Tat's MinYMiser is what the rest is modelled on. Every
+measurement in this repository was taken on Hatari. Behind all of it is the
+wider body of Atari work. YMX rearranges what those established, and could
+not exist without them.
 
 **It is a tool for the people who make the music.** It was written by
 odipar to put that tool in their hands: a musician writes the tune with a
-tracker, the tracker writes the format, the player plays it on a plain
-68000 with the RAM a real machine has, and the rest of us get to hear
-what they made. Everything below is in service of that.
+tracker, the tracker writes the format, the player plays it on an Atari
+ST with the RAM a real machine has, and the rest of us get to hear what
+they made. Everything below is in service of that.
 
 ## The format
 
@@ -58,6 +55,7 @@ opcodes and the frame contract. The rest of the documentation is beside it.
 | [doc/BINARIES.md](doc/BINARIES.md) | the prebuilt binaries, and how a tool combines them without an assembler |
 | [doc/tools.md](doc/tools.md) | every tool's usage, flags and environment |
 | [doc/terminology.md](doc/terminology.md) | the vocabulary all of these use |
+| [doc/performance.md](doc/performance.md) | what a play call costs, in cycles, on real songs |
 | [doc/experiments.md](doc/experiments.md) | ideas measured against the real corpus, and what the measurements said |
 | [doc/RELEASES.md](doc/RELEASES.md) | what changed in each published set of binaries |
 

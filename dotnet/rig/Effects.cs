@@ -521,10 +521,10 @@ namespace Rig
             {
                 return problem;
             }
-            if (perf && Acc(player) != 2 * (21 + 21 + 23))
+            if (perf && Acc(player) != 2 * (18 + 18 + 20))
             {                               // both drums' playouts
                 return "effects: the drum ticks accumulated " + Acc(player)
-                        + ", not 130";
+                        + ", not 112";
             }
 
             // The toggle tick: the loud half writes the volume and installs
@@ -554,7 +554,7 @@ namespace Rig
                 return "effects: the retrigger tick wrote "
                         + PlayerTests.Show(pairs);
             }
-            if (perf && Acc(player) != 130 + 15 + 15 + 12)
+            if (perf && Acc(player) != 112 + 15 + 15 + 12)
             {
                 return "effects: the ticks accumulated " + Acc(player);
             }

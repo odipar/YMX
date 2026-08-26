@@ -387,9 +387,9 @@ final class Effects {
         if (!problem.isEmpty()) {
             return problem;
         }
-        if (perf && acc(player) != 2 * (21 + 21 + 23)) {    // both drums'
+        if (perf && acc(player) != 2 * (18 + 18 + 20)) {    // both drums'
             return "effects: the drum ticks accumulated " + acc(player)
-                    + ", not 130";                          // playouts
+                    + ", not 112";                          // playouts
         }
 
         // The toggle tick: the loud half writes the volume and installs the
@@ -413,7 +413,7 @@ final class Effects {
         if (!pairs.equals(List.of(new Player.Pair(13, 11)))) {
             return "effects: the retrigger tick wrote " + pairs;
         }
-        if (perf && acc(player) != 130 + 15 + 15 + 12) {
+        if (perf && acc(player) != 112 + 15 + 15 + 12) {
             return "effects: the ticks accumulated " + acc(player);
         }
 
