@@ -34,14 +34,18 @@ public final class MkPrg {
     /** Stub flag bit 0: drop YMXDONE.MRK on exit, for scripted runs. */
     public static final int STUB_FLAG_MARKER = 1;
 
-    /** Stub flag bit 1: tick from the VBL, because the set claims Timer C
-     * for an effect channel and the host may not use it for the calls. */
+    /**
+     * Stub flag bit 1: the VBL ticks play whatever this machine refreshes
+     * at, because the set claims Timer C for an effect channel and leaves
+     * the stub none to tick from. With the bit clear the stub compares the
+     * tune's rate against the screen's own and picks the clock itself.
+     */
     public static final int STUB_FLAG_VBL = 2;
 
     /**
-     * Flag bit 2: clear the screen before the banner. A -perf build paints
-     * the background colour, and the desktop's own pixels stand in front of
-     * it: the bars then show in the borders alone.
+     * Flag bit 2: clear the screen before the banner. A raster-monitor core
+     * paints the background colour, and the desktop's own pixels stand in
+     * front of it: the bars then show in the borders alone.
      */
     public static final int STUB_FLAG_CLEAR = 4;
 
@@ -49,8 +53,7 @@ public final class MkPrg {
 
     public record Options(Path output, List<Path> tunes, @Nullable String title,
                           @Nullable String composer, @Nullable List<String> names,
-                          boolean perf, boolean maskBurst, boolean marker,
-                          boolean vbl) {}
+                          boolean perf, boolean maskBurst, boolean marker) {}
 
     public static Path build(Options options) {
         Path output = options.output().toAbsolutePath();
@@ -84,8 +87,7 @@ public final class MkPrg {
         }
         int subtunes = subtunes(file);
         byte[] prg = wrap(readStub(resolveStub()), file, subtunes,
-                subtunes == 1 ? frames(file) : 0, options.marker(),
-                options.vbl(), options.perf());
+                subtunes == 1 ? frames(file) : 0, options.marker());
         try {
             Files.write(output, prg);
         } catch (IOException e) {
@@ -102,7 +104,7 @@ public final class MkPrg {
      * in the stub or a position-independent SNDH needs relocating.
      */
     static byte[] wrap(byte[] stub, byte[] sndh, int subtunes, int frames,
-                       boolean marker, boolean vbl, boolean perf) {
+                       boolean marker) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         int text = stub.length + sndh.length;
         out.write(0x60);                          // PRG magic $601A
@@ -127,15 +129,9 @@ public final class MkPrg {
                     + " which is a 50 Hz clock, so this set needs a host of"
                     + " its own");
         }
-        if (vbl && rate != 50) {
-            throw Tools.fail("mkprg: -vbl ticks from the VBL, which is a"
-                    + " 50 Hz clock, and this set plays at " + rate + " Hz."
-                    + " Drop -vbl and the stub ticks from Timer C, which"
-                    + " carries any rate");
-        }
         putWord(patched, STUB_FLAGS, (marker ? STUB_FLAG_MARKER : 0)
-                | (timerC || vbl ? STUB_FLAG_VBL : 0)
-                | (perf ? STUB_FLAG_CLEAR : 0));
+                | (timerC ? STUB_FLAG_VBL : 0)
+                | (paintsRaster(sndh) ? STUB_FLAG_CLEAR : 0));
         putWord(patched, STUB_RATE, rate);
         out.writeBytes(patched);
         out.writeBytes(sndh);
@@ -179,6 +175,24 @@ public final class MkPrg {
         for (int i = at + 5; i < sndh.length && sndh[i] != 0; i++) {
             if (sndh[i] == 'c') {
                 return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether the core inside this SNDH file is a raster-monitor one, read
+     * off the core's own descriptor rather than the option that asked for
+     * one: the file may be a set a caller combined earlier, and then the
+     * option says nothing about what is inside it.
+     */
+    static boolean paintsRaster(byte[] sndh) {
+        for (int at = 0; at + 4 <= sndh.length; at += 2) {
+            if (sndh[at] == 'Y' && sndh[at + 1] == 'M' && sndh[at + 2] == 'X'
+                    && sndh[at + 3] == 'C') {
+                int flags = at - MkSndh.CORE_MAGIC + MkSndh.CORE_FLAGS;
+                return flags >= 0 && flags + 1 < sndh.length
+                        && (MkSndh.word(sndh, flags) & 1) != 0;
             }
         }
         return false;
@@ -279,14 +293,13 @@ public final class MkPrg {
     }
 
     private static final String USAGE =
-            "usage: mkprg.sh [-m] [-perf] [-nomask] [-vbl] [-tTitle] [-cComposer]"
+            "usage: mkprg.sh [-m] [-perf] [-nomask] [-tTitle] [-cComposer]"
             + " [-Nnamesfile] output.prg tunes.ymx...|set.sndh";
 
     public static void main(String[] args) {
         boolean marker = false;
         boolean perf = false;
         boolean maskBurst = true;
-        boolean vbl = false;
         @Nullable String title = null;
         @Nullable String composer = null;
         @Nullable List<String> names = null;
@@ -299,8 +312,6 @@ public final class MkPrg {
                 perf = true;
             } else if (a.equals("-nomask")) {
                 maskBurst = false;
-            } else if (a.equals("-vbl")) {
-                vbl = true;
             } else if (a.startsWith("-t")) {
                 title = a.substring(2);
             } else if (a.startsWith("-c")) {
@@ -335,7 +346,7 @@ public final class MkPrg {
         }
         try {
             build(new Options(output, tunes, title, composer, names, perf,
-                    maskBurst, marker, vbl));
+                    maskBurst, marker));
         } catch (IllegalArgumentException e) {
             throw Tools.fail("mkprg: " + e.getMessage());
         }

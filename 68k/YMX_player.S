@@ -13,20 +13,26 @@
 ;
 ;    0  bra.w  main
 ;    4  'YMXP'                 stub descriptor
-;    8  .w  1                  descriptor version
+;    8  .w  2                  descriptor version
 ;   10  .w  1                  subtunes, patched by the tool
 ;   12  .l  0                  frames of subtune 1 when it plays once and
 ;                              stands alone, patched by the tool; 0 = play on
-;   16  .w  0                  flags, patched by the tool: bit 0 = drop
-;                              YMXDONE.MRK on exit, bit 1 = tick from the
-;                              VBL because the set claims Timer C
+;   16  .w  0                  flags, patched by the tool:
+;                              bit 0 - drop YMXDONE.MRK on exit
+;                              bit 1 - the VBL carries the calls, because
+;                                      the set claims Timer C for an effect
+;                                      channel and leaves none to tick from
+;                              bit 2 - clear the screen before the banner,
+;                                      set for a -perf core
 ;   18  .w  50                 the tune rate in Hz, patched by the tool
 ;                              from the SNDH file's own timer tag
 ;
 ; Nothing in here is absolute, so the PRG's relocation table is empty. The
-; session: takeover, play driven from Timer C at the system's own 200 Hz
-; with the rate divided out - the SNDH convention, doc/BINARIES.md section
-; 5 - or from the VBL where the set claims Timer C for an effect channel.
+; session: takeover, then play driven from whichever clock suits the tune.
+; The VBL carries the calls where this machine refreshes at the tune's own
+; rate, and where the set claims Timer C and leaves none to tick from;
+; otherwise Timer C does, at the system's 200 Hz with the rate divided out
+; - the SNDH convention, doc/BINARIES.md section 5.
 ; A stop on SPACE or when a patched frame count runs out, the number keys
 ; 1-9 switching subtunes. Flag bit 0 is for scripted runs - ym/play.sh
 ; watches for the marker file so it can close the emulator by itself.
@@ -213,21 +219,28 @@ play:
         clr.w   ST_BUSY(a6)
         moveq   #1,d0                           ; subtune 1
         bsr     sndh_call_init
-        lea     vbl_idle(pc),a0                 ; the VBL is parked; the tick
-        btst    #1,stub_flags+1(pc)             ; source below carries play
-        bne     .tick_vbl
-; Timer C is free of the tune, so it carries the calls - the SNDH host
-; convention. The system's own 200 Hz (/64, 192 counts), this handler on
-; its vector, and the rate accumulated against 200, so a 50 Hz tune plays
-; every fourth tick and a 60 Hz one lands 60 calls in every 200, exactly:
-; the accumulator is integer arithmetic and loses no call.
+; Which clock carries the calls. The VBL is the screen's own, so a tune
+; whose rate is the rate this machine refreshes at plays with every call
+; at one place on the screen, and nothing walks. Timer C counts the MFP's
+; 2.4576 MHz crystal, which the video clock does not track: it carries any
+; rate, at 169 cycles a frame of drift against a 50.0527 Hz PAL frame - a
+; third of a scanline, which a -perf build paints.
 ;
-; Timer C counts the MFP's own 2.4576 MHz crystal, which the video clock
-; does not track. 200 Hz against a 50.0527 Hz PAL frame walks the calls
-; a third of a scanline a frame, measured at 169 cycles, and a -perf
-; build paints that walk. A host that wants the calls at a fixed place
-; on the screen drives them from the VBL below. The handback below
-; already restores everything this touches.
+; So the VBL where this machine refreshes at the tune's rate, and Timer C
+; where it does not: a 50 Hz tune on a 60 Hz machine, or a rate no screen
+; gives. A set that claims Timer C for an effect channel leaves no choice
+; and takes the VBL either way, which is flag bit 1.
+        lea     vbl_idle(pc),a0                 ; the VBL is parked unless
+        btst    #1,stub_flags+1(pc)             ; one of the two below hands
+        bne     .tick_vbl                       ; it the calls
+        bsr     screen_hz
+        cmp.w   stub_rate(pc),d0
+        beq     .tick_vbl
+; Timer C carries them. The system's own 200 Hz (/64, 192 counts), this
+; handler on its vector, and the rate accumulated against 200, so a 50 Hz
+; tune plays every fourth tick and a 60 Hz one lands 60 calls in every
+; 200, exactly: the accumulator is integer arithmetic and loses no call.
+; The handback below already restores everything this touches.
         lea     tc_handler(pc),a1
         move.l  a1,TIMER_C_VEC.w
         move.b  #TIMERC_SYSTEM_DATA,$FFFFFA23.w
@@ -236,9 +249,9 @@ play:
         bset    #5,$FFFFFA15.w                  ; unmasked
         bra     .tick_go
 .tick_vbl:
-        lea     handler(pc),a0                  ; the set claims Timer C for
-.tick_go:                                       ; itself: the VBL calls play
-        move.l  a0,VBL_VECTOR.w
+        lea     handler(pc),a0                  ; the screen's own rate is the
+.tick_go:                                       ; tune's, or the set claims
+        move.l  a0,VBL_VECTOR.w                 ; Timer C: the VBL calls play
         move.w  #$2300,sr                       ; the tick and the file's timers
 
 .wait:
@@ -395,12 +408,27 @@ tc_handler:
         movem.l (sp)+,d1/a6
         rte
 
-; The VBL: one call per frame where the set claims Timer C, and parked
-; where it does not.
+; The VBL: one call per frame where it carries them, and parked where
+; Timer C does.
 handler:
         bsr     tick
 vbl_idle:
         rte                                     ; ours alone: no TOS behind us
+
+; The rate this machine refreshes at, in d0. High resolution is 71 Hz and
+; the sync bit says nothing there; the other two resolutions take it, 50
+; when it is set and 60 when it is clear. Both registers read back what
+; was written to them.
+screen_hz:
+        moveq   #71,d0
+        cmp.b   #2,$FFFF8260.w                  ; high resolution
+        beq.s   .known
+        moveq   #60,d0
+        btst    #1,$FFFF820A.w                  ; the sync bit: 50 or 60
+        beq.s   .known
+        moveq   #50,d0
+.known:
+        rts
 
 puts:
         move.l  a0,-(sp)

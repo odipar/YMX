@@ -7,8 +7,6 @@
 #   ym/play.sh -min13 -sec52 song.ym    # trim: start deep in a long tune
 #   ym/play.sh one.ym two.ym            # a set: subtunes, number keys pick
 #   ym/play.sh -perf song.ym            # the raster monitor
-#   ym/play.sh -vbl song.ym             # tick from the VBL, not Timer C: the
-#                                       # -perf bars then hold one place
 #   ym/play.sh -nomask song.ym          # drop the frame write's interrupt mask
 #
 # ym/play.sh -h lists the lot. Press SPACE in the Hatari window to stop; the

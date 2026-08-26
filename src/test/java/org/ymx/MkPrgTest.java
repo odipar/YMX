@@ -33,38 +33,11 @@ final class MkPrgTest {
         return stub;
     }
 
-    /**
-     * Each descriptor flag comes from its own option, and they combine.
-     * The stub reads three bits out of one word, so an option wired to the
-     * wrong bit would leave the program ticking from the wrong clock or
-     * painting over its own bars.
-     */
-    @Test
-    void eachOptionSetsItsOwnFlagBit() {
-        byte[] sndh = {'X', 'Y'};
-        int at = 28 + MkPrg.STUB_FLAGS;
-        assertEquals(0, word(MkPrg.wrap(stub(), sndh, 1, 0, false, false, false), at),
-                "nothing asked for, nothing set");
-        assertEquals(MkPrg.STUB_FLAG_MARKER,
-                word(MkPrg.wrap(stub(), sndh, 1, 0, true, false, false), at),
-                "the marker alone");
-        assertEquals(MkPrg.STUB_FLAG_VBL,
-                word(MkPrg.wrap(stub(), sndh, 1, 0, false, true, false), at),
-                "-vbl alone");
-        assertEquals(MkPrg.STUB_FLAG_CLEAR,
-                word(MkPrg.wrap(stub(), sndh, 1, 0, false, false, true), at),
-                "-perf alone, which clears the screen");
-        assertEquals(MkPrg.STUB_FLAG_MARKER | MkPrg.STUB_FLAG_VBL
-                        | MkPrg.STUB_FLAG_CLEAR,
-                word(MkPrg.wrap(stub(), sndh, 1, 0, true, true, true), at),
-                "all three together");
-    }
-
     @Test
     void theProgramFollowsTheContract() {
         byte[] stub = stub();
         byte[] sndh = {'X', 'Y'};
-        byte[] prg = MkPrg.wrap(stub, sndh, 3, 4500, true, false, false);
+        byte[] prg = MkPrg.wrap(stub, sndh, 3, 4500, true);
 
         assertEquals(0x601A, word(prg, 0));
         assertEquals(stub.length + sndh.length, (int) longAt(prg, 2), "text size");

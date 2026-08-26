@@ -151,7 +151,7 @@ taken again.
 |---|---:|
 | player, unit size 2 | 3,412 |
 | ST4 decoder | 288 |
-| PRG stub | 3,002 |
+| PRG stub | 3,038 |
 | workspace, `N` = 960 | 25,658 |
 | workspace, `N` = 1776 | 46,058 |
 | workspace, `N` = 2520 (the cap) | 64,658 |
@@ -224,13 +224,16 @@ which clock calls it, and the counter cannot tell a timer host that landed
 in a border from a VBL host, whose bar is invisible without the wait: a
 build that stopped waiting once it had seen the display running painted a
 bar in 1 frame of 499 under the VBL, because one call delayed into the
-display turned the wait off for good. `mkprg.sh -vbl` picks the clock
-instead. Measured over the same 499 frames, `Synergy Credits` at `-perf`:
+display turned the wait off for good.
 
-| tick source | frames with a bar | where it sat |
+None of it arises where the VBL carries the calls, which is what the PRG
+stub picks whenever the machine refreshes at the tune's own rate. The
+same program, the same tune, with only the rate word patched:
+
+| the tune's rate against a 50 Hz screen | drift of the call | the stub picked |
 |---|---:|---|
-| Timer C | 496 | anywhere from line 60 to 458 |
-| the VBL, `-vbl` | 498 | line 60 in 497 of them |
+| 50 Hz, the screen's own | -0.6 cycles a frame | the VBL |
+| 60 Hz | -63.7 cycles a frame | Timer C |
 
 A `-perf` build also clears the screen before its banner, since the
 monitor paints the background colour and the pixels the desktop left

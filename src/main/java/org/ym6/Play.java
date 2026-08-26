@@ -41,9 +41,6 @@ public final class Play {
                                                    # works in red, timer ticks in green
                                                    # (A) and blue (D), and a yellow bar
                                                    # estimates the ticks' scanlines
-              ym/play.sh -vbl song.ym             # tick from the VBL instead of Timer
-                                                   # C, so the -perf bars hold one place
-                                                   # on the screen. 50 Hz tunes only
               ym/play.sh -nomask song.ym          # drop the interrupt mask around the
                                                    # frame write, which the writes do
                                                    # not need: ticks then interleave
@@ -62,7 +59,6 @@ public final class Play {
         String once = "";
         boolean perf = false;
         boolean maskBurst = true;
-        boolean vbl = false;
         List<String> extra = new ArrayList<>();
         int i = 0;
         for (; i < args.length && args[i].startsWith("-"); i++) {
@@ -71,8 +67,6 @@ public final class Play {
                 perf = true;
             } else if (a.equals("-nomask")) {
                 maskBurst = false;
-            } else if (a.equals("-vbl")) {
-                vbl = true;
             } else if (a.equals("-o")) {
                 once = "-o";
             } else if (a.equals("-h") || a.equals("--help")) {
@@ -93,7 +87,7 @@ public final class Play {
             yms.add(Path.of(args[i]));
         }
         if (yms.isEmpty()) {
-            throw Tools.fail("usage: play.sh [-perf] [-nomask] [-vbl] [-nRING]"
+            throw Tools.fail("usage: play.sh [-perf] [-nomask] [-nRING]"
                     + " [-cCHUNK] [-kUNIT] [-o] song.ym...");
         }
         for (Path ym : yms) {
@@ -131,7 +125,7 @@ public final class Play {
         System.out.println("play.sh: packing " + join(yms));
         List<Path> packed = Packing.pack(yms, work, flags);
         MkPrg.build(new MkPrg.Options(work.resolve("PLAY.PRG"), packed, set.title(),
-                set.composer(), set.names(), perf, maskBurst, true, vbl));
+                set.composer(), set.names(), perf, maskBurst, true));
 
         Path marker = work.resolve("YMXDONE.MRK");
         Packing.deleteQuietly(marker);
