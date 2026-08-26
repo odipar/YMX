@@ -7,7 +7,18 @@
 # Stages every core variant - three unit sizes by the perf and mask flags -
 # plus the PRG stub, verified against the descriptors the combiners read,
 # with a MANIFEST.txt of sizes and SHA-256 digests. doc/BINARIES.md is the
-# contract another system follows. -publish creates or updates the release
+# contract another system follows.
+#
+# It also carries in the standalone ym-to-ymx zips that ymx/publish.sh
+# builds into dist/standalone, one per platform, taking those named for
+# this release and leaving an older release's where they lie. Staging
+# clears its directory first, so publish.sh runs between the two:
+#
+#   ymx/mkrelease.sh            # the binaries publish.sh embeds
+#   ymx/publish.sh              # the executables carrying them
+#   ymx/mkrelease.sh -publish   # both, to the release page
+#
+# A release staged without publish.sh carries no zips and publishes fine. -publish creates or updates the release
 # tagged binaries-v<release> - the format version and this release's patch
 # - with gh, replacing its assets and posting this release's section of
 # doc/RELEASES.md as the notes.

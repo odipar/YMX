@@ -31,11 +31,22 @@ for rid in $RIDS; do
     echo "$exe: $size bytes"
 done
 
-# the launchers travel beside them
+# One zip per platform, the executable and its launcher together, named
+# with the release version as the player binaries are: what mkrelease.sh
+# stages and attaches to the release.
+VERSION=$(sed -n 's/^YMX player binaries - release \([0-9.]*\),.*/\1/p' \
+    dist/release/MANIFEST.txt)
+if [ -z "$VERSION" ]; then
+    echo "publish: dist/release/MANIFEST.txt names no release" >&2
+    exit 1
+fi
 for rid in $RIDS; do
     case "$rid" in
         win-*) cp ymx/ymxplay.cmd "$OUT/$rid/" ;;
         *)     cp ymx/ymxplay.sh  "$OUT/$rid/" ;;
     esac
+    zip="ym-to-ymx-$rid-v$VERSION.zip"
+    (cd "$OUT/$rid" && rm -f "../$zip" && zip -q -X "../$zip" *)
+    echo "$OUT/$zip: $(wc -c < "$OUT/$zip" | tr -d ' ') bytes"
 done
 echo "$OUT: $(echo $RIDS | wc -w | tr -d ' ') platforms"
