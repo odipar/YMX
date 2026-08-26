@@ -151,7 +151,7 @@ taken again.
 |---|---:|
 | player, unit size 2 | 3,412 |
 | ST4 decoder | 288 |
-| PRG stub | 3,018 |
+| PRG stub | 2,984 |
 | workspace, `N` = 960 | 25,658 |
 | workspace, `N` = 1776 | 46,058 |
 | workspace, `N` = 2520 (the cap) | 64,658 |
@@ -188,6 +188,36 @@ of a scanline a frame and wraps every 948 frames, near 19 seconds. Under
 the VBL it stands still. For music the difference is 0.1 per cent of
 tempo, below hearing. A demo that wants the play call at a fixed place
 on the screen drives it from the VBL.
+
+### Why the bar stops, walks, and jumps back
+
+The monitor waits for the beam before it paints red. It reads the video
+address counter at `$FFFF8209`, which moves only while the shifter is
+fetching pixels, and spins until it moves. A VBL host calls play in the
+blanking, dozens of lines above the screen, so the wait puts every bar
+at the same place and the bars compare.
+
+Under a Timer C host the call lands anywhere in the frame, and the wait
+then shows in three phases. Measured on `Synergy Credits`, 1,218 calls:
+
+| where the call falls | what the bar does |
+|---|---|
+| in a border, where the counter is frozen | waits, and paints at line 63 |
+| in the display, lines 63 to 262 | paints at once, and walks with the drift |
+| past line 262 | waits for the next frame, and paints at line 63 again |
+
+Every one of the 1,218 marks fell between lines 63 and 262 - the PAL
+display area, 200 lines from 63 - and 284 of them, 23 per cent, sat
+exactly on line 63. So the bar holds at 63, walks to 262 over about 600
+frames, and returns to 63. The jump is the monitor's wait, not the
+player's timing: across the same run Timer C ticked 4,874 times at a
+mean interval of 40,106 cycles, the nominal 200 Hz, and play was called
+on every fourth tick 1,216 times out of 1,217.
+
+The wait sits before the red mark, so it costs the figures above
+nothing: red to yellow is still the frame's own work. It does burn the
+machine while it spins - up to 30,052 cycles was measured - which a
+`-perf` build does and a plain one does not.
 
 ## What moves these numbers
 

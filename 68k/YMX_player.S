@@ -47,6 +47,7 @@ ACIA_CTRL   equ     $FFFFFC00       ; the keyboard ACIA, polled directly
 ; rather than read back, because a running timer's data register reads as
 ; the count it has reached and not as the count it restarts from.
 TIMERC_SYSTEM_DATA equ  192
+TIMERD_SYSTEM_DATA equ  2       ; and Timer D's, the serial clock's divider
 
 TIMER_D_VEC equ     $110            ; the MFP timer vectors, in MFP order
 TIMER_C_VEC equ     $114
@@ -71,9 +72,7 @@ SV_IMRB     equ     27
 SV_TACR     equ     28              ; 7 timer bytes
 SV_TBCR     equ     29
 SV_TCDCR    equ     30
-SV_TADR     equ     31
-SV_TBDR     equ     32
-SV_TDDR     equ     33
+                                ; no data register: see the restore
 
 ; The session state, as offsets into `state`.
 ST_DONE     equ     0               ; word  nonzero once the tune ended
@@ -182,7 +181,9 @@ play:
 ; generator and keeps ticking at a few hundred kHz - machine state
 ; the tune did not name. A host that takes the machine over should give
 ; the player a quiet MFP; the player itself claims only what its tune
-; names. Data registers are saved too: a timer reloads from them.
+; names. No data register is saved: one reads as the count the timer has
+; reached, not the value it reloads from, so there is nothing there to
+; put back. The restore below writes the two counts the system runs.
 ; The timer vectors. Stream T may put a channel on any of the four, so all
 ; four are saved: a tune on Timer C leaves the system's 200 Hz clock parked
 ; on the player's own do-nothing entry, and the desktop counts nothing
@@ -195,9 +196,6 @@ play:
         move.b  $FFFFFA19.w,SV_TACR(a5)
         move.b  $FFFFFA1B.w,SV_TBCR(a5)
         move.b  $FFFFFA1D.w,SV_TCDCR(a5)
-        move.b  $FFFFFA1F.w,SV_TADR(a5)
-        move.b  $FFFFFA21.w,SV_TBDR(a5)
-        move.b  $FFFFFA25.w,SV_TDDR(a5)
         clr.b   $FFFFFA19.w                     ; Timer A
         clr.b   $FFFFFA1B.w                     ; Timer B
         clr.b   $FFFFFA1D.w                     ; Timers C and D share this
@@ -291,17 +289,20 @@ play:
         move.l  SV_VBL(a5),VBL_VECTOR.w
         movea.l SV_USP(a5),a0
         move    a0,usp
-        move.b  SV_TADR(a5),$FFFFFA1F.w         ; counts back before controls,
-        move.b  SV_TBDR(a5),$FFFFFA21.w         ; so a timer restarts on the
-        move.b  SV_TDDR(a5),$FFFFFA25.w
-; Timer C's count is not one of the saved fields: a timer's data register
-; reads as the count it has reached, so what a takeover reads back is
-; wherever the count happened to be and writing that back leaves the
-; system's own tick running at some rate of its own. That is what left the
-; desktop unable to time a double click. The count goes back as the value
-; the operating system runs it at; the prescaler comes back with TCDCR
-; below, which does read as what was written to it.
+; A timer's data register reads as the count it has reached, so what a
+; takeover reads back is wherever the count happened to be, and writing
+; that back leaves the timer running at some rate of its own. That is what
+; left the desktop unable to time a double click. The two the system runs
+; go back as the values it runs them at - Timer C's 200 Hz clock, and
+; Timer D's serial divider - and the counts come back before the controls,
+; so a timer restarts on the value it will keep. The prescalers come back
+; with TCDCR below, which does read as what was written to it.
+;
+; Timers A and B are the host's: their controls go back as they were, and
+; a tune that claimed one leaves its count changed, which is assumption 5
+; in YMX.S and the reason that assumption names no data register.
         move.b  #TIMERC_SYSTEM_DATA,$FFFFFA23.w
+        move.b  #TIMERD_SYSTEM_DATA,$FFFFFA25.w
         move.b  SV_TACR(a5),$FFFFFA19.w         ; TOS's timers running again
         move.b  SV_TBCR(a5),$FFFFFA1B.w
         move.b  SV_TCDCR(a5),$FFFFFA1D.w
@@ -412,7 +413,7 @@ m_marker:   dc.b    "YMXDONE.MRK",0
 m_bye:      dc.b    "Done.",13,10,0
         even
 
-saved:      ds.b    35                          ; the SV_ fields
+saved:      ds.b    31                          ; the SV_ fields
         even
 state:      ds.b    12                          ; the ST_ fields
         even
