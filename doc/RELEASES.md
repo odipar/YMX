@@ -20,6 +20,32 @@ by someone deciding whether to take the release, not by someone
 reviewing it: the commits carry the reasoning and the measurements, and
 the section carries the list.
 
+## 0.8.2
+
+The player is 3,434 bytes at unit size 2, where 0.8.1 carried 3,434, and
+the PRG stub 3,038 where it carried 3,038. Format 0.7 still. Every one of
+the thirteen binaries is byte-identical to 0.8.1's: this release changes
+the tool that carries them, not them.
+
+- `ym-to-ymx -timersT` reached the SNDH title instead of the packer, so a
+  tune asked for other timers was packed on the default ones and the run
+  reported success. Anything packed with that flag by an earlier standalone
+  build carries the default map and is worth packing again.
+- The tool no longer writes over an existing `.sndh` or `.prg` without
+  `-f`, and `st4` and `dst4` no longer write over an existing output at
+  all without it.
+- A flag value the packer has no use for - a zero unit, a negative count,
+  a number past what a 32-bit value holds - now stops the run. It was
+  taken and then ignored, and a finished file came out.
+- The trim options reach the packer from `play` and from the SNDH command,
+  where they were read as a file name.
+- Every command that packs writes the same report: the per-stream table
+  where a pack is what was asked for, and the summary alone on the way to
+  a program.
+- The three implementations are held to one command line giving one
+  answer - the same bytes, the same text and the same exit status - by a
+  check that runs over every command and flag.
+
 ## 0.8.1
 
 The player is 3,434 bytes at unit size 2, where 0.8.0 carried 3,434, and
