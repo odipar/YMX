@@ -84,7 +84,7 @@ public final class YmxFormat {
      * change and the format does not - an optimized player, a fixed
      * stub. The format version above is the compatibility gate; this
      * number never reaches the format word. */
-    public static final int PATCH = 1;
+    public static final int PATCH = 2;
 
     /** The release's version as prose: the format version, then the
      * patch, a dot between them. */
