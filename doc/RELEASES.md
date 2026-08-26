@@ -22,28 +22,22 @@ the section carries the list.
 
 ## 0.8.2
 
-The player is 3,434 bytes at unit size 2, and the PRG stub 3,038. Format
-0.7 still. All thirteen binaries are unchanged: this release changes the
-tool that carries them, not them.
+The player is 3,434 bytes at unit size 2, the PRG stub 3,038. Format 0.7.
+The thirteen binaries are unchanged. This release changes the tool only.
 
-- `ym-to-ymx -timersT` reached the SNDH title instead of the packer, so a
-  tune asked for other timers was packed on the default ones and the run
-  reported success. Anything packed with that flag by an earlier standalone
-  build carries the default map and is worth packing again.
-- The tool no longer writes over an existing `.sndh` or `.prg` without
-  `-f`, and `st4` and `dst4` no longer write over an existing output at
-  all without it.
-- A flag value the packer has no use for - a zero unit, a negative count,
-  a number past what a 32-bit value holds - now stops the run. It was
-  taken and then ignored, and a finished file came out.
-- The trim options reach the packer from `play` and from the SNDH command,
-  where they were read as a file name.
+- `ym-to-ymx -timersT` was read as the SNDH title and never reached the
+  packer. Tunes packed with it carry the default timer map, and the run
+  reported success. Repack them.
+- `ym-to-ymx` no longer overwrites an existing `.sndh` or `.prg` without
+  `-f`. Nor do `st4` and `dst4`.
+- A zero, negative or out-of-range flag value stops the run. It was
+  accepted, then ignored, and a file was written.
+- `play` and the SNDH command pass the trim options to the packer. They
+  were read as a file name.
 - Every command that packs writes the same report: the per-stream table
-  where a pack is what was asked for, and the summary alone on the way to
-  a program.
-- The three implementations are held to one command line giving one
-  answer - the same bytes, the same text and the same exit status - by a
-  check that runs over every command and flag.
+  where the pack was asked for, the summary alone otherwise.
+- A check compares the three implementations over every command and flag:
+  the same bytes, the same output, the same exit status.
 
 ## 0.8.1
 
