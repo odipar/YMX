@@ -276,11 +276,10 @@ func prgResolveStub() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	stub := filepath.Join(repo, "dist", "ymxprg"+sndhBinarySuffix()+".bin")
-	if sndhStale(repo, stub, "YMX_player.S") {
-		return "", fmt.Errorf("mkprg: %s is missing or older than the source"+
-			" it is assembled from - take it from the binaries release, or"+
-			" assemble it with ymx/mkcores.sh", stub)
+	stub, err := sndhPrebuilt(repo, "ymxprg"+sndhBinarySuffix()+".bin",
+		"YMX_player.S")
+	if err != nil {
+		return "", fmt.Errorf("mkprg: %w", err)
 	}
 	return stub, nil
 }

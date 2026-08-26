@@ -358,14 +358,38 @@ func sndhResolveCore(options SndhOptions) (string, error) {
 	if !options.MaskBurst {
 		suffix += "-nomask"
 	}
-	core := filepath.Join(repo, "dist", "ymxsndh-k"+strconv.Itoa(unit)+suffix+
-		sndhBinarySuffix()+".bin")
-	if sndhStale(repo, core, "YMX_sndh.S", "YMX.S", "ST4_wrap.S") {
-		return "", fmt.Errorf("mksndh: %s is missing or older than the sources"+
-			" it is assembled from - take it from the binaries release, or"+
-			" assemble it with ymx/mkcores.sh", core)
+	name := "ymxsndh-k" + strconv.Itoa(unit) + suffix +
+		sndhBinarySuffix() + ".bin"
+	core, err := sndhPrebuilt(repo, name,
+		"YMX_sndh.S", "YMX.S", "ST4_wrap.S")
+	if err != nil {
+		return "", fmt.Errorf("mksndh: %w", err)
 	}
 	return core, nil
+}
+
+// sndhPrebuilt gives a binary of this name from dist/, or from the staged
+// release beside it.
+//
+// This tree assembles nothing: rmac is what the other two reach for when a
+// core is missing, and not needing it is the point of a standalone build. So
+// dist/release is worth reading before giving up - ymx/mkrelease.sh stages
+// every core there under the release's own name, and a checkout that has
+// staged a release already holds what this needs. Both are held to the same
+// rule: a binary older than a source it was assembled from is stale wherever
+// it sits.
+func sndhPrebuilt(repo, name string, sources ...string) (string, error) {
+	beside := filepath.Join(repo, "dist", name)
+	if !sndhStale(repo, beside, sources...) {
+		return beside, nil
+	}
+	staged := filepath.Join(repo, "dist", "release", name)
+	if !sndhStale(repo, staged, sources...) {
+		return staged, nil
+	}
+	return "", fmt.Errorf("%s is missing or older than the sources it is"+
+		" assembled from, and so is %s - take it from the binaries release,"+
+		" or assemble it with ymx/mkcores.sh", beside, staged)
 }
 
 // sndhStale reports whether a prebuilt binary is missing or older than a
