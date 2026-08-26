@@ -185,8 +185,8 @@ public final class MkRelease {
         return List.of("gh", "release", "edit", tag, "--notes", notes);
     }
 
-    /** The command that replaces every asset: each core, the stub and the
-     * manifest, out of the staging directory. */
+    /** The command that replaces every asset: each core, the stub, each
+     * standalone zip and the manifest, out of the staging directory. */
     static List<String> uploadCommand(Path dir, String tag) {
         List<String> upload = new ArrayList<>(List.of("gh", "release", "upload",
                 tag, "--clobber"));

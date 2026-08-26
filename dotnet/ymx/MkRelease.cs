@@ -225,7 +225,8 @@ namespace Ymx
         }
 
         /// <summary>The command that replaces every asset: each core, the
-        /// stub and the manifest, out of the staging directory.</summary>
+        /// stub, each standalone zip and the manifest, out of the staging
+        /// directory.</summary>
         internal static List<string> UploadCommand(string dir, string tag)
         {
             var upload = new List<string> {"gh", "release", "upload", tag,
