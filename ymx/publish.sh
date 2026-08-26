@@ -46,7 +46,7 @@ for rid in $RIDS; do
     # built tool gets tried out, so the build starts from an empty one
     rm -rf "$OUT/$rid"
     dotnet publish dotnet -c Release -r "$rid" --self-contained true \
-        -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true \
+        -p:PublishAot=true -p:UseAppHost=true \
         -p:AssemblyName=ym-to-ymx -p:DebugType=none \
         -o "$OUT/$rid" >/dev/null
     cp "ymx/$launcher" "$OUT/$rid/"

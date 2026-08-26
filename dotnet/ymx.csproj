@@ -11,6 +11,10 @@
     <RootNamespace></RootNamespace>
     <StartupObject>Program</StartupObject>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <IsAotCompatible>true</IsAotCompatible>
+    <VerifyReferenceAotCompatibility>true</VerifyReferenceAotCompatibility>
+    <PublishAot>true</PublishAot>
+    <UseAppHost>true</UseAppHost>
   </PropertyGroup>
 
   <!-- The SNDH cores and the PRG stub, carried in the assembly so a
