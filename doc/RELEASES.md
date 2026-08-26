@@ -20,6 +20,22 @@ by someone deciding whether to take the release, not by someone
 reviewing it: the commits carry the reasoning and the measurements, and
 the section carries the list.
 
+## 0.8.1
+
+The player is 3,434 bytes at unit size 2, where 0.8.0 carried 3,434, and
+the PRG stub 3,038 where it carried 3,038. Format 0.7 still. Every one of
+the thirteen binaries is byte-identical to 0.8.0's: this release changes
+the tool that carries them, not them.
+
+- The standalone `ym-to-ymx` now covers six platforms rather than three -
+  Windows, macOS and Linux on both x64 and arm64 - and each download is
+  around 900 KB where it was 30 MB.
+- It is built from a third implementation of the tools, in Go, which is
+  what makes both of those true: one machine cross-compiles to every
+  target with no toolchain installed for any of them.
+- That implementation writes the same bytes as the other two. Every file
+  it produces is checked against the C# tree's, file by file.
+
 ## 0.8.0
 
 The player is 3,434 bytes at unit size 2, where 0.7.2 carried 3,434, and
