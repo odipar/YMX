@@ -6,8 +6,9 @@ YMX is a streaming register-dump format for the YM2149 sound chip in the
 Atari ST, playable by a 68000 without the tune resident in memory. A file
 carries twenty-five independently compressed streams: fourteen register
 streams, one value per frame, and eleven streams of a **compiled effect
-script** that drives the MFP's timers. Twenty-five is the stored count in
-every file; §1.5 separates it from the decoded and the carrying counts.
+script** that drives the MFP's timers. A file may carry extension streams
+past those, to a stored count of at most 32; §1.5 separates the stored,
+decoded and carrying counts.
 Each stream is decoded through a ring of `N` bytes, one stream refilled per
 frame, so memory use depends on the player configuration, not on tune
 length.
@@ -913,14 +914,14 @@ The shape:
   set only for a stream the file carries.
 - The file carries no stream at an index §1.7 leaves reserved.
 - Where `L` is not 0, `L` is less than `O`.
-- Where the loop table offset is 0, each of the twenty-five sections
+- Where the loop table offset is 0, each carried stream's section
   decodes to `O` values, and `L` is 0 or leaves `O` - `L` at most `N`, so
   a wrap reaches back one pass into the rings and no further (§8).
 - Where the loop table offset is not 0 it is a long boundary, `L` is not
-  0, and the loop table's twenty-five entries are nonzero, `O` - `L` is
-  larger than `N`, so §8's second form is the one in force: each section
-  table's section decodes to `L` values and each loop table's to `O` -
-  `L`. At a unit size above 1, `L` is a multiple of the unit size.
+  0, and the loop table's entry for every carried stream is nonzero, `O` -
+  `L` is larger than `N`, so §8's second form is the one in force: each
+  section table's section decodes to `L` values and each loop table's to
+  `O` - `L`. At a unit size above 1, `L` is a multiple of the unit size.
 - Every section decodes to values of one byte. No back-reference exceeds
   `N` bytes and no operation exceeds 65535 units (§1.4).
 - The sample table is within §6: at most 32 samples, the `$80` marker at

@@ -146,16 +146,16 @@ final class SpecConsistencyTest {
     @Test
     void everyPackedFileKeepsTheLoopRulesTheDocumentStates() throws IOException {
         String said = flat();
-        assertTrue(said.contains("Where the loop table offset is 0, each of the"
-                        + " twenty-five sections decodes to `O` values, and `L`"
-                        + " is 0 or leaves `O` - `L` at most `N`"),
+        assertTrue(said.contains("Where the loop table offset is 0, each"
+                        + " carried stream's section decodes to `O` values,"
+                        + " and `L` is 0 or leaves `O` - `L` at most `N`"),
                 "SPEC §9.3's rule on a file with no loop table has been"
                         + " reworded: this test reads the bounds it checks the"
                         + " packed files against out of it");
         assertTrue(said.contains("Where the loop table offset is not 0 it is a"
                         + " long boundary, `L` is not 0, and the loop table's"
-                        + " twenty-five entries are nonzero, `O` - `L` is larger"
-                        + " than `N`"),
+                        + " entry for every carried stream is nonzero, `O` -"
+                        + " `L` is larger than `N`"),
                 "SPEC §9.3's rule on a file with a loop table has been"
                         + " reworded: this test reads the bounds it checks the"
                         + " packed files against out of it");

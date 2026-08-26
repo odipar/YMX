@@ -105,7 +105,8 @@ Four rules this left behind:
 3. **Distrust the capture before the player.** A glitched recording of correct
    playback is indistinguishable from a broken player until the capture chain
    is validated.
-4. **The ear is an instrument.** It twice found what the audits passed.
+4. **Listening is a check of its own.** It twice found what the audits
+   passed.
 
 **The timers left running** (2026-08-21). Two builds sending byte-identical
 chip traffic, and one of them audibly wrong.

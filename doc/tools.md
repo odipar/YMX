@@ -29,8 +29,8 @@ run it, and a direct run is
 `mvn -q compile exec:exec@ymx -Dargs="..."`, or
 `dotnet dotnet/bin/Release/net10.0/ymx.dll ymx ...`. A wrong call prints
 the tool's own usage (`mkcores.sh` and `mkrelease.sh` take no arguments,
-so they just run), and this document collects the same information in
-one place.
+so a bare call runs them), and this document collects the same
+information in one place.
 
 ## The packer
 
@@ -150,9 +150,9 @@ the format did not - needs no repin.
 
 ### play.sh
 
-Test drive: pack, build a program with the exit marker, run it under
-Hatari. SPACE in the emulator window stops; everything built lands in a
-work directory next to the first tune, named after it and the shape.
+Pack, build a program with the exit marker, and run it under Hatari. SPACE
+in the emulator window stops; everything built lands in a work directory
+next to the first tune, named after it and the shape.
 
     ym/play.sh [-perf] [-nomask] [-nRING] [-cCHUNK] [-kUNIT] [-o] song.ym...
 
