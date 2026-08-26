@@ -1,0 +1,2 @@
+# The prebuilt binaries are build output: ymx/publish.sh copies them here.
+*.bin

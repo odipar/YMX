@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/odipar/ymx/internal/ym"
+	"github.com/odipar/ymx/internal/pack"
 	"github.com/odipar/ymx/internal/ymx"
 )
 
@@ -65,52 +65,17 @@ func main() {
 		}
 	}
 
-	song, err := ym.Read(input)
+	o := pack.Defaults()
+	o.Ring, o.Chunk, o.Unit = ring, chunk, unit
+	o.Loops, o.DrumHz, o.TimerMap = startsOver, drumHz, timerMap
+	packed, err := pack.Pack(input, o)
 	if err != nil {
 		fail(inputName + ": " + err.Error())
 	}
-
-	// The reader and the engine keep their own vocabularies, so the dump
-	// crosses into the engine's here and nowhere else.
-	crossed := &ymx.Song{
-		Format: song.Format, Frames: song.Frames, PlayerHz: song.PlayerHz,
-		MasterClock: song.MasterClock, LoopFrame: song.LoopFrame,
-		Attributes: song.Attributes, Drums: song.Drums, Name: song.Name,
-		Author: song.Author, Comment: song.Comment, Registers: song.Registers,
+	for _, note := range packed.Notes {
+		fmt.Println(note)
 	}
-	effects := ymx.ExtractUpTo(crossed, drumHz)
-	tune, err := ymx.BuildTuneOver(crossed, effects)
-	if err != nil {
-		fail(inputName + ": " + err.Error())
-	}
-
-	// The unit size, where the caller named none: two where a frame near the
-	// end is safe to duplicate, and one where none is. A duplicate frame is
-	// safe when it neither restarts the envelope nor starts a drum.
-	safe := safeToDuplicate(crossed)
-	switch {
-	case unit == 0 && chunk%2 == 0:
-		if padded := pad(tune, 2, safe); padded != nil {
-			tune, unit = padded, 2
-		} else {
-			unit = 1
-			fmt.Println("Packing at -k1: this tune's length is not a whole" +
-				" number of 2-byte units, and no frame near the end is safe" +
-				" to duplicate")
-		}
-	case unit == 0:
-		unit = 1
-	case unit > 1:
-		if padded := pad(tune, unit, safe); padded != nil {
-			tune = padded
-		}
-	}
-
-	result, err := ymx.EncodeOnTimers(tune, ring, chunk, startsOver, unit,
-		timerMap)
-	if err != nil {
-		fail(err.Error())
-	}
+	result := packed.Result
 	if err := os.WriteFile(outputName, result.File, 0o644); err != nil {
 		fail("Cannot write output file " + outputName)
 	}
@@ -123,44 +88,6 @@ func main() {
 	fmt.Printf("Packed %d register bytes into %d (%.1f%%), file %d bytes\n",
 		raw, result.PackedSize(),
 		100.0*float64(result.PackedSize())/float64(raw), len(result.File))
-}
-
-// pad stretches the tune to a whole number of units, reporting what it
-// duplicated. It gives nil where no frame near the end is safe.
-func pad(tune *ymx.Tune, unit int, safe func(int) bool) *ymx.Tune {
-	padded := tune.PadToUnit(unit, safe)
-	if padded != nil && padded != tune {
-		added := padded.Frames - tune.Frames
-		plural := "s"
-		if added == 1 {
-			plural = ""
-		}
-		fmt.Printf("Padded %d frame%s (duplicates of safe frames) so the"+
-			" length is whole %d-byte units\n", added, plural, unit)
-	}
-	return padded
-}
-
-// safeToDuplicate says which frames may be repeated: one that neither
-// restarts the envelope nor starts a drum.
-func safeToDuplicate(song *ymx.Song) func(int) bool {
-	r := song.Registers
-	ym6 := strings.HasPrefix(song.Format, "YM6")
-	return func(f int) bool {
-		if r[13][f] != 0xFF {
-			return false // this frame restarts the envelope
-		}
-		c1 := int(r[1][f]) & 0xF0
-		c3 := int(r[3][f]) & 0xF0
-		var drum bool
-		if ym6 {
-			drum = c1&0xC0 == 0x40 && c1&0x30 != 0 ||
-				c3&0xC0 == 0x40 && c3&0x30 != 0
-		} else {
-			drum = c3&0x30 != 0
-		}
-		return !drum
-	}
 }
 
 func number(text string) int {
