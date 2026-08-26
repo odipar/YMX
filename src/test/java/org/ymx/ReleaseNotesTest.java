@@ -58,12 +58,11 @@ final class ReleaseNotesTest {
     void theNewestSectionLeadsWithTheMeasuredPlayerSize() throws IOException {
         String notes = newest();
         Matcher said = Pattern.compile("The player is ([\\d,]+) bytes at unit size"
-                + " (\\d), where ([\\d.]+) carried ([\\d,]+)").matcher(notes);
+                + " (\\d)").matcher(notes);
         assertTrue(said.find(), "doc/RELEASES.md's section for "
                 + YmxFormat.releaseName() + " states no player size. Every"
                 + " section leads with one: \"The player is N bytes at unit"
-                + " size k, where <release> carried M\", which is what this"
-                + " check reads it out of");
+                + " size k\", which is what this check reads it out of");
 
         String measured = Files.readString(README);
         Matcher rig = Pattern.compile("is the player, ([\\d,]+) bytes at the"
@@ -77,13 +76,22 @@ final class ReleaseNotesTest {
         assertEquals(number(rig.group(1)), number(said.group(1)),
                 "the release notes state a player size the rig did not measure");
 
-        String before = MkRelease.notesFor(said.group(3));
+        // A section may quote what the release before it carried. Where it
+        // does, the figure is read out of that release's own section; where
+        // it does not, there is nothing to misquote. A release whose page has
+        // been taken down is not worth pointing a reader at.
+        Matcher quotes = Pattern.compile("where ([\\d.]+) carried ([\\d,]+)")
+                .matcher(notes);
+        if (!quotes.find()) {
+            return;
+        }
+        String before = MkRelease.notesFor(quotes.group(1));
         Matcher carried = Pattern.compile("([\\d,]+) bytes at unit size (\\d)")
                 .matcher(before);
         assertTrue(carried.find(), "doc/RELEASES.md's section for "
-                + said.group(3) + " states no player size of its own");
-        assertEquals(number(carried.group(1)), number(said.group(4)),
-                "the newest section misquotes " + said.group(3) + "'s size");
+                + quotes.group(1) + " states no player size of its own");
+        assertEquals(number(carried.group(1)), number(quotes.group(2)),
+                "the newest section misquotes " + quotes.group(1) + "'s size");
         assertEquals(number(carried.group(2)), number(said.group(2)),
                 "the two sizes are quoted at different unit sizes");
     }

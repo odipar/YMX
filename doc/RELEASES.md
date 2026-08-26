@@ -22,10 +22,9 @@ the section carries the list.
 
 ## 0.8.2
 
-The player is 3,434 bytes at unit size 2, where 0.8.1 carried 3,434, and
-the PRG stub 3,038 where it carried 3,038. Format 0.7 still. Every one of
-the thirteen binaries is byte-identical to 0.8.1's: this release changes
-the tool that carries them, not them.
+The player is 3,434 bytes at unit size 2, and the PRG stub 3,038. Format
+0.7 still. All thirteen binaries are unchanged: this release changes the
+tool that carries them, not them.
 
 - `ym-to-ymx -timersT` reached the SNDH title instead of the packer, so a
   tune asked for other timers was packed on the default ones and the run
