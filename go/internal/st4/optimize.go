@@ -30,7 +30,7 @@ func clamp(value int64, low, high int) int {
 // candidates are weighed in the same order with the same strictly-better
 // replacement rule as the other two trees, so ties fall the same way and the
 // bytes match.
-func Optimize(units []uint32, unit, offsetLimit int) *Block {
+func Optimize(units []uint32, unit, offsetLimit int, progress bool) *Block {
 	literalBits := 8 * unit
 	count := len(units)
 	optimalBits := make([]int, count)
@@ -38,7 +38,7 @@ func Optimize(units []uint32, unit, offsetLimit int) *Block {
 	winOffset := make([]int, count)
 	winAux := make([]int, count)
 	forward(units, literalBits, offsetLimit, optimalBits, winKind, winOffset,
-		winAux)
+		winAux, progress)
 	r := &rebuilder{
 		units:       units,
 		literalBits: literalBits,
@@ -51,7 +51,7 @@ func Optimize(units []uint32, unit, offsetLimit int) *Block {
 }
 
 func forward(units []uint32, literalBits, offsetLimit int, optimalBits []int,
-	winKind []byte, winOffset, winAux []int) {
+	winKind []byte, winOffset, winAux []int, progress bool) {
 	count := len(units)
 	width := clamp(int64(count)-1, InitialOffset, offsetLimit)
 	stateBits := make([]int, width+1)
@@ -74,6 +74,8 @@ func forward(units []uint32, literalBits, offsetLimit int, optimalBits []int,
 	// before the stream.
 	stateBits[InitialOffset] = -1
 	stateEnd[InitialOffset] = -1
+
+	meter := NewMeter(TotalSteps(count, 0, offsetLimit), progress)
 
 	for index := 0; index < count; index++ {
 		maxOffset := clamp(int64(index), InitialOffset, offsetLimit)
@@ -157,7 +159,9 @@ func forward(units []uint32, literalBits, offsetLimit int, optimalBits []int,
 			panic("every position has a winner")
 		}
 		optimalBits[index] = best
+		meter.Advance(int64(maxOffset))
 	}
+	meter.Finish()
 }
 
 // rebuilder rebuilds an optimal parse chain from what the forward pass

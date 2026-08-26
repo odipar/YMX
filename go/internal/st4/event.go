@@ -21,12 +21,13 @@ const absent = -1 << 63
 // OptimizeEvents is the parser the tools use. Where the event count is low it
 // runs the engine, and otherwise the plain DP, which is what the other trees
 // do and what keeps the bytes the same.
-func OptimizeEvents(units []uint32, unit, offsetLimit int) *Block {
+func OptimizeEvents(units []uint32, unit, offsetLimit int,
+	progress bool) *Block {
 	e := newEngine(units, unit, offsetLimit)
 	if e.countEvents() > int64(churn)*int64(len(units)) {
-		return Optimize(units, unit, offsetLimit)
+		return Optimize(units, unit, offsetLimit, progress)
 	}
-	e.run()
+	e.run(progress)
 	r := &rebuilder{
 		units:       units,
 		literalBits: e.literalBits,
@@ -205,8 +206,9 @@ func (e *engine) countEvents() int64 {
 	return events
 }
 
-func (e *engine) run() {
+func (e *engine) run(progress bool) {
 	count := len(e.units)
+	meter := NewMeter(TotalSteps(count, 0, e.offsetLimit), progress)
 
 	// The fake state every chain hangs from: offset one, just before the
 	// stream, as the reference DP seeds it.
@@ -334,7 +336,9 @@ func (e *engine) run() {
 		e.costTree.set(j, int64(best)<<22|int64(uint32(j)))
 
 		e.chain(j)
+		meter.Advance(int64(clamp(int64(j), 1, e.offsetLimit)))
 	}
+	meter.Finish()
 }
 
 func (e *engine) startRun(offset, start int) {

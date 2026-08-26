@@ -22,6 +22,9 @@ type Options struct {
 	DrumHz    int
 	TimerMap  int
 	SidResume bool
+
+	// Progress draws the parse's percentage where something is watching.
+	Progress bool
 }
 
 // Defaults are the shape the packer uses where the caller names none.
@@ -32,6 +35,7 @@ func Defaults() Options {
 		Unit:     0,
 		Loops:    true,
 		TimerMap: ymx.DefaultTimers,
+		Progress: true,
 	}
 }
 
@@ -89,8 +93,8 @@ func Pack(input []byte, o Options) (*Packed, error) {
 		}
 	}
 
-	result, err := ymx.EncodeOnTimers(tune, o.Ring, o.Chunk, o.Loops, unit,
-		o.TimerMap)
+	result, err := ymx.EncodeOnTimers(tune, o.Ring, o.Chunk, o.Loops,
+		o.Progress, unit, o.TimerMap)
 	if err != nil {
 		return nil, err
 	}

@@ -42,7 +42,7 @@ func main() {
 		fail("st4: cannot read " + args[0])
 	}
 	units := st4.Split(input, unit)
-	optimal := st4.OptimizeEvents(units, unit, st4.MaxOffsetUnits(unit))
+	optimal := st4.OptimizeEvents(units, unit, st4.MaxOffsetUnits(unit), true)
 	result := st4.Compress(optimal, units, unit, maxOp)
 	if err := os.WriteFile(args[1], result.Container(), 0o644); err != nil {
 		fail("st4: cannot write " + args[1])

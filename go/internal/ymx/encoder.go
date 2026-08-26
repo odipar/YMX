@@ -86,16 +86,17 @@ func (r *EncodeResult) LongestOp() int {
 }
 
 // Encode writes a tune out with the default channel-to-timer map.
-func Encode(tune *Tune, ringSize, chunk int, loops bool, unit int) (
-	*EncodeResult, error) {
-	return EncodeOnTimers(tune, ringSize, chunk, loops, unit, DefaultTimers)
+func Encode(tune *Tune, ringSize, chunk int, loops, progress bool,
+	unit int) (*EncodeResult, error) {
+	return EncodeOnTimers(tune, ringSize, chunk, loops, progress, unit,
+		DefaultTimers)
 }
 
 // EncodeOnTimers is the whole encoder, with the channel-to-timer map the T
 // stream carries. From this line down nothing depends on which format the
 // tune was read out of.
-func EncodeOnTimers(tune *Tune, ringSize, chunk int, loops bool, unit,
-	timerMap int) (*EncodeResult, error) {
+func EncodeOnTimers(tune *Tune, ringSize, chunk int, loops, progress bool,
+	unit, timerMap int) (*EncodeResult, error) {
 	// The floor first, on what every tune decodes; the exact check waits for
 	// the script, since a tune that leaves channels idle decodes fewer
 	// streams and may use a smaller chunk.
@@ -163,11 +164,12 @@ func EncodeOnTimers(tune *Tune, ringSize, chunk int, loops bool, unit,
 	for stream := 0; stream < Streams; stream++ {
 		values := vectors[stream]
 		if loopSections == nil {
-			sections[stream] = packSection(values, offsetLimit, unit)
+			sections[stream] = packSection(values, offsetLimit, unit, progress)
 		} else {
-			sections[stream] = packSection(values[:plan.Frame], offsetLimit, unit)
+			sections[stream] = packSection(values[:plan.Frame], offsetLimit,
+				unit, progress)
 			loopSections[stream] = packSection(values[plan.Frame:], offsetLimit,
-				unit)
+				unit, progress)
 		}
 		var second *section
 		if loopSections != nil {
@@ -221,12 +223,13 @@ type section struct {
 // packSection packs one section. A short section costs more as a container
 // than as itself, and then the values are what the file gets, with the
 // section's offset saying so.
-func packSection(values []byte, offsetLimit, unit int) section {
+func packSection(values []byte, offsetLimit, unit int, progress bool) section {
 	if len(values) == 0 {
 		return section{Bytes: nil}
 	}
 	units := st4.Split(values, unit)
-	result := st4.Compress(st4.OptimizeEvents(units, unit, offsetLimit),
+	result := st4.Compress(
+		st4.OptimizeEvents(units, unit, offsetLimit, progress),
 		units, unit, st4.MaxOp)
 	container := result.Container()
 	if len(values) < len(container) {
