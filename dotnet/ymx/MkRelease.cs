@@ -54,7 +54,7 @@ namespace Ymx
 
         private const string UsageText =
                 "usage: mkrelease.sh [-publish] [stagedir]\n"
-                + "       mkrelease.sh -notes";
+                + "       mkrelease.sh -notes [release]";
 
         public static void Main(string[] args)
         {
@@ -86,11 +86,14 @@ namespace Ymx
             }
             if (notesOnly)
             {
-                if (publish || i < args.Length)
+                if (publish)
                 {
                     throw Tools.Fail(UsageText);
                 }
-                RepostNotes();
+                // A release names itself, so an older page can be rewritten
+                // from its own section without staging anything.
+                RepostNotes(i < args.Length ? args[i]
+                        : YmxFormat.ReleaseName());
                 return;
             }
             string dir = Path.GetFullPath(i < args.Length ? args[i]
@@ -194,9 +197,24 @@ namespace Ymx
         /// </summary>
         internal static string Notes(string commit)
         {
-            return Reflow(ReleaseNotes())
+            return Notes(YmxFormat.ReleaseName(), commit, true);
+        }
+
+        /// <summary>
+        /// A release's page, out of its own section: the notes reflowed, and
+        /// one line saying where the binaries came from.
+        /// <para>carriesZip is a fact about the release rather than about
+        /// this build. Releases before 0.8.2 published their binaries as
+        /// loose files, so naming a zip on one of those pages would point a
+        /// reader at an asset that is not there.</para>
+        /// </summary>
+        internal static string Notes(string release, string commit,
+                bool carriesZip)
+        {
+            return Reflow(NotesFor(release))
                     + "\n\nPrebuilt SNDH cores and the PRG stub, assembled at "
-                    + commit + ", in " + BinariesZipName()
+                    + commit
+                    + (carriesZip ? ", in ymx-binaries-v" + release + ".zip" : "")
                     + ". doc/BINARIES.md is the combine contract; MANIFEST.txt"
                     + " lists sizes and SHA-256 digests.";
         }
@@ -270,9 +288,9 @@ namespace Ymx
         /// where its binaries came from however far main has moved since -
         /// a reworded section is the page changing, not the release.
         /// </summary>
-        private static void RepostNotes()
+        private static void RepostNotes(string release)
         {
-            string tag = Tag();
+            string tag = "binaries-v" + release;
             if (Tools.Status(Tools.Repo(),
                     new List<string> {"gh", "release", "view", tag}) != 0)
             {
@@ -282,8 +300,12 @@ namespace Ymx
             string tagged = Tools.Output(Tools.Repo(), new List<string>
                     {"gh", "api", "repos/{owner}/{repo}/commits/" + tag,
                     "--jq", ".sha"});
+            bool carriesZip = Tools.Output(Tools.Repo(), new List<string>
+                    {"gh", "release", "view", tag, "--json", "assets", "--jq",
+                    ".assets[].name | select(. == \"ymx-binaries-v" + release
+                            + ".zip\")"}).Trim().Length != 0;
             Tools.RunLoudly(Tools.Repo(),
-                    EditCommand(tag, Notes(ShortSha(tagged))));
+                    EditCommand(tag, Notes(release, ShortSha(tagged), carriesZip)));
             Console.WriteLine("notes rewritten for " + tag + " at "
                     + ShortSha(tagged));
         }
@@ -490,7 +512,14 @@ namespace Ymx
         /// throws rather than leaving, so a test can call it.</summary>
         public static string ReleaseNotes()
         {
-            string heading = "## " + YmxFormat.ReleaseName();
+            return NotesFor(YmxFormat.ReleaseName());
+        }
+
+        /// <summary>Any release's section, by its version. An older page can
+        /// be rewritten from its own account without staging anything.</summary>
+        public static string NotesFor(string release)
+        {
+            string heading = "## " + release;
             string path = Path.Combine(Tools.Repo(), "doc", "RELEASES.md");
             string document;
             try

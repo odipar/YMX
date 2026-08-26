@@ -178,6 +178,37 @@ final class MkReleaseTest {
         assertArrayEquals(first, again, "the binaries zip is not reproducible");
     }
 
+    /**
+     * A page can be rewritten from its own section, for a release that is not
+     * this build's. The three older pages were rewritten by hand once, with
+     * the notes assembled in a shell script, and the footer ran into the
+     * paragraph above it on all three - which is the sort of thing the stager
+     * gets right and a one-off does not.
+     */
+    @Test
+    void anOlderReleasesNotesComeFromItsOwnSection() {
+        String older = MkRelease.notes("0.6.0", "4e46b58", false);
+        assertTrue(older.startsWith("The player is 3,412 bytes"),
+                "0.6.0's notes do not open with its own section: "
+                        + older.substring(0, Math.min(60, older.length())));
+        assertTrue(older.contains("assembled at 4e46b58."),
+                "the notes name another commit than the one asked for");
+        assertTrue(!older.contains("ymx-binaries-v0.6.0.zip"),
+                "0.6.0 published loose files, so its page must not send a"
+                        + " reader to a zip that is not among its assets");
+        assertTrue(older.contains("\n\nPrebuilt SNDH cores"),
+                "a blank line separates the footer from the section, or the"
+                        + " page renders them as one paragraph");
+    }
+
+    /** This release names its zip, because it carries one. */
+    @Test
+    void thisReleasesNotesNameTheBinariesZip() {
+        String mine = MkRelease.notes(YmxFormat.releaseName(), "abc1234", true);
+        assertTrue(mine.contains(", in " + MkRelease.binariesZipName() + "."),
+                "the notes do not say which asset holds the binaries");
+    }
+
     @Test
     void theUploadCommandCarriesEveryStagedFile() {
         Path dir = Path.of("dist", "release");

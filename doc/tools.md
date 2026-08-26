@@ -196,11 +196,12 @@ notes, so a release with no account of what it changes is not
 published.
 
     ymx/mkrelease.sh [-publish] [stagedir]
-    ymx/mkrelease.sh -notes
+    ymx/mkrelease.sh -notes [release]
 
 | flag | meaning |
 |---|---|
 | `-publish` | create or update the GitHub release `binaries-v<release>` through `gh`, replacing its assets |
+| `-notes [release]` | rewrite a published page's notes and nothing else. Without a version it is this build's release; with one, any release still published. The commit the page names is the tag's own, not HEAD |
 | `-notes` | post this release's section again, and nothing else |
 
 A new release is tagged at the staged commit, the one its notes name. An

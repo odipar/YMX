@@ -4,6 +4,8 @@
 #   ymx/mkrelease.sh [stagedir]              # assemble and verify only
 #   ymx/mkrelease.sh -publish [stagedir]     # and publish a GitHub release
 #   ymx/mkrelease.sh -notes                  # rewrite a published page's notes
+#   ymx/mkrelease.sh -notes 0.6.0            # rewrite an older page's, from
+#                                            # its own section and its own tag
 #
 # Stages every core variant - three unit sizes by the perf and mask flags -
 # plus the PRG stub, verified against the descriptors the combiners read,
