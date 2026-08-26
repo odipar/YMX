@@ -21,7 +21,7 @@ import org.junit.jupiter.api.io.TempDir;
  */
 final class MkPrgTest {
 
-    /** A stub-shaped byte block: 'YMXP' at 4, version 1, even-sized. */
+    /** A stub-shaped byte block: 'YMXP' at 4, version 2, even-sized. */
     static byte[] stub() {
         byte[] stub = new byte[40];
         stub[0] = 0x60;
@@ -29,7 +29,7 @@ final class MkPrgTest {
         stub[5] = 'M';
         stub[6] = 'X';
         stub[7] = 'P';
-        stub[9] = 1;
+        stub[9] = 2;
         return stub;
     }
 
@@ -50,6 +50,8 @@ final class MkPrgTest {
         assertEquals(3, word(prg, text + MkPrg.STUB_TUNES), "subtunes patched");
         assertEquals(4500, longAt(prg, text + MkPrg.STUB_FRAMES), "frames patched");
         assertEquals(MkPrg.STUB_FLAG_MARKER, word(prg, text + MkPrg.STUB_FLAGS));
+        assertEquals(50, word(prg, text + MkPrg.STUB_RATE),
+                "a set with no timer tag is patched to the 50 Hz default");
         assertArrayEquals(sndh, Arrays.copyOfRange(prg,
                 text + stub.length, text + stub.length + sndh.length));
         assertEquals(0, longAt(prg, prg.length - 4), "the empty relocation table");

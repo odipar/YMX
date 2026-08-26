@@ -172,10 +172,11 @@ Position-independent, raw, even-sized. Fixed layout at its start:
 |---:|---:|---|
 | 0 | 4 | `bra.w` to the program |
 | 4 | 4 | `'YMXP'` |
-| 8 | 2 | descriptor version - **1** |
+| 8 | 2 | descriptor version - **2** |
 | 10 | 2 | subtunes - patched by the combiner |
 | 12 | 4 | frames of subtune 1 when it plays once and stands alone - patched; 0 = play on |
-| 16 | 2 | flags - patched: bit 0 = drop `YMXDONE.MRK` on exit |
+| 16 | 2 | flags - patched: bit 0 = drop `YMXDONE.MRK` on exit, bit 1 = tick from the VBL because the set claims Timer C |
+| 18 | 2 | the tune rate in Hz - patched from the SNDH file's own timer tag; the assembler leaves 50 |
 
 The stub reaches the SNDH file at its own last byte: the file is appended
 directly after it, at an even position - the reason the stub must be
@@ -195,13 +196,44 @@ In order:
 4. **The relocation table**: one zero long - nothing in the stub or a
    position-independent SNDH file is relocated.
 
-The program takes the machine over, calls play once per VBL, stops on
+The program takes the machine over, drives play as §5 states, stops on
 SPACE or ESCAPE or when a patched frame count runs out, and switches
 subtunes on the number keys 1-9. It hands the machine back as it found
 it: the VBL vector, the MFP's interrupt and timer registers, and all four
 MFP timer vectors, which a player parks and restores none of.
 
-## 5. From the release to a program, step by step
+## 5. Driving play - the host's side
+
+An SNDH file is passive: init sets the tune up and installs the timers
+its own effects claim, and something outside the file calls play at the
+tune's rate. The header's timer tag - `TC` here, one of `TA` `TB` `TC`
+`TD` `!V` in the wild - addresses that caller: it gives the rate, and
+names the interrupt a desktop host should make the calls from. The
+`FLAG~` letters list the timers the subtunes claim for effects, so a
+host picks a tick source the tunes do not use.
+
+The convention, and the reason `TC` is the tag this recipe writes: a
+desktop host chains the operating system's own 200 Hz Timer C interrupt
+- reprogramming nothing - counts the rate against 200, and calls play
+when the count crosses. The system clock keeps running, and Timers A, B
+and D stay free for the effects. The reference hosts read the tag the
+same way: the rate is obeyed and the timer letter is advice, since a
+host that owns its machine may make the calls from anything.
+
+The stub owns the whole machine, so it does not chain: it programs
+Timer C itself at the same 200 Hz (/64, count 192), accumulates the
+patched rate against 200 - a 50 Hz tune plays every fourth tick, a
+60 Hz one lands 60 calls in every 200 with no drift, a rate above 200
+lands more than one call on a tick - and clears the in-service bit
+before each call, so the file's own timers preempt the frame write
+exactly as they would under a VBL host. Where the set claims Timer C
+for an effect channel (flag bit 1, from the `FLAG~` letters), the stub
+ticks from the VBL instead, and the combiner rejects such a set at any
+rate but 50, since the VBL is a 50 Hz clock. The handback needs nothing
+new: the four timer vectors, the control registers and Timer C's 192
+were already restored.
+
+## 6. From the release to a program, step by step
 
 The whole build for a system with no assembler and no JVM.
 
@@ -229,9 +261,9 @@ and the PRG header; patches two longs in the core and three fields in the
 stub; copies the tunes; and zero-fills the workspace and the relocation
 long. No instruction changes.
 
-## 6. Use cases
+## 7. Use cases
 
-Each case is §5 with one decision changed.
+Each case is §6 with one decision changed.
 
 **One tune, its own sizes.** Read the tune's header, take the core its
 sections' unit selects - `ymxsndh-k1-v<release>.bin` for a tune
@@ -276,7 +308,7 @@ clear, and stub flag bit 0 set (§3): the program plays the patched frame
 count, drops `YMXDONE.MRK` on exit, and a harness watching for the file
 closes the emulator by itself.
 
-**A jukebox host.** Stop after §5 step 4: an SNDH host plays the file as
+**A jukebox host.** Stop after §6 step 4: an SNDH host plays the file as
 it stands. The stub and PRG header are only for running it as a TOS
 program.
 
@@ -286,5 +318,5 @@ rate, exit to hand the machine back. Every entry preserves d0-a6.
 
 **A changed set.** The file holds no checksums; the tags, the table and
 the workspace all follow from the tune headers and positions, so adding,
-dropping or replacing a tune is a rebuild from the same parts - §5 steps
+dropping or replacing a tune is a rebuild from the same parts - §6 steps
 4 and 5 again, not a patch.

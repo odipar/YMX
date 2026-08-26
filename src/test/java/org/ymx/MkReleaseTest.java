@@ -227,8 +227,8 @@ final class MkReleaseTest {
             refusedStub(stub, "is not a PRG stub");
         }
         byte[] version = MkPrgTest.stub();
-        version[MkPrg.STUB_VERSION + 1] = 2;
-        refusedStub(version, "stub descriptor version 2");
+        version[MkPrg.STUB_VERSION + 1] = 1;
+        refusedStub(version, "stub descriptor version 1");
         byte[] frames = MkPrgTest.stub();
         frames[MkPrg.STUB_FRAMES + 3] = 9;
         refusedStub(frames, "frame count");

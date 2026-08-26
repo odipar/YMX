@@ -362,11 +362,11 @@ namespace Ymx
             {
                 throw new ArgumentException(name + " is not a PRG stub");
             }
-            if (MkSndh.Word(stub, MkPrg.StubVersion) != 1)
+            if (MkSndh.Word(stub, MkPrg.StubVersion) != 2)
             {
                 throw new ArgumentException(name
                         + " carries stub descriptor version "
-                        + MkSndh.Word(stub, MkPrg.StubVersion) + ", not 1");
+                        + MkSndh.Word(stub, MkPrg.StubVersion) + ", not 2");
             }
             if (!ZeroLong(stub, MkPrg.StubFrames))
             {
