@@ -33,19 +33,19 @@ public final class Play {
               ym/play.sh -n256 song.ym            # smaller rings: less RAM, worse ratio
               ym/play.sh -n2048 -c32 song.ym      # longer calls: cheaper on average
               ym/play.sh -o song.ym               # play once and stop, instead of
-                                                   # starting over at the end
+                                                  # starting over at the end
               ym/play.sh -min13 -sec52 song.ym    # trim: start deep in a long tune
               ym/play.sh -startframe41403 -frames1729 song.ym
               ym/play.sh one.ym two.ym            # a set: subtunes, number keys pick
               ym/play.sh -perf song.ym            # the raster monitor: the frame step
-                                                   # works in red, timer ticks in green
-                                                   # (A) and blue (D), and a yellow bar
-                                                   # estimates the ticks' scanlines
+                                                  # works in red, timer ticks in green
+                                                  # (A) and blue (D), and a yellow bar
+                                                  # estimates the ticks' scanlines
               ym/play.sh -nomask song.ym          # drop the interrupt mask around the
-                                                   # frame write, which the writes do
-                                                   # not need: ticks then interleave
-                                                   # with it instead of waiting ~500
-                                                   # cycles behind it
+                                                  # frame write, which the writes do
+                                                  # not need: ticks then interleave
+                                                  # with it instead of waiting ~500
+                                                  # cycles behind it
 
             Press SPACE in the Hatari window to stop. Everything it builds lands in a
             work directory next to the first tune. The trim flags take one tune.
@@ -77,23 +77,21 @@ public final class Play {
             } else if (a.startsWith("-c")) {
                 chunk = number(a.substring(2));
             } else if (a.startsWith("-k")) {
-                unit = "-k" + a.substring(2);
-            } else {
+                unit = "-k" + number(a.substring(2));   // parsed, so -k01 and
+            } else {                                    // -k1 name one directory
                 extra.add(a);           // the packer's: trim, -drumhz, whatever
             }                           // it reads next
         }
         List<Path> yms = new ArrayList<>();
         for (; i < args.length; i++) {
+            if (!Files.isRegularFile(Path.of(args[i]))) {
+                throw Tools.fail("play.sh: cannot read " + args[i]);
+            }
             yms.add(Path.of(args[i]));
         }
         if (yms.isEmpty()) {
             throw Tools.fail("usage: play.sh [-perf] [-nomask] [-nRING]"
                     + " [-cCHUNK] [-kUNIT] [-o] song.ym...");
-        }
-        for (Path ym : yms) {
-            if (!Files.isRegularFile(ym)) {
-                throw Tools.fail("play.sh: no such file: " + ym);
-            }
         }
         String hatari = env("HATARI", "hatari");
         Path tos = Path.of(env("TOS", System.getProperty("user.home")

@@ -55,7 +55,8 @@ public final class St4Decompressor {
      * for a ring of that many units, so this is how tests hold a {@code -mN}
      * stream to its ring without a ring in sight.
      *
-     * @throws IllegalStateException when the stream reaches further back
+     * @throws IllegalStateException when the stream reaches further back than
+     *     the limit, runs out of literals, or writes past the output
      */
     public static byte[] decompress(byte[] control, byte[] literal, byte[] byteOffsets,
                                     byte[] wordOffsets, int unit, int size,
@@ -96,6 +97,12 @@ public final class St4Decompressor {
         int length = readInterlacedEliasGamma();
         assert length > 0 : "invalid literal length";
         for (int i = 0; i < length * unit; i++) {
+            if (literalIndex >= literal.length) {
+                throw new IllegalStateException("truncated literal stream");
+            }
+            if (outputIndex >= output.length) {
+                throw new IllegalStateException("the streams overran the output");
+            }
             output[outputIndex++] = literal[literalIndex++];
         }
         state = State.LITERALS;
@@ -139,6 +146,9 @@ public final class St4Decompressor {
         int distance = lastOffset * unit;
         assert distance <= outputIndex : "match reaches before the output";
         for (int i = 0; i < length * unit; i++) {
+            if (outputIndex >= output.length) {
+                throw new IllegalStateException("the streams overran the output");
+            }
             output[outputIndex] = output[outputIndex - distance];
             outputIndex++;
         }

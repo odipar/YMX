@@ -24,6 +24,16 @@ Press SPACE in its window to stop. Everything it builds lands in a work
 directory next to the first tune. HATARI= and TOS= point at your own
 install.`
 
+// The first value the packer has no use for, held until the TOS image has
+// been looked for: that is the order the other trees report them in.
+var problem string
+
+func record(message string) {
+	if problem == "" {
+		problem = message
+	}
+}
+
 func main() {
 	options := pack.Defaults()
 	perf, maskBurst := false, true
@@ -44,14 +54,28 @@ flags:
 			return
 		case a == "-sidresume":
 			options.SidResume = true
+		case strings.HasPrefix(a, "-timers"):
+			options.TimerMap = timers(a[len("-timers"):])
 		case strings.HasPrefix(a, "-drumhz"):
-			options.DrumHz = number(a[len("-drumhz"):])
+			options.DrumHz = number(a[len("-drumhz"):], false)
+		case strings.HasPrefix(a, "-startframe"):
+			options.StartFrame = number(a[len("-startframe"):], true)
+		case strings.HasPrefix(a, "-endframe"):
+			options.EndFrame = number(a[len("-endframe"):], true)
+		case strings.HasPrefix(a, "-frames"):
+			options.FrameCount = number(a[len("-frames"):], true)
+		case strings.HasPrefix(a, "-min"):
+			options.StartMin = number(a[len("-min"):], true)
+		case strings.HasPrefix(a, "-sec"):
+			options.StartSec = number(a[len("-sec"):], true)
 		case strings.HasPrefix(a, "-n"):
-			options.Ring = number(a[2:])
+			options.Ring = number(a[2:], false)
 		case strings.HasPrefix(a, "-c"):
-			options.Chunk = number(a[2:])
+			options.Chunk = number(a[2:], false)
 		case strings.HasPrefix(a, "-k"):
-			options.Unit = number(a[2:])
+			options.Unit = number(a[2:], false)
+		case strings.HasPrefix(a, "-l"):
+			options.LoopFrame = number(a[2:], true)
 		default:
 			break flags
 		}
@@ -69,6 +93,15 @@ flags:
 	hatari := env("HATARI", "hatari")
 	tos := env("TOS", filepath.Join(home(), "hatari-2.6.1_macos",
 		"tos-2.06.rom"))
+	// Before the pack, not after: a missing image otherwise costs a whole
+	// build and leaves a work directory behind, which the other trees do not.
+	if info, err := os.Stat(tos); err != nil || info.IsDir() {
+		fail("play.sh: no TOS image at " + tos +
+			" - set TOS=/path/to/tos.img")
+	}
+	if problem != "" {
+		fail("Error: " + problem)
+	}
 
 	// One directory per run, named after the first tune and the shape, so a
 	// second run with a different ring size does not overwrite the first.
@@ -82,7 +115,7 @@ flags:
 	}
 	name += fmt.Sprintf("-n%d-c%d", options.Ring, options.Chunk)
 	if options.Unit != 0 {
-		name += fmt.Sprintf("-%d", options.Unit)
+		name += fmt.Sprintf("-k%d", options.Unit)
 	}
 	work := filepath.Join(filepath.Dir(first), name)
 	if err := os.MkdirAll(work, 0o755); err != nil {
@@ -94,6 +127,7 @@ flags:
 		fail(err.Error())
 	}
 	fmt.Println("play.sh: packing " + strings.Join(rest, " "))
+	fmt.Println(pack.Banner())
 	packed := make([]string, 0, len(rest))
 	for _, tune := range rest {
 		input, err := os.ReadFile(tune)
@@ -102,8 +136,12 @@ flags:
 		}
 		result, err := pack.Pack(input, options)
 		if err != nil {
-			fail(tune + ": " + err.Error())
+			fail("Error: " + err.Error())
 		}
+		for _, note := range result.Notes {
+			fmt.Println(note)
+		}
+		pack.Report(os.Stdout, result.Result)
 		out := filepath.Join(work, pack.Stem(tune)+".ymx")
 		if err := os.WriteFile(out, result.Result.File, 0o644); err != nil {
 			fail("play.sh: cannot write " + out)
@@ -170,12 +208,31 @@ func home() string {
 	return ""
 }
 
-func number(text string) int {
-	value, err := strconv.Atoi(text)
-	if err != nil {
-		fail(usageText)
+// number reads a flag's value. This command reads the digits itself, because
+// the work directory is named after the ring, the chunk and the unit, and
+// says so in its own words when they are not digits. A value that is digits
+// but no use to the packer - a zero unit, a negative count - is held back:
+// the other trees hand the flag to the packer, which turns it down after the
+// TOS image has been looked for, and the order is what a caller sees.
+func number(text string, zeroAllowed bool) int {
+	value, message := pack.Number(text, zeroAllowed)
+	if message == "" {
+		return value
 	}
+	if _, digits := strconv.Atoi(text); digits != nil {
+		fail("play.sh: not a number: " + text)
+	}
+	record(message)
 	return value
+}
+
+// timers reads the timer map, failing the way this command fails.
+func timers(spec string) int {
+	assignments, err := pack.ParseTimers(spec)
+	if err != nil {
+		fail("play.sh: " + err.Error())
+	}
+	return assignments
 }
 
 func fail(message string) {

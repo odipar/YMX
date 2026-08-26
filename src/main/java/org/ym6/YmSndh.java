@@ -1,5 +1,6 @@
 package org.ym6;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
@@ -39,9 +40,15 @@ public final class YmSndh {
         if (args.length - i < 2) {
             throw Tools.fail(USAGE);
         }
+        // The packer's flags are read before anything is made, so a flag it
+        // does not have stops the run with no work directory left behind.
+        Ymx.checkFlags(packerFlags);
         Path output = Path.of(args[i++]);
         List<Path> yms = new ArrayList<>();
         for (; i < args.length; i++) {
+            if (!Files.isRegularFile(Path.of(args[i]))) {
+                throw Tools.fail("ymsndh: cannot read " + args[i]);
+            }
             yms.add(Path.of(args[i]));
         }
 

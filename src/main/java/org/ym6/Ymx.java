@@ -79,75 +79,29 @@ public final class Ymx {
                 + YmxFormat.releaseName() + " by Robbert van Dalen, "
                 + "streaming ST4");
 
-        int ringSize = YmxFormat.DEFAULT_RING_SIZE;
-        int chunk = YmxFormat.DEFAULT_CHUNK;
-        int unit = 0;                           // 0 until chosen: -kK, or the
-        boolean playOnce = false;               // tune's shape
-        boolean forcedMode = false;
-        boolean sidResume = false;
-        int startMin = 0;                       // the trim window, for zooming
-        int startSec = 0;                       // in on a moment of a tune
-        int startFrame = -1;
-        int endFrame = -1;
-        int frameCount = -1;
-        int loopFrame = -1;                     // -1 until -lF: the header's own
-        int drumHz = YmEffects.MAX_TIMER_HZ;
-        int timerMap = YmxFormat.DEFAULT_TIMERS;
-        int i = 0;
-        for (; i < args.length && args[i].startsWith("-"); i++) {
-            switch (args[i]) {
-                case "-f" -> forcedMode = true;
-                case "-o" -> playOnce = true;
-                case "-sidresume" -> sidResume = true;
-                default -> {
-                    if (args[i].startsWith("-timers")) {
-                        timerMap = parseTimers(args[i].substring(7));
-                    } else if (args[i].startsWith("-drumhz")) {
-                        drumHz = parseNumber(args[i].substring(7));
-                    } else if (args[i].startsWith("-startframe")) {
-                        startFrame = parseNumber(args[i].substring(11), true);
-                    } else if (args[i].startsWith("-endframe")) {
-                        endFrame = parseNumber(args[i].substring(9), true);
-                    } else if (args[i].startsWith("-frames")) {
-                        frameCount = parseNumber(args[i].substring(7), true);
-                    } else if (args[i].startsWith("-min")) {
-                        startMin = parseNumber(args[i].substring(4), true);
-                    } else if (args[i].startsWith("-sec")) {
-                        startSec = parseNumber(args[i].substring(4), true);
-                    } else if (args[i].startsWith("-n")) {
-                        ringSize = parseNumber(args[i].substring(2));
-                    } else if (args[i].startsWith("-c")) {
-                        chunk = parseNumber(args[i].substring(2));
-                    } else if (args[i].startsWith("-k")) {
-                        unit = parseNumber(args[i].substring(2));
-                    } else if (args[i].startsWith("-l")) {
-                        loopFrame = parseNumber(args[i].substring(2), true);
-                    } else {
-                        throw error("Invalid parameter " + args[i]);
-                    }
-                }
-            }
-        }
+        Flags flags = parseFlags(args);
+        int i = flags.inputs;
 
         // A trailing DIRECTORY collects a whole set: every argument before it
         // is an input, each packed with the identical configuration into
         // <dir>/<stem>.ymx - the shape a multi-tune player needs, since one
         // player build serves one unit size and one workspace.
         if (args.length - i >= 2 && Files.isDirectory(Path.of(args[args.length - 1]))) {
-            if (startMin != 0 || startSec != 0 || startFrame >= 0
-                    || endFrame >= 0 || frameCount >= 0) {
+            if (flags.startMin != 0 || flags.startSec != 0 || flags.startFrame >= 0
+                    || flags.endFrame >= 0 || flags.frameCount >= 0) {
                 throw error("the trim options take one tune, not a set");
             }
-            if (unit == 0) {
-                unit = 2;               // uniform by construction: padding
+            if (flags.unit == 0) {
+                flags.unit = 2;         // uniform by construction: padding
             }                           // makes any shape fit, or fails loudly
             Path dir = Path.of(args[args.length - 1]);
             for (int input = i; input < args.length - 1; input++) {
                 String stem = Path.of(args[input]).getFileName().toString()
                         .replaceAll("(?i)\\.ym$", "");
                 packOne(args[input], dir.resolve(stem + ".ymx").toString(),
-                        ringSize, chunk, unit, playOnce, forcedMode,
-                        drumHz, sidResume, timerMap, 0, 0, -1, -1, -1, loopFrame);
+                        flags.ringSize, flags.chunk, flags.unit, flags.playOnce,
+                        flags.forcedMode, flags.drumHz, flags.sidResume,
+                        flags.timerMap, 0, 0, -1, -1, -1, flags.loopFrame);
             }
             return;
         }
@@ -163,10 +117,10 @@ public final class Ymx {
                            ymx [options] one.ym two.ym more.ym output-dir/
                       -f      Force overwrite of output file
                       -o      Play once: stop at the end instead of starting over
-                      -lF     Start over from frame F rather than from the
-                              frame the header gives; -l0 starts over from the
-                              beginning. Where the wrap cannot enter F the
-                              packer takes the next frame it can and says so
+                      -lF     Start over from frame F rather than from the frame
+                              the header gives; -l0 starts over from the
+                              beginning. Where the wrap cannot enter F the packer
+                              takes the next frame it can and says so
                       -nN     Ring size per stream, in bytes (default 960)
                       -cC     Values decoded per call, and the round-robin group
                               size (default 24; N mod C = 0, and C at
@@ -208,9 +162,80 @@ public final class Ymx {
                     build can hold as subtunes.""");
             return;
         }
-        packOne(args[i], outputName, ringSize, chunk, unit, playOnce,
-                forcedMode, drumHz, sidResume, timerMap, startMin, startSec, startFrame,
-                endFrame, frameCount, loopFrame);
+        packOne(args[i], outputName, flags.ringSize, flags.chunk, flags.unit,
+                flags.playOnce, flags.forcedMode, flags.drumHz, flags.sidResume,
+                flags.timerMap, flags.startMin, flags.startSec, flags.startFrame,
+                flags.endFrame, flags.frameCount, flags.loopFrame);
+    }
+
+    /** The command line's flags, and where the inputs start. */
+    private static final class Flags {
+        int ringSize = YmxFormat.DEFAULT_RING_SIZE;
+        int chunk = YmxFormat.DEFAULT_CHUNK;
+        int unit = 0;                           // 0 until chosen: -kK, or the
+        boolean playOnce = false;               // tune's shape
+        boolean forcedMode = false;
+        boolean sidResume = false;
+        int startMin = 0;                       // the trim window, for zooming
+        int startSec = 0;                       // in on a moment of a tune
+        int startFrame = -1;
+        int endFrame = -1;
+        int frameCount = -1;
+        int loopFrame = -1;                     // -1 until -lF: the header's own
+        int drumHz = YmEffects.MAX_TIMER_HZ;
+        int timerMap = YmxFormat.DEFAULT_TIMERS;
+        int inputs = 0;                         // the first argument that is
+    }                                           // not a flag
+
+    /**
+     * Reads the leading flags and stops the tool on one the packer does not
+     * have. Nothing is opened and nothing is written, so a front end reads its
+     * flags through this before it makes a work directory and a bad flag
+     * leaves none behind.
+     */
+    public static void checkFlags(java.util.List<String> flags) {
+        parseFlags(flags.toArray(new String[0]));
+    }
+
+    private static Flags parseFlags(String[] args) {
+        Flags flags = new Flags();
+        int i = 0;
+        for (; i < args.length && args[i].startsWith("-"); i++) {
+            switch (args[i]) {
+                case "-f" -> flags.forcedMode = true;
+                case "-o" -> flags.playOnce = true;
+                case "-sidresume" -> flags.sidResume = true;
+                default -> {
+                    if (args[i].startsWith("-timers")) {
+                        flags.timerMap = parseTimers(args[i].substring(7));
+                    } else if (args[i].startsWith("-drumhz")) {
+                        flags.drumHz = parseNumber(args[i].substring(7));
+                    } else if (args[i].startsWith("-startframe")) {
+                        flags.startFrame = parseNumber(args[i].substring(11), true);
+                    } else if (args[i].startsWith("-endframe")) {
+                        flags.endFrame = parseNumber(args[i].substring(9), true);
+                    } else if (args[i].startsWith("-frames")) {
+                        flags.frameCount = parseNumber(args[i].substring(7), true);
+                    } else if (args[i].startsWith("-min")) {
+                        flags.startMin = parseNumber(args[i].substring(4), true);
+                    } else if (args[i].startsWith("-sec")) {
+                        flags.startSec = parseNumber(args[i].substring(4), true);
+                    } else if (args[i].startsWith("-n")) {
+                        flags.ringSize = parseNumber(args[i].substring(2));
+                    } else if (args[i].startsWith("-c")) {
+                        flags.chunk = parseNumber(args[i].substring(2));
+                    } else if (args[i].startsWith("-k")) {
+                        flags.unit = parseNumber(args[i].substring(2));
+                    } else if (args[i].startsWith("-l")) {
+                        flags.loopFrame = parseNumber(args[i].substring(2), true);
+                    } else {
+                        throw error("Invalid parameter " + args[i]);
+                    }
+                }
+            }
+        }
+        flags.inputs = i;
+        return flags;
     }
 
     /** The whole pipeline for one tune: read, trim, pad, pack, write, report. */
@@ -569,6 +594,9 @@ public final class Ymx {
      * worked out, and says so in those words rather than as a bad parameter.
      */
     private static int parseNumber(String argument, boolean zeroAllowed) {
+        if (!decimal(argument)) {
+            throw error("Invalid parameter value " + argument);
+        }
         try {
             int value = Integer.parseInt(argument);
             if (value < 0 || (value == 0 && !zeroAllowed)) {
@@ -578,5 +606,24 @@ public final class Ymx {
         } catch (NumberFormatException e) {
             throw error("Invalid parameter value " + argument);
         }
+    }
+
+    /**
+     * Whether the text is an optional sign and then ASCII digits.
+     * {@code Integer.parseInt} reads the digits of every script, so
+     * {@code -n} with the Arabic-Indic 960 packed a file here where the other
+     * two trees, which convert 32-bit decimal, refused the value.
+     */
+    private static boolean decimal(String argument) {
+        int at = argument.startsWith("+") || argument.startsWith("-") ? 1 : 0;
+        if (at == argument.length()) {
+            return false;
+        }
+        for (; at < argument.length(); at++) {
+            if (argument.charAt(at) < '0' || argument.charAt(at) > '9') {
+                return false;
+            }
+        }
+        return true;
     }
 }

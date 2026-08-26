@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/odipar/ymx/internal/cores"
@@ -67,6 +66,33 @@ func main() {
 	composer := ""
 	var names []string
 
+	// The first bad flag, held back until the output and the tunes are
+	// settled: with too few arguments the usage text is printed instead,
+	// and an output the extension rules out is reported before any flag.
+	// The other trees check in that order, the flags reaching their packer
+	// last.
+	problem := ""
+	record := func(message string) {
+		if problem == "" {
+			problem = message
+		}
+	}
+	number := func(text string, zeroAllowed bool) int {
+		value, message := pack.Number(text, zeroAllowed)
+		if message != "" {
+			record(message)
+		}
+		return value
+	}
+	timers := func(spec string) int {
+		assignments, err := pack.ParseTimers(spec)
+		if err != nil {
+			record(err.Error())
+			return options.TimerMap
+		}
+		return assignments
+	}
+
 	args := os.Args[1:]
 	for len(args) > 0 && strings.HasPrefix(args[0], "-") {
 		a := args[0]
@@ -84,19 +110,19 @@ func main() {
 		case a == "-sidresume":
 			options.SidResume = true
 		case strings.HasPrefix(a, "-timers"):
-			options.TimerMap = parseTimers(a[len("-timers"):])
+			options.TimerMap = timers(a[len("-timers"):])
 		case strings.HasPrefix(a, "-drumhz"):
-			options.DrumHz = number(a[len("-drumhz"):])
+			options.DrumHz = number(a[len("-drumhz"):], false)
 		case strings.HasPrefix(a, "-startframe"):
-			options.StartFrame = number(a[len("-startframe"):])
+			options.StartFrame = number(a[len("-startframe"):], true)
 		case strings.HasPrefix(a, "-endframe"):
-			options.EndFrame = number(a[len("-endframe"):])
+			options.EndFrame = number(a[len("-endframe"):], true)
 		case strings.HasPrefix(a, "-frames"):
-			options.FrameCount = number(a[len("-frames"):])
+			options.FrameCount = number(a[len("-frames"):], true)
 		case strings.HasPrefix(a, "-min"):
-			options.StartMin = number(a[len("-min"):])
+			options.StartMin = number(a[len("-min"):], true)
 		case strings.HasPrefix(a, "-sec"):
-			options.StartSec = number(a[len("-sec"):])
+			options.StartSec = number(a[len("-sec"):], true)
 		case strings.HasPrefix(a, "-t") && len(a) > 2:
 			title = a[2:]
 		case strings.HasPrefix(a, "-N") && len(a) > 2:
@@ -108,15 +134,17 @@ func main() {
 		case strings.HasPrefix(a, "-c") && len(a) > 2 && !isDigit(a[2]):
 			composer = a[2:] // -c with digits is the packer's chunk size
 		case strings.HasPrefix(a, "-n"):
-			options.Ring = number(a[2:])
+			options.Ring = number(a[2:], false)
 		case strings.HasPrefix(a, "-c"):
-			options.Chunk = number(a[2:])
+			options.Chunk = number(a[2:], false)
 		case strings.HasPrefix(a, "-k"):
-			options.Unit = number(a[2:])
+			options.Unit = number(a[2:], false)
 		case strings.HasPrefix(a, "-l"):
-			options.LoopFrame = number(a[2:])
+			options.LoopFrame = number(a[2:], true)
 		default:
-			fail(usageText)
+			// A leading dash that matches no case is a flag this
+			// command does not have, not the name of the output.
+			record("Invalid parameter " + a)
 		}
 		args = args[1:]
 	}
@@ -139,10 +167,33 @@ func main() {
 		fail(fmt.Sprintf("ym-to-ymx: a .ymx holds one tune. Name a .sndh or a"+
 			" .prg output to combine %d of them", len(yms)))
 	}
+	if problem != "" {
+		fail("Error: " + problem)
+	}
+	// The trim options take one tune: a window is frames of that tune, and a
+	// set is packed with the one configuration a player build holds.
+	if len(yms) > 1 && (options.StartMin != 0 || options.StartSec != 0 ||
+		options.StartFrame >= 0 || options.EndFrame >= 0 ||
+		options.FrameCount >= 0) {
+		fail("Error: the trim options take one tune, not a set")
+	}
 	if !force {
 		if _, err := os.Stat(output); err == nil {
 			fail("ym-to-ymx: already existing output file " + output)
 		}
+	}
+
+	// What the set calls itself, where the caller named nothing: the tunes'
+	// own names and a composer they all agree on. The dumps are read here,
+	// so a dump that cannot be read is named in the message; a packing
+	// failure that follows names no file.
+	var set pack.TuneSet
+	if kind != ".ymx" {
+		read, err := pack.SetOf(yms)
+		if err != nil {
+			fail(err.Error())
+		}
+		set = read
 	}
 
 	// The packed tunes: straight to the output where that is what was asked
@@ -153,6 +204,7 @@ func main() {
 			fail("ym-to-ymx: cannot make " + work)
 		}
 	}
+	fmt.Println(pack.Banner())
 	packed := make([]string, 0, len(yms))
 	unit := 2
 	for _, name := range yms {
@@ -162,10 +214,18 @@ func main() {
 		}
 		result, err := pack.Pack(input, options)
 		if err != nil {
-			fail(name + ": " + err.Error())
+			fail("Error: " + err.Error())
 		}
 		for _, note := range result.Notes {
 			fmt.Println(note)
+		}
+		// A .ymx output is the pack itself, so its per-stream cost is what
+		// was asked for. Any other output is a step on the way to a file
+		// that plays, and the table is one line per stream per tune.
+		if kind == ".ymx" {
+			pack.Report(os.Stdout, result.Result)
+		} else {
+			pack.ReportQuietly(os.Stdout, result.Result)
 		}
 		out := output
 		if kind != ".ymx" {
@@ -176,9 +236,6 @@ func main() {
 		if err := os.WriteFile(out, result.Result.File, 0o644); err != nil {
 			fail("ym-to-ymx: cannot write " + out)
 		}
-		fmt.Printf("%s: %d frames at %d Hz, %d bytes\n", out,
-			result.Result.Tune.Frames, result.Result.Tune.FrameRate,
-			len(result.Result.File))
 		packed = append(packed, out)
 		unit = result.Result.Unit
 	}
@@ -186,12 +243,6 @@ func main() {
 		return
 	}
 
-	// What the set calls itself, where the caller named nothing: the tunes'
-	// own names and a composer they all agree on.
-	set, err := pack.SetOf(yms)
-	if err != nil {
-		fail("ym-to-ymx: " + err.Error())
-	}
 	if title == "" {
 		title = set.Title
 	}
@@ -244,24 +295,7 @@ func isDigit(b byte) bool {
 	return b >= '0' && b <= '9'
 }
 
-func number(text string) int {
-	value, err := strconv.Atoi(text)
-	if err != nil {
-		fail(usageText)
-	}
-	return value
-}
-
 func fail(message string) {
 	fmt.Fprintln(os.Stderr, message)
 	os.Exit(1)
-}
-
-// parseTimers reads the timer map, failing the way this command fails.
-func parseTimers(spec string) int {
-	assignments, err := pack.ParseTimers(spec)
-	if err != nil {
-		fail(err.Error())
-	}
-	return assignments
 }

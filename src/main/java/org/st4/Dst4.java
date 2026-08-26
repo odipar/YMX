@@ -75,10 +75,11 @@ public final class Dst4 {
             output = St4Decompressor.decompress(container.control(), container.literal(),
                     container.byteOffsets(), container.wordOffsets(), container.unit(),
                     container.size());
-        } catch (AssertionError | IndexOutOfBoundsException e) {
-            // With -ea a malformed stream trips a descriptive assertion; the
-            // decoder does not validate its input, so report rather than
-            // continue on corrupt data.
+        } catch (AssertionError | IllegalStateException | IndexOutOfBoundsException e) {
+            // The decoder reports a stream that reaches past the offset
+            // limit, runs out of literals or writes past the output; with -ea
+            // the rest of the malformed streams trip a descriptive assertion.
+            // Report rather than continue on corrupt data.
             throw error("Corrupted or truncated ST4 data in " + inputName
                     + (e.getMessage() == null ? "" : ": " + e.getMessage()));
         }

@@ -38,9 +38,15 @@ public final class ProgressMeter {
     private long steps;
     private int shown = -1;
 
+    /**
+     * Opens a meter over a parse of this many steps. The meter redraws one
+     * line with a carriage return, which a terminal overwrites and a file or a
+     * pipe keeps, so every redraw lands in a redirected log: the meter draws
+     * only when standard output is a terminal.
+     */
     public ProgressMeter(long total, boolean enabled) {
         this.total = total;
-        this.enabled = enabled;
+        this.enabled = enabled && System.console() != null;
         this.started = System.nanoTime();
     }
 

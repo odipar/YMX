@@ -79,7 +79,8 @@ namespace St4
             {
                 input = File.ReadAllBytes(args[i]);
             }
-            catch (IOException)
+            catch (Exception e) when (e is IOException
+                    || e is UnauthorizedAccessException)
             {
                 throw Error("Cannot access input file " + args[i]);
             }
@@ -102,7 +103,8 @@ namespace St4
             {
                 File.WriteAllBytes(outputName, Container(result));
             }
-            catch (IOException)
+            catch (Exception e) when (e is IOException
+                    || e is UnauthorizedAccessException)
             {
                 throw Error("Cannot write output file " + outputName);
             }

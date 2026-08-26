@@ -69,6 +69,17 @@ type Packed struct {
 	Notes  []string
 }
 
+// Cross carries a dump into the engine's vocabulary. The reader and the
+// engine keep their own, and this is where the two meet.
+func Cross(song *ym.Song) *ymx.Song {
+	return &ymx.Song{
+		Format: song.Format, Frames: song.Frames, PlayerHz: song.PlayerHz,
+		MasterClock: song.MasterClock, LoopFrame: song.LoopFrame,
+		Attributes: song.Attributes, Drums: song.Drums, Name: song.Name,
+		Author: song.Author, Comment: song.Comment, Registers: song.Registers,
+	}
+}
+
 // Pack packs one dump.
 func Pack(input []byte, o Options) (*Packed, error) {
 	song, err := ym.Read(input)
@@ -76,15 +87,8 @@ func Pack(input []byte, o Options) (*Packed, error) {
 		return nil, err
 	}
 
-	// The reader and the engine keep their own vocabularies; the dump
-	// crosses into the engine's here and nowhere else.
 	var notes []string
-	crossed := &ymx.Song{
-		Format: song.Format, Frames: song.Frames, PlayerHz: song.PlayerHz,
-		MasterClock: song.MasterClock, LoopFrame: song.LoopFrame,
-		Attributes: song.Attributes, Drums: song.Drums, Name: song.Name,
-		Author: song.Author, Comment: song.Comment, Registers: song.Registers,
-	}
+	crossed := Cross(song)
 	if err := trim(crossed, o, &notes); err != nil {
 		return nil, err
 	}
@@ -132,13 +136,19 @@ func Pack(input []byte, o Options) (*Packed, error) {
 		}
 	}
 
+	// After the trim and the padding, which describe what was packed before
+	// the tune itself is described.
+	notes = append(notes, songNotes(song, effects)...)
+
 	result, err := ymx.EncodeOnTimers(tune, o.Ring, o.Chunk, o.Loops,
 		o.Progress, unit, o.TimerMap)
 	if err != nil {
 		return nil, err
 	}
-	return &Packed{Result: result, Song: crossed,
-		Notes: append(notes, result.Notes...)}, nil
+	// The encoder's own notes stay on the result. They describe the file
+	// rather than the road to it, and Report places them among the figures
+	// they belong with; a command that writes no report prints them itself.
+	return &Packed{Result: result, Song: crossed, Notes: notes}, nil
 }
 
 func appendNote(notes []string, note string) []string {
@@ -168,7 +178,7 @@ func trim(song *ymx.Song, o Options, notes *[]string) error {
 		return nil
 	}
 	if start < 0 || start >= end {
-		return fmt.Errorf("empty trim window: frames %d..%d of %d",
+		return fmt.Errorf("Empty trim window: frames %d..%d of %d",
 			start, end, song.Frames)
 	}
 	for r := range song.Registers {

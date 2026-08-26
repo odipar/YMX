@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -188,12 +189,21 @@ namespace Ym6
 
         private static Ym6Reader.Song ReadSong(string path)
         {
+            byte[] input;
             try
             {
-                return Ym6Reader.Read(File.ReadAllBytes(path));
+                input = File.ReadAllBytes(path);
             }
             catch (Exception e) when (e is IOException
-                    || e is Ym6Reader.FormatException)
+                    || e is UnauthorizedAccessException)
+            {
+                throw Error("Cannot access input file " + path);
+            }
+            try
+            {
+                return Ym6Reader.Read(input);
+            }
+            catch (Ym6Reader.FormatException e)
             {
                 throw Error(path + ": " + e.Message);
             }
@@ -268,7 +278,8 @@ namespace Ym6
             {
                 input = File.ReadAllBytes(inputName);
             }
-            catch (IOException)
+            catch (Exception e) when (e is IOException
+                    || e is UnauthorizedAccessException)
             {
                 throw Error("Cannot access input file " + inputName);
             }
@@ -406,7 +417,8 @@ namespace Ym6
             {
                 File.WriteAllBytes(outputName, result.File);
             }
-            catch (IOException)
+            catch (Exception e) when (e is IOException
+                    || e is UnauthorizedAccessException)
             {
                 throw Error("Cannot write output file " + outputName);
             }
@@ -449,6 +461,17 @@ namespace Ym6
                         : (c3 & 0x30) != 0;
                 return !drum;
             };
+        }
+
+        /// <summary>Part of whole, in percent, rounded the way the tree this
+        /// was ported from rounds it: a half goes up. .NET and Go take a half
+        /// to the even digit, so 528 of 8448 reads 6.2 there and 6.3 in Java,
+        /// and the three trees must not disagree about a figure a reader
+        /// compares between them.</summary>
+        private static double Percent(int part, int whole)
+        {
+            return Math.Round(100.0 * part / whole, 1,
+                    MidpointRounding.AwayFromZero);
         }
 
         private static void Report(Ym6Reader.Song song,
@@ -527,14 +550,14 @@ namespace Ym6
                 Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
                         "  {0} {1,6} -> {2,6} bytes ({3,5:F1}%){4}", name,
                         stream.Frames, stream.PackedSize,
-                        100.0 * stream.PackedSize / stream.Frames,
+                        Percent(stream.PackedSize, stream.Frames),
                         stream.LoopSize == 0 ? "" : string.Format(
                                 CultureInfo.InvariantCulture, "  {0,6} + {1}",
                                 stream.FirstSize, stream.LoopSize)));
             }
             Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
                     "Packed {0} register bytes into {1} ({2:F1}%), file {3} bytes",
-                    raw, result.PackedSize(), 100.0 * result.PackedSize() / raw,
+                    raw, result.PackedSize(), Percent(result.PackedSize(), raw),
                     result.File.Length));
             int flags = (result.File[YmxFormat.OffsetFlags] << 8)
                     | result.File[YmxFormat.OffsetFlags + 1];
@@ -556,6 +579,35 @@ namespace Ym6
                 Console.WriteLine(string.Format("Warning: longest operation is"
                         + " {0} bytes, over the 65535 the 68000 decoder can"
                         + " represent: do not play this file", result.LongestOp()));
+            }
+        }
+
+        /// <summary>Reads the packer's flags and keeps nothing. A command
+        /// packing on its way to an SNDH file checks them before it makes a
+        /// work directory, so a flag the packer does not have stops the run
+        /// with nothing left behind. The Java tree runs its own parser for
+        /// this; here the list is written a second time, and ymx/parity.sh is
+        /// what holds the two copies to the same answer.</summary>
+        public static void CheckFlags(List<string> flags)
+        {
+            foreach (string flag in flags)
+            {
+                if (flag == "-f" || flag == "-o" || flag == "-sidresume")
+                {
+                    continue;
+                }
+                if (flag.StartsWith("-timers")) { ParseTimers(flag[7..]); }
+                else if (flag.StartsWith("-drumhz")) { ParseNumber(flag[7..]); }
+                else if (flag.StartsWith("-startframe")) { ParseNumber(flag[11..], true); }
+                else if (flag.StartsWith("-endframe")) { ParseNumber(flag[9..], true); }
+                else if (flag.StartsWith("-frames")) { ParseNumber(flag[7..], true); }
+                else if (flag.StartsWith("-min")) { ParseNumber(flag[4..], true); }
+                else if (flag.StartsWith("-sec")) { ParseNumber(flag[4..], true); }
+                else if (flag.StartsWith("-n")) { ParseNumber(flag[2..]); }
+                else if (flag.StartsWith("-c")) { ParseNumber(flag[2..]); }
+                else if (flag.StartsWith("-k")) { ParseNumber(flag[2..]); }
+                else if (flag.StartsWith("-l")) { ParseNumber(flag[2..], true); }
+                else { throw Error("Invalid parameter " + flag); }
             }
         }
 
@@ -626,7 +678,11 @@ namespace Ym6
 
         internal static int ParseNumber(string argument, bool zeroAllowed)
         {
-            if (!int.TryParse(argument, NumberStyles.Integer,
+            // NumberStyles.None, not Integer: Integer allows the whitespace
+            // around a value that Java's Integer.parseInt and Go's
+            // strconv.ParseInt turn down, so "-n 960" packed here alone. The
+            // leading sign the other two accept is added back below.
+            if (!int.TryParse(argument, NumberStyles.AllowLeadingSign,
                     CultureInfo.InvariantCulture, out int value) || value < 0
                     || (value == 0 && !zeroAllowed))
             {

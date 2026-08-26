@@ -69,7 +69,11 @@ func Stem(tune string) string {
 func readSong(tune string) (*ym.Song, error) {
 	data, err := os.ReadFile(tune)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", tune, err)
+		// The path as the caller typed it, and nothing of the system call:
+		// the other two trees say only that the file cannot be read, and a
+		// reader comparing three logs should not have to strip one tree's
+		// syscall text out of them.
+		return nil, fmt.Errorf("cannot read %s", tune)
 	}
 	song, err := ym.Read(data)
 	if err != nil {
