@@ -19,13 +19,13 @@ type TuneSet struct {
 }
 
 // SetOf reads the dumps and says what the set calls itself.
-func SetOf(tunes []string) (TuneSet, error) {
+func SetOf(command string, tunes []string) (TuneSet, error) {
 	names := make([]string, 0, len(tunes))
 	composer := ""
 	claimed := false
 	agree := true
 	for _, tune := range tunes {
-		song, err := readSong(tune)
+		song, err := readSong(command, tune)
 		if err != nil {
 			return TuneSet{}, err
 		}
@@ -49,8 +49,8 @@ func SetOf(tunes []string) (TuneSet, error) {
 }
 
 // PlayerHz is the rate every tune must share: one SNDH declares one.
-func PlayerHz(tune string) (int, error) {
-	song, err := readSong(tune)
+func PlayerHz(command, tune string) (int, error) {
+	song, err := readSong(command, tune)
 	if err != nil {
 		return 0, err
 	}
@@ -66,14 +66,15 @@ func Stem(tune string) string {
 	return name
 }
 
-func readSong(tune string) (*ym.Song, error) {
+// readSong reads one dump. A file that does not open names the command,
+// because the fault is the command line; a file that opens and is not a
+// dump names the file, because the fault is in it. The other two trees
+// split it the same way, and nothing of the system call reaches either
+// message.
+func readSong(command, tune string) (*ym.Song, error) {
 	data, err := os.ReadFile(tune)
 	if err != nil {
-		// The path as the caller typed it, and nothing of the system call:
-		// the other two trees say only that the file cannot be read, and a
-		// reader comparing three logs should not have to strip one tree's
-		// syscall text out of them.
-		return nil, fmt.Errorf("cannot read %s", tune)
+		return nil, fmt.Errorf("%s: cannot read %s", command, tune)
 	}
 	song, err := ym.Read(data)
 	if err != nil {

@@ -122,7 +122,7 @@ flags:
 		fail("play.sh: cannot make " + work)
 	}
 
-	set, err := pack.SetOf(rest)
+	set, err := pack.SetOf("play.sh", rest)
 	if err != nil {
 		fail(err.Error())
 	}

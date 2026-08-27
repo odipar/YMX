@@ -189,7 +189,7 @@ func main() {
 	// failure that follows names no file.
 	var set pack.TuneSet
 	if kind != ".ymx" {
-		read, err := pack.SetOf(yms)
+		read, err := pack.SetOf("ym-to-ymx", yms)
 		if err != nil {
 			fail(err.Error())
 		}

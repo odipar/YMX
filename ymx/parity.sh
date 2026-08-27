@@ -98,6 +98,9 @@ one_case() {
         # The set form takes a directory that is already there; without it
         # every tree prints usage and the case compares nothing.
         case " $* " in *" adir/ "*) mkdir -p "$d/adir" ;; esac
+        # A case naming a fixture builds it here, in the tree's own
+        # directory, so the three runs meet the same bytes.
+        [ -n "$SETUP" ] && (cd "$d" && sh -c "$SETUP")
         argv=""
         for a in "$@"; do
             a=$(printf '%s' "$a" | sed -e 's|@T|a.ym|g' -e 's|@U|b.ym|g')
@@ -136,6 +139,7 @@ one_case() {
         fi
     done
 
+    SETUP=""
     if [ -n "$differs" ]; then
         fail=$((fail + 1)); failed_cases="$failed_cases $label"
         echo "DIFFER $label ($command):$differs"
@@ -183,6 +187,48 @@ sweep() {
         one_case perf-$1     ymsndh -perf out.sndh @T
         one_case nomask-$1   ym-to-ymx -nomask out.prg @T
     fi
+}
+
+
+# The malformed inputs, built once so the three runs meet the same bytes.
+# A file a tool cannot read is where the trees have most room to differ:
+# one names the fault, one prints its runtime's bounds text, one exits on a
+# trace. None of that shows in a sweep over files that read cleanly.
+fixtures() {
+    FX=$WORK/fx; mkdir -p "$FX"
+    # deterministic, so a rerun compares the same bytes
+    perl -e 'print pack("C*", map { ($_ * 37 + 11) % 256 } 0 .. 4095)' > "$FX/in.bin"
+    printf 'not a ym file at all' > "$FX/bad.ym"
+    perl -e 'print "\0" x 13, "##", "\0"' > "$FX/hash16.bin"
+    perl -e 'print pack("C*", map { ($_ * 7) % 256 } 0 .. 31)' > "$FX/notaymx.bin"
+
+    # a real ST4 container, and the same one cut short
+    "$REPO/go/bin/st4" -f "$FX/in.bin" "$FX/good.st4" >/dev/null 2>&1
+    perl -e 'local $/; open F, "<", $ARGV[0]; binmode F; $d = <F>; print substr($d, 0, 30)' \
+        "$FX/good.st4" > "$FX/short.st4"
+
+    # a real SNDH, and the same one a byte short of its terminator
+    (cd "$FX" && cp "$TUNE_A" f.ym \
+        && "$REPO/go/bin/ymsndh" good.sndh f.ym >/dev/null 2>&1)
+    perl -e 'local $/; open F, "<", $ARGV[0]; binmode F; $d = <F>;
+             print substr($d, 0, length($d) - 1)' \
+        "$FX/good.sndh" > "$FX/trunc.sndh" 2>/dev/null
+}
+
+# What a tool does with a file it cannot read.
+malformed() {
+    SETUP="cp $WORK/fx/trunc.sndh ."   ; one_case bad-sndh-cut   mkprg out.prg trunc.sndh
+    SETUP="cp $WORK/fx/hash16.bin ."   ; one_case bad-sndh-hash  mkprg out.prg hash16.bin
+    SETUP="cp $WORK/fx/notaymx.bin ."  ; one_case bad-ymx        mksndh out.sndh notaymx.bin
+    SETUP="cp $WORK/fx/short.st4 ."    ; one_case bad-st4-short  dst4 short.st4 out.bin
+    SETUP="cp $WORK/fx/good.st4 ."     ; one_case bad-st4-as-ymx mkprg out.prg good.st4
+    SETUP="cp $WORK/fx/bad.ym ."       ; one_case bad-ym         ymx bad.ym out.ymx
+    SETUP="cp $WORK/fx/bad.ym ."       ; one_case bad-ym-sndh    ymsndh out.sndh bad.ym
+    SETUP="mkdir adir"                 ; one_case dir-as-input   st4 adir out.st4
+    SETUP="cp $WORK/fx/in.bin . && mkdir adir"
+    one_case dir-as-output  st4 in.bin adir
+    SETUP="cp $WORK/fx/good.st4 . && mkdir adir"
+    one_case dir-as-output-d dst4 good.st4 adir
 }
 
 # The command lines that used to answer differently in different trees.
@@ -243,6 +289,8 @@ done < "$WORK/tunes"
 
 TUNE_A=$(head -1 "$WORK/tunes"); TUNE_B=$(head -2 "$WORK/tunes" | tail -1)
 refusals
+fixtures
+malformed
 
 echo
 echo "parity: $pass matched, $fail differed"
