@@ -1029,38 +1029,30 @@ decodes without complaint may still be one §9.3 forbids: a reader checks
 
 ## 10. Coupled streams
 
-The streams are independent in the container and mostly independent in
-use. This section collects the places they are not: where one stream's
-byte settles what another's means, the frame each turns on, and what the
-coupling buys.
+Where one stream's byte settles what another's means, the frame each
+turns on, and what the coupling buys.
 
-Every rule here is one of §9.3's, so a player checks none of them. A
-writer that carries the right value on the wrong frame produces a file
-that plays and plays wrong, and nothing in a player reports it. Timings
-are stated against §7's four steps: the skips precede the frame write,
-and the actions follow it.
+Every rule here is one of §9.3's, so nothing in a player reports a file
+that breaks one. Timings are §7's four steps: the skips precede the
+frame write, and the actions follow it.
 
 ### 10.1 The volume register and the skip latch
 
 A voice is skipped when its volume register is left out of the frame
-write, for as long as a timer stream owns that register (§2.1). Four
-things turn on that state.
+write, for as long as a timer stream owns that register (§2.1).
 
 **The skip bits are state, not an edge.** `M` bit 4 says bits 7-5 are
-meaningful this frame; with bit 4 clear they are not read and the skip
-state stands (§2.1). Every frame that changes a skip bit sets bit 4. A
-skip left set holds the voice out of the frame write for the rest of the
+meaningful this frame; with bit 4 clear they are not read and the state
+stands (§2.1). Every frame that changes a skip bit sets bit 4. A skip
+left set holds the voice out of the frame write for the rest of the
 tune.
 
-**A start frame skips before it writes.** The skips are step 1 and the
-frame write is step 2, so a voice a stream is about to take is out of
-the write on the frame the stream starts. On a trigger frame the voice's
+**A start frame skips in that frame.** On a trigger frame the voice's
 register byte holds the sample number, and a voice still in the frame
 write sends that number to the chip as a volume.
 
-**A skipped voice's byte is a parameter.** A toggle stream's volume and
-a PCM stream's sample number are read from the current frame's byte of
-`R8+v`, the byte the skip keeps off the chip (§3.2):
+**A skipped voice's byte is a parameter**, read from the current frame's
+byte of `R8+v` (§3.2):
 
 | opcode | what it reads from `R8+v` |
 |---|---|
@@ -1071,20 +1063,19 @@ a PCM stream's sample number are read from the current frame's byte of
 | `HOLD` with flag 2 | the volume |
 | `RESUME` with flag 2 | the volume |
 
-A sample number reaches a player through a five-bit register, which is
-the ceiling of 32 samples §6 states.
+A sample number reaches a player through a five-bit register, so a file
+carries at most 32 samples (§6).
 
-**The rejoin frame clears the skip.** Skips precede the frame write, so
-the voice's volume is written on the frame its skip bit clears, and
-lifting a skip needs no resynchronisation (§2.1).
+**The rejoin frame clears the skip**, and that frame's write carries the
+voice's volume (§2.1).
 
 `START_TOGGLE` is the one opcode that writes a sound register itself:
 `R(8+v) := 0`, a skipped voice included. That is phase zero, and the
 first level arrives one timer period later from the tick (§3.3). The
 write lands in step 3, so where a frame writes one register twice the
-action's value is the one the register holds (§7).
+action's value stands (§7).
 
-Three endings need the rejoin stated separately:
+The rejoin moves in three cases:
 
 - A sample cut off by its own channel's next start does not reach its
   end marker. No tick writes that voice again, so the voice rejoins only
@@ -1133,9 +1124,7 @@ value restarts it.
 
 A retrigger stream's shape is in `X` bits 7-4, one per frame rather than
 one per channel: the chip has one envelope generator, and per-channel
-shapes would drive it at two shapes and two rates (§2.2). A toggle
-stream's volume and a PCM stream's sample number come from a voice's
-register stream; a shape has no voice to come from (§3.2).
+shapes would drive it at two shapes and two rates (§2.2).
 
 A `HOLD` sets at most one of flag 2, the toggle stream's volume, and
 flag 4, the retrigger stream's shape: a channel carries one stream kind
@@ -1143,11 +1132,10 @@ between one start opcode and the next (§9.3).
 
 ### 10.3 The timers and the map that names them
 
-`T` is read every frame and binds when a timer is programmed. A stream's
-ticks name the timer the map gave its channel when that stream's timer
-was last programmed, not the timer the current byte gives it, and a map
-change stops no timer (§2.3). A changed byte takes effect before that
-frame's actions.
+A stream's ticks name the timer the map gave its channel when that
+stream's timer was last programmed, not the timer the current byte gives
+it, and a map change stops no timer (§2.3). The byte is read every
+frame, and a changed one takes effect before that frame's actions.
 
 So a change reaches only a channel with nothing running, and names only
 a timer claimed at frame 0 (§9.3). A channel whose timer counts with its
@@ -1161,8 +1149,8 @@ Three more hold between an opcode and the stream it addresses:
 - `RETUNE` addressed to voice 3 replaces the control nibble and the
   reload with the timer running, and repatches no parameter, so it is
   emitted only on a frame where the stream's parameter did not change.
-  Where the parameter changed on that frame, the voice-addressed form is
-  the one to emit, and the period in flight is truncated (§3.1).
+  Where it changed, the voice-addressed form is the one to emit, and the
+  period in flight is truncated (§3.1).
 - `RESUME` continues one stream across a gap: same voice, same
   prescaler, no rate. A prescaler changed across the gap re-enters
   through the voice-addressed `RETUNE` (§3.3).
@@ -1170,8 +1158,7 @@ Three more hold between an opcode and the stream it addresses:
 ### 10.4 PCM, which takes a voice whole
 
 `R7` carries bits 5-0, the host holding 7-6, with every generator masked
-off a voice for as long as a PCM stream owns it (§2). This holds on every
-frame of the sample, not only the trigger frame.
+off a voice for as long as a PCM stream owns it (§2).
 
 `START_PCM_PREEMPT`'s `X` bits 3-0 mark the channels with a running
 timer that the trigger silences, and mark no others. Where it silences
@@ -1185,9 +1172,6 @@ until it rejoins the frame write (§6).
 
 ### 10.5 What the couplings buy
 
-The couplings are three kinds of thing, and one kind of them is open to
-simplification.
-
 **The chip's.** One envelope generator gives one shape a frame, so `X`
 carries the shape and no voice's register stream does. One mixer
 register gives `R7` the masking of a PCM voice's generators. A five-bit
@@ -1198,26 +1182,21 @@ format's to settle.
 parameter (§10.1), and `R13`'s `$FF` standing for a frame that leaves
 the envelope alone (§10.2), each stand in for a stream the file would
 otherwise carry. A stream costs `N` bytes of ring in every workspace,
-read or not (§1.3), and one place in the decode list, which is one
-refill turn out of `C` (§1.5). The two couplings together hold a YM
-tune's stream count at the 25 §1.5 states.
+read or not (§1.3), and one refill turn out of `C` (§1.5). The two hold
+a YM tune's stream count at the 25 of §1.5.
 
 **Derivable.** `START_PCM_PREEMPT`'s `X` nibble names the channels the
 trigger stops, which a player already holds: it programmed those timers.
-The skip bits are derivable the same way, from the channel state a
-player keeps across frames. Both are carried in the file rather than
-worked out, and the frame write is the reason: it is one unbroken run of
-register writes at a fixed cost, and a skip settled inside it would put
-a test on every voice of every frame. The bits state the answer where
-step 1 can apply it, ahead of the write in step 2 and ahead of the
-actions in step 3 that settle ownership.
+The skip bits are derivable the same way. The frame write is why the file carries them
+instead: it is one unbroken run of register writes at a fixed cost, and
+a skip settled inside it would put a test on every voice of every frame.
+The bits state the answer where step 1 can apply it.
 
 A coupling removed is a new format version, and a tune packed at the old
-one is repacked from its source (§1.1). The cheaper reading of the same
-observation is that a value a player could derive is a value a checker
-can derive: one that holds the channel state a player holds, works out
-the ownership the bits declare, and reports each frame the two disagree
-on catches every rule in this section without the format moving.
+one is repacked from its source (§1.1). A value a player could derive is
+a value a checker can derive: holding the channel state a player holds
+and comparing it against the bits the file declares reports every rule
+in this section, and moves the format none.
 
 ---
 
