@@ -130,7 +130,7 @@ final class Check {
         int[] loop = new int[sampleCount];
         for (int sample = 0; sample < sampleCount; sample++) {
             int at = sampleTable + 8 * sample;
-            if (at < 0 || at + 8 > file.length) {
+            if (at < 0 || at > file.length - 8) {
                 faults.add(new Fault(-1, "§6 sample table",
                         "entry " + sample + " lies outside the file"));
                 return faults;
@@ -212,7 +212,8 @@ final class Check {
         }
         // The table's own extent, which the entries below are read from: a
         // header naming a table past the file's end has no entries to read.
-        if (loopTable < 0 || loopTable + 4 * YmxFormat.STREAMS > file.length) {
+        if (loopTable < 0
+                || loopTable > file.length - 4 * YmxFormat.STREAMS) {
             faults.add(new Fault(-1, "§9.3 shape", "the loop table is at "
                     + loopTable + ", outside the file at " + file.length
                     + " bytes"));

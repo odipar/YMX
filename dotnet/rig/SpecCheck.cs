@@ -141,7 +141,8 @@ namespace Rig
             for (int sample = 0; sample < sampleCount; sample++)
             {
                 int at = sampleTable + YmxFormat.SampleEntrySize * sample;
-                if (at < 0 || at + YmxFormat.SampleEntrySize > file.Length)
+                if (at < 0
+                        || at > file.Length - YmxFormat.SampleEntrySize)
                 {
                     faults.Add(new Fault(-1, "§6 sample table",
                             "entry " + sample + " lies outside the file"));
@@ -251,7 +252,7 @@ namespace Rig
             // The table's own extent, which the entries below are read from: a
             // header naming a table past the file's end has no entries to read.
             if (loopTable < 0
-                    || loopTable + 4 * YmxFormat.Streams > file.Length)
+                    || loopTable > file.Length - 4 * YmxFormat.Streams)
             {
                 faults.Add(new Fault(-1, "§9.3 shape", "the loop table is at "
                         + loopTable + ", outside the file at " + file.Length
