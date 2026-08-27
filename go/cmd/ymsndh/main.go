@@ -103,9 +103,9 @@ func main() {
 
 	// The dumps are read first: a tune that cannot be read leaves no work
 	// directory behind, which is what the other two trees leave.
-	set, err := pack.SetOf(yms)
+	set, err := pack.SetOf("ymsndh", yms)
 	if err != nil {
-		fail("ymsndh: " + err.Error())
+		fail(err.Error())
 	}
 
 	// A fresh work directory each run: yesterday's leftovers are not this

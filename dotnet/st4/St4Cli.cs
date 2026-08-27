@@ -89,7 +89,12 @@ namespace St4
                 throw Error("Empty input file " + args[i]);
             }
 
-            if (!forcedMode && File.Exists(outputName))
+            // Directory.Exists as well: a directory named as the output is
+            // something already there, and File.Exists alone reads as false
+            // for one, so the run reached the write and reported the fault
+            // there rather than here, as the other two trees report it.
+            if (!forcedMode
+                    && (File.Exists(outputName) || Directory.Exists(outputName)))
             {
                 throw Error("Already existing output file " + outputName);
             }
