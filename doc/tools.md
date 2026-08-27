@@ -280,12 +280,12 @@ reads its output back with this.
 
     ymx/test/check.sh tune.ymx [more.ymx ...]
     ymx/test/check.sh -go tune.ymx [more.ymx ...]
+    ymx/test/check.sh -dotnet tune.ymx [more.ymx ...]
 
-`-go` as the first argument reads the file with the Go tree
-(`go/cmd/ymxcheck`) instead of the Java one. Both read the same rules off
-the same streams and report the same faults, over the collection and over a
-file whose bytes have been changed one at a time. The C# tree has no reader,
-so this script takes no `-dotnet`.
+`-go` and `-dotnet` as the first argument read the file with the Go tree
+(`go/cmd/ymxcheck`) or the C# one instead of the Java one. All three read
+the same rules off the same streams and report the same faults, over the
+collection and over a file whose bytes have been changed one at a time.
 
 One line per file - `within §9.3`, or a count and one line per place the
 file leaves them, each naming the frame and the rule. A non-zero exit
@@ -417,8 +417,8 @@ that did not run is never a pass, and the exit status is non-zero where any
 step failed.
 
 Without `-full` it runs the steps that need no corpus and no emulator: the
-Maven build, the Go and C# builds, the §9.3 reader in both trees, and the
-player rig's quick battery. `-full` adds the parity run, the rig in full,
+Maven build, the Go and C# builds, the §9.3 reader in all three trees, and
+the player rig's quick battery. `-full` adds the parity run, the rig in full,
 the corpus sweep and the tick reference.
 
 Each step writes its own log, and the table names the log of every step that
@@ -436,6 +436,7 @@ of `dotnet dotnet/bin/Release/net10.0/ymx.dll` names the tool:
 | `mksndh`, `mkprg`, `mkcores`, `mkrelease` | the combiners |
 | `ymsndh`, `play` | `ym_sndh.sh`, `play.sh` |
 | `rig`, `sweep`, `gendata` | the test rigs and `run.sh`'s data step |
+| `check` | `check.sh`, the §9.3 reader |
 | `setversion` | `setversion.sh` |
 
 ## Environment

@@ -25,7 +25,8 @@ public static class Program
         {
             Console.Error.WriteLine("usage: ymx <tool> [arguments...]\n"
                     + "tools: ym-to-ymx st4 dst4 ymx mksndh mkprg mkcores"
-                    + " mkrelease setversion ymsndh play rig sweep gendata");
+                    + " mkrelease setversion ymsndh play rig sweep gendata"
+                    + " check");
             return 1;
         }
         string[] rest = args[1..];
@@ -72,6 +73,9 @@ public static class Program
                 return 0;
             case "gendata":
                 Rig.GenData.Main(rest);
+                return 0;
+            case "check":
+                Rig.SpecCheck.Main(rest);
                 return 0;
             default:
                 Console.Error.WriteLine("ymx: unknown tool " + args[0]);
