@@ -26,6 +26,7 @@ defaults quoted below are the constants' own values.
 | `ymx/test/run.sh` | `org.ymx.rig.GenData` + rmac + Hatari | the real-hardware harness |
 | `ymx/test/ticks.sh` | `org.ymx.rig.TickDump` + Hatari | the tick reference against a real MFP |
 | `ymx/test/cost.sh` | `ymx/test/cost.py` + Hatari | what a play call costs, in cycles |
+| `ymx/test/damage.sh` | `ymx/test/damage.py` + the three readers | a tune read back with its bytes changed |
 
 The packer has no wrapper of its own: the play script and `ym_sndh.sh`
 run it, and a direct run is
@@ -308,6 +309,33 @@ reads without checking, and R13's `$FF` on every frame that must not
 restart the envelope, a marker whose absence is a value the file is free
 to carry.
 
+### damage.sh
+
+A packed tune with its bytes changed one at a time, read back by every tree
+that is built.
+
+    ymx/test/damage.sh [tune.ymx]
+
+A reader that stops the run on one damaged file reports nothing about that
+file, and nothing about any file after it. Four inputs did that, and none of
+the other batteries reached one of them: a negative sample-table offset, a
+sample table near the int ceiling whose entry offset wraps, a loop table past
+the file's end, and a malformed container. Each was one changed byte.
+
+Every header byte is changed, and a spread through the body; each is changed
+three times, by `$01`, `$80` and `$FF`, so a copy reaches a low bit, a high
+bit and the whole byte. The default tune is
+`doc/conformance/tunes/plain_packed.ymx`. A tree whose tools are absent is
+named and left out.
+
+The report counts what agreed, what differed, and what was set aside: a file
+whose report names a section that does not decode, where the three ST4
+readers word one reason three ways. A non-zero exit where any tree differs
+or ends its run, and the first fault they word differently is printed. The
+generator and the comparison are `ymx/test/damage.py`.
+
+`DamagedFileTest` covers the Java reader alone and runs with the tests.
+
 ### rig.sh
 
 The whole emulator battery: tune shapes, the SNDH container, the retrigger
@@ -417,8 +445,8 @@ that did not run is never a pass, and the exit status is non-zero where any
 step failed.
 
 Without `-full` it runs the steps that need no corpus and no emulator: the
-Maven build, the Go and C# builds, the §9.3 reader in all three trees, and
-the player rig's quick battery. `-full` adds the parity run, the rig in full,
+Maven build, the Go and C# builds, the §9.3 reader in all three trees, the
+damaged-file sweep, and the player rig's quick battery. `-full` adds the parity run, the rig in full,
 the corpus sweep and the tick reference.
 
 Each step writes its own log, and the table names the log of every step that
@@ -447,6 +475,7 @@ of `dotnet dotnet/bin/Release/net10.0/ymx.dll` names the tool:
 | `UNICORN_LIB` | the rigs | where libunicorn is, when the usual paths and the pip wheel fail |
 | `YMX_NOMASK` | rig.sh | assemble the player with the frame write unmasked |
 | `YMX_PACK_OPTIONS` | sweep.sh | extra packer options for the sweep |
+| `DAMAGE_WORK` | damage.sh | the directory the changed copies go in |
 | `VERIFY_LOGS` | verify.sh | the directory the step logs go in |
 | `YM_CORPUS` | mvn test, parity.sh, verify.sh | the directory holding the YM collection the documents count; without it the tests that read those figures back are skipped |
 | `YMX_PLAY_FRAMES` | run.sh | how many frames the real-hardware harness plays; raise it to resolve a smaller cycle difference |

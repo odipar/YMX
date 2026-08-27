@@ -109,6 +109,8 @@ step "9.3, the Go reader" check-go "$GO_ABSENT" \
     "'$REPO/ymx/test/check.sh' -go '$TUNES'/*.ymx"
 step "9.3, the C# reader" check-dotnet "$DOTNET_ABSENT" \
     "'$REPO/ymx/test/check.sh' -dotnet '$TUNES'/*.ymx"
+step "9.3, a damaged file" damage "" \
+    "'$REPO/ymx/test/damage.sh'"
 step "the player rig" rig "$RMAC_ABSENT" \
     "'$REPO/ymx/test/rig.sh' --quick"
 

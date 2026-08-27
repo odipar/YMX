@@ -135,7 +135,7 @@ func Check(file []byte) []Fault {
 	loop := make([]int, sampleCount)
 	for sample := 0; sample < sampleCount; sample++ {
 		at := sampleTable + ymx.SampleEntrySize*sample
-		if at < 0 || at+ymx.SampleEntrySize > len(file) {
+		if at < 0 || at > len(file)-ymx.SampleEntrySize {
 			add(-1, "§6 sample table",
 				fmt.Sprintf("entry %d lies outside the file", sample))
 			return faults
@@ -219,7 +219,7 @@ func shape(file []byte, faults []Fault, frames, streams, ring, loopFrame,
 	}
 	// The table's own extent, which the entries below are read from: a
 	// header naming a table past the file's end has no entries to read.
-	if loopTable < 0 || loopTable+4*ymx.Streams > len(file) {
+	if loopTable < 0 || loopTable > len(file)-4*ymx.Streams {
 		add(fmt.Sprintf("the loop table is at %d, outside the file at %d"+
 			" bytes", loopTable, len(file)))
 		return faults
