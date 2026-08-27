@@ -52,6 +52,44 @@ variant is fixed, menu-less, always-on clustering of (2,3), (4,5) and
 (11,12) - one layout, two cursors, no adaptivity, -3.3% of register data. The
 script's A/P pairs would likely join for the same correlation reason.
 
+
+**Spare bits in the register streams** (2026-08-26). A skipped voice's
+volume register carries the stream's parameter rather than a volume
+(§10.1), so the five-bit mask a written volume needs does not bind
+there. Would widening the sample number to the byte's eight bits buy
+anything, and the other registers' spare bits with it?
+
+The read path is eight bits wide already. A trigger does `moveq #0,d1`,
+`move.b (a1),d1` and scales, with no mask, and the header's sample count
+is a word. The ceiling of 32 sits in three other places: the packer's
+mask on R8 to R10, `MAX_SAMPLES`, and the player's `ds.l 64` of resolved
+addresses.
+
+It does not bind. Across the 543 tunes the collection reads, the largest
+sample count is 12, none passes 16, and seven pass 8. Raising the
+ceiling costs the player `ds.l 512` where it holds `ds.l 64`, 1,792
+bytes on a player of 3,434, unless the table moves into the workspace
+and becomes the first region of it sized from the header.
+
+The general form declines with it. Spare bits sit in every register
+stream - four each in R1, R3 and R5, three in R6, three in R8 to R10,
+four in R13 - and the chip ignores all of them. They are free only where
+the byte varies for another reason and reaches no register, which is the
+skipped volume and nothing else. In a stream that repeats, data in the
+spare bits stops it repeating, and the budget is cycles and RAM rather
+than bytes. Reading such bits back costs a test per voice per frame
+inside the burst, which is the cost the skip latch is there to avoid.
+
+New data has a route already: the extension streams of §1.6 and §1.7, at
+indices 25 to 31, with the required-streams mask stating whether a
+consumer that reads none of one may still play the file. Spare bits
+carry no such gate, and a player built before them reads them as part of
+a value it sends to the chip.
+
+**Untried:** if a source ever carries more than 32 samples, the change is
+the packer's mask, `MAX_SAMPLES`, and the resolved table sized from the
+header's count at init. The read path needs nothing.
+
 ---
 
 ## Diagnosed and fixed
