@@ -632,6 +632,12 @@ final class Check {
     private static byte[] section(byte[] file, int table, int index, int count) {
         long entry = entry(file, table, index);
         int start = (int) YmxFormat.sectionOffset(entry);
+        // Named here rather than left to the copy below, whose own words are
+        // the runtime's and differ from tree to tree.
+        if (start < 0 || start > file.length) {
+            throw new IllegalStateException(
+                    "the section is at " + start + ", outside the file");
+        }
         if (YmxFormat.isStored(entry)) {
             return Arrays.copyOfRange(file, start, start + count);
         }

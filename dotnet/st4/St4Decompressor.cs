@@ -105,6 +105,10 @@ namespace St4
             Check.That(length > 0, "invalid literal length");
             for (int i = 0; i < length * unit; i++)
             {
+                Check.That(literalIndex < literal.Length,
+                        "truncated literal stream");
+                Check.That(outputIndex < output.Length,
+                        "the streams overran the output");
                 output[outputIndex++] = literal[literalIndex++];
             }
             state = State.Literals;
@@ -159,6 +163,8 @@ namespace St4
             Check.That(distance <= outputIndex, "match reaches before the output");
             for (int i = 0; i < length * unit; i++)
             {
+                Check.That(outputIndex < output.Length,
+                        "the streams overran the output");
                 output[outputIndex] = output[outputIndex - distance];
                 outputIndex++;
             }
