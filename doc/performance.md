@@ -92,6 +92,40 @@ Everything else sits under 9 lines. **13 scanlines - 4 per cent of a
 frame - covers every shape measured**, including files no packer run has
 ever produced.
 
+### What a reopen spends
+
+The window is exact. A stream crosses on the turn its head section runs
+out, so the frames are `L - C` through `L - C + live - 1`, one for each
+stream the tune decodes. `Dragon Flight  4 - Finish 1.ym` packed at `N` =
+960 and `C` = 32, seventeen live streams and `L` = 1440, puts them at 1408
+through 1424, and the measurement finds those seventeen and no others:
+
+| calls | cycles |
+|---|---:|
+| 1404 to 1407 | 908 |
+| 1408 to 1424 | 3160 to 4748 |
+| 1425 to 1439 | 908 |
+| 1440 on | 1856 |
+
+The 908 and the 1856 are the refill's two regimes, and an average blends
+them: a turn with nothing left to decode costs 908, which is every turn
+between a section running dry and the next one opening, and a turn that
+decodes its group costs 1856.
+
+What the window costs above that is the first decode from a fresh section.
+A decoder opened at a section's start has nothing behind it, so its first
+values come out as literals, and a literal costs a control bit and a byte
+where a match spreads one operation header over many units. Letting the
+loop section reach back into the ring would answer it and cannot: the ring
+holds the head's last `N` values on the first pass and the loop section's
+own on every later one, so one back-reference would decode two ways.
+
+The boundary falling mid-refill is not what costs. `C` has only to divide
+`N` and cover the streams, so the same source packs both ways without
+padding or moving its loop point: at `C` = 30, `(O - L) mod C` is ten and
+the worst frame is 4736 cycles; at `C` = 32 it is zero and the worst frame
+is 4748.
+
 ## What one tick costs
 
 A tick is an MFP interrupt into a small handler. Measured between the
