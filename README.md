@@ -178,11 +178,16 @@ format a tune came out of: the engine works on the `Tune` alone.
 mvn test                              # the packer, 41 pinned tunes, a rig slice
 ymx/test/rig.sh                       # the player, under emulation
 ymx/test/sweep.sh songs/*.ym          # a YM collection, differentially
+ymx/test/check.sh tune.ymx            # a packed tune against §9.3
+ymx/test/damage.sh                    # the same, its bytes changed one at a time
+ymx/test/ticks.sh                     # the ticks against a real MFP
+ymx/test/cost.sh tune.ymx             # what a play call costs, in cycles
 ```
 
 The three player tests run the 68000 player under emulation and need rmac
 and libunicorn (`brew install unicorn`, or `UNICORN_LIB` names the
-library).
+library). `ticks.sh` and `cost.sh` run under Hatari instead and need a TOS
+image; `check.sh` and `damage.sh` drive nothing and need neither.
 
 Two tests read the documents' figures back against the YM collection they
 count, which is not in the tree. `YM_CORPUS` says which directory holds
