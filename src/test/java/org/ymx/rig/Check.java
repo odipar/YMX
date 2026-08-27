@@ -328,7 +328,7 @@ final class Check {
             case START_RETRIGGER ->
                     claim(faults, frame, channels, channel, Kind.RETRIGGER, voice, low);
             case START_PCM -> {
-                if (marked(channels) != 0) {
+                if (silenced(channels, channel, voice) != 0) {
                     faults.add(new Fault(frame, "§9.3 actions", name
                             + " leaves a running timer standing; START_PCM_PREEMPT"
                             + " is the encoding where one is stopped"));
@@ -337,11 +337,11 @@ final class Check {
             }
             case START_PCM_PREEMPT -> {
                 int nibble = spare & 0x0F;
-                int running = marked(channels) & ~(1 << channel);
-                if (nibble != running) {
+                int stops = silenced(channels, channel, voice);
+                if (nibble != stops) {
                     faults.add(new Fault(frame, "§9.3 actions", name + " marks channels "
-                            + hex(nibble) + " in X where the running ones are "
-                            + hex(running)));
+                            + hex(nibble) + " in X where the silenced ones are "
+                            + hex(stops)));
                 }
                 for (int other = 0; other < YmxFormat.CHANNELS; other++) {
                     if ((nibble & (1 << other)) != 0) {
@@ -431,14 +431,27 @@ final class Check {
     }
 
     /** The channels with a timer counting. */
-    private static int marked(Channel[] channels) {
-        int running = 0;
+    /**
+     * The channels a trigger silences: §9.3's rule is what the trigger stops,
+     * not what happens to be running. A trigger takes one voice, so it
+     * silences the channels holding a toggle stream on that voice, and no
+     * others. Its own channel is reprogrammed rather than stopped, and a
+     * stream on another voice is untouched.
+     *
+     * <p>Counting every running channel instead reported 4,888 faults over 36
+     * of the 543 tunes in the collection, all of them a repeated trigger
+     * meeting its own channel's timer.</p>
+     */
+    private static int silenced(Channel[] channels, int trigger, int voice) {
+        int stops = 0;
         for (int channel = 0; channel < YmxFormat.CHANNELS; channel++) {
-            if (channels[channel].running) {
-                running |= 1 << channel;
+            Channel other = channels[channel];
+            if (channel != trigger && other.kind == Kind.TOGGLE && other.running
+                    && other.voice == voice) {
+                stops |= 1 << channel;
             }
         }
-        return running;
+        return stops;
     }
 
     /**

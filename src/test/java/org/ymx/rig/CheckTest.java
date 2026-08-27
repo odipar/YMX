@@ -53,6 +53,40 @@ final class CheckTest {
     }
 
     /**
+     * A trigger repeated on one channel reports nothing. §9.3 asks what a
+     * trigger silences, which is the channels holding a toggle stream on the
+     * voice it takes; a channel meeting its own running timer is
+     * reprogrammed, not stopped, and START_PCM stays the encoding.
+     *
+     * <p>Reading the rule as any running timer reported this on 36 of the
+     * 543 tunes in the collection, 4,888 times, and the conformance kit
+     * carries no repeated trigger to catch it.</p>
+     */
+    @Test
+    void aTriggerRepeatedOnItsOwnChannelIsWithinTheRules() {
+        assertEquals(List.of(), Check.check(retriggered()));
+    }
+
+    /**
+     * The same eight frames, with a PCM stream triggered on voice A at frame
+     * 0 and again at frame {@value #RELEASED} while its own timer runs.
+     */
+    private static byte[] retriggered() {
+        byte[][] streams = new byte[YmxFormat.STREAMS][FRAMES];
+        byte[] master = streams[YmxFormat.STREAM_M];
+        byte[] action = streams[YmxFormat.streamAction(0)];
+        byte[] count = streams[YmxFormat.streamAction(0) + 1];
+
+        master[0] = (byte) (1 | 0x10 | (1 << 5));   // channel 0 acts, voice A skipped
+        action[0] = (byte) ((6 << 5) | 1);          // START_PCM, voice A, prescaler 1
+        count[0] = 100;
+        master[RELEASED] = 1;                       // acts, and the skip stands
+        action[RELEASED] = (byte) ((6 << 5) | 1);   // the same trigger again
+        count[RELEASED] = 100;
+        return file(streams);
+    }
+
+    /**
      * Eight frames on timer channel 0: a toggle stream takes voice A at
      * frame 0 and is released at frame {@value #RELEASED}. With
      * {@code lifted} the release frame's M clears voice A's skip, which is
@@ -75,6 +109,11 @@ final class CheckTest {
         master[RELEASED] = (byte) (lifted ? 1 | 0x10 : 1);
         action[RELEASED] = (byte) (2 << 5);         // RELEASE, stopping
 
+        return file(streams);
+    }
+
+    /** The streams written into a file with every section stored. */
+    private static byte[] file(byte[][] streams) {
         int body = YmxFormat.HEADER_SIZE + 2;       // the header's two pad bytes
         byte[] file = new byte[body + YmxFormat.STREAMS * FRAMES];
         putLong(file, YmxFormat.OFFSET_MAGIC, YmxFormat.MAGIC);
