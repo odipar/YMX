@@ -20,6 +20,20 @@ by someone deciding whether to take the release, not by someone
 reviewing it: the commits carry the reasoning and the measurements, and
 the section carries the list.
 
+## 0.8.3
+
+The player is 3,434 bytes at unit size 2, the PRG stub 3,038. Format 0.7.
+The thirteen binaries are byte-identical to 0.8.2's: this release changes
+the standalone tool only.
+
+- `ym-to-ymx` names itself where a tune cannot be read, and names the file
+  where the file opens and is not a dump. One fault is in the command line
+  and the other is in the file, and the three implementations split them the
+  same way now.
+- `ym-to-ymx` takes a prebuilt core from a staged release beside `dist/` as
+  well as out of `dist/` itself, so a checkout that has assembled none
+  builds an SNDH file or a program without rmac.
+
 ## 0.8.2
 
 The player is 3,434 bytes at unit size 2, the PRG stub 3,038. Format 0.7.
