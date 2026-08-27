@@ -162,11 +162,37 @@ ring, the median 8,398 frames and 209,950 bytes; the format's own ceiling of
   Six bytes where twenty are written is about 4.5% of the file, and the read
   path changes in one place.
 
-- **`L` on a group boundary.** The frame where a stream reopens decodes two
-  pieces, because nothing puts the section boundary on a group boundary.
-  Padding `L` up to a multiple of `C` removes the straddle and leaves only
-  the fresh decoder's own cost. The packer writes the padding; the player
-  reads nothing new.
+
+**A section boundary where a refill ends** (2026-08-27). The frame where a
+stream crosses from its head section to its loop section decodes two pieces,
+because nothing puts that boundary where a refill stops: a refill produces
+`C` values and `O - L` is not a multiple of `C`. That frame costs about
+three times an average one, and it returns on every pass. Would putting the
+boundary where a refill ends take the cost out of it?
+
+No. `C` has only to divide `N` and cover the streams, so a tune whose
+`O - L` divides by such a `C` aligns with no padding and no move of its loop
+point. `Dragon Flight  4 - Finish 1.ym` packed twice from the one source at
+`N` = 960, 1,719 calls each under a cycle-exact Hatari:
+
+| `C` | `(O - L) mod C` | avg | p99 | max |
+|---:|---:|---:|---:|---:|
+| 30 | 10 | 1,491 | 3,180 | 4,736 |
+| 32 | 0 | 1,464 | 3,320 | 4,748 |
+
+The worst frame does not move: twelve cycles of 4,700, and upwards. The p99
+moves upwards too. The 2% between the averages is the refill size, which is
+what changing `C` changes.
+
+So the second piece is not what the frame spends, and what it does spend is
+still unaccounted for: `ST4_init` is four instructions and `ymx_reopen`
+about a hundred cycles, against roughly three thousand over an average
+frame. Alignment does not reach it.
+
+Padding rather than choosing `C` was the first form of this idea, and it is
+worse: `O - L` padded up to a multiple of `C` lengthens a tune's pass by up
+to `C - 1` frames, near half a second at 50 Hz, where the padding that fits
+a tune to its unit size adds at most three.
 
 ---
 
