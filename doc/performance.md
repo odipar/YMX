@@ -112,13 +112,20 @@ them: a turn with nothing left to decode costs 908, which is every turn
 between a section running dry and the next one opening, and a turn that
 decodes its group costs 1856.
 
-What the window costs above that is the first decode from a fresh section.
-A decoder opened at a section's start has nothing behind it, so its first
-values come out as literals, and a literal costs a control bit and a byte
-where a match spreads one operation header over many units. Letting the
-loop section reach back into the ring would answer it and cannot: the ring
-holds the head's last `N` values on the first pass and the loop section's
-own on every later one, so one back-reference would decode two ways.
+What the window costs above that is `ymx_reopen`, not the decode. The
+routine is 39 instructions, fifteen of them a `move.l` writing decoder state
+into the stream's block, and it runs once per stream per pass. The floor of
+the window sits 1324 cycles above a working refill, at 3180 against 1856.
+
+A decoder opened at a section's start does have nothing behind it, so its
+first values come out as literals and its parse is thinner. Both are
+measured, and both are the variation above the floor rather than the floor.
+Over the seventeen streams, the group a section opens with holds 39 literal
+units of 272 where a group from the middle of the same section holds none,
+and 46 operations cover it where 17 cover the middle one. Eight of the
+seventeen open with no literal and a single operation, the same parse the
+middle group has, and their frames still cost 3192 to 3256: what the frame
+decodes does not reach the floor.
 
 The boundary falling mid-refill is not what costs. `C` has only to divide
 `N` and cover the streams, so the same source packs both ways without
