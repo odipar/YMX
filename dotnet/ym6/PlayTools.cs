@@ -367,14 +367,36 @@ namespace Ym6
     /// </summary>
     public static class Play
     {
+        // The help text and the one-line failure the other two trees print.
+        // A caller reading one tree's examples runs them against another.
+        private const string HelpText =
+                "play.sh - test drive a YM tune: pack it, build a player, run it under Hatari.\n"
+                + "\n"
+                + "  ym/play.sh song.ym                  # 960-byte rings, 24 values per call\n"
+                + "  ym/play.sh -n256 song.ym            # smaller rings: less RAM, worse ratio\n"
+                + "  ym/play.sh -n2048 -c32 song.ym      # longer calls: cheaper on average\n"
+                + "  ym/play.sh -o song.ym               # play once and stop, instead of\n"
+                + "                                      # starting over at the end\n"
+                + "  ym/play.sh -min13 -sec52 song.ym    # trim: start deep in a long tune\n"
+                + "  ym/play.sh -startframe41403 -frames1729 song.ym\n"
+                + "  ym/play.sh one.ym two.ym            # a set: subtunes, number keys pick\n"
+                + "  ym/play.sh -perf song.ym            # the raster monitor: the frame step\n"
+                + "                                      # works in red, timer ticks in green\n"
+                + "                                      # (A) and blue (D), and a yellow bar\n"
+                + "                                      # estimates the ticks' scanlines\n"
+                + "  ym/play.sh -nomask song.ym          # drop the interrupt mask around the\n"
+                + "                                      # frame write, which the writes do\n"
+                + "                                      # not need: ticks then interleave\n"
+                + "                                      # with it instead of waiting ~500\n"
+                + "                                      # cycles behind it\n"
+                + "\n"
+                + "Press SPACE in the Hatari window to stop. Everything it builds lands in a\n"
+                + "work directory next to the first tune. The trim flags take one tune.\n"
+                + "\n"
+                + "  HATARI=/path/to/hatari TOS=/path/to/tos.img ym/play.sh song.ym";
+
         private const string UsageText =
-                "play.sh - test drive a YM tune: pack it, build a player, run"
-                + " it under Hatari.\n"
-                + "  ym/play.sh [-perf] [-nomask] [-nRING] [-cCHUNK] [-kUNIT]"
-                + " [-o] [trim flags] song.ym...\n"
-                + "Press SPACE in the Hatari window to stop. Everything it"
-                + " builds lands in a work\ndirectory next to the first tune."
-                + " HATARI= and TOS= point at your own install.";
+                "usage: play.sh [-perf] [-nomask] [-nRING] [-cCHUNK] [-kUNIT] [-o] song.ym...";
 
         public static void Main(string[] args)
         {
@@ -403,7 +425,7 @@ namespace Ym6
                 }
                 else if (a == "-h" || a == "--help")
                 {
-                    Console.WriteLine(UsageText);
+                    Console.WriteLine(HelpText);
                     return;
                 }
                 else if (a.StartsWith("-n"))

@@ -178,6 +178,19 @@ func main() {
 
 // packOne is the whole road for one tune: read, pack, write, report.
 func packOne(inputName, outputName string, o pack.Options, force bool) {
+	// The floor only, and before the input is opened: how many streams a
+	// tune decodes depends on the channels it names, which the encoder
+	// derives and checks again. A command line wrong in the ring, the chunk
+	// or the unit is answered for that, whatever the input turns out to be.
+	unit := o.Unit
+	if unit < 1 {
+		unit = 1
+	}
+	if problem := ymx.CheckShape(o.Ring, o.Chunk, unit,
+		ymx.StreamA0); problem != "" {
+		fail(problem)
+	}
+
 	input, err := os.ReadFile(inputName)
 	if err != nil {
 		fail("Cannot access input file " + inputName)

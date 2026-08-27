@@ -16,13 +16,34 @@ import (
 	"github.com/odipar/ymx/internal/ymx"
 )
 
-const usageText = `usage: play.sh [-perf] [-nomask] [-nRING] [-cCHUNK]
-               [-kUNIT] [-o] song.ym...
+// The help text and the one-line failure the other two trees print. A
+// caller reading one tree's examples runs them against another.
+const helpText = `play.sh - test drive a YM tune: pack it, build a player, run it under Hatari.
 
-Packs the tunes, builds a program around them and runs it under Hatari.
-Press SPACE in its window to stop. Everything it builds lands in a work
-directory next to the first tune. HATARI= and TOS= point at your own
-install.`
+  ym/play.sh song.ym                  # 960-byte rings, 24 values per call
+  ym/play.sh -n256 song.ym            # smaller rings: less RAM, worse ratio
+  ym/play.sh -n2048 -c32 song.ym      # longer calls: cheaper on average
+  ym/play.sh -o song.ym               # play once and stop, instead of
+                                      # starting over at the end
+  ym/play.sh -min13 -sec52 song.ym    # trim: start deep in a long tune
+  ym/play.sh -startframe41403 -frames1729 song.ym
+  ym/play.sh one.ym two.ym            # a set: subtunes, number keys pick
+  ym/play.sh -perf song.ym            # the raster monitor: the frame step
+                                      # works in red, timer ticks in green
+                                      # (A) and blue (D), and a yellow bar
+                                      # estimates the ticks' scanlines
+  ym/play.sh -nomask song.ym          # drop the interrupt mask around the
+                                      # frame write, which the writes do
+                                      # not need: ticks then interleave
+                                      # with it instead of waiting ~500
+                                      # cycles behind it
+
+Press SPACE in the Hatari window to stop. Everything it builds lands in a
+work directory next to the first tune. The trim flags take one tune.
+
+  HATARI=/path/to/hatari TOS=/path/to/tos.img ym/play.sh song.ym`
+
+const usageText = "usage: play.sh [-perf] [-nomask] [-nRING] [-cCHUNK] [-kUNIT] [-o] song.ym..."
 
 // The first value the packer has no use for, held until the TOS image has
 // been looked for: that is the order the other trees report them in.
@@ -50,7 +71,7 @@ flags:
 		case a == "-o":
 			options.Loops = false
 		case a == "-h", a == "--help":
-			fmt.Println(usageText)
+			fmt.Println(helpText)
 			return
 		case a == "-sidresume":
 			options.SidResume = true
