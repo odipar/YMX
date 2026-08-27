@@ -61,7 +61,7 @@ final class ConformanceSourcesTest {
             }
         }
         assertTrue(readme.contains("come to " + format(ticks) + " ticks"),
-                "doc/conformance/README.md does not say the ten tunes come to "
+                "doc/conformance/README.md does not say the tunes come to "
                         + format(ticks) + " ticks, which is what"
                         + " MANIFEST-ticks.txt's rows add up to");
 
@@ -117,8 +117,8 @@ final class ConformanceSourcesTest {
                 rows.add(new String[] {m.group(1), m.group(2), m.group(3)});
             }
         }
-        assertEquals(10, rows.size(), "doc/conformance/SOURCES.md no longer"
-                + " names ten tunes, and the kit holds ten");
+        assertEquals(11, rows.size(), "doc/conformance/SOURCES.md no longer"
+                + " names eleven tunes, and the kit holds eleven");
 
         Path work = Files.createTempDirectory("kit");
         for (String[] row : rows) {
