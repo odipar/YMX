@@ -11,10 +11,8 @@
 # past the file's end, and a malformed container. Each was one changed byte.
 #
 # This changes one byte at a time, reads every result back with each tree
-# that is built, and compares what they report. A tree whose tools are absent
-# is named and left out. Files where a section does not decode are set aside
-# and counted: the three ST4 readers word that one reason differently, which
-# is text and not behaviour.
+# that is built, and compares every report. A tree whose tools are absent is
+# named and left out.
 #
 # The work goes in DAMAGE_WORK, or ymx-damage under the temporary directory.
 # DamagedFileTest covers the Java reader alone and runs with the tests.

@@ -328,11 +328,10 @@ bit and the whole byte. The default tune is
 `doc/conformance/tunes/plain_packed.ymx`. A tree whose tools are absent is
 named and left out.
 
-The report counts what agreed, what differed, and what was set aside: a file
-whose report names a section that does not decode, where the three ST4
-readers word one reason three ways. A non-zero exit where any tree differs
-or ends its run, and the first fault they word differently is printed. The
-generator and the comparison are `ymx/test/damage.py`.
+The report counts what agreed and what differed, over every file. A non-zero
+exit where any tree differs or ends its run, and the first fault they word
+differently is printed. The generator and the comparison are
+`ymx/test/damage.py`.
 
 `DamagedFileTest` covers the Java reader alone and runs with the tests.
 
