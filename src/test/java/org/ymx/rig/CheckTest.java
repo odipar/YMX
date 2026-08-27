@@ -53,6 +53,54 @@ final class CheckTest {
     }
 
     /**
+     * A voice a sample owns, unskipped before that sample could have ended,
+     * is reported. §6 bounds the earliest frame a one-shot finishes on, and
+     * before it the file is claiming an end that cannot have happened.
+     *
+     * <p>Without the bound an unskipped PCM voice read as a sample that had
+     * finished, so the one rule §10.1 states for a sample went unchecked -
+     * the same shape as the toggle case above, for the stream kind that ends
+     * itself.</p>
+     */
+    @Test
+    void aSampleVoiceUnskippedTooEarlyIsReported() {
+        List<Check.Fault> faults = Check.check(sampled(false));
+        assertEquals(1, faults.size(), faults::toString);
+        assertEquals(RELEASED, faults.get(0).frame());
+        assertTrue(faults.get(0).detail().contains("cannot have finished"),
+                faults.get(0)::toString);
+    }
+
+    /** The same tune with the skip standing is within the rules. */
+    @Test
+    void theSameTuneWithTheSkipStandingIsWithinTheRules() {
+        assertEquals(List.of(), Check.check(sampled(true)));
+    }
+
+    /**
+     * Eight frames: a one-shot sample of 4,000 bytes triggered on voice A at
+     * frame 0, at prescaler 7 and count 200, so §6 puts its rejoin far past
+     * frame {@value #RELEASED}. With {@code held} the skip stands; without
+     * it frame {@value #RELEASED} clears it.
+     */
+    private static byte[] sampled(boolean held) {
+        byte[][] streams = new byte[YmxFormat.STREAMS][FRAMES];
+        byte[] master = streams[YmxFormat.STREAM_M];
+        byte[] action = streams[YmxFormat.streamAction(0)];
+        byte[] count = streams[YmxFormat.streamAction(0) + 1];
+
+        master[0] = (byte) (1 | 0x10 | (1 << 5));   // channel 0 acts, voice A skipped
+        action[0] = (byte) ((6 << 5) | 7);          // START_PCM, voice A, prescaler 7
+        count[0] = (byte) 200;
+        streams[8][0] = 0;                          // R8: the sample number
+        if (!held) {
+            master[RELEASED] = (byte) (1 | 0x10);   // the skip cleared, and nothing
+            action[RELEASED] = (byte) (1 << 5);     // a HOLD, so the channel acts
+        }
+        return file(streams, 4000, YmxFormat.SAMPLE_ONE_SHOT);
+    }
+
+    /**
      * A trigger repeated on one channel reports nothing. §9.3 asks what a
      * trigger silences, which is the channels holding a toggle stream on the
      * voice it takes; a channel meeting its own running timer is
@@ -114,8 +162,22 @@ final class CheckTest {
 
     /** The streams written into a file with every section stored. */
     private static byte[] file(byte[][] streams) {
-        int body = YmxFormat.HEADER_SIZE + 2;       // the header's two pad bytes
+        return file(streams, -1, 0);
+    }
+
+    /** The streams written into a file, with a one-entry sample table where
+     * {@code length} is not negative. */
+    private static byte[] file(byte[][] streams, int length, int loop) {
+        int table = length < 0 ? 0 : YmxFormat.HEADER_SIZE + 2;
+        int body = (length < 0 ? YmxFormat.HEADER_SIZE + 2 : table + 8);
         byte[] file = new byte[body + YmxFormat.STREAMS * FRAMES];
+        if (table != 0) {
+            putLong(file, YmxFormat.OFFSET_SAMPLE_TABLE, table);
+            putWord(file, YmxFormat.OFFSET_SAMPLE_COUNT, 1);
+            putLong(file, table, body);             // the sample's own bytes
+            putWord(file, table + 4, length);
+            putWord(file, table + 6, loop);
+        }
         putLong(file, YmxFormat.OFFSET_MAGIC, YmxFormat.MAGIC);
         putWord(file, YmxFormat.OFFSET_VERSION, YmxFormat.VERSION);
         putWord(file, YmxFormat.OFFSET_FLAGS, YmxFormat.flagChannel(0));

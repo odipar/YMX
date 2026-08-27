@@ -80,6 +80,13 @@ ROM image.
 
 ## Hearing a tune from the repository
 
+Four tunes to try are under [ym/examples](ym/examples), chosen to be heard
+rather than to cover a format feature:
+
+```
+ym/play.sh "ym/examples/Cuddly - main menu.ym"
+```
+
 ```sh
 mvn -q compile
 ym/play.sh song.ym                  # pack a YM tune, build a player, run it
@@ -167,7 +174,7 @@ format a tune came out of: the engine works on the `Tune` alone.
 ## Tests
 
 ```sh
-mvn test                              # the packer, 38 pinned tunes, a rig slice
+mvn test                              # the packer, 41 pinned tunes, a rig slice
 ymx/test/rig.sh                       # the player, under emulation
 ymx/test/sweep.sh songs/*.ym          # a YM collection, differentially
 ```

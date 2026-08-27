@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.TreeSet;
 import org.st4.St4Decompressor;
 import org.st4.St4Format;
+import org.ymx.Tune;
 import org.ymx.YmxFormat;
 
 /**
@@ -24,9 +25,9 @@ import org.ymx.YmxFormat;
  * drives nothing and needs neither rmac nor libunicorn.
  *
  * <p>What it reads is listed in {@code doc/tools.md}. Two rules are outside
- * it: the sample table of §6, and R13's {@code $FF} on every frame that
- * must not restart the envelope - a marker whose absence is a value the
- * file is free to carry.
+ * it: the sample table's own bounds, which this reads without checking, and
+ * R13's {@code $FF} on every frame that must not restart the envelope - a
+ * marker whose absence is a value the file is free to carry.
  */
 final class Check {
 
@@ -71,6 +72,8 @@ final class Check {
         Kind kind = Kind.NONE;
         int voice = NO_VOICE;
         int prescaler;
+        int rejoin;                         // the frame a one-shot could
+                                            // first have finished on
         boolean running;                    // the timer counts
         boolean disabled;                   // released, its interrupt down
     }
@@ -118,6 +121,25 @@ final class Check {
             return faults;
         }
 
+        // §6's table, which the rejoin bound below reads: one entry of eight
+        // bytes per sample, its length at 4 and its loop point at 6.
+        int sampleTable = longAt(file, YmxFormat.OFFSET_SAMPLE_TABLE);
+        int sampleCount = sampleTable == 0 ? 0
+                : wordAt(file, YmxFormat.OFFSET_SAMPLE_COUNT);
+        int[] length = new int[sampleCount];
+        int[] loop = new int[sampleCount];
+        for (int sample = 0; sample < sampleCount; sample++) {
+            int at = sampleTable + 8 * sample;
+            if (at + 8 > file.length) {
+                faults.add(new Fault(-1, "§6 sample table",
+                        "entry " + sample + " lies outside the file"));
+                return faults;
+            }
+            length[sample] = wordAt(file, at + 4);
+            loop[sample] = wordAt(file, at + 6);
+        }
+        int rate = wordAt(file, YmxFormat.OFFSET_PLAYER_HZ);
+
         byte[][] value = new byte[YmxFormat.STREAMS][];
         for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
             try {
@@ -131,7 +153,7 @@ final class Check {
             return faults;
         }
         registers(faults, value, frames);
-        script(faults, value, frames, flags);
+        script(faults, value, frames, flags, length, loop, rate);
         return faults;
     }
 
@@ -214,7 +236,8 @@ final class Check {
     // The script: M, T and the action bytes
     // -----------------------------------------------------------------
 
-    private static void script(List<Fault> faults, byte[][] value, int frames, int flags) {
+    private static void script(List<Fault> faults, byte[][] value, int frames,
+            int flags, int[] length, int[] loop, int rate) {
         byte[] master = value[YmxFormat.STREAM_M];
         byte[] spare = value[YmxFormat.STREAM_X];
         byte[] timers = value[YmxFormat.STREAM_T];
@@ -248,7 +271,8 @@ final class Check {
             previousMap = timers[frame] & 0xFF;
             for (int channel = 0; channel < YmxFormat.CHANNELS; channel++) {
                 if ((m & (1 << channel)) != 0) {
-                    act(faults, frame, channel, channels, value, spare[frame] & 0xFF);
+                    act(faults, frame, channel, channels, value,
+                            spare[frame] & 0xFF, length, loop, rate);
                 }
             }
             ownership(faults, frame, skips, channels, reported);
@@ -304,7 +328,8 @@ final class Check {
 
     /** One channel's action byte, and what it leaves the channel carrying. */
     private static void act(List<Fault> faults, int frame, int channel,
-            Channel[] channels, byte[][] value, int spare) {
+            Channel[] channels, byte[][] value, int spare,
+            int[] length, int[] loop, int rate) {
         int action = value[YmxFormat.streamAction(channel)][frame] & 0xFF;
         int opcode = action >> 5;
         int voice = (action >> 3) & 3;
@@ -328,6 +353,8 @@ final class Check {
             case START_RETRIGGER ->
                     claim(faults, frame, channels, channel, Kind.RETRIGGER, voice, low);
             case START_PCM -> {
+                triggered(channels[channel], value, frame, channel, voice,
+                        low, length, loop, rate);
                 if (silenced(channels, channel, voice) != 0) {
                     faults.add(new Fault(frame, "§9.3 actions", name
                             + " leaves a running timer standing; START_PCM_PREEMPT"
@@ -336,6 +363,8 @@ final class Check {
                 claim(faults, frame, channels, channel, Kind.PCM, voice, low);
             }
             case START_PCM_PREEMPT -> {
+                triggered(channels[channel], value, frame, channel, voice,
+                        low, length, loop, rate);
                 int nibble = spare & 0x0F;
                 int stops = silenced(channels, channel, voice);
                 if (nibble != stops) {
@@ -442,6 +471,50 @@ final class Check {
      * of the 543 tunes in the collection, all of them a repeated trigger
      * meeting its own channel's timer.</p>
      */
+
+    /**
+     * A trigger's sample and its rate, kept so the rejoin below can be read
+     * off them. The sample number is the voice's register byte on this frame,
+     * which the skip keeps off the chip (§3.2), and the count is the trigger's
+     * own P.
+     */
+    private static void triggered(Channel state, byte[][] value, int frame,
+            int channel, int voice, int prescaler, int[] length, int[] loop,
+            int rate) {
+        int sample = value[8 + voice][frame] & 0xFF;
+        int count = value[YmxFormat.streamAction(channel) + 1][frame] & 0xFF;
+        state.rejoin = rejoinOf(length, loop, sample, prescaler, count, rate,
+                frame);
+    }
+
+    /**
+     * The frame a one-shot sample started on {@code frame} could first have
+     * ended on, which is §6's rejoin bound:
+     *
+     * <pre>
+     * frames = ceil(((length + 1) · prescaler[index] · count · rate
+     *                + 2457600/16) / 2457600)
+     * </pre>
+     *
+     * <p>A looping sample never ends of itself, so it gives
+     * {@link Integer#MAX_VALUE}: a voice it owns rejoins the frame write
+     * only where something stops it.</p>
+     */
+    private static int rejoinOf(int[] length, int[] loop, int sample,
+            int prescaler, int count, int rate, int frame) {
+        if (sample < 0 || sample >= length.length) {
+            return Integer.MAX_VALUE;       // no such sample: §6 has it
+        }
+        if (loop[sample] != YmxFormat.SAMPLE_ONE_SHOT) {
+            return Integer.MAX_VALUE;       // it loops, and ends at no frame
+        }
+        long ticks = (long) (length[sample] + 1) * Tune.prescaler(prescaler)
+                * (count == 0 ? 256 : count);
+        long clock = 2457600L;
+        long frames = (ticks * rate + clock / 16 + clock - 1) / clock;
+        return frame + (int) frames;
+    }
+
     private static int silenced(Channel[] channels, int trigger, int voice) {
         int stops = 0;
         for (int channel = 0; channel < YmxFormat.CHANNELS; channel++) {
@@ -489,9 +562,27 @@ final class Check {
                 detail = " is not skipped and a toggle stream owns its volume register:"
                         + " the frame write and the ticks both write R" + (8 + voice);
             } else if (!skipped && owner == Kind.PCM) {
+                // A sample ends at its own marker and the file says nothing
+                // of it, so an unskipped voice reads as one that finished.
+                // §6 bounds when it could have: before that frame it cannot
+                // have, and the skip is one the writer did not set.
+                int earliest = Integer.MAX_VALUE;
                 for (Channel state : channels) {
                     if (state.voice == voice && state.kind == Kind.PCM) {
-                        stop(state);        // the sample reached its marker
+                        earliest = Math.min(earliest, state.rejoin);
+                    }
+                }
+                if (frame < earliest) {
+                    detail = " is not skipped and a PCM stream owns its volume"
+                            + " register: the sample cannot have finished"
+                            + (earliest == Integer.MAX_VALUE
+                                    ? ", since it loops"
+                                    : " before frame " + earliest);
+                } else {
+                    for (Channel state : channels) {
+                        if (state.voice == voice && state.kind == Kind.PCM) {
+                            stop(state);    // the sample reached its marker
+                        }
                     }
                 }
             }

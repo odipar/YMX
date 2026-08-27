@@ -289,12 +289,17 @@ What it reads:
 | | the rules |
 |---|---|
 | the shape | `O`, `N` and `S` within §1.3 and §1.5; every section-table entry nonzero; `L` below `O`; the loop table's form against `O - L` and the ring, and its entries |
-| the values | each register within the mask §2 gives it; M marks only channels §1.2 flags; a voice's skip set while a timer stream owns its volume register and clear otherwise; stream T's map, its distinct timers at frame 0 and the bounds on a change |
+| the values | each register within the mask §2 gives it; M marks only channels §1.2 flags; a voice's skip set while a timer stream owns its volume register and clear otherwise, a sample's against §6's rejoin bound; stream T's map, its distinct timers at frame 0 and the bounds on a change |
 | the actions | a programming opcode's prescaler index; `RELEASE`'s voice field; `RETUNE` over a running stream of the same voice; `RESUME` after a disabling release on a toggle stream; `HOLD`'s flags 2 and 4; one timer stream to a voice; `START_PCM_PREEMPT`'s X nibble against the channels it stops |
 
-Two rules of §9.3 are outside it: the sample table of §6, and R13's `$FF`
-on every frame that must not restart the envelope, a marker whose absence
-is a value the file is free to carry.
+A voice a sample owns is read against §6's rejoin bound: a one-shot's
+earliest end is the length, the prescaler, the count and the rate, and a
+skip cleared before it claims an end that cannot have happened.
+
+Two rules of §9.3 are outside it: the sample table's own bounds, which it
+reads without checking, and R13's `$FF` on every frame that must not
+restart the envelope, a marker whose absence is a value the file is free
+to carry.
 
 ### rig.sh
 
