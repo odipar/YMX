@@ -3,9 +3,10 @@
 Ideas measured against the real corpus and the real tools, and what the
 measurements said. Most are declines - an idea can be good, measurable and
 still cost more complexity than it saves, and writing the number down keeps
-it from being proposed, measured and declined a second time. The rest are
-diagnoses: bugs whose causes were buried deep enough that finding them
-taught something.
+it from being proposed, measured and declined a second time. One is
+deferred, which is a decline waiting on a condition. The rest are diagnoses:
+bugs whose causes were buried deep enough that finding them taught
+something, and one change that came out of a decline.
 
 These are the results only. The full logs - the false trails, the instrument
 readings, the method - were kept while the work was live and are in the
@@ -151,17 +152,6 @@ ring, the median 8,398 frames and 209,950 bytes; the format's own ceiling of
 2,520 frames a stream fits none of them. It also holds one decoder state of
 64 bytes where the columns hold 25.
 
-**What the two questions surfaced**, neither adopted yet:
-
-- **The section header.** A section costs 20 bytes of ST4 container and 4 of
-  section-table entry, and over the sample that is 45,600 bytes of 585,470,
-  7.8% of the file. Inside a `.ymx` the container's signature carries a magic,
-  a version and a unit size that the file's own header already gives, and its
-  size is the section's frame count, which the header gives too; its three
-  stream offsets are the only fields a reader needs, and they fit in words.
-  Six bytes where twenty are written is about 4.5% of the file, and the read
-  path changes in one place.
-
 
 **A section boundary where a refill ends** (2026-08-27). The frame where a
 stream crosses from its head section to its loop section decodes two pieces,
@@ -193,6 +183,37 @@ Padding rather than choosing `C` was the first form of this idea, and it is
 worse: `O - L` padded up to a multiple of `C` lengthens a tune's pass by up
 to `C - 1` frames, near half a second at 50 Hz, where the padding that fits
 a tune to its unit size adds at most three.
+
+---
+
+## Deferred
+
+Measured, worth having, and waiting on something.
+
+**The section header** (2026-08-27). A section costs 20 bytes of ST4
+container and 4 of section-table entry, which over the collection is 347,400
+bytes of 3,072,556 - 11% of what a `.ymx` holds. Inside a `.ymx` the
+container's signature carries a magic, a version and a unit size the file's
+own header already gives, and its size is the frame count the tables give.
+The three stream offsets are the only fields a reader needs, and counted in
+longs - which every stream begins on - they fit in words. Eight bytes where
+twenty are written, six of them content.
+
+Built, and measured rather than estimated: 2,903,524 bytes over the 543
+tunes against 3,072,556, **5.50%**, twelve bytes off every packed section.
+All four trees wrote and read it and the three tool trees produced identical
+files, so the change itself holds.
+
+Reverted on a cost the saving does not cover. The format version moves from
+0.7 to 0.8, which stops every packed file playing and asks every writer
+outside this repository to follow, and there is one. The estimate that
+recommended it said 4.5% and one place in the read path; the measurement
+said 5.5% and four trees, the specification, the conformance kit and a
+release.
+
+**What would change it:** the format bumping for another reason. The work is
+a day, the saving is permanent, and it costs nothing extra to carry once the
+compatibility break is being paid for anyway.
 
 ---
 
