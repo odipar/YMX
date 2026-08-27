@@ -90,6 +90,84 @@ a value it sends to the chip.
 the packer's mask, `MAX_SAMPLES`, and the resolved table sized from the
 header's count at init. The read path needs nothing.
 
+**A command stream in place of the columns** (2026-08-27). The format writes
+one byte per stream per frame, and most of them repeat the byte before: over
+543 tunes, 14,862,992 of 94,733,950 stream bytes differ from the frame before
+them, 15.7%. Would writing only those, each with an index saying which stream
+it belongs to, pack smaller than the columns do?
+
+No. Every shape measured, each packed as the packer packs a section and each
+held to one 16,384-byte ring shared out over the streams it writes:
+
+| encoding | against the columns |
+|---|---:|
+| a 32-bit mask a frame, then the bytes that changed | 2.39x |
+| the same mask split into four byte planes | 2.60x |
+| index and data interleaved, a marker closing each frame | 1.89x |
+| the indexes in one stream, the bytes in another | 2.56x |
+| 25 bit masks and 25 columns of changed bytes | 1.41x |
+| 25 run-length columns and 25 value columns | 1.48x |
+| each column written against the frame before it | 1.04x |
+
+The reason is the same for all of them: ST4 writes an unchanged byte as part
+of a match, which costs bits, and a command spends a whole byte of index to
+save them. The 25 opening values a decoder needs are 0.09% on top and change
+nothing.
+
+**Block interleaving** (2026-08-27). The columns are packed as 25 sections,
+so a 24,000-byte workspace is 25 windows of 960. Would one stream holding a
+block of each column in turn - one window of 24,000 - pack smaller? Measured
+over 72 tunes drawn across the length distribution, 624,727 frames, 16% of
+the corpus by frame, both layouts at 24,000 bytes:
+
+| layout | payload | sections | whole |
+|---|---:|---:|---:|
+| the columns as they are | 539,870 | 1,900 | 1.00x |
+| one stream, 480 frames a block | 562,762 | 76 | 0.96x |
+| two streams, 13 columns and 12 | 564,176 | 152 | 0.97x |
+| three streams, 14, 3 and 8 by what they carry | 566,610 | 228 | 0.98x |
+| four streams, 8, 8, 8 and 1 | 570,254 | 304 | 0.99x |
+| three streams, 10, 8 and 7 | 571,944 | 228 | 0.99x |
+
+The packing is 4.2% worse. The file is 3.6% smaller only because 1,900
+sections become 76, and that saving is the section header's, not the
+layout's. Interleaved, a repeat inside one column has 24 other columns
+between its two occurrences, so every match offset is twenty-five times
+larger and ST4 writes offsets in a variable-length code: the wider window
+pays for itself in the offsets it reaches with. Writing the frame's
+twenty-five bytes in a row instead, with no blocks at all, is 3.27x, which
+says the same thing from the other side.
+
+Which columns share a stream does matter, though less than how many: 14, 3
+and 8 by what they carry packs 1.3% smaller than 10, 8 and 7 at the same
+stream count, block size and ring.
+
+Declined for size. What it does that nothing else does is remove the section
+reopen: with one section a pass, the loop section is decoded through the last
+block of the one before it, where the frame's decoding is already done and
+the same 25 bytes a frame are free. A ring cannot buy that. Of the 36 tunes
+that reopen, the shortest pass is 2,688 frames and needs 67,200 bytes of
+ring, the median 8,398 frames and 209,950 bytes; the format's own ceiling of
+2,520 frames a stream fits none of them. It also holds one decoder state of
+64 bytes where the columns hold 25.
+
+**What the two questions surfaced**, neither adopted yet:
+
+- **The section header.** A section costs 20 bytes of ST4 container and 4 of
+  section-table entry, and over the sample that is 45,600 bytes of 585,470,
+  7.8% of the file. Inside a `.ymx` the container's signature carries a magic,
+  a version and a unit size that the file's own header already gives, and its
+  size is the section's frame count, which the header gives too; its three
+  stream offsets are the only fields a reader needs, and they fit in words.
+  Six bytes where twenty are written is about 4.5% of the file, and the read
+  path changes in one place.
+
+- **`L` on a group boundary.** The frame where a stream reopens decodes two
+  pieces, because nothing puts the section boundary on a group boundary.
+  Padding `L` up to a multiple of `C` removes the straddle and leaves only
+  the fresh decoder's own cost. The packer writes the padding; the player
+  reads nothing new.
+
 ---
 
 ## Diagnosed and fixed
