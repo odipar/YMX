@@ -405,6 +405,25 @@ two trees have to be built first. `-quick` is four tunes and the cases that
 have caught something; the default is eight tunes and every case.
 `ParityTest` runs `-quick` and is skipped where `YM_CORPUS` is unset.
 
+## Every check, in one run
+
+    ymx/verify.sh [-full]
+
+The checks are spread over a Maven build, three trees, a file reader, an
+emulator rig, a corpus sweep and two Hatari harnesses, so running one of
+them answers for one of them. This runs each in turn: one line per step,
+PASS, FAIL, or SKIP naming the tool or the directory that is absent. A step
+that did not run is never a pass, and the exit status is non-zero where any
+step failed.
+
+Without `-full` it runs the steps that need no corpus and no emulator: the
+Maven build, the Go and C# builds, the §9.3 reader in both trees, and the
+player rig's quick battery. `-full` adds the parity run, the rig in full,
+the corpus sweep and the tick reference.
+
+Each step writes its own log, and the table names the log of every step that
+failed.
+
 ## The C# tool names
 
 `-dotnet` reaches these through the wrappers; directly, the first argument
@@ -427,7 +446,8 @@ of `dotnet dotnet/bin/Release/net10.0/ymx.dll` names the tool:
 | `UNICORN_LIB` | the rigs | where libunicorn is, when the usual paths and the pip wheel fail |
 | `YMX_NOMASK` | rig.sh | assemble the player with the frame write unmasked |
 | `YMX_PACK_OPTIONS` | sweep.sh | extra packer options for the sweep |
-| `YM_CORPUS` | mvn test | the directory holding the YM collection the documents count; without it the tests that read those figures back are skipped |
+| `VERIFY_LOGS` | verify.sh | the directory the step logs go in |
+| `YM_CORPUS` | mvn test, parity.sh, verify.sh | the directory holding the YM collection the documents count; without it the tests that read those figures back are skipped |
 | `YMX_PLAY_FRAMES` | run.sh | how many frames the real-hardware harness plays; raise it to resolve a smaller cycle difference |
 | `ymx.repo` / `YMX_REPO` | the combiners, the play tools and the rigs | the repository root, when not derivable (the Java property, the C# variable) |
 | `ymx.core` / `YMX_CORE` | mksndh.sh | a core file, overriding `dist/` |
