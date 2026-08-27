@@ -10,15 +10,25 @@
 # from it and reports nothing (§9.1), so this is what a writer other than
 # the packer reads its output back with.
 #
-# -go as the first argument reads the file with the Go tree
-# (go/cmd/ymxcheck) instead of the Java one; both read the same rules off
-# the same streams and report the same faults.
+# -go or -dotnet as the first argument reads the file with the Go tree
+# (go/cmd/ymxcheck) or the C# one (dotnet, tool name check) instead of the
+# Java one; all three read the same rules off the same streams and report
+# the same faults.
 #
 # The work is org.ymx.rig.Check's; this only finds the repo and the
 # classes. Needs neither rmac nor libunicorn.
 set -e
 TEST_DIR=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$TEST_DIR/../.." && pwd)
+
+if [ "$1" = "-dotnet" ]; then
+    shift
+    DLL="$REPO/dotnet/bin/Release/net10.0/ymx.dll"
+    # The build's own lines go to stderr: this script's stdout is the
+    # report, which a caller compares against another tree's.
+    (cd "$REPO/dotnet" && dotnet build -c Release -v q >&2)
+    YMX_REPO="$REPO" exec dotnet "$DLL" check "$@"
+fi
 
 if [ "$1" = "-go" ]; then
     shift
