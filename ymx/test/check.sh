@@ -10,11 +10,21 @@
 # from it and reports nothing (§9.1), so this is what a writer other than
 # the packer reads its output back with.
 #
+# -go as the first argument reads the file with the Go tree
+# (go/cmd/ymxcheck) instead of the Java one; both read the same rules off
+# the same streams and report the same faults.
+#
 # The work is org.ymx.rig.Check's; this only finds the repo and the
 # classes. Needs neither rmac nor libunicorn.
 set -e
 TEST_DIR=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$TEST_DIR/../.." && pwd)
+
+if [ "$1" = "-go" ]; then
+    shift
+    (cd "$REPO/go" && go build -o bin/ymxcheck ./cmd/ymxcheck)
+    exec "$REPO/go/bin/ymxcheck" "$@"
+fi
 
 (cd "$REPO" && mvn -q test-compile)
 exec java -ea -Dymx.repo="$REPO" \
