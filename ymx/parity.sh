@@ -190,6 +190,24 @@ sweep() {
 }
 
 
+
+# What each command says when it is given nothing, or asked for help. The
+# texts drifted apart once already: one tree's ymx printed two lines where
+# the others printed forty-seven.
+usage_texts() {
+    one_case usage-ymx        ymx
+    one_case usage-st4        st4
+    one_case usage-dst4       dst4
+    one_case usage-mksndh     mksndh
+    one_case usage-mkprg      mkprg
+    one_case usage-ymsndh     ymsndh
+    one_case usage-y2y        ym-to-ymx
+    one_case help-play        play -h
+    one_case help-y2y         ym-to-ymx -h
+    # a flag wrong and an input missing at once: which one a tree answers
+    one_case flag-before-input ymx -c7 nosuch.ym out.ymx
+}
+
 # The malformed inputs, built once so the three runs meet the same bytes.
 # A file a tool cannot read is where the trees have most room to differ:
 # one names the fault, one prints its runtime's bounds text, one exits on a
@@ -289,6 +307,7 @@ done < "$WORK/tunes"
 
 TUNE_A=$(head -1 "$WORK/tunes"); TUNE_B=$(head -2 "$WORK/tunes" | tail -1)
 refusals
+usage_texts
 fixtures
 malformed
 
