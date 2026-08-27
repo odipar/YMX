@@ -1,7 +1,7 @@
 # The pinned YM tunes
 
-Thirty-six tunes from a 544-file collection and two built by hand, and the
-`.ymx` each one packs to.
+Thirty-nine tunes from a 544-file collection and two built by hand, and
+the `.ymx` each one packs to.
 `PinnedCorpusTest` packs them again and compares, so a change anywhere in the
 packer, the script compiler or ST4 fails here rather than in a shipped
 file. The test says how to repin after an intended change.
@@ -9,9 +9,22 @@ file. The test says how to repin after an intended change.
 They were chosen to cover features rather than to sample: both dialects,
 every effect class the collection holds - digidrums, SID voices, and tunes
 with no effect - each distinct drum rate, the tunes that put two and
-three voices on the envelope at once, seven whose header gives a loop frame
+three voices on the envelope at once, eight whose header gives a loop frame
 other than 0, and the extremes of length (4 to 58,716 frames) and size (162
 bytes to 55 KB).
+
+Three carry the extremes of what a player is asked to keep up with, which
+the rest of the set leaves at the middle:
+
+* `Synergy Wicked Polygons 2` loops from frame 41,403 of 43,132, the
+  furthest into a tune the collection loops from, where the next pinned
+  tune loops from 2,019. It acts on 16,403 frames, more than any other
+  file in the collection.
+* `Chambers of Shaolin - Mega Pock Olipse` runs a timer at 512 ticks a
+  frame, which the collection reaches nowhere else but in the four
+  Chambers tunes.
+* `Sid Music #1` acts on 13,558 of its 17,153 frames, a SID voice moving
+  on four frames in five.
 
 All eight of the compiled script's opcodes are covered here. A recorded
 dump reaches `START_PCM`, `START_TOGGLE`, `RELEASE`, and, through
