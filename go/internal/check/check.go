@@ -714,7 +714,7 @@ func entry(file []byte, table, index int) int64 {
 }
 
 func longAt(file []byte, at int) int {
-	if at < 0 || at+4 > len(file) {
+	if at < 0 || at > len(file)-4 {
 		return 0
 	}
 	return int(int32(uint32(file[at])<<24 | uint32(file[at+1])<<16 |
@@ -722,7 +722,7 @@ func longAt(file []byte, at int) int {
 }
 
 func wordAt(file []byte, at int) int {
-	if at < 0 || at+2 > len(file) {
+	if at < 0 || at > len(file)-2 {
 		return 0
 	}
 	return int(file[at])<<8 | int(file[at+1])
