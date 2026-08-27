@@ -22,6 +22,7 @@ covered.
 | `cut_form` | `Dragon Flight  4 - Finish 1.ym` | none |
 | `wide_ring` | `Turrican - world 4-1.ym` | `-k1 -n2048 -c32` |
 | `plays_once` | `Knucklebusters.ym` | `-o -frames4000` |
+| `repeat_trigger` | `Chambers of Shaolin - Chinese revolution.ym` | `-frames120` |
 | `retrigger` | `Sync buzzer, built.ym` | none |
 | `resume_model` | `Synergy Credits.ym` | `-sidresume` |
 

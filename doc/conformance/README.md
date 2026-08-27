@@ -1,7 +1,7 @@
 # The conformance kit
 
-Ten packed tunes, and what the 68000 player writes to the sound chip for
-each. The kit exists to test [SPEC.md](../SPEC.md) rather than the code:
+Eleven packed tunes, and what the 68000 player writes to the sound chip
+for each. The kit comes to 29,806 entries. The kit exists to test [SPEC.md](../SPEC.md) rather than the code:
 hand it to someone who has never seen this repository, and see whether the
 document alone is enough to decode the tunes.
 
@@ -92,10 +92,10 @@ produced 53,055 entries with no value, no result and no register's
 presence differing from the player anywhere, and left six places where the
 document made an implementer choose.
 
-The fifth ran against this kit, which comes to 29,406 entries. Three
-implementers each produced all 29,406, byte for byte the reference on all
-ten tunes: no value, no result and no register's presence differed
-anywhere. Two of the three passed the second test. The third read another
+The fifth ran against this kit at the ten tunes it carried then, 29,406
+entries. Three implementers each produced all 29,406, byte for byte the
+reference on every one: no value, no result and no register's presence
+differed anywhere. Two of the three passed the second test. The third read another
 implementer's decoder out of a scratch directory the harness gave all
 three, and reported it; its own decoder was decoding every section a run
 earlier, and the fault was the harness's, not that implementer's.
@@ -136,9 +136,9 @@ four now.
 ## The second reference, which carries the ticks
 
 `MANIFEST.txt` records a call's own writes, which is the reader of §9.4.
-`MANIFEST-ticks.txt` records the same ten tunes with the timers run: the
-same calls, and after each one every tick that falls before the next, in
-time order. The ten come to 286,452 ticks. `ymx/test/rig.sh` regenerates
+`MANIFEST-ticks.txt` records the same eleven tunes with the timers run:
+the same calls, and after each one every tick that falls before the next,
+in time order. The eleven come to 332,521 ticks. `ymx/test/rig.sh` regenerates
 both and checks both digests.
 
 That is the record §3, §5 and §6 can be checked against. A reader's
@@ -203,8 +203,8 @@ and fixes as its own the four things about when a tick falls that the
 document leaves to the host. Three implementers worked from `SPEC.md` and
 that task, with the record kept back.
 
-All three produced every call and every tick of all ten tunes, byte for
-byte the record: 29,406 calls and 286,452 ticks each, no value, no
+All three produced every call and every tick of the ten tunes the kit
+held then, byte for byte the record: 29,406 calls and 286,452 ticks each, no value, no
 result, no register and no tick's place differing anywhere. None read an
 implementation.
 
@@ -230,7 +230,7 @@ that were the task's.
 
 A second player run followed, against the document those nine were written
 into. All three implementers again produced every call and every tick of
-all ten tunes byte for byte, and the marks fell from seventeen to eleven.
+those ten byte for byte, and the marks fell from seventeen to eleven.
 All three found the same sentence: §3.3, rewritten for the first run, said
 `RESUME` "delivers the next tick one period after the count reaches its
 next underflow", which passes over an underflow that §9.2 does not drop.

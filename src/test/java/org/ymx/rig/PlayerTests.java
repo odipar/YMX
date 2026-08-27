@@ -546,7 +546,7 @@ final class PlayerTests {
 
     /**
      * The conformance kit, against the player it was taken from.
-     * {@code doc/conformance} holds ten tunes and a digest of what the
+     * {@code doc/conformance} holds eleven tunes and a digest of what the
      * player writes for each, and the exercise that tests SPEC.md hands a
      * reader the tunes and keeps the digests back. The kit is only worth
      * handing over while it still describes this player, so this replays
@@ -584,9 +584,9 @@ final class PlayerTests {
             }
             checked++;
         }
-        if (checked != 10) {
+        if (checked != 11) {
             return "conformance: the manifest has " + checked + " tunes, and"
-                    + " doc/conformance/README.md accounts for ten";
+                    + " doc/conformance/README.md accounts for eleven";
         }
         return "";
     }
@@ -626,9 +626,9 @@ final class PlayerTests {
             }
             checked++;
         }
-        if (checked != 10) {
+        if (checked != 11) {
             return "ticks: the manifest has " + checked + " tunes, and the"
-                    + " kit holds ten";
+                    + " kit holds eleven";
         }
         return "";
     }
@@ -1045,9 +1045,9 @@ final class PlayerTests {
         failures += report(runSndhCorpus(),
                 "the pinned tunes combined (both paths, same chip writes)");
         failures += report(runConformanceKit(),
-                "the conformance kit      (ten tunes, digests of the player)");
+                "the conformance kit      (eleven tunes, digests of the player)");
         failures += report(runTickReference(),
-                "the tick reference       (ten tunes, every timer tick)");
+                "the tick reference       (eleven tunes, every timer tick)");
         failures += report(runRequiredExtension(),
                 "a required extension     (the mask rejects, the ceiling holds)");
         for (boolean perf : new boolean[] {false, true}) {
