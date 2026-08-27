@@ -130,7 +130,7 @@ final class Check {
         int[] loop = new int[sampleCount];
         for (int sample = 0; sample < sampleCount; sample++) {
             int at = sampleTable + 8 * sample;
-            if (at + 8 > file.length) {
+            if (at < 0 || at + 8 > file.length) {
                 faults.add(new Fault(-1, "§6 sample table",
                         "entry " + sample + " lies outside the file"));
                 return faults;
@@ -144,7 +144,7 @@ final class Check {
         for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
             try {
                 value[stream] = stream(file, stream, frames, loopFrame, loopTable);
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | AssertionError e) {
                 faults.add(new Fault(-1, "§1.4 section",
                         "stream " + stream + " does not decode: " + e.getMessage()));
             }
@@ -180,9 +180,15 @@ final class Check {
                         "section-table entry " + stream + " is 0"));
             }
         }
+        if (loopFrame < 0) {
+            faults.add(new Fault(-1, "§9.3 shape",
+                    "L is " + loopFrame + ", not a frame index"));
+            return;                         // O - L is read below
+        }
         if (loopFrame != 0 && loopFrame >= frames) {
             faults.add(new Fault(-1, "§9.3 shape",
                     "L is " + loopFrame + ", not below O at " + frames));
+            return;                         // O - L is read below
         }
         if (loopTable == 0) {
             if (loopFrame != 0 && frames - loopFrame > ring) {
@@ -203,6 +209,14 @@ final class Check {
             faults.add(new Fault(-1, "§9.3 shape", "the file carries a loop table and O - L is "
                     + (frames - loopFrame) + ", within the ring at " + ring
                     + ": one section per stream is the form"));
+        }
+        // The table's own extent, which the entries below are read from: a
+        // header naming a table past the file's end has no entries to read.
+        if (loopTable < 0 || loopTable + 4 * YmxFormat.STREAMS > file.length) {
+            faults.add(new Fault(-1, "§9.3 shape", "the loop table is at "
+                    + loopTable + ", outside the file at " + file.length
+                    + " bytes"));
+            return;
         }
         for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
             if (entry(file, loopTable, stream) == 0) {

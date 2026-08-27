@@ -279,6 +279,13 @@ the chip from it and reports nothing, so a writer other than the packer
 reads its output back with this.
 
     ymx/test/check.sh tune.ymx [more.ymx ...]
+    ymx/test/check.sh -go tune.ymx [more.ymx ...]
+
+`-go` as the first argument reads the file with the Go tree
+(`go/cmd/ymxcheck`) instead of the Java one. Both read the same rules off
+the same streams and report the same faults, over the collection and over a
+file whose bytes have been changed one at a time. The C# tree has no reader,
+so this script takes no `-dotnet`.
 
 One line per file - `within §9.3`, or a count and one line per place the
 file leaves them, each naming the frame and the rule. A non-zero exit
