@@ -167,6 +167,7 @@ ST4_UNIT    equ     2
 | [`org.st4`](src/main/java/org/st4) | the ST4 compressor, a copy carried here |
 | [68k/](68k) | all the 68000 sources: the player, its wrappers, the ST4 decoders |
 | [dotnet/](dotnet) | the C# tree: every tool and rig again, producing the same bytes |
+| [go/](go) | the Go tree: the tools again, producing the same bytes |
 
 The front end stops at a `Tune`, and no field past that point records what
 format a tune came out of: the engine works on the `Tune` alone.
@@ -194,6 +195,10 @@ YM_CORPUS=/path/to/ym_collection mvn test
 Every shell script also takes `-dotnet` as its first argument, which runs
 the C# tree in [dotnet/](dotnet) instead of the Java one - the same tools
 and rigs, producing the same bytes, built by the .NET SDK on first use.
+
+The Go tree in [go/](go) is the third, carrying the tools rather than the
+rigs. [ymx/parity.sh](ymx/parity.sh) runs one command line through all three
+and compares everything it leaves.
 
 The sweep is the broadest of these. It replays a converted tune on the
 real player under emulation and compares every write it makes to the sound
