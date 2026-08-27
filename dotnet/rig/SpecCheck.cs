@@ -871,7 +871,7 @@ namespace Rig
 
         private static int LongAt(byte[] file, int at)
         {
-            if (at < 0 || at + 4 > file.Length)
+            if (at < 0 || at > file.Length - 4)
             {
                 return 0;
             }
@@ -881,7 +881,7 @@ namespace Rig
 
         private static int WordAt(byte[] file, int at)
         {
-            if (at < 0 || at + 2 > file.Length)
+            if (at < 0 || at > file.Length - 2)
             {
                 return 0;
             }

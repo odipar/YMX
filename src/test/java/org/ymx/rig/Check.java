@@ -677,12 +677,25 @@ final class Check {
         return longAt(file, table + 4 * index) & 0xFFFF_FFFFL;
     }
 
+    /**
+     * The long at {@code at}, or 0 where that lies outside the file. The
+     * bound is written as a subtraction: {@code at + 4} overflows on an
+     * offset near the ceiling, and a guard that overflows passes the value
+     * it was written to stop.
+     */
     private static int longAt(byte[] file, int at) {
+        if (at < 0 || at > file.length - 4) {
+            return 0;
+        }
         return ((file[at] & 0xFF) << 24) | ((file[at + 1] & 0xFF) << 16)
                 | ((file[at + 2] & 0xFF) << 8) | (file[at + 3] & 0xFF);
     }
 
+    /** The word at {@code at}, or 0 where that lies outside the file. */
     private static int wordAt(byte[] file, int at) {
+        if (at < 0 || at > file.length - 2) {
+            return 0;
+        }
         return ((file[at] & 0xFF) << 8) | (file[at + 1] & 0xFF);
     }
 
