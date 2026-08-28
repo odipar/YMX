@@ -112,10 +112,18 @@ them: a turn with nothing left to decode costs 908, which is every turn
 between a section running dry and the next one opening, and a turn that
 decodes its group costs 1856.
 
-What the window costs above that is `ymx_reopen`, not the decode. The
-routine is 39 instructions, fifteen of them a `move.l` writing decoder state
-into the stream's block, and it runs once per stream per pass. The floor of
-the window sits 1324 cycles above a working refill, at 3180 against 1856.
+What the window costs above that is the reopen path and not the decode. The
+floor sits 1324 cycles above a working refill, at 3180 against 1856, and
+opening a section is the only work a reopen frame does that a refill frame
+does not.
+
+How those 1324 divide is not measured. `ymx_reopen` is 39 instructions,
+fifteen of them a `move.l` writing decoder state into the stream's block,
+and counting them reaches something nearer half. A decoder opened at a
+section's start also begins with an empty bit queue and no offset to reuse,
+so its first control read refills the queue and its first match reads an
+offset where a later one repeats it. Neither of those shows in a literal
+count or an operation count, which is what the two figures below count.
 
 A decoder opened at a section's start does have nothing behind it, so its
 first values come out as literals and its parse is thinner. Both are
