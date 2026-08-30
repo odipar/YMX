@@ -100,17 +100,70 @@ final class HouseStyleTest {
         for (Path doc : DOCS) {
             List<String> lines = Files.readAllLines(doc);
             for (int at = 0; at < lines.size(); at++) {
-                String line = lines.get(at).toLowerCase();
+                // a space in front, so an entry that leads
+                // with one matches a word at the start of a
+                // line as well as inside one
+                String line = " " + lines.get(at).toLowerCase();
                 for (String struck : STRUCK) {
                     if (line.contains(struck)) {
                         hits.add(doc + ":" + (at + 1) + " carries \"" + struck + '"');
                     }
                 }
             }
+            hits.addAll(wrappedHits(doc, lines));
         }
         assertTrue(hits.isEmpty(), () -> String.join("\n", hits)
                 + "\nAGENTS.md has the rule each phrase was struck under;"
                 + " reword the line, or take the entry off this list in the"
                 + " same change.");
+    }
+
+    /**
+     * The hits a line wrap hides. A phrase broken across two lines stands in
+     * neither of them, so every paragraph is read joined as well, and what
+     * the joined text holds beyond what its own lines hold is reported at
+     * the line the paragraph begins on. A table row, an indented block and a
+     * fence break a paragraph: joining those would put words side by side
+     * that no sentence puts there.
+     */
+    private static List<String> wrappedHits(Path doc, List<String> lines) {
+        List<String> hits = new ArrayList<>();
+        int from = 0;
+        for (int at = 0; at <= lines.size(); at++) {
+            boolean breaks = at == lines.size() || lines.get(at).isBlank()
+                    || lines.get(at).startsWith("|")
+                    || lines.get(at).startsWith("    ")
+                    || lines.get(at).startsWith("```");
+            if (!breaks) {
+                continue;
+            }
+            if (at > from) {
+                List<String> paragraph = lines.subList(from, at);
+                String joined = " " + String.join(" ", paragraph).toLowerCase();
+                for (String struck : STRUCK) {
+                    int whole = occurrences(joined, struck);
+                    int apart = 0;
+                    for (String line : paragraph) {
+                        apart += occurrences(" " + line.toLowerCase(), struck);
+                    }
+                    for (int n = apart; n < whole; n++) {
+                        hits.add(doc + ":" + (from + 1) + " carries \""
+                                + struck + "\", broken by a line wrap");
+                    }
+                }
+            }
+            from = at + 1;
+        }
+        return hits;
+    }
+
+    /** How many times a struck phrase stands in a run of text. */
+    private static int occurrences(String text, String struck) {
+        int found = 0;
+        for (int at = text.indexOf(struck); at >= 0;
+                at = text.indexOf(struck, at + 1)) {
+            found++;
+        }
+        return found;
     }
 }
