@@ -402,9 +402,9 @@ YH_SECTIONS     equ     42              ; one offset per stream: its section,
 YMX_MAGIC       equ     $594D5821       ; 'YMX!'
 YMX_VERSION     equ     $0008           ; the format version: the major in
                                         ; the high byte, the minor in the
-                                        ; low. There is no older version to
-                                        ; stay compatible with; doc/SPEC.md
-                                        ; defines the layout
+                                        ; low. A file of another version is
+                                        ; rejected at init, not read: SPEC.md
+                                        ; §10.5 repacks from source instead
 YMX_FLAG_LOOPS  equ     1               ; header flag: the tune starts over
 YMX_FLAG_CHAN   equ     2               ; and one per timer channel, from bit
                                         ; 1 up: set when the tune uses it,

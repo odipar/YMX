@@ -14,7 +14,7 @@ const Magic = 0x594D5821
 
 // Version is the only format version this build writes or reads: the major
 // in the high byte, the minor in the low, so versions order numerically.
-const Version = 0x0007
+const Version = 0x0008
 
 // ReleaseMajor is the binaries' own version, which moves when they change
 // and stands when they do not. It is three plain numbers rather than a

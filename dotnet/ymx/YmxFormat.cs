@@ -19,7 +19,7 @@ namespace Ymx
         /// <summary>The only version this release writes or reads: the
         /// major in the high byte, the minor in the low, so versions order
         /// numerically.</summary>
-        public const int Version = 0x0007;
+        public const int Version = 0x0008;
 
         /// <summary>
         /// The binaries' own version, which moves when they change and

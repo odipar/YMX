@@ -1,6 +1,6 @@
 # The YMX format - specification
 
-Version 0.7. Big-endian throughout.
+Version 0.8. Big-endian throughout.
 
 YMX is a streaming register-dump format for the YM2149 sound chip in the
 Atari ST, playable by a 68000 without the tune resident in memory. A file
@@ -33,8 +33,9 @@ streams it implements. §9.4 says what a reader leaves unread and why.
 
 The format began as the `.yx6` container of the [ST4](https://github.com/odipar/ST4)
 repository, renumbered; the layout has changed since, and this document
-defines the current layout. No older YMX version exists to stay compatible
-with.
+defines the current layout. A file states its version and a player checks
+it (§9.1), so a player built for one version reads no file of another; a
+tune packed at an older one is repacked from its source (§10.5).
 
 **Vocabulary.** The five terms used most, defined here;
 [terminology.md](terminology.md) maps this vocabulary to the names the
@@ -67,7 +68,7 @@ source formats and their tools use:
 | offset | size | field |
 |---:|---:|---|
 | 0 | 4 | `'YMX!'` - `$594D5821` |
-| 4 | 2 | format version, the major byte then the minor - **$0007**, version 0.7 |
+| 4 | 2 | format version, the major byte then the minor - **$0008**, version 0.8 |
 | 6 | 2 | flags (§1.2) |
 | 8 | 4 | `O`, the frame count |
 | 12 | 2 | frame rate in Hz: how often the player is called |
@@ -477,13 +478,17 @@ clock, and cannot be driven from a Timer C interrupt.
 
 - **opcode** (bits 7-5) - one of the eight in §3.
 - **voice** (bits 4-3) - 0, 1, 2 for voices A, B, C. Three voices in a
-  two-bit field, so **3 is no voice**: only `RETUNE` carries 3 (§3.1).
-  `RELEASE` stops a channel's timer and names no voice, and a writer
-  writes its field as 0; every other opcode addresses voice 0, 1 or 2.
+  two-bit field, so **3 is no voice**, and three opcodes take it as the
+  discriminator of a second form: `RETUNE` (§3.1), `START_RETRIGGER` (§3.4)
+  and `RESUME` (§3.5). `RELEASE` stops a channel's timer and names no voice,
+  and a writer writes its field as 0; every other opcode addresses voice 0,
+  1 or 2, and a value outside what an opcode defines is a malformed file
+  (§9.1).
 - **low** (bits 2-0) - the MFP prescaler index for an opcode that programs a
-  timer, or flags for `HOLD`, `RESUME` and `RELEASE`. A programming opcode's
-  index is 1 to 7; index 0 is the MFP's stopped state (§5), and no opcode
-  carries it.
+  timer, or flags for `HOLD`, `RELEASE` and a `RESUME` that names a voice.
+  A programming opcode's index is 1 to 7; index 0 is the MFP's stopped state
+  (§5), and no opcode carries it. `RESUME` at voice 3 programs, so its low
+  bits are an index rather than flags (§3.5).
 
 `P` is the MFP timer count for an opcode that programs or reloads a timer.
 
@@ -493,12 +498,12 @@ clock, and cannot be driven from a Timer C interrupt.
 
 | # | opcode | operation | sound registers written in this frame |
 |---:|---|---|---|
-| 0 | `RESUME` | re-enable a released toggle stream's interrupt. Flags: 1 = reload the count, 2 = reload the volume. Phase continued through the gap | none |
+| 0 | `RESUME` | re-enable a released toggle stream's interrupt. Flags: 1 = reload the count, 2 = reload the volume. Phase continued through the gap. At voice 3 a rate instead, and the timer is programmed (§3.5) | none |
 | 1 | `HOLD` | update a running stream. Flags: 1 = reload the count from P, 2 = reload the toggle stream's volume, 4 = reload the retrigger stream's shape. Emitted only on frames where a value changed | none |
 | 2 | `RELEASE` | stop this channel's timer. Bit 0 set: disable the interrupt instead, leaving the timer counting | none |
 | 3 | `START_TOGGLE` | start a toggle stream: select, volume, vector := the loud half, then a full program | `R(8+v) := 0`, a skipped voice included |
 | 4 | `RETUNE` | a new rate for a running stream, keeping its place in the cycle. See §3.1 | none |
-| 5 | `START_RETRIGGER` | start a retrigger stream: shape, vector := the retrigger tick, then a full program | none |
+| 5 | `START_RETRIGGER` | start a retrigger stream: shape, vector := the retrigger tick, then a full program. At voice 3 the shape and a new rate over the stream already running, and no vector (§3.4) | none |
 | 6 | `START_PCM` | a trigger, fresh or repeated: sample table lookup, select, vector, full program. The read position becomes the sample's first byte, so its first tick writes byte 0 | none |
 | 7 | `START_PCM_PREEMPT` | as `START_PCM`, but first stop the timer of every channel marked in X's low nibble | none |
 
@@ -510,43 +515,44 @@ What each opcode reads besides its action byte:
 
 | opcode | P | X | the voice's register byte |
 |---|---|---|---|
-| `RESUME` | with flag 1 | - | the volume, with flag 2 |
+| `RESUME` to a voice | with flag 1 | - | the volume, with flag 2 |
+| `RESUME` to voice 3 | yes | - | the volume |
 | `HOLD` | with flag 1 | the shape, with flag 4 | the volume, with flag 2 |
 | `RELEASE` | - | - | - |
 | `RETUNE` to a voice | yes | - | the volume |
 | `RETUNE` to voice 3 | yes | - | - |
 | `START_TOGGLE` | yes | - | the volume |
-| `START_RETRIGGER` | yes | the shape | - |
+| `START_RETRIGGER` to a voice | yes | the shape | - |
+| `START_RETRIGGER` to voice 3 | yes | the shape | - |
 | `START_PCM` | yes | - | the sample number |
 | `START_PCM_PREEMPT` | yes | the channels to stop | the sample number |
 
 ### 3.1 The two forms of RETUNE
 
 `RETUNE` does not write the timer's vector: the installed tick handler
-stays installed.
+stays installed. Neither form stops the timer. The control nibble is
+replaced in a single write that never passes through zero, and the reload
+is written to the data register with the timer running; the MFP takes it
+at the next underflow. The period in flight completes, and a toggle stream
+keeps its phase and its place inside its current half.
 
 **Addressed to a voice (0-2)**: the volume is repatched from the voice's
-register byte, then the timer is stopped, loaded and run. The period in
-flight is truncated.
+register byte first.
 
-**Addressed to voice 3**: the **live retune**. The timer's control nibble
-is replaced in a single write that never passes through zero, and the
-reload is written to the data register with the timer running; the MFP
-takes it at the next underflow. The period in flight completes. A toggle
-stream keeps its phase and its place inside its current half.
+**Addressed to voice 3**: nothing is repatched, so a writer emits this
+form only on a frame where the stream's parameter - a toggle stream's
+volume, a retrigger stream's shape - did not change.
 
-The live form repatches no parameter, so a writer emits it only on a
-frame where the stream's parameter - a toggle stream's volume, a
-retrigger stream's shape - did not change. Where the parameter changed on
-the same frame, the ordinary form is required, and the period in flight
-is truncated.
+Both forms need the timer already running. The control register is written
+before the data register, so on a stopped timer the first period would run
+at the previous count.
 
 Either form continues the code held on its channel: same kind, same
 voice, a changed rate. A changed kind or voice re-enters through the
-kind's start opcode. The ordinary form over a running PCM stream leaves the
+kind's start opcode. Either form over a running PCM stream leaves the
 sample playing from its current position at the new rate - the vector
-stays installed, and the voice's byte it reads repatches the toggle
-volume, which the next `START_TOGGLE` repatches again.
+stays installed, and the voice's byte the voiced form reads repatches the
+toggle volume, which the next `START_TOGGLE` repatches again.
 
 ### 3.2 Where a stream's parameter comes from
 
@@ -571,7 +577,9 @@ carries one voice between one start opcode and the next (§9.3).
 
 `RESUME` implements the alternative gap model: a release disables the
 timer's interrupt, the timer keeps counting, and a re-arrival resumes the
-toggle stream at its current phase. A tick that fell due while disabled is
+toggle stream at its current phase. At voice 3 it programs the timer
+(§3.5), so it keeps the half the release left standing but not the place
+inside it. A tick that fell due while disabled is
 not delivered: no interrupt is taken and the tick's handler does not run,
 so it writes no register, reads no sample byte, and leaves a toggle stream
 on the half the release left standing. The count runs on under it, and the
@@ -581,13 +589,47 @@ after `RESUME` lands one. The model in use is the writer's choice, fixed
 at pack time.
 
 `RESUME` is emitted only where the gap was a disabling release and the
-arriving code continues the same stream - same voice, same prescaler; the
-opcode's low bits are flags, so it carries no rate. A channel keeps the
+arriving code continues the same stream and the same voice. Addressed to a
+voice its low bits are flags, so it carries no rate. A channel keeps the
 prescaler index of the last opcode that programmed its timer, and that is
 the index `RESUME`'s flag 1 reloads against, as it is the one `HOLD`'s
-flag 1 reloads against. A prescaler changed across the gap re-enters
-through the voice-addressed `RETUNE`, whose program ends with the
-interrupt enabled (§9.2).
+flag 1 reloads against. A prescaler changed across the
+gap re-enters through `RESUME` at voice 3, which programs the timer at the
+index it carries and ends with the interrupt enabled (§3.5, §9.2).
+
+### 3.4 The retrigger retune
+
+`START_RETRIGGER` addressed to voice 3 is a retrigger stream's shape and
+its rate moving on one frame. The shape is taken from X and patched into
+the tick, and the timer is reprogrammed the way §3.1 states: no stop, no
+vector, the period in flight completing.
+
+The voice field is the discriminator, and a retrigger stream needs no
+voice of its own: its shape is the one envelope generator's, not a
+voice's (§3.2). The form continues the stream on its channel, so a
+changed kind re-enters through a start opcode as elsewhere.
+
+Without it a shape and a rate moving together take the full
+`START_RETRIGGER`, whose program stops the timer and truncates the period
+in flight.
+
+### 3.5 RESUME with a rate
+
+`RESUME` addressed to voice 3 re-enters a released toggle stream at a
+prescaler the gap changed. Its low bits are that index rather than flags,
+`P` is the count, and the volume is read from the voice's register byte
+with no flag to ask for it.
+
+The timer is programmed - stopped, loaded, run - rather than reloaded with
+the timer running. After a gap the counter holds an arbitrary count, so a
+live reload would defer the new rate by up to one period of the old rate,
+where a program lands it on the first tick after the re-arrival. No vector
+is written, so the half the release left standing is the half that
+returns.
+
+The form names no voice. A channel carries one voice between one start
+opcode and the next (§9.3), and that is the voice whose register byte the
+volume comes from.
 
 Which `RELEASE` a writer emits: a retrigger stream's release stops its
 timer; a toggle stream's release stops under the default model and
@@ -840,7 +882,7 @@ stream crosses on its own refill turn and none crosses before it has read
 ### 9.1 What a player checks
 
 - the magic is `'YMX!'`;
-- the version is $0007 - 0.7;
+- the version is $0008 - 0.8;
 - the stream count `S` is 25 to 32;
 - the required-streams mask names no stream the consumer does not
   implement: `Q AND NOT implemented` is zero, where bit `k` of
@@ -877,7 +919,8 @@ a value. Those operations:
 | X bits 3-0 with `START_PCM_PREEMPT` | each marked channel's timer is stopped before this channel's timer is programmed |
 | `RELEASE` bit 0 clear | the timer is stopped |
 | `RELEASE` bit 0 set | the timer's interrupt is disabled and the timer keeps counting; a tick falling due in the gap is dropped |
-| `RETUNE` addressed to voice 3 | the timer is reprogrammed without being stopped, so the count in flight runs to its end |
+| `RETUNE`, either form, and `START_RETRIGGER` at voice 3 | the timer is reprogrammed without being stopped, so the count in flight runs to its end |
+| `RESUME` at voice 3 | the timer is programmed at the index the opcode carries, with no vector written, so the installed half stands and the new rate is exact from the first tick after it |
 | `HOLD` flag 1, `RESUME` flag 1 | the count reaches the data register with the timer running, so the period in flight runs to its end and the next one takes the new count. Neither opcode stops a timer |
 | a toggle stream's volume, a PCM stream's sample number | read from the voice's own register stream on the frame the stream starts, and where an opcode's flag re-reads them (§3) |
 | `START_TOGGLE` | R8+v is written 0 among that frame's actions, and the first tick, one timer period later, writes the level |
@@ -947,9 +990,10 @@ The values:
   any skip bit sets M's bit 4. After a one-shot sample the rejoin is
   bounded by §6.
 - On a frame that starts a PCM or toggle stream, on a frame whose
-  voice-addressed `RETUNE` retunes a toggle stream, and on any frame an
-  opcode's flag re-reads the parameter, the voice's register byte carries
-  the operand defined in §3.
+  voice-addressed `RETUNE` retunes a toggle stream, on a frame whose
+  `RESUME` at voice 3 re-enters one, and on any frame an opcode's flag
+  re-reads the parameter, the voice's register byte carries the operand
+  defined in §3.
 
 The actions:
 
@@ -959,10 +1003,15 @@ The actions:
   may be 0, read by the MFP as 256 (§5).
 - `RETUNE` to voice 3 is emitted only where the stream's parameter did
   not change that frame (§3.1).
-- A `RETUNE` keeps the stream's kind and voice; a changed kind or voice
-  re-enters through a start opcode (§3.1).
-- `RESUME` is emitted only after a disabling release, for the same
-  stream, voice and prescaler (§3.3).
+- A `RETUNE`, and a `START_RETRIGGER` at voice 3, keep the stream's kind
+  and voice; a changed kind or voice re-enters through a start opcode
+  (§3.1, §3.4).
+- `START_RETRIGGER` at voice 3 and `RESUME` at voice 3 are emitted only
+  over a stream already running on that channel: both reprogram a timer
+  and write no vector (§3.4, §3.5).
+- `RESUME` is emitted only after a disabling release, for the same stream
+  and voice. Addressed to a voice the prescaler is the same too; at voice 3
+  it is the index the opcode carries (§3.3, §3.5).
 - A `HOLD` sets at most one of flags 2 and 4: a channel runs one stream
   kind.
 - A sample cut off by its own channel's next start never reaches its
@@ -1146,14 +1195,15 @@ Three more hold between an opcode and the stream it addresses:
 
 - At most one timer stream runs on a voice at a time. Where a source
   starts two, the conflict is settled at pack time (§9.3).
-- `RETUNE` addressed to voice 3 replaces the control nibble and the
-  reload with the timer running, and repatches no parameter, so it is
-  emitted only on a frame where the stream's parameter did not change.
-  Where it changed, the voice-addressed form is the one to emit, and the
-  period in flight is truncated (§3.1).
-- `RESUME` continues one stream across a gap: same voice, same
-  prescaler, no rate. A prescaler changed across the gap re-enters
-  through the voice-addressed `RETUNE` (§3.3).
+- `RETUNE` replaces the control nibble and the reload with the timer
+  running under either form. Voice 3 repatches no parameter, so it is
+  emitted only on a frame where the stream's parameter did not change;
+  where it changed, the voice-addressed form repatches it and the period
+  in flight still completes (§3.1).
+- `RESUME` continues one stream across a gap, same voice. Addressed to a
+  voice it carries no rate; a prescaler changed across the gap re-enters
+  through `RESUME` at voice 3, which programs the timer at the index it
+  carries (§3.3, §3.5).
 
 ### 10.4 PCM, which takes a voice whole
 
@@ -1305,7 +1355,7 @@ section is read, and what a call reports.
 
 ```
    0  59 4D 58 21   'YMX!'
-   4  00 07         format version 0.7
+   4  00 08         format version 0.8
    6  00 01         flags: bit 0 set, the tune starts over
    8  00 00 00 04   O = 4 frames
   12  00 32         50 Hz
