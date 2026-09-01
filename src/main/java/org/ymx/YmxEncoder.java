@@ -170,7 +170,11 @@ public final class YmxEncoder {
         // mixer force, then the script's own five streams. Bytes a stream does
         // not consume repeat their predecessor - the event optimizer packs a
         // repeat to nothing, and the player never reads them.
-        EffectScript.Result script = EffectScript.compile(tune, timerMap);
+        // The source's own loop frame is compiled as an entry, so a stream
+        // running into it starts there and LoopFrame can keep it. The file's
+        // L is resolved from this script below, so it is not known here.
+        EffectScript.Result script = EffectScript.compile(tune, timerMap,
+                loops ? tune.loopFrame() : 0);
         int channels = channelsUsed(script);
         problem = YmxFormat.checkShape(ringSize, chunk, unit,
                 YmxFormat.liveStreams(channels));

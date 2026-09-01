@@ -110,7 +110,10 @@ namespace Ymx
                         + " its length must be a multiple of " + unit);
             }
 
-            EffectScript.Result script = EffectScript.Compile(tune, timerMap);
+            // The source's own loop frame is compiled as an entry, so a
+            // stream running into it starts there and LoopFrame can keep it.
+            EffectScript.Result script = EffectScript.Compile(tune, timerMap,
+                    loops ? tune.LoopFrame : 0);
             int channels = ChannelsUsed(script);
             problem = YmxFormat.CheckShape(ringSize, chunk, unit,
                     YmxFormat.LiveStreams(channels));
