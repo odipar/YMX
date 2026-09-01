@@ -52,127 +52,22 @@ if [ ! -d "$CORPUS" ]; then
     exit 2
 fi
 
-# The Java class behind each command. ym-to-ymx has none: that tool is C# and
-# Go only, so its cases run in those two.
-# The name a tree gives a command, where the three do not agree. The
-# checker is one tool: ymxcheck as a Go binary, check as the C# dispatcher's
-# subcommand, org.ymx.rig.Check as a Java class.
-tree_command() {
-    case $1:$2 in
-        ymxcheck:dotnet) echo check ;;
-        *)               echo "$1" ;;
-    esac
-}
-
-java_class() {
-    case $1 in
-        ymxcheck) echo org.ymx.rig.Check ;;
-        ymx)    echo org.ym6.Ymx ;;
-        ym-to-ymx) echo org.ym6.YmToYmx ;;
-        play)   echo org.ym6.Play ;;
-        ymsndh) echo org.ym6.YmSndh ;;
-        st4)    echo org.st4.St4 ;;
-        dst4)   echo org.st4.Dst4 ;;
-        mksndh) echo org.ymx.MkSndh ;;
-        mkprg)  echo org.ymx.MkPrg ;;
-        *)      echo "" ;;
-    esac
-}
-
-# What a run leaves that says nothing about the tree that made it: the paths
-# it happened to run in, the progress meter's redraws, and a measured time.
-# normalise <file> <case directory>
-normalise() {
-    # The case directory first, and it carries the tree's own name: a run that
-    # prints where it wrote differs from another only in that name, which is
-    # the one thing about it that cannot be the same. /private/var before it,
-    # because a temp directory reached through the platform's own symlink is
-    # the same directory and one tree resolves it.
-    tr -d '\r' < "$1" \
-        | sed -e 's|/private/var/|/var/|g' \
-              -e "s|$2|CASE|g" \
-              -e "s|$WORK|WORK|g" -e "s|$REPO|REPO|g" -e "s|$HOME|HOME|g" \
-              -e 's|[0-9][0-9]*\.[0-9][0-9]* ms|T ms|g' \
-              -e 's|[0-9][0-9]*m* *[0-9][0-9]*s left||g' \
-              -e 's|^\[[ 0-9][ 0-9][ 0-9]%\].*$||' \
-        | grep -v '^ *$'
-}
-
-# Every file the case left, by name and digest, so a file written under
-# another name shows up as a difference.
-fingerprint() {
-    (cd "$1" && find . -type f | LC_ALL=C sort | while read -r f; do
-        printf '%s  %s\n' "$f" "$(shasum -a 256 < "$f" | cut -c1-16)"
-    done)
-}
+# What runs a command in three trees and compares them, shared with
+# parity-one.sh so the parallel pass over the collection compares exactly what
+# a case compares.
+. "$REPO/ymx/parity-lib.sh"
 
 pass=0; fail=0; failed_cases=""
 
-# one_case <label> <command> <argv...>
 # @T and @U stand for the two tunes, copied in as a.ym and b.ym; @O for an
 # output name the case chooses.
 one_case() {
-    label=$1; command=$2; shift 2
-    for tree in java dotnet go; do
-        d=$WORK/$label/$tree
-        rm -rf "$d"; mkdir -p "$d"
-        cp "$TUNE_A" "$d/a.ym"; cp "$TUNE_B" "$d/b.ym"
-        # The set form takes a directory that is already there; without it
-        # every tree prints usage and the case compares nothing.
-        case " $* " in *" adir/ "*) mkdir -p "$d/adir" ;; esac
-        # A case naming a fixture builds it here, in the tree's own
-        # directory, so the three runs meet the same bytes.
-        [ -n "$SETUP" ] && (cd "$d" && sh -c "$SETUP")
-        argv=""
-        for a in "$@"; do
-            a=$(printf '%s' "$a" | sed -e 's|@T|a.ym|g' -e 's|@U|b.ym|g')
-            argv="$argv $a"
-        done
-        klass=$(java_class "$command")
-        if [ "$tree" = java ] && [ -z "$klass" ]; then
-            continue        # ym-to-ymx: this tree does not carry it
-        fi
-        (
-            cd "$d" || exit 1
-            case $tree in
-                java)   eval "TOS=/nope java -ea -Dymx.repo=$REPO -cp $REPO/target/classes:$REPO/target/test-classes $klass $argv" ;;
-                dotnet) eval "TOS=/nope YMX_REPO=$REPO dotnet $DLL $(tree_command "$command" dotnet) $argv" ;;
-                go)     eval "TOS=/nope $REPO/go/bin/$(tree_command "$command" go) $argv" ;;
-            esac
-        ) >"$d.out" 2>"$d.err"
-        echo $? > "$d.status"
-    done
-
-    trees="java dotnet go"
-    [ -z "$(java_class "$command")" ] && trees="dotnet go"
-    first=""; differs=""
-    for tree in $trees; do
-        d=$WORK/$label/$tree
-        {
-            echo "--- exit"; cat "$d.status"
-            echo "--- stdout"; normalise "$d.out" "$d"
-            echo "--- stderr"; normalise "$d.err" "$d"
-            echo "--- files"; fingerprint "$d"
-        } > "$d.report"
-        if [ -z "$first" ]; then
-            first=$tree
-        elif ! cmp -s "$WORK/$label/$first.report" "$d.report"; then
-            differs="$differs $first/$tree"
-        fi
-    done
-
-    SETUP=""
-    if [ -n "$differs" ]; then
-        fail=$((fail + 1)); failed_cases="$failed_cases $label"
-        echo "DIFFER $label ($command):$differs"
-        for pair in $differs; do
-            a=${pair%%/*}; b=${pair##*/}
-            diff "$WORK/$label/$a.report" "$WORK/$label/$b.report" \
-                | head -12 | sed 's/^/    /'
-        done
-    else
+    if compare_trees "$@"; then
         pass=$((pass + 1))
+    else
+        fail=$((fail + 1)); failed_cases="$failed_cases $1"
     fi
+    SETUP=""
 }
 
 # The cases. Each has caught something, or covers a flag that changes bytes.
@@ -266,22 +161,45 @@ fixtures() {
 # never packed. This covers the tunes rather than the options, and it names
 # none of them.
 whole_corpus() {
+    mkdir -p "$WORK/staged" "$WORK/verdict"
+    rm -f "$WORK/verdict"/* "$WORK/corpus-jobs"
     n=0
     while IFS= read -r tune; do
         n=$((n + 1))
-        # A name holding a quote would end the SETUP string early and leave
-        # the three trees packing nothing, which compares equal. Staging
-        # through one path this script chose keeps the name out of the shell.
-        cp "$tune" "$WORK/staged.ym" || {
-            echo "parity.sh: cannot stage $tune" >&2; fail=$((fail + 1)); continue; }
-        SETUP="cp '$WORK/staged.ym' t.ym"
-        before=$fail
-        one_case "corpus-$n" ymx t.ym out.ymx
-        # A case that matched leaves nothing to read, and the collection fills
-        # a disk if every one of them stays.
-        [ "$fail" -eq "$before" ] && rm -rf "$WORK/corpus-$n"
+        # A name holding an apostrophe would end the worker's setup line early
+        # and leave all three trees packing nothing, which compares equal.
+        # Staging under a number this script chose keeps every corpus name out
+        # of the shell.
+        cp "$tune" "$WORK/staged/$n.ym" || {
+            echo "parity.sh: cannot stage $tune" >&2
+            fail=$((fail + 1)); continue; }
+        echo "$n" >> "$WORK/corpus-jobs"
     done < "$WORK/tunes"
-    echo "  corpus: $n tunes packed by all three trees"
+
+    # One tune is one process, and they share nothing but the staged bytes.
+    # Two cores are left for the three runtimes each worker starts.
+    jobs=${PARITY_JOBS:-0}
+    if [ "$jobs" -lt 1 ]; then
+        jobs=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
+        [ "$jobs" -gt 3 ] && jobs=$((jobs - 2))
+        [ "$jobs" -lt 1 ] && jobs=1
+    fi
+    export REPO WORK DLL TUNE_A TUNE_B
+    xargs -P "$jobs" -n 1 "$REPO/ymx/parity-one.sh" < "$WORK/corpus-jobs"
+
+    # The verdicts are read in order, so a run names its differing tunes the
+    # same way however the workers were scheduled.
+    i=0
+    while [ "$i" -lt "$n" ]; do
+        i=$((i + 1))
+        if [ -s "$WORK/verdict/$i" ]; then
+            fail=$((fail + 1)); failed_cases="$failed_cases corpus-$i"
+            cat "$WORK/verdict/$i"
+        else
+            pass=$((pass + 1))
+        fi
+    done
+    echo "  corpus: $n tunes packed by all three trees, $jobs at a time"
 }
 
 # A tune whose own loop frame the packer keeps. The sweep's tunes come off
