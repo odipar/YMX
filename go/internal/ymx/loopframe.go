@@ -50,9 +50,9 @@ type LoopPlan struct {
 
 // ResolveLoopFrame resolves the frame a file starts over from. loops is what
 // the file's flag bit 0 will say; ringSize and chunk are the shape the caller
-// asked for, and the plan's ring size is that one or a larger multiple of the
-// chunk. unit is the size the sections are packed at, which a cut has to fall
-// on: each of the two sections is a whole number of units.
+// asked for, and the plan carries the ring size it was given. unit is the size
+// the sections are packed at, which a cut has to fall on: each of the two
+// sections is a whole number of units.
 func ResolveLoopFrame(tune *Tune, script *ScriptResult, loops bool,
 	ringSize, chunk, unit int) LoopPlan {
 	var notes []string
@@ -65,54 +65,58 @@ func ResolveLoopFrame(tune *Tune, script *ScriptResult, loops bool,
 	if tune.Frames-1 < last {
 		last = tune.Frames - 1
 	}
-	// Three answers out of one walk: the first frame that can be entered, the
-	// first a ring can reach back over - the body shrinks as the frame moves
-	// later, so once one fits every later one does - and the first a cut can
-	// start at.
+	// The loop point the file carries is the source's, or the first frame from
+	// it that can be entered. The form follows from that frame: the rings carry
+	// the body where they hold it, and a cut carries it otherwise. Neither
+	// moves the loop point to suit itself.
 	entered := -1
 	ringFrame := -1
-	ring := ringSize
 	cutFrame := -1
 	for candidate := given; candidate <= last; candidate++ {
-		if !LoopFrameQualifies(tune, script, candidate) {
-			continue
-		}
-		if entered < 0 {
+		if LoopFrameQualifies(tune, script, candidate) {
 			entered = candidate
-		}
-		size := tune.Frames - candidate
-		// The chunk divides it and two chunks fit, since a body past the ring
-		// is already past a ring of at least two; the cap is what is left to
-		// check.
-		needed := ringSize
-		if size > ringSize {
-			needed = (size + chunk - 1) / chunk * chunk
-		}
-		if needed <= MaxRingSize {
-			ringFrame = candidate
-			ring = needed
 			break
 		}
-		if cutFrame < 0 && candidate%unit == 0 {
-			cutFrame = candidate
+	}
+	// Nothing from the source's loop frame on can be entered with the timers
+	// stopped, the skips cleared and the envelope generator not restarted. The
+	// tune starts over there anyway: a stream an earlier frame left running is
+	// not running on the second pass, which is audible, and the alternative is
+	// to lose the loop.
+	forced := entered < 0
+	if forced {
+		entered = given
+		notes = append(notes, fmt.Sprintf("Frame %d, where the tune starts over,"+
+			" cannot be entered with the timers stopped, the skips cleared and"+
+			" the envelope generator not restarted, and no frame from there to"+
+			" %d can: the tune starts over there, and what an earlier frame"+
+			" left running is not running on the second pass", given, last))
+	}
+	// A ring of n bytes holds n frames, and the rings stay the size the caller
+	// asked for.
+	if tune.Frames-entered <= ringSize {
+		ringFrame = entered
+	} else {
+		// Each section is a whole number of units, so a cut falls on one. The
+		// search runs to the end of the tune, since a cut holds any body: the
+		// loop point stays as near the source's as a unit allows.
+		for candidate := entered; candidate < tune.Frames; candidate++ {
+			if candidate%unit == 0 &&
+				(forced || LoopFrameQualifies(tune, script, candidate)) {
+				cutFrame = candidate
+				break
+			}
 		}
-	}
-	if entered < 0 {
-		notes = append(notes, fmt.Sprintf("The source starts over at frame %d,"+
-			" and no frame from there to %d can be entered with the timers"+
-			" stopped, the skips cleared and the envelope generator not"+
-			" restarted: the tune starts over from frame 0 instead, so its"+
-			" first %d frames are heard on every pass", given, last, given))
-		return LoopPlan{Frame: 0, RingSize: ringSize, Cut: false, Notes: notes}
-	}
-	if ringFrame < 0 && cutFrame < 0 {
-		notes = append(notes, fmt.Sprintf("The source starts over at frame %d,"+
-			" leaving %d frames to replay, more than the %d bytes the largest"+
-			" ring holds, and no frame from there to %d that can be entered"+
-			" falls on a %d-byte unit: the tune starts over from frame 0"+
-			" instead, so its first %d frames are heard on every pass",
-			given, tune.Frames-entered, MaxRingSize, last, unit, given))
-		return LoopPlan{Frame: 0, RingSize: ringSize, Cut: false, Notes: notes}
+		if cutFrame < 0 {
+			notes = append(notes, fmt.Sprintf("The tune starts over at frame %d,"+
+				" and no frame from there on falls on a %d-byte unit and can be"+
+				" entered with the timers stopped, the skips cleared and the"+
+				" envelope generator not restarted: the tune starts over from"+
+				" frame 0 instead, so its first %d frames are heard on every"+
+				" pass", given, unit, given))
+			notes = append(notes, idealNote(tune, entered, chunk, ringSize))
+			return LoopPlan{Frame: 0, RingSize: ringSize, Cut: false, Notes: notes}
+		}
 	}
 
 	frame := cutFrame
@@ -127,21 +131,7 @@ func ResolveLoopFrame(tune *Tune, script *ScriptResult, loops bool,
 			given, entered, entered-given, plural(entered-given)))
 	}
 	if ringFrame >= 0 {
-		if ring != ringSize {
-			notes = append(notes, fmt.Sprintf("Rings raised from %d to %d bytes"+
-				" so the %d frames from the loop frame fit one: %d bytes of"+
-				" rings rather than %d, and no file bytes. The header carries"+
-				" the raised size, and a host sizes its workspace from it",
-				ringSize, ring, tune.Frames-frame, Streams*ring,
-				Streams*ringSize))
-		}
-		if frame != entered {
-			notes = append(notes, fmt.Sprintf("Frame %d leaves more frames to"+
-				" replay than the largest ring holds, so the tune starts over"+
-				" from frame %d instead, the first one a ring reaches back"+
-				" over", entered, frame))
-		}
-		return LoopPlan{Frame: frame, RingSize: ring, Cut: false, Notes: notes}
+		return LoopPlan{Frame: frame, RingSize: ringSize, Cut: false, Notes: notes}
 	}
 	if frame != entered {
 		notes = append(notes, fmt.Sprintf("Frame %d is not a whole number of"+
@@ -151,12 +141,26 @@ func ResolveLoopFrame(tune *Tune, script *ScriptResult, loops bool,
 	}
 	replayed := tune.Frames - frame
 	notes = append(notes, fmt.Sprintf("The %d frames from frame %d are past the"+
-		" %d bytes the largest ring holds, so every stream is packed as two"+
-		" sections - one of the %d frames before it, one of the %d from it -"+
-		" and the file carries a loop table locating the second: file bytes"+
-		" rather than workspace", replayed, frame, MaxRingSize, frame,
-		replayed))
+		" %d bytes the rings hold, so every stream is packed as two sections -"+
+		" one of the %d frames before it, one of the %d from it - and the file"+
+		" carries a loop table locating the second: file bytes rather than"+
+		" workspace", replayed, frame, ringSize, frame, replayed))
+	notes = append(notes, idealNote(tune, frame, chunk, ringSize))
 	return LoopPlan{Frame: frame, RingSize: ringSize, Cut: true, Notes: notes}
+}
+
+// idealNote gives the rings that hold the frames replayed from at, against the
+// ringSize asked for, rounded up to whole chunks.
+func idealNote(tune *Tune, at, chunk, ringSize int) string {
+	body := tune.Frames - at
+	span := (body + chunk - 1) / chunk * chunk
+	if span > MaxRingSize {
+		return fmt.Sprintf("No ring holds the %d frames from frame %d, since"+
+			" the largest holds %d bytes", body, at, MaxRingSize)
+	}
+	return fmt.Sprintf("Rings of %d bytes hold the %d frames from frame %d, and"+
+		" start it over there: %d bytes of rings rather than %d, and no file"+
+		" bytes", span, body, at, Streams*span, Streams*ringSize)
 }
 
 // plural is the "s" a count of one leaves off.

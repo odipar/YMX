@@ -1,6 +1,7 @@
 package org.ymx;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -77,36 +78,56 @@ final class LoopFrameTest {
     }
 
     /** Nothing within the budget can be entered, so the tune starts over
-     * from its first frame and says so. */
+     * where its source says and carries what that costs. */
     @Test
-    void anEmptyBudgetFallsBackToTheBeginning() {
+    void nothingToEnterStartsOverWhereTheSourceSays() {
         LoopFrame.Plan plan = resolve(plain(100), 960);
-        assertEquals(0, plan.frame(), "no frame qualifies");
-        assertTrue(plan.notes().stream().anyMatch(n -> n.contains("100")),
-                "the frame the source gave is reported: " + plan.notes());
+        assertEquals(100, plan.frame(), "the source's frame is kept");
+        assertTrue(plan.notes().stream().anyMatch(n ->
+                        n.contains("not running on the second pass")),
+                "what the forced loop costs is reported: " + plan.notes());
     }
 
-    /** The budget is a second of frames, so a frame past it is out of
-     * reach even though it could be entered. */
+    /** The budget is a second of frames. A frame past it is out of reach,
+     * and the loop is then kept at the source's own frame rather than given
+     * up: the budget selects a clean entry, not whether there is a loop. */
     @Test
     void theBudgetIsASecondOfFrames() {
         assertEquals(RATE, LoopFrame.budget(RATE));
-        assertEquals(0, resolve(plain(100, 100 + RATE + 1), 960).frame(),
-                "one frame past the budget is out of reach");
-        assertEquals(100 + RATE, resolve(plain(100, 100 + RATE), 960).frame(),
+        LoopFrame.Plan past = resolve(plain(100, 100 + RATE + 1), 960);
+        assertEquals(100, past.frame(),
+                "one frame past the budget is out of reach, and 100 is kept");
+        assertTrue(past.notes().stream().anyMatch(n ->
+                        n.contains("not running on the second pass")),
+                "the loop past the budget is forced: " + past.notes());
+        LoopFrame.Plan within = resolve(plain(100, 100 + RATE), 960);
+        assertEquals(100 + RATE, within.frame(),
                 "the last frame of the budget is within it");
+        assertTrue(within.notes().stream().noneMatch(n ->
+                        n.contains("not running on the second pass")),
+                "a frame within the budget is entered cleanly: " + within.notes());
     }
 
-    /** A body larger than the ring raises the ring to hold it. */
+    /** A body larger than the ring leaves the ring the size it was asked for,
+     * and a note gives the size that holds the body. */
     @Test
-    void aBodyPastTheRingRaisesIt() throws IOException {
+    void aBodyPastTheRingLeavesItAlone() throws IOException {
         Tune tune = source("Turrican - world 4-3").startingOverAt(160);
         LoopFrame.Plan plan = resolve(tune, 960);
+        assertEquals(960, plan.ringSize(), "the rings stay the size asked for");
+        assertTrue(plan.notes().stream().anyMatch(n -> n.contains("Rings of 1776 bytes")),
+                "the size that holds the body is given: " + plan.notes());
+    }
+
+    /** Asked for a ring that holds the body, the packer keeps the frame the
+     * source starts over at and replays it out of the rings. */
+    @Test
+    void aRingThatHoldsTheBodyStartsOverAtTheSourcesFrame() throws IOException {
+        Tune tune = source("Turrican - world 4-3").startingOverAt(160);
+        LoopFrame.Plan plan = resolve(tune, 1776);
         assertEquals(160, plan.frame(), "the frame survives");
-        assertTrue(plan.ringSize() >= tune.frames() - 160,
-                "the ring holds the body: " + plan.ringSize());
-        assertEquals(0, plan.ringSize() % 24, "the ring is a whole number of chunks");
-        assertTrue(plan.ringSize() <= YmxFormat.MAX_RING_SIZE, "within the cap");
+        assertEquals(1776, plan.ringSize(), "the rings stay the size asked for");
+        assertFalse(plan.cut(), "the rings carry it, so no section is cut");
     }
 
     /** A body past the largest ring is replayed out of a second section per

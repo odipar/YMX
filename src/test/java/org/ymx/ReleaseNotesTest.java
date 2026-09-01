@@ -192,7 +192,8 @@ final class ReleaseNotesTest {
         Tune tune = fallsBack();
         LoopFrame.Plan plan = LoopFrame.resolve(tune, EffectScript.compile(tune),
                 true, 960, 24, 1);
-        assertEquals(0, plan.frame(), "the tune built here has to fall back");
+        assertEquals(100, plan.frame(), "the tune built here cannot be entered"
+                + " at its own frame, and starts over there all the same");
         assertTrue(plan.notes().stream().anyMatch(note -> note.contains(conditions)),
                 "the packer reports the fallback as " + plan.notes()
                         + ", and the release page states it as \"" + conditions

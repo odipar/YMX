@@ -463,11 +463,14 @@ the tune starts over or not, and the sections are exactly what they would
 have been. It costs memory instead, because the rings have to be big
 enough: twenty-five rings of 1,776 bytes rather than 960, so 44,400 bytes
 of ring rather than 24,000. The ring size is per tune and lives in its
-header, so the packer raises it only where the raised ring holds the
-pass, up to the cap of 2,520 bytes a ring.
+header, and `-nN` asks for it, up to the cap of 2,520 bytes a ring. The
+packer packs at the size it was asked for: where the rings do not hold
+the pass it packs two sections instead, and gives the `N` that would have
+held it.
 
-`Turrican - world 4-3` is this case. Its file is 2,536 bytes, the same as
-it would be with no loop, and its header gives `N` = 1,776.
+`Turrican - world 4-3` is this case, packed with `-n1776`. Its file is
+2,536 bytes, the same as it would be with no loop, and its header gives
+`N` = 1,776.
 
 ### The pass is too long to keep
 
@@ -491,8 +494,10 @@ which section is opened is new.
 This costs bytes. The two halves cannot compress against each other, so a
 match in the second half cannot reach back into the first, and the file
 carries twenty-five more section headers. Of the 99 tunes with a loop
-frame, 36 need the cut, and on the three of them in `ym/test` the file
-grows by 13.8%, 22.5% and 40.8%. It costs no memory.
+frame, 58 need the cut, and on the six of them in `ym/test` the file
+grows by 1.3%, 7.8%, 13.8%, 25.1%, 33.1% and 40.8%, each against the same
+tune packed with `-l0` at the unit size it is packed at. It costs no
+memory.
 
 ### What the packer has to check first
 
@@ -510,13 +515,16 @@ that shape differs between the first pass and the rest.
 
 So the packer keeps the frame the header gives when nothing is carried
 into it, takes the next frame within a second that qualifies when it is
-not, and where neither holds, packs the tune to start over from frame 0
-and reports that it did. Over the corpus, 87 of the 99 tunes with a loop
-frame can be entered at the frame their own header gives.
+not, and where neither holds starts over at the header's frame all the
+same: a stream an earlier frame left running is not running on the
+second pass, which is audible, and the conversion says so. Over the
+corpus, 87 of the 99 tunes with a loop frame can be entered at the frame
+their own header gives.
 
-One more thing moves a frame: a section holds a whole number of ST4
-units, so at the default unit size of 2, a cut can only begin on an even
-frame. `Crapman level 9` gives 2,019 and its file carries 2,020.
+One more thing could move a frame: a section holds a whole number of ST4
+units, so at the default unit size of 2 a cut can only begin on an even
+frame. The packer packs such a tune at unit 1, where every frame is one:
+`Crapman level 9` gives 2,019 and its file carries 2,019.
 
 ### What a listener hears
 

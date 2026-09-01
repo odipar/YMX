@@ -18,7 +18,7 @@ covered.
 | `plain_packed` | `Turrican 2 - world completed 1.ym` | none |
 | `unit1` | `Turrican 2 - world completed 1.ym` | `-k1` |
 | `unit4` | `Turrican 2 - world completed 1.ym` | `-k4` |
-| `ring_form` | `Turrican - world 4-3.ym` | none |
+| `ring_form` | `Turrican - world 4-3.ym` | `-n1776` |
 | `cut_form` | `Dragon Flight  4 - Finish 1.ym` | none |
 | `wide_ring` | `Turrican - world 4-1.ym` | `-k1 -n2048 -c32` |
 | `plays_once` | `Knucklebusters.ym` | `-o -frames4000` |

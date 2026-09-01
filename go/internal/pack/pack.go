@@ -115,6 +115,8 @@ func Pack(input []byte, o Options) (*Packed, error) {
 	}
 
 	unit := o.Unit
+	unitAsked := unit != 0
+	unpadded := tune
 	safe := safeToDuplicate(crossed)
 	switch {
 	case unit == 0 && o.Chunk%2 == 0:
@@ -138,12 +140,40 @@ func Pack(input []byte, o Options) (*Packed, error) {
 
 	// After the trim and the padding, which describe what was packed before
 	// the tune itself is described.
+	beforeSong := len(notes)
 	notes = append(notes, songNotes(song, effects)...)
 
 	result, err := ymx.EncodeOnTimers(tune, o.Ring, o.Chunk, o.Loops,
 		o.Progress, unit, o.TimerMap)
 	if err != nil {
 		return nil, err
+	}
+	// A section is a whole number of units, so a cut falls on a unit boundary
+	// and a loop point that is not one leaves the tune starting over from
+	// frame 0. Every frame is a boundary at unit 1: where the unit was not
+	// asked for, the packer packs at 1 and keeps the loop point. The pack at
+	// the shape asked for has already succeeded, so a shape the encoder
+	// rejects here leaves that one standing rather than failing the tune.
+	if !unitAsked && unit > 1 && o.Loops && unpadded.LoopFrame > 0 &&
+		result.LoopFrame != unpadded.LoopFrame {
+		atOne, oneErr := ymx.EncodeOnTimers(unpadded, o.Ring, o.Chunk, o.Loops,
+			o.Progress, 1, o.TimerMap)
+		// Unit 1 stands only where it starts the tune over where the source
+		// says. Where the frame moved for another reason it moves at unit 1
+		// too, and the shape asked for is the cheaper of the two.
+		if oneErr == nil && atOne.LoopFrame == unpadded.LoopFrame {
+			result = atOne
+			// The line sits with the padding, before the tune is described,
+			// because that is where the packer chose the unit.
+			said := fmt.Sprintf("Packing at -k1: frame %d, where this tune"+
+				" starts over, is not a whole number of 2-byte units, and a"+
+				" section is", result.LoopFrame)
+			placed := make([]string, 0, len(notes)+1)
+			placed = append(placed, notes[:beforeSong]...)
+			placed = append(placed, said)
+			placed = append(placed, notes[beforeSong:]...)
+			notes = placed
+		}
 	}
 	// The encoder's own notes stay on the result. They describe the file
 	// rather than the road to it, and Report places them among the figures
