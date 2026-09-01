@@ -356,10 +356,12 @@ final class Check {
             faults.add(new Fault(frame, "§2.4 A",
                     name + " names voice " + voice + "; the field is written as 0"));
         }
-        if (opcode != RETUNE && opcode != RELEASE && voice == NO_VOICE) {
+        if (opcode != RETUNE && opcode != RELEASE && opcode != START_RETRIGGER
+                && opcode != RESUME && voice == NO_VOICE) {
             faults.add(new Fault(frame, "§2.4 A", name + " names voice 3"));
         }
-        if (programs(opcode) && (low < 1 || low > 7)) {
+        if ((programs(opcode) || programsAtVoiceThree(opcode, voice))
+                && (low < 1 || low > 7)) {
             faults.add(new Fault(frame, "§9.3 actions",
                     name + " carries prescaler index " + low + ", outside 1 to 7"));
         }
@@ -472,6 +474,13 @@ final class Check {
     private static boolean programs(int opcode) {
         return opcode == RETUNE || opcode == START_TOGGLE || opcode == START_RETRIGGER
                 || opcode == START_PCM || opcode == START_PCM_PREEMPT;
+    }
+
+    /** Whether this byte is one of the two forms whose low bits are a
+     * prescaler because voice 3 discriminates them (SPEC.md §3.4, §3.5). */
+    private static boolean programsAtVoiceThree(int opcode, int voice) {
+        return voice == NO_VOICE
+                && (opcode == START_RETRIGGER || opcode == RESUME);
     }
 
     /** The channels with a timer counting. */

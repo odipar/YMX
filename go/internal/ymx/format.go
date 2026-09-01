@@ -25,10 +25,10 @@ const Version = 0x0008
 const ReleaseMajor = 0
 
 // ReleaseMinor is the release's minor number. See [ReleaseMajor].
-const ReleaseMinor = 8
+const ReleaseMinor = 9
 
 // Patch is the release's patch number. See [ReleaseMajor].
-const Patch = 3
+const Patch = 0
 
 // ReleaseName is the release's version as prose, major.minor.patch.
 func ReleaseName() string {

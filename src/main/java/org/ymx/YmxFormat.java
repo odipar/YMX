@@ -91,10 +91,10 @@ public final class YmxFormat {
     public static final int RELEASE_MAJOR = 0;
 
     /** The release's minor number. See {@link #RELEASE_MAJOR}. */
-    public static final int RELEASE_MINOR = 8;
+    public static final int RELEASE_MINOR = 9;
 
     /** The release's patch number. See {@link #RELEASE_MAJOR}. */
-    public static final int PATCH = 3;
+    public static final int PATCH = 0;
 
     /** The release's version as prose, major.minor.patch. */
     public static String releaseName() {

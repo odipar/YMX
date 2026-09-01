@@ -86,6 +86,69 @@ final class OpcodeCoverageTest {
                         + " other");
     }
 
+    /** The three opcodes SPEC.md gives a second form, discriminated by
+     * voice 3: RETUNE (§3.1), START_RETRIGGER (§3.4), RESUME (§3.5). */
+    private static final List<String> VOICE_THREE = List.of(
+            "RESUME", "RETUNE", "START_RETRIGGER");
+
+    /**
+     * The voice-3 forms no pinned tune compiles to, and why. Reaching an
+     * opcode says nothing about them: a form is that opcode with a
+     * different voice field, and the check above counts one where the
+     * player dispatches two.
+     *
+     * <p>Both listed here wait on a source that sets
+     * {@code Semantics.retunesLive}, which nothing in this tree does: a YM
+     * file records a code sitting in a register, not the moment a player
+     * reprogrammed anything, so it never asks for a live retune.
+     */
+    private static final Set<String> UNREACHED_FORMS =
+            Set.of("RETUNE", "START_RETRIGGER");
+
+    @Test
+    void everyVoiceThreeFormTheTunesReachKeepsBeingReached() throws IOException {
+        Set<String> reached = new LinkedHashSet<>();
+        List<Path> tunes = new ArrayList<>();
+        try (Stream<Path> listing = Files.list(Path.of("ym", "test"))) {
+            listing.filter(p -> p.toString().endsWith(".ym")).sorted()
+                    .forEach(tunes::add);
+        }
+        for (Path each : tunes) {
+            Tune tune = YmEffects.tune(Ym6Reader.read(Files.readAllBytes(each)));
+            reached.addAll(voiceThreeOf(tune));
+            reached.addAll(voiceThreeOf(tune.under(new EffectScript.Semantics(
+                    true, true, false, true, false))));
+        }
+
+        List<String> missing = new ArrayList<>(VOICE_THREE);
+        missing.removeAll(reached);
+        missing.removeAll(UNREACHED_FORMS);
+        assertTrue(missing.isEmpty(), "no pinned tune compiles to " + missing
+                + " at voice 3 any more. A form that was covered has stopped"
+                + " being covered, and the opcode check above cannot see it");
+
+        List<String> nowReached = new ArrayList<>(UNREACHED_FORMS);
+        nowReached.retainAll(reached);
+        assertTrue(nowReached.isEmpty(), nowReached + " is reached at voice 3"
+                + " now and is still listed as unreached. Take it out of"
+                + " UNREACHED_FORMS: the list is what the corpus cannot do,"
+                + " and it should only shrink");
+    }
+
+    /** The opcodes one tune's script carries at voice 3. */
+    private static Set<String> voiceThreeOf(Tune tune) {
+        Set<String> found = new LinkedHashSet<>();
+        for (byte[] actions : EffectScript.compile(tune).actions()) {
+            for (byte action : actions) {
+                if (action != 0
+                        && ((action >> 3) & 3) == EffectScript.VOICELESS) {
+                    found.add(OPCODES.get((action & 0xFF) >> 5));
+                }
+            }
+        }
+        return found;
+    }
+
     /** The opcodes one tune's compiled script carries. */
     private static Set<String> opcodesOf(Tune tune) {
         Set<String> found = new LinkedHashSet<>();

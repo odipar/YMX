@@ -256,7 +256,14 @@ public final class YmxEncoder {
             boolean read = (master[p] & bit) != 0;
             if (read && actions != null) {
                 int opcode = actions[p] & 0xE0;
+                // RESUME at voice 3 programs the timer, so its low bits are
+                // a prescaler and not the flags RESUME_RELOAD sits among:
+                // it always reads a count (SPEC.md §3.5).
+                boolean resumeRetuned =
+                        opcode == EffectScript.OPCODE_RESUME
+                        && ((actions[p] >> 3) & 3) == EffectScript.VOICELESS;
                 read = opcode >= EffectScript.OPCODE_START_TOGGLE
+                        || resumeRetuned
                         || opcode == EffectScript.OPCODE_HOLD
                                 && (actions[p] & EffectScript.HOLD_RELOAD) != 0
                         || opcode == EffectScript.OPCODE_RESUME

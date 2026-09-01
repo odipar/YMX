@@ -33,10 +33,10 @@ namespace Ymx
         public const int ReleaseMajor = 0;
 
         /// <summary>The release's minor number. See ReleaseMajor.</summary>
-        public const int ReleaseMinor = 8;
+        public const int ReleaseMinor = 9;
 
         /// <summary>The release's patch number. See ReleaseMajor.</summary>
-        public const int Patch = 3;
+        public const int Patch = 0;
 
         /// <summary>The release's version as prose,
         /// major.minor.patch.</summary>
