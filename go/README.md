@@ -27,8 +27,10 @@ passes over the corpus.
 
 `mkrelease`, `setversion`, `rig`, `sweep` and `gendata` stay in the other
 two trees, and `mkcores` in the Java one alone. The published standalone
-`ym-to-ymx` is built from the C# tree; this one and the Java one carry the
-same command without carrying the cores. They assemble the 68000
-sources, cut releases and run the test rig, which is the repository's own
-work rather than a user's, and a third copy of them would be three places
-to keep a figure in step.
+`ym-to-ymx` is built from this tree, which cross-compiles to all six
+platforms from one machine; the C# tree carries the same command with the
+cores as assembly resources, and the Java one reads them from `dist/`.
+
+The six that stay elsewhere assemble the 68000 sources, cut releases and
+run the test rig, which is the repository's own work rather than a user's,
+and a third copy of them would be three places to keep a figure in step.
