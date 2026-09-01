@@ -28,6 +28,12 @@ final class BuiltTunesTest {
         assertBuilt("Digidrum preempt, built.ym", BuiltTunes.preempt());
     }
 
+    @Test
+    void theRetriggerRetuneIsWhatItsSourceBuilds() throws IOException {
+        assertBuilt("Retrigger retune, built.ym",
+                BuiltTunes.retriggerRetune());
+    }
+
     private static void assertBuilt(String name, byte[] built)
             throws IOException {
         Path file = Rig.REPO.resolve("ym").resolve("test").resolve(name);

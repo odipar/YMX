@@ -175,7 +175,7 @@ format a tune came out of: the engine works on the `Tune` alone.
 ## Tests
 
 ```sh
-mvn test                              # the packer, 41 pinned tunes, a rig slice
+mvn test                              # the packer, 42 pinned tunes, a rig slice
 ymx/test/rig.sh                       # the player, under emulation
 ymx/test/sweep.sh songs/*.ym          # a YM collection, differentially
 ymx/test/check.sh tune.ymx            # a packed tune against §9.3

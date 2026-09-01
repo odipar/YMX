@@ -97,13 +97,14 @@ final class OpcodeCoverageTest {
      * different voice field, and the check above counts one where the
      * player dispatches two.
      *
-     * <p>Both listed here wait on a source that sets
-     * {@code Semantics.retunesLive}, which nothing in this tree does: a YM
-     * file records a code sitting in a register, not the moment a player
-     * reprogrammed anything, so it never asks for a live retune.
+     * <p>The list is empty. It held RETUNE and START_RETRIGGER until the
+     * tunes were compiled under a source that signals a live retune as
+     * well: no YM file asks for one, since it records a code sitting in a
+     * register and not the moment a player reprogrammed anything, but the
+     * packing is one the format carries and the packer emits, so the check
+     * below compiles for it the way it compiles for the resume gap model.
      */
-    private static final Set<String> UNREACHED_FORMS =
-            Set.of("RETUNE", "START_RETRIGGER");
+    private static final Set<String> UNREACHED_FORMS = Set.of();
 
     @Test
     void everyVoiceThreeFormTheTunesReachKeepsBeingReached() throws IOException {
@@ -118,6 +119,8 @@ final class OpcodeCoverageTest {
             reached.addAll(voiceThreeOf(tune));
             reached.addAll(voiceThreeOf(tune.under(new EffectScript.Semantics(
                     true, true, false, true, false))));
+            reached.addAll(voiceThreeOf(tune.under(new EffectScript.Semantics(
+                    true, true, false, false, true))));
         }
 
         List<String> missing = new ArrayList<>(VOICE_THREE);
