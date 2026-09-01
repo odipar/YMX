@@ -360,6 +360,30 @@ public final class EffectScript {
         return script.run();
     }
 
+    /**
+     * The same, compiled so the source's own loop frame can be entered.
+     *
+     * <p>A wrap stops every claimed timer, parks its vector and clears the
+     * skips (SPEC.md §8), so a frame that continues a stream started
+     * earlier plays differently on the second pass than on the first, and
+     * {@link LoopFrame} will not keep it. At {@code loopFrame} this
+     * compiler forgets what it is holding, so a stream running into that
+     * frame compiles as a start and the skips standing there are set by
+     * that frame's own M. The frame then reads the way the wrap leaves the
+     * machine, and the same bytes play on every pass including the first.
+     *
+     * <p>It is the source's frame and not the file's: the file's is
+     * resolved from the script this returns, so it is not known yet. A
+     * frame outside the tune, or 0, changes nothing.
+     */
+    public static Result compile(Tune tune, int timerMap, int loopFrame) {
+        EffectScript script = new EffectScript(tune);
+        Arrays.fill(script.timers, (byte) timerMap);
+        script.entersAt = loopFrame > 0 && loopFrame < script.frames
+                ? loopFrame : -1;
+        return script.run();
+    }
+
     private Result run() {
         for (int p = 0; p < frames; p++) {
             frame(p);
@@ -380,9 +404,26 @@ public final class EffectScript {
 
     private int skipsBefore;
 
+    /** The frame compiled as though nothing were running, or -1. */
+    private int entersAt = -1;
+
 
     private void frame(int p) {
         skipsBefore = skips;
+        if (p == entersAt) {
+            // What the wrap leaves: no timer claimed, no vector installed,
+            // no parameter patched. Compiling against that makes a running
+            // stream start here rather than be held or retuned.
+            for (int c = 0; c < channels.length; c++) {
+                channels[c] = new Channel();
+            }
+            // and a skip standing here is this frame's own to set, since the
+            // wrap cleared them. Where none stands there is nothing to
+            // re-state, and forcing M's bit would cost a byte for nothing.
+            if (skips != 0) {
+                skipsBefore = ~skips;
+            }
+        }
         // X's high nibble is this frame's shape - the packer resolved
         // it, so the player never has to look for it. It changes rarely, which is
         // what keeps a stream carrying one value on almost every frame.
