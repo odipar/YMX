@@ -86,7 +86,21 @@ namespace Rig
             int failed = 0;
             foreach (string name in args)
             {
-                List<Fault> faults = Read(File.ReadAllBytes(name));
+                byte[] file;
+                try
+                {
+                    file = File.ReadAllBytes(name);
+                }
+                catch (IOException)
+                {
+                    // A file that is not there is the caller's mistake, not
+                    // a fault in a tune: it is reported and not thrown, the
+                    // way the Go and Java checkers report it.
+                    Console.Error.WriteLine("ymxcheck: cannot read " + name);
+                    Environment.Exit(1);
+                    return;
+                }
+                List<Fault> faults = Read(file);
                 Console.WriteLine(name + ": "
                         + (faults.Count == 0 ? "within §9.3"
                                 : faults.Count + " outside §9.3"));
