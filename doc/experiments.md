@@ -69,8 +69,9 @@ addresses.
 It does not bind. Across the 543 tunes the collection reads, the largest
 sample count is 12, none passes 16, and seven pass 8. Raising the
 ceiling costs the player `ds.l 512` where it holds `ds.l 64`, 1,792
-bytes on a player of 3,534, unless the table moves into the workspace
-and becomes the first region of it sized from the header.
+bytes on the 3,434-byte player this was measured against, unless the
+table moves into the workspace and becomes the first region of it sized
+from the header.
 
 The general form declines with it. Spare bits sit in every register
 stream - four each in R1, R3 and R5, three in R6, three in R8 to R10,
