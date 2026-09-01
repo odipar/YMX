@@ -389,8 +389,8 @@ that boundary loses the place in the cycle.
 |---|---|
 | **start** | begin from the beginning |
 | **hold** | keep running, no restart: the count, the toggle level or the shape may be refreshed under it. Emitted only when one of them moved |
-| **retune** | change the rate, keep the place in the cycle. The timer is stopped to reprogram it, so the period in flight is cut short |
-| **live retune** | change the rate with the timer left running: control register, then data register, and the period in flight runs to its own end. Emitted only where the source has a live rate move and the stream's parameter did not change |
+| **retune** | change the rate, keep the place in the cycle. The timer is not stopped: control register, then data register, and the period in flight runs to its own end. Addressed to a voice it repatches the parameter first |
+| **live retune** | the same, addressed to voice 3, repatching nothing. Emitted only where the stream's parameter did not change |
 | **release** | stop writing |
 | **resume** | write again, from where it was |
 | **expire** | stop because a one-shot sample ran out. PCM streams only |
