@@ -14,13 +14,12 @@ import org.junit.jupiter.api.Test;
 /**
  * The workspace a host reserves against the ring size a file carries.
  *
- * <p>A pass that fits a ring costs no file bytes, so the packer raises
- * {@code N} above the ring size it was asked for to hold one ({@link
- * LoopFrame}). A host that reserved for the size it packed with is then
- * short by twenty-five times the difference, which nothing checks at run
- * time, so the sizing rule the sources state is held here against a header
- * the packer wrote: the run-time form reads {@code N}, and the build-time
- * form reserves for the cap.
+ * <p>The packer carries the ring size it was asked for, so a host that
+ * reserved for that size has room. {@code -nN} still asks for any size up
+ * to the format's cap, and nothing checks the reservation at run time, so
+ * the sizing rule the sources state is held here against a header the
+ * packer wrote: the run-time form reads {@code N}, and the build-time form
+ * reserves for the cap.
  *
  * <p>The numbers in the guidance are read back out of it rather than
  * repeated here: {@code YMX_FIXED} from the player's own equates, the cap
@@ -59,40 +58,42 @@ final class WorkspaceSizingTest {
     }
 
     /**
-     * The raise itself: a tune whose pass is past the ring asked for is
-     * packed with a larger one, so the flag the file was packed with is not
-     * the ring size its header gives.
+     * The header gives the ring size the file was packed with, whether or
+     * not one pass fits it. A pass past the ring is replayed out of a second
+     * section instead, which costs file bytes and leaves the ring alone.
      */
     @Test
-    void thePackerRaisesTheRingAboveTheOneAskedFor() {
+    void theHeaderCarriesTheRingAskedFor() {
         int asked = YmxFormat.DEFAULT_RING_SIZE;
-        int carried = packedRing(asked);
-        assertTrue(carried > asked, "a pass of " + (FRAMES - LOOP) + " frames"
-                + " needs more than " + asked + " bytes of ring; the header"
-                + " carries " + carried);
-        assertTrue(carried <= YmxFormat.MAX_RING_SIZE,
-                "the header's ring size is past the format's cap: " + carried);
+        assertTrue(FRAMES - LOOP > asked, "the shape this asks about: a pass"
+                + " of " + (FRAMES - LOOP) + " frames is past " + asked
+                + " bytes of ring");
+        assertEquals(asked, packedRing(asked),
+                "the header gives the ring size asked for");
+        int wide = 2040;   // a whole number of 24-byte chunks
+        assertEquals(wide, packedRing(wide),
+                "and gives a larger one where that is what was asked for");
     }
 
     /**
      * The build-time form: the reservation the player's guidance states
-     * covers the workspace the player lays out for that header, and the
-     * reservation for the ring size asked for does not.
+     * covers the workspace the player lays out for the largest header a
+     * packer can write.
      */
     @Test
     void theDocumentedReservationCoversTheHeaderThePackerWrote()
             throws IOException {
         int fixed = fixedFromEquates();
-        int asked = YmxFormat.DEFAULT_RING_SIZE;
-        int carried = packedRing(asked);
+        int carried = packedRing(YmxFormat.DEFAULT_RING_SIZE);
         int laidOut = fixed + YmxFormat.STREAMS * carried;
         assertTrue(laidOut <= reserved(), "the player lays out " + laidOut
                 + " bytes for a header of " + carried + ", past the "
                 + reserved() + " the build-time reservation in " + PLAYER
                 + " covers");
-        assertTrue(fixed + YmxFormat.STREAMS * asked < laidOut,
-                "a reservation for the ring size asked for is no longer"
-                + " short, so the guidance may size from the flag again");
+        int widest = fixed + YmxFormat.STREAMS * YmxFormat.MAX_RING_SIZE;
+        assertTrue(widest <= reserved(), "a file may carry the cap "
+                + YmxFormat.MAX_RING_SIZE + ", which lays out " + widest
+                + " bytes, past the " + reserved() + " reserved");
     }
 
     /**
@@ -121,7 +122,7 @@ final class WorkspaceSizingTest {
 
     /** The cap the tools document, against the format's own. */
     @Test
-    void theToolsDocumentTheCapThePackerRaisesTo() throws IOException {
+    void theToolsDocumentTheCapAnAskCanReach() throws IOException {
         String row = Files.readAllLines(Path.of("doc", "tools.md")).stream()
                 .filter(line -> line.startsWith("| `-nN` |"))
                 .findFirst().orElse("");

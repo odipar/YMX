@@ -374,6 +374,8 @@ namespace Ym6
 
             // The default unit is 2; a tune of odd length is PADDED with a
             // safe duplicate frame, or drops to -k1 when none exists.
+            bool unitAsked = unit != 0;
+            Tune unpadded = tune;
             if (unit == 0 && chunk % 2 == 0)
             {
                 Tune? padded = PadToUnit(song, tune, 2);
@@ -412,6 +414,40 @@ namespace Ym6
             catch (ArgumentException e)
             {
                 throw Error(e.Message);
+            }
+            // A section is a whole number of units, so a cut falls on a unit
+            // boundary and a loop point that is not one leaves the tune
+            // starting over from frame 0. Every frame is a boundary at unit 1:
+            // where the unit was not asked for, the packer packs at 1 and keeps
+            // the loop point.
+            if (!unitAsked && unit > 1 && startsOver && unpadded.LoopFrame > 0
+                    && result.LoopFrame != unpadded.LoopFrame)
+            {
+                // The pack at the shape asked for has already succeeded, so a
+                // shape the encoder rejects here leaves that one standing
+                // rather than failing the tune.
+                YmxEncoder.Result? atOne = null;
+                try
+                {
+                    atOne = YmxEncoder.Encode(unpadded, ringSize, chunk,
+                            startsOver, true, 1, timerMap);
+                }
+                catch (ArgumentException)
+                {
+                    atOne = null;
+                }
+                // Unit 1 stands only where it starts the tune over where the
+                // source says. Where the frame moved for another reason it
+                // moves at unit 1 too, and the shape asked for is the cheaper
+                // of the two.
+                if (atOne != null && atOne.LoopFrame == unpadded.LoopFrame)
+                {
+                    result = atOne;
+                    Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
+                            "Packing at -k1: frame {0}, where this tune starts"
+                            + " over, is not a whole number of 2-byte units, and"
+                            + " a section is", result.LoopFrame));
+                }
             }
             try
             {

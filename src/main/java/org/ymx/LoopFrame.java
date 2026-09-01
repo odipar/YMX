@@ -92,54 +92,59 @@ public final class LoopFrame {
         int given = tune.loopFrame();
         int budget = budget(tune.frameRate());
         int last = Math.min(given + budget, tune.frames() - 1);
-        // Three answers out of one walk: the first frame that can be entered,
-        // the first a ring can reach back over - the body shrinks as the frame
-        // moves later, so once one fits every later one does - and the first a
-        // cut can start at.
+        // The loop point the file carries is the source's, or the first frame
+        // from it that can be entered. The form follows from that frame: the
+        // rings carry the body where they hold it, and a cut carries it
+        // otherwise. Neither moves the loop point to suit itself.
         int entered = -1;
         int ringFrame = -1;
-        int ring = ringSize;
         int cutFrame = -1;
         for (int candidate = given; candidate <= last; candidate++) {
-            if (!qualifies(tune, script, candidate)) {
-                continue;
-            }
-            if (entered < 0) {
+            if (qualifies(tune, script, candidate)) {
                 entered = candidate;
-            }
-            int body = tune.frames() - candidate;
-            // The chunk divides it and two chunks fit, since a body past the
-            // ring is already past a ring of at least two; the cap is what is
-            // left to check.
-            int needed = body <= ringSize ? ringSize
-                    : ((body + chunk - 1) / chunk) * chunk;
-            if (needed <= YmxFormat.MAX_RING_SIZE) {
-                ringFrame = candidate;
-                ring = needed;
                 break;
             }
-            if (cutFrame < 0 && candidate % unit == 0) {
-                cutFrame = candidate;
+        }
+        // Nothing from the source's loop frame on can be entered with the
+        // timers stopped, the skips cleared and the envelope generator not
+        // restarted. The tune starts over there anyway: a stream an earlier
+        // frame left running is not running on the second pass, which is
+        // audible, and the alternative is to lose the loop.
+        boolean forced = entered < 0;
+        if (forced) {
+            entered = given;
+            notes.add(String.format("Frame %d, where the tune starts over, cannot be"
+                    + " entered with the timers stopped, the skips cleared and the"
+                    + " envelope generator not restarted, and no frame from there to"
+                    + " %d can: the tune starts over there, and what an earlier frame"
+                    + " left running is not running on the second pass",
+                    given, last));
+        }
+        // A ring of n bytes holds n frames, and the rings stay the size the
+        // caller asked for.
+        if (tune.frames() - entered <= ringSize) {
+            ringFrame = entered;
+        } else {
+            // Each section is a whole number of units, so a cut falls on one.
+            // The search runs to the end of the tune, since a cut holds any
+            // body: the loop point stays as near the source's as a unit allows.
+            for (int candidate = entered; candidate < tune.frames(); candidate++) {
+                if (candidate % unit == 0
+                        && (forced || qualifies(tune, script, candidate))) {
+                    cutFrame = candidate;
+                    break;
+                }
             }
-        }
-        if (entered < 0) {
-            notes.add(String.format("The source starts over at frame %d, and no frame"
-                    + " from there to %d can be entered with the timers stopped, the"
-                    + " skips cleared and the envelope generator not restarted: the"
-                    + " tune starts over from frame 0 instead, so its first %d frames"
-                    + " are heard on every pass",
-                    given, last, given));
-            return new Plan(0, ringSize, false, notes);
-        }
-        if (ringFrame < 0 && cutFrame < 0) {
-            notes.add(String.format("The source starts over at frame %d, leaving %d"
-                    + " frames to replay, more than the %d bytes the largest ring"
-                    + " holds, and no frame from there to %d that can be entered"
-                    + " falls on a %d-byte unit: the tune starts over from frame 0"
-                    + " instead, so its first %d frames are heard on every pass",
-                    given, tune.frames() - entered, YmxFormat.MAX_RING_SIZE, last,
-                    unit, given));
-            return new Plan(0, ringSize, false, notes);
+            if (cutFrame < 0) {
+                notes.add(String.format("The tune starts over at frame %d, and no"
+                        + " frame from there on falls on a %d-byte unit and can be"
+                        + " entered with the timers stopped, the skips cleared and"
+                        + " the envelope generator not restarted: the tune starts"
+                        + " over from frame 0 instead, so its first %d frames are"
+                        + " heard on every pass", given, unit, given));
+                notes.add(idealNote(tune, entered, chunk, ringSize));
+                return new Plan(0, ringSize, false, notes);
+            }
         }
 
         int frame = ringFrame >= 0 ? ringFrame : cutFrame;
@@ -151,21 +156,7 @@ public final class LoopFrame {
                     given, entered, entered - given, entered - given == 1 ? "" : "s"));
         }
         if (ringFrame >= 0) {
-            if (ring != ringSize) {
-                notes.add(String.format("Rings raised from %d to %d bytes so the %d"
-                        + " frames from the loop frame fit one: %d bytes of rings"
-                        + " rather than %d, and no file bytes. The header carries"
-                        + " the raised size, and a host sizes its workspace from it",
-                        ringSize, ring, tune.frames() - frame,
-                        YmxFormat.STREAMS * ring, YmxFormat.STREAMS * ringSize));
-            }
-            if (frame != entered) {
-                notes.add(String.format("Frame %d leaves more frames to replay than"
-                        + " the largest ring holds, so the tune starts over from"
-                        + " frame %d instead, the first one a ring reaches back"
-                        + " over", entered, frame));
-            }
-            return new Plan(frame, ring, false, notes);
+            return new Plan(frame, ringSize, false, notes);
         }
         if (frame != entered) {
             notes.add(String.format("Frame %d is not a whole number of %d-byte units,"
@@ -175,12 +166,30 @@ public final class LoopFrame {
         }
         int body = tune.frames() - frame;
         notes.add(String.format("The %d frames from frame %d are past the %d bytes the"
-                + " largest ring holds, so every stream is packed as two sections -"
-                + " one of the %d frames before it, one of the %d from it - and the"
-                + " file carries a loop table locating the second: file bytes rather"
-                + " than workspace", body, frame, YmxFormat.MAX_RING_SIZE, frame,
-                body));
+                + " rings hold, so every stream is packed as two sections - one of"
+                + " the %d frames before it, one of the %d from it - and the file"
+                + " carries a loop table locating the second: file bytes rather than"
+                + " workspace", body, frame, ringSize, frame, body));
+        notes.add(idealNote(tune, frame, chunk, ringSize));
         return new Plan(frame, ringSize, true, notes);
+    }
+
+    /**
+     * The rings that hold the frames replayed from {@code at}, against the
+     * {@code ringSize} asked for, rounded up to whole {@code chunk}s.
+     */
+    private static String idealNote(Tune tune, int at, int chunk, int ringSize) {
+        int body = tune.frames() - at;
+        int span = ((body + chunk - 1) / chunk) * chunk;
+        int ideal = span <= YmxFormat.MAX_RING_SIZE ? span : 0;
+        return ideal > 0
+                ? String.format("Rings of %d bytes hold the %d frames from frame %d,"
+                        + " and start it over there: %d bytes of rings rather than"
+                        + " %d, and no file bytes", ideal, body, at,
+                        YmxFormat.STREAMS * ideal, YmxFormat.STREAMS * ringSize)
+                : String.format("No ring holds the %d frames from frame %d, since"
+                        + " the largest holds %d bytes", body, at,
+                        YmxFormat.MAX_RING_SIZE);
     }
 
     /**

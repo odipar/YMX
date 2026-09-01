@@ -48,6 +48,18 @@ exist that did not.
 - **A malformed voice-3 byte no longer reads past a table.**
   `ymx_parmoff` held three longs where the index its lookup builds reaches
   four.
+- **The rings stay the size they were asked for.** A body past the ring
+  raised `N` to hold one pass, so a file's header gave a ring size the
+  caller never asked for and a host sized its workspace from it. The
+  packer packs at the size given and states the size that holds the body,
+  which `-nN` then asks for.
+- **A tune starts over where its source says.** Where its frame is not a
+  whole number of 2-byte units the packer packs at unit 1, and where the
+  wrap cannot enter that frame it starts over there regardless: a stream
+  an earlier frame left running is not running on the second pass, which
+  is audible, and the conversion says so. Of the 544 tunes in the
+  collection none now starts over from frame 0 against its source, where
+  twelve did.
 
 ## 0.8.3
 

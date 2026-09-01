@@ -743,7 +743,6 @@ final class PlayerTests {
     static String runSndhCorpus() throws IOException {
         Path cores = Rig.SCRATCH.resolve("cores");
         MkCores.cores(cores, false, false);
-        Path core = cores.resolve("ymxsndh-k2" + Tools.binarySuffix() + ".bin");
         List<Path> pinned = new ArrayList<>();
         for (String where : new String[] {"ym", "ymr"}) {
             try (Stream<Path> walk = Files.list(Rig.REPO.resolve(where)
@@ -756,7 +755,7 @@ final class PlayerTests {
             return "sndh corpus: no pinned .ymx under ym/test";
         }
         for (Path tune : pinned) {
-            String problem = sndhAgainstPlayer(tune, core);
+            String problem = sndhAgainstPlayer(tune, cores);
             if (!problem.isEmpty()) {
                 return problem;
             }
@@ -764,15 +763,21 @@ final class PlayerTests {
         return "";
     }
 
-    /** One pinned tune down both paths, frame by frame. */
-    private static String sndhAgainstPlayer(Path tune, Path core)
+    /** One pinned tune down both paths, frame by frame. A core reads one
+     * unit size and rejects a tune packed for another, so the tune's own
+     * header selects both the core and the player it is read by. */
+    private static String sndhAgainstPlayer(Path tune, Path cores)
             throws IOException {
         byte[] packed = Files.readAllBytes(tune);
         String name = tune.getFileName().toString();
         int frames = header(packed, 8, 4);
         int budget = Math.min(frames + 40, 400);
 
-        Player straight = new Player(packed, 2);
+        org.ymx.YmxHeader read = org.ymx.YmxHeader.read(tune);
+        int unit = read.anyUnit() ? 2 : read.unit();
+        Path core = cores.resolve("ymxsndh-k" + unit + Tools.binarySuffix()
+                + ".bin");
+        Player straight = new Player(packed, unit);
         if (straight.init() != 0) {
             return "sndh corpus: " + name + ": YMX_init rejected the tune";
         }

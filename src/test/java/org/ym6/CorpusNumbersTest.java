@@ -35,9 +35,11 @@ final class CorpusNumbersTest {
     private static final Path DOC = Path.of("doc", "terminology.md");
     private static final Path CONVERSION = Path.of("ym", "CONVERSION.md");
 
-    /** The pinned tunes doc/terminology.md works through by name. */
+    /** The pinned tunes doc/terminology.md works through by name. The ring
+     * form is asked for rather than arrived at, so its example is the
+     * conformance kit's, packed with the -n1776 its row gives. */
     private static final Path RING_EXAMPLE =
-            Path.of("ym", "test", "Turrican - world 4-3.ymx");
+            Path.of("doc", "conformance", "tunes", "ring_form.ymx");
     private static final Path CUT_EXAMPLE =
             Path.of("ym", "test", "Dragon Flight  4 - Finish 1.ymx");
     private static final Path UNIT_EXAMPLE =
@@ -191,7 +193,8 @@ final class CorpusNumbersTest {
                         + " packed with `-l0`", "what a cut costs");
         checkTheWorkedExamples(vocabulary);
         String[] eachGrew = groups(vocabulary,
-                "the file grows by ([\\d.]+)%, ([\\d.]+)% and ([\\d.]+)%",
+                "the file grows by ([\\d.]+)%, ([\\d.]+)%, ([\\d.]+)%,"
+                        + " ([\\d.]+)%, ([\\d.]+)% and ([\\d.]+)%",
                 "what a cut costs each tune it is done to");
         List<String> grewBy = new ArrayList<>();
         List<Path> cut = new ArrayList<>();
@@ -208,8 +211,16 @@ final class CorpusNumbersTest {
             Path source = packed.resolveSibling(
                     name.substring(0, name.lastIndexOf('.')) + ".ym");
             Path flat = Files.createTempFile("uncut", ".ymx");
+            Path probe = Files.createTempFile("probe", ".ymx");
+            boolean unitOne;
             try {
-                packStartingOverAtZero(source, flat);
+                unitOne = pack("-f", source.toString(), probe.toString())
+                        .contains("Packing at -k1");
+            } finally {
+                Files.deleteIfExists(probe);
+            }
+            try {
+                packStartingOverAtZero(source, flat, unitOne);
                 double exactly = 100.0
                         * (Files.size(packed) - Files.size(flat)) / Files.size(flat);
                 grewBy.add(String.format(java.util.Locale.ROOT, "%.1f", exactly));
@@ -346,15 +357,32 @@ final class CorpusNumbersTest {
 
     /** One tune through its own CLI, told to start over from frame 0: the
      * options the pinned file was packed with, minus the loop frame. */
-    private static void packStartingOverAtZero(Path source, Path out) {
+    private static void packStartingOverAtZero(Path source, Path out,
+                                               boolean unitOne) {
+        if (unitOne) {
+            pack("-f", "-l0", "-k1", source.toString(), out.toString());
+        } else {
+            pack("-f", "-l0", source.toString(), out.toString());
+        }
+    }
+
+    /**
+     * One pack, with what the packer said about it. A tune whose loop point
+     * is not a whole number of 2-byte units is packed at 1, and a file
+     * measured against a baseline packed at 2 would carry the difference
+     * between the two unit sizes rather than what the cut costs.
+     */
+    private static String pack(String... args) {
         java.io.PrintStream spoken = System.out;
-        System.setOut(new java.io.PrintStream(java.io.OutputStream.nullOutputStream(),
-                true, java.nio.charset.StandardCharsets.ISO_8859_1));
+        java.io.ByteArrayOutputStream said = new java.io.ByteArrayOutputStream();
+        System.setOut(new java.io.PrintStream(said, true,
+                java.nio.charset.StandardCharsets.ISO_8859_1));
         try {
-            Ymx.main(new String[] {"-f", "-l0", source.toString(), out.toString()});
+            Ymx.main(args);
         } finally {
             System.setOut(spoken);
         }
+        return said.toString(java.nio.charset.StandardCharsets.ISO_8859_1);
     }
 
     /**
@@ -463,11 +491,32 @@ final class CorpusNumbersTest {
         boolean enters = false;
         boolean cut = false;
         if (loopFrame > 0 && loopFrame < song.frames()) {
-            Tune tune = YmEffects.tune(song, effects);
-            EffectScript.Result script = EffectScript.compile(tune);
-            enters = org.ymx.LoopFrame.qualifies(tune, script, loopFrame);
-            cut = org.ymx.LoopFrame.resolve(tune, script, true,
-                    YmxFormat.DEFAULT_RING_SIZE, YmxFormat.DEFAULT_CHUNK, 2).cut();
+            Tune unpadded = YmEffects.tune(song, effects);
+            EffectScript.Result script = EffectScript.compile(unpadded);
+            enters = org.ymx.LoopFrame.qualifies(unpadded, script, loopFrame);
+            // The packer pads to whole 2-byte units before it resolves, and a
+            // duplicated frame moves the frames after it, so the census pads
+            // too or it resolves against a tune the packer never sees.
+            Tune tune = Ymx.padToUnit(song, unpadded, 2);
+            if (tune == null) {
+                tune = unpadded;
+            }
+            EffectScript.Result padded = EffectScript.compile(tune);
+            org.ymx.LoopFrame.Plan plan = org.ymx.LoopFrame.resolve(tune, padded,
+                    true, YmxFormat.DEFAULT_RING_SIZE, YmxFormat.DEFAULT_CHUNK, 2);
+            // A section is a whole number of units, so a loop point that is
+            // not one leaves the tune starting over from frame 0. The packer
+            // packs such a tune at unit 1, where every frame is a boundary,
+            // and the census counts what the packer does.
+            if (plan.frame() != loopFrame) {
+                org.ymx.LoopFrame.Plan atOne = org.ymx.LoopFrame.resolve(unpadded,
+                        script, true, YmxFormat.DEFAULT_RING_SIZE,
+                        YmxFormat.DEFAULT_CHUNK, 1);
+                if (atOne.frame() == loopFrame) {
+                    plan = atOne;
+                }
+            }
+            cut = plan.cut();
         }
         return new Surveyed(name, song.playerHz(), drumFrames, slowest, fastest,
                 effects.sinus(), together, loopFrame, song.frames(), enters, cut);

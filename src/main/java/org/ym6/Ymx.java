@@ -394,6 +394,8 @@ public final class Ymx {
         // restart) nor triggers a drum - the packer scans for a safe frame and
         // says what it did. An explicit -kK pads the same way and fails loudly
         // only when no safe frame exists.
+        boolean unitAsked = unit != 0;
+        Tune unpadded = tune;
         if (unit == 0 && chunk % 2 == 0) {
             Tune padded = padToUnit(song, tune, 2);
             if (padded != null) {
@@ -418,6 +420,37 @@ public final class Ymx {
         try {
             result = YmxEncoder.encode(tune, ringSize, chunk, startsOver, true, unit,
                     timerMap);
+            // A section is a whole number of units, so a cut falls on a unit
+            // boundary and a loop point that is not one leaves the tune
+            // starting over from frame 0. Every frame is a boundary at unit 1:
+            // where the unit was not asked for, the packer packs at 1 and
+            // keeps the loop point.
+            if (!unitAsked && unit > 1 && startsOver && unpadded.loopFrame() > 0
+                    && result.loopFrame() != unpadded.loopFrame()) {
+                // The pack at the shape asked for has already succeeded, so
+                // a shape the encoder rejects here leaves that one standing
+                // rather than failing the tune.
+                YmxEncoder.Result atOne;
+                try {
+                    atOne = YmxEncoder.encode(unpadded, ringSize, chunk,
+                            startsOver, true, 1, timerMap);
+                } catch (IllegalArgumentException rejected) {
+                    atOne = result;
+                }
+                // Unit 1 stands only where it starts the tune over where the
+                // source says. Where the frame moved for another reason it
+                // moves at unit 1 too, and the shape asked for is the cheaper
+                // of the two.
+                if (atOne != result && atOne.loopFrame() == unpadded.loopFrame()) {
+                    unit = 1;
+                    tune = unpadded;
+                    result = atOne;
+                    System.out.printf(Locale.ROOT, "Packing at -k1: frame %d, where"
+                            + " this tune starts over, is not a whole number of"
+                            + " 2-byte units, and a section is%n",
+                            result.loopFrame());
+                }
+            }
         } catch (IllegalArgumentException e) {
             // The encoder always says what it rejected, but getMessage() is
             // @Nullable, so give it something to fall back on.
