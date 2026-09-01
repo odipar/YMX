@@ -141,8 +141,9 @@ twenty-five bytes in a row instead, with no blocks at all, is 3.27x, which
 says the same thing from the other side.
 
 Which columns share a stream does matter, though less than how many: 14, 3
-and 8 by what they carry packs 1.3% smaller than 10, 8 and 7 at the same
-stream count, block size and ring.
+and 8 by what they carry packs 0.9% smaller than 10, 8 and 7 at the same
+stream count, block size and ring - 566,610 payload bytes against 571,944,
+and the same 228 sections either way.
 
 Declined for size. What it does that nothing else does is remove the section
 reopen: with one section a pass, the loop section is decoded through the last
@@ -176,9 +177,11 @@ moves upwards too. The 2% between the averages is the refill size, which is
 what changing `C` changes.
 
 So the second piece is not what the frame spends, and what it does spend is
-still unaccounted for: `ST4_init` is four instructions and `ymx_reopen`
-about a hundred cycles, against roughly three thousand over an average
-frame. Alignment does not reach it.
+still unaccounted for: `ST4_init` is four instructions, and a reopen frame
+was later measured at 1,304 cycles above a working refill, with the
+instruction count reaching something nearer half of that
+([performance.md](performance.md), what a reopen spends). Alignment does
+not reach it.
 
 Padding rather than choosing `C` was the first form of this idea, and it is
 worse: `O - L` padded up to a multiple of `C` lengthens a tune's pass by up

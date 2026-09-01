@@ -46,12 +46,14 @@ work, not the call's.
 | Wings of Death 8 - level 6 | 2,122 | 3,632 | 6,988 | 13.7 | 1.17 | 165 |
 | Synergy Credits | 2,317 | 3,424 | 3,880 | 7.6 | 0.22 | 132 |
 
-**The budget line.** A YM6 song costs **1,600 to 2,300 cycles a frame on
-average - 3 to 4.5 scanlines - with a p99 near 6 lines**, and its worst
-call in a 1,500-frame sample lands between 7 and 14 lines. That is 2 to 4
-per cent of a PAL frame on average and under 5 per cent at the p99. The
-spread across songs is narrow because the frame's work barely depends on
-the music: fourteen register writes, a few actions, one refill.
+**The budget line.** A YM6 song costs **1,575 to 2,317 cycles a frame on
+average - 3.1 to 4.5 scanlines**, which is 1.0 to 1.4 per cent of a PAL
+frame. Its p99 runs 4.8 to 12.7 lines, a median of 6.3, and its worst call
+in a 1,500-frame sample lands between 6.8 and 21.6 lines. `Chambers of
+Shaolin - Modu Attack` is the outlier at both: a p99 of 12.7 lines where
+ten of the fourteen sit under 7, and the one maximum past 14. The spread
+of the averages is narrow because the frame's work barely depends on the
+music: fourteen register writes, a few actions, one refill.
 
 `ticks/frame` counts only the ticks that landed *inside* a frame's own
 work, so it is a collision rate rather than the tune's tick rate; the
@@ -89,8 +91,10 @@ frame budgets for them:
    its call 2995 of 3000, and `resume_model`'s is near its own end.
 
 Everything else sits under 9 lines. **13 scanlines - 4 per cent of a
-frame - covers every shape measured**, including files no packer run has
-ever produced.
+frame - covers every shape above**, including files no packer run has ever
+produced. It does not cover every song: three rows of the real-songs table
+reach past it, and `Chambers of Shaolin - Modu Attack` reaches 21.6 lines
+on one call in three thousand.
 
 ### What a reopen spends
 
@@ -113,13 +117,13 @@ between a section running dry and the next one opening, and a turn that
 decodes its group costs 1856.
 
 What the window costs above that is the reopen path and not the decode. The
-floor sits 1324 cycles above a working refill, at 3180 against 1856, and
+floor sits 1304 cycles above a working refill, at 3160 against 1856, and
 opening a section is the only work a reopen frame does that a refill frame
 does not.
 
-How those 1324 divide is not measured. `ymx_reopen` is 39 instructions,
-fifteen of them a `move.l` writing decoder state into the stream's block,
-and counting them reaches something nearer half. A decoder opened at a
+How those 1304 divide is not measured. `ymx_reopen` is 38 instructions,
+nine of them a `move.l` writing decoder state into the stream's block, and
+counting them reaches something nearer half. A decoder opened at a
 section's start also begins with an empty bit queue and no offset to reuse,
 so its first control read refills the queue and its first match reads an
 offset where a later one repeats it. Neither of those shows in a literal
@@ -157,8 +161,8 @@ each other rather than standing as absolute costs:
 A digidrum at 6 kHz - the corpus's usual rate - is 120 ticks a frame at
 50 Hz, so **about 19,700 cycles, 38 scanlines, 12 per cent of the frame**,
 and that is the tune's cost under any player. The packer's ceiling of
-25,600 Hz is a quarter of the machine by the same arithmetic, which is why
-it is a ceiling.
+25,600 Hz is 512 ticks a frame, 83,968 cycles, **half the machine** by the
+same arithmetic, which is why it is a ceiling.
 
 The **timer burn** column of `cost.sh` reads the yellow bar: the player's
 own estimate of what its ticks cost, burned off after the frame's work so

@@ -200,7 +200,7 @@ every figure above worse.
 
 One run has been measured against this record, the first at player level.
 `TASK-player.md` is its task: it asks for the ticks as well as the calls,
-and fixes as its own the four things about when a tick falls that the
+and fixes as its own the five conventions about when a tick falls that the
 document leaves to the host. Three implementers worked from `SPEC.md` and
 that task, with the record kept back.
 

@@ -1,6 +1,6 @@
 # The pinned YM tunes
 
-Thirty-nine tunes from a 544-file collection and two built by hand, and
+Thirty-nine tunes from a 544-file collection and three built by hand, and
 the `.ymx` each one packs to.
 `PinnedCorpusTest` packs them again and compares, so a change anywhere in the
 packer, the script compiler or ST4 fails here rather than in a shipped
@@ -30,21 +30,22 @@ All eight of the compiled script's opcodes are covered here. A recorded
 dump reaches `START_PCM`, `START_TOGGLE`, `RELEASE`, and, through
 `Synergy Credits`, `HOLD` and the voice-addressed `RETUNE`; `RESUME` is
 reached under `-sidresume`. No YM file in the 544 starts a retrigger
-stream or preempts a running timer, measured by compiling every one of
-them, so two dumps carry those:
+stream or preempts a running timer, and none moves a retrigger stream's
+shape and its rate on one frame, measured by compiling every one of them,
+so three dumps carry those:
 
 * `Sync buzzer, built.ym` runs a retrigger stream on voice C in bursts -
   a YM6 file files that as a sync-buzzer - and a toggle stream on voice B
   whose rate moves while its volume holds.
 * `Retrigger retune, built.ym` runs one unbroken retrigger stream on
   voice C whose shape and rate step on the same frame, which the buzzer
-  above deliberately does not: its shape steps only where a burst starts.
-  It is the tune that reaches `START_RETRIGGER` at voice 3.
+  above does not: its shape steps only where a burst starts. It is the
+  tune that reaches `START_RETRIGGER` at voice 3.
 * `Digidrum preempt, built.ym` puts both of a frame's effect slots on
   voice A, a drum arriving every twentieth frame on the voice a toggle
   stream is running on, so the drum's stream stops that timer first.
 
-`org.ymx.rig.BuiltTunes` is the source both come out of and
+`org.ymx.rig.BuiltTunes` is the source all three come out of and
 `BuiltTunesTest` rebuilds them, so each stays reproducible from that
 source. `OpcodeCoverageTest` holds the coverage: it fails if
 an opcode a tune reaches stops being reached, and its list of opcodes no
