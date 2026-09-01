@@ -166,8 +166,8 @@ The program picks its own clock when it runs, off the machine it finds:
 | any other rate | any | Timer C |
 
 The VBL is the screen's own, so a call on it holds one place on the
-screen and nothing walks - what a demo wants when it draws to the music,
-and what makes a `-perf` bar stand still. Timer C counts the MFP's
+screen and nothing walks: a demo drawing to the music needs that, and a
+`-perf` bar stands still on it. Timer C counts the MFP's
 crystal, which the video clock does not track, so it carries any rate at
 a third of a scanline a frame of drift. A 50 Hz tune on a PAL machine
 takes the VBL; the same tune on a 60 Hz machine takes Timer C. A set that
@@ -203,7 +203,6 @@ published.
 |---|---|
 | `-publish` | create or update the GitHub release `binaries-v<release>` through `gh`, replacing its assets |
 | `-notes [release]` | rewrite a published page's notes and nothing else. Without a version it is this build's release; with one, any release still published. The commit the page names is the tag's own, not HEAD |
-| `-notes` | post this release's section again, and nothing else |
 
 A new release is tagged at the staged commit, the one its notes name. An
 existing tag stays where it is, so a run from another commit stops rather
@@ -443,7 +442,7 @@ PASS, FAIL, or SKIP naming the tool or the directory that is absent. A step
 that did not run is never a pass, and the exit status is non-zero where any
 step failed.
 
-Without `-full` it runs the steps that need no corpus and no emulator: the
+Without `-full` it runs the steps that need no corpus and no Hatari: the
 Maven build, the Go and C# builds, the §9.3 reader in all three trees, the
 damaged-file sweep, and the player rig's quick battery. `-full` adds the
 parity run, the rig in full, the corpus sweep and the tick reference.

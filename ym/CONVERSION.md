@@ -44,8 +44,7 @@ A YM frame starts at most two effects, so a YM tune uses two of the format's
 four timer channels - the packer's default puts them on Timers A and D - and
 the other two channels' streams repeat one value and compress to almost
 nothing, and the base count leaves them outside the streams a player
-decodes. Timer B and Timer C stay
-the host's.
+decodes. Timer B and Timer C stay the host's.
 
 ## What a YM file gives up
 
@@ -61,7 +60,7 @@ the host's.
 | A loop frame the wrap cannot enter | the repeat starts at the next frame it can, or at frame 0 where no frame within a second can be entered | yes |
 | A loop frame further from the end than a ring holds | the rings grow to hold the frames between | yes |
 | A loop frame further from the end than the largest ring holds | the repeat starts at the first later frame within a second that a ring reaches back over | yes |
-| A loop frame further from the end than the largest ring holds | every stream is packed as two sections, which costs file bytes | yes |
+| The same, with no later frame the budget reaches | every stream is packed as two sections, which costs file bytes | yes |
 | A loop frame with no unit boundary in reach, packing at 2 or 4 bytes a unit | the tune starts over from frame 0, so its opening is heard on every pass | yes |
 | The SID gap model | a choice the file cannot record - see below | no |
 
@@ -181,6 +180,6 @@ above it is dropped here.
   reports which it found. An LHA-archived `.ym` it does read: the wrapper is
   unpacked first, and every file in `test` is one. What the rest costs is
   1 file of the collection's 544, a `YM3!`; the other 543 read. The
-  collection holds no `YM2!` at all, so the sample bank a YM2 conversion
+  collection holds no `YM2!`, so the sample bank a YM2 conversion
   would have to carry - Mad Max's forty, held in that player rather than
   in the file - would serve nothing that is here to convert.

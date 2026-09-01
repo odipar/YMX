@@ -8,7 +8,7 @@ carries twenty-five independently compressed streams: fourteen register
 streams, one value per frame, and eleven streams of a **compiled effect
 script** that drives the MFP's timers. A file may carry extension streams
 past those, to a stored count of at most 32; §1.5 separates the stored,
-decoded and carrying counts. Each stream is decoded through a ring of `N`
+decoded and changing counts. Each stream is decoded through a ring of `N`
 bytes, one stream refilled per frame, so memory use depends on the player
 configuration, not on tune length.
 
@@ -165,8 +165,8 @@ first reads its values (§8).
 **Packed sections.** A packed section is a complete ST4 container - a
 twenty-byte header whose first long is the signature, then four streams.
 Appendix A states the container and its bitstream in full. The format
-comes from the [ST4](https://github.com/odipar/ST4) repository, and the
-appendix rather than that repository is what an implementation follows.
+comes from the [ST4](https://github.com/odipar/ST4) repository, and an
+implementation follows the appendix rather than that repository.
 A writer with no ST4 compressor stores every section instead (below) and
 emits no container.
 
@@ -230,7 +230,7 @@ Three counts apply:
 |---|---|
 | **stored** - `S`, 25 to 32 | the size of the section table |
 | **decoded** - 17, 19, 21, 23 or 25 | the base count a consumer reads per cycle: 17 where no channel is flagged, and `17 + 2(h + 1)` where `h` is the **highest** flagged channel. Each extension stream a consumer reads adds one |
-| **carrying** - fewer still | an idle channel's pair is one value repeated, and compresses to almost nothing |
+| **changing** - fewer still | how many of those hold a value that moves: an idle channel's pair is one value repeated, and compresses to almost nothing |
 
 The base count steps by the highest channel in use, not by the number in
 use: a consumer reads stream 0 through the highest used channel's pair and
@@ -654,8 +654,7 @@ The four **kinds** of timer stream:
 | `10` | **wave stream** | a table read out the same way. Reserved: a writer of this version does not emit it |
 | `11` | **retrigger stream** | R13 rewritten at the timer's rate, restarting the envelope - a "sync-buzzer" |
 
-The **code byte** does not appear in the file. It is the intermediate a
-writer compiles the script from, one byte per channel per frame, specified
+The **code byte** is one byte per channel per frame, specified
 so that writers reading different source formats compile the same codes to
 the same script - §3.1 and §3.3 state which opcode a code's arrival, change
 or departure selects:
@@ -728,14 +727,13 @@ is tested, and it plays as one tick of silence at the loop seam.
 
 The **loop point** is a position in the sample, not an address. On the end
 marker, a tick with a loop point other than `$FFFF` sets its pointer to
-that position and continues; the seam costs the marker's one tick of
-silence. A one-shot writes 13 - a mid-scale level - to the volume register
-and stops its timer, so the voice holds that level until it rejoins the
-frame write. Both writes are the marker tick's own: it writes the marker
-byte, then 13, and the timer stops after the second. That tick is the one
-place in the format where a tick writes one register twice. `0` is a valid
-loop point - the sample repeats whole - so the no-loop value is one past
-the largest position a sample can hold.
+that position and continues. A one-shot writes 13 - a mid-scale level -
+to the volume register and stops its timer, so the voice holds that level
+until it rejoins the frame write. Both writes are the marker tick's own:
+it writes the marker byte, then 13, and the timer stops after the second.
+That tick is the one place in the format where a tick writes one register
+twice. `0` is a valid loop point - the sample repeats whole - so the
+no-loop value is one past the largest position a sample can hold.
 
 A sample number is read from a voice's five-bit volume register (§3.2), so
 a file may carry at most **32** samples.
@@ -836,10 +834,9 @@ On the frame that ends the tune, after its write, actions and refill, and
 as the last thing that call does, every claimed timer is stopped, its
 vector parked on a routine with no effect, its interrupt enabled with no
 tick pending, and the three skip states cleared. That is the state frame 0
-was played in on the first pass, so every pass is identical. The stop is
-the call's last step, so that call lands no tick of its own: every timer
-is stopped before the next one would fall due, and nothing of the pass
-that ended reaches the one that follows.
+was played in on the first pass, so every pass is identical, and that call
+lands no tick of its own: every timer is stopped before the next one would
+fall due.
 
 Frame `L` is then reached in one of two ways, and `O - L` against `N`
 selects which.
@@ -1192,7 +1189,7 @@ it (§3.3).
 Three more hold between an opcode and the stream it addresses:
 
 - At most one timer stream runs on a voice at a time. Where a source
-  starts two, the conflict is settled at pack time (§9.3).
+  starts two, the conflict is resolved at pack time (§9.3).
 - `RETUNE` replaces the control nibble and the reload with the timer
   running under either form. Voice 3 repatches no parameter, so it is
   emitted only on a frame where the stream's parameter did not change;

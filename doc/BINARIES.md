@@ -33,10 +33,9 @@ platform; and a `MANIFEST.txt` of sizes and SHA-256 digests with the
 source commit, the release version and the format version. The manifest
 is published both inside the binaries zip and beside it, so its digests
 can be read before anything is downloaded. The zips hold a standalone
-`ym-to-ymx` and the script
-that runs it under Hatari; the executable carries these same cores and
-this same stub, so a machine with no SDK packs and combines without
-following the recipe below. The release notes
+`ym-to-ymx` and the script that runs it under Hatari; the executable
+carries these same cores and this same stub, so a machine with no SDK
+packs and combines without following the recipe below. The release notes
 are that release's section of [RELEASES.md](RELEASES.md), which says
 what changed in it. A new format version is a new release; so is a patch
 of the same format, which is published beside the patch before it:
@@ -251,12 +250,14 @@ patched rate against 200 - a 50 Hz tune plays every fourth tick, a
 60 Hz one lands 60 calls in every 200 with no drift, a rate above 200
 lands more than one call on a tick - and clears the in-service bit
 before each call, so the file's own timers preempt the frame write
-exactly as they would under a VBL host. Where the set claims Timer C
-for an effect channel (flag bit 1, from the `FLAG~` letters), the stub
-ticks from the VBL instead, and the combiner rejects such a set at any
-rate but 50, since the VBL is a 50 Hz clock. The handback needs nothing
-new: the four timer vectors, the control registers and Timer C's 192
-were already restored.
+exactly as they would under a VBL host. It leaves Timer C in two cases.
+Where the set claims Timer C for an effect channel (flag bit 1, from the
+`FLAG~` letters) it ticks from the VBL at any screen rate, and the
+combiner rejects such a set at any rate but 50, since the VBL is a 50 Hz
+clock. With that bit clear it reads the screen's own rate and takes the
+VBL where the two match, Timer C where they do not. The handback needs
+nothing new: the four timer vectors, the control registers and Timer C's
+192 were already restored.
 
 ## 6. From the release to a program, step by step
 
@@ -320,10 +321,10 @@ combines with any core (§2).
 flags word (§1): the descriptor says what a core is, not the file name.
 
 **Another format version.** A tune's header word at offset 4 gives its
-format version; the release for it is tagged `binaries-v<that
-version>.<patch>` - every tag carries a patch, `0` where the binaries
-were never patched. One release stands per format version, the newest
-patch, and the release for another format version stays published
+format version. Every tag carries the release version, not that one
+(§1), so the release for a tune is the one whose cores declare its format
+at offset 22. One release stands per format version, the newest, and the
+release for another format version stays published
 beside it. A combiner takes the release whose format version its tunes
 declare and verifies the core's word at offset 22 against them; the
 word carries the format version alone, so every patch of one format

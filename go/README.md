@@ -23,8 +23,10 @@ passes over the corpus.
 | `mkprg` | wrap packed tunes, or an SNDH file, in a program |
 | `ymsndh` | pack a set of dumps and combine them in one step |
 | `play` | pack a tune, build a program and run it under Hatari |
+| `ymxcheck` | read a packed tune back against SPEC.md §9.3 |
 
-`mkcores`, `mkrelease`, `setversion`, `rig`, `sweep` and `gendata` stay in
-the other two trees. They assemble the 68000 sources, cut releases and run
-the test rig, which is the repository's own work rather than a user's, and
-a third copy of them would be three places to keep a figure in step.
+`mkrelease`, `setversion`, `rig`, `sweep` and `gendata` stay in the other
+two trees, and `mkcores` in the Java one alone. They assemble the 68000
+sources, cut releases and run the test rig, which is the repository's own
+work rather than a user's, and a third copy of them would be three places
+to keep a figure in step.
