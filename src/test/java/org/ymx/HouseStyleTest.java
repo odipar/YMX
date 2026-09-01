@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -20,22 +21,66 @@ import org.junit.jupiter.api.Test;
  */
 final class HouseStyleTest {
 
-    /** Every documentation file the ban list covers. */
-    private static final List<Path> DOCS = List.of(
-            Path.of("doc", "SPEC.md"),
-            Path.of("doc", "BINARIES.md"),
-            Path.of("doc", "tools.md"),
-            Path.of("doc", "terminology.md"),
-            Path.of("doc", "experiments.md"),
-            Path.of("doc", "performance.md"),
-            Path.of("doc", "RELEASES.md"),
-            Path.of("README.md"),
-            Path.of("ym", "CONVERSION.md"),
-            Path.of("ym", "test", "README.md"),
-            Path.of("doc", "conformance", "README.md"),
-            Path.of("doc", "conformance", "TASK.md"),
-            Path.of("doc", "conformance", "TASK-player.md"),
-            Path.of("doc", "conformance", "SOURCES.md"));
+    /** The two documents that state the rules, and so quote what they
+     * strike. Every other Markdown file in the tree is held. */
+    private static final List<String> STATES_THE_RULES =
+            List.of("AGENTS.md", "CLAUDE.md");
+
+    /** The width AGENTS.md's Shape rule is held at. */
+    private static final int WIDTH = 78;
+
+    /**
+     * Every document, found rather than listed. A list is a place a new
+     * document is not: {@code go/README.md} and
+     * {@code ym/examples/README.md} were outside the one that stood here,
+     * so nothing held them.
+     */
+    private static List<Path> documents() throws IOException {
+        try (Stream<Path> tree = Files.walk(Path.of("."))) {
+            return tree.filter(Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(".md"))
+                    .filter(path -> !path.toString().contains("/target/"))
+                    .filter(path -> !STATES_THE_RULES
+                            .contains(path.getFileName().toString()))
+                    .sorted()
+                    .toList();
+        }
+    }
+
+    /**
+     * AGENTS.md's Shape rule: one wrap width a document, held. A table row,
+     * an indented block, a fenced block and a line carrying a link are not
+     * prose and set their own width, so none is measured.
+     *
+     * <p>Four lines had drifted past the width across three merged changes
+     * with every test passing, each one a paragraph edited and not
+     * rewrapped whole. Nothing read them until this did.
+     */
+    @Test
+    void everyDocumentHoldsOneWrapWidth() throws IOException {
+        List<String> wide = new ArrayList<>();
+        for (Path doc : documents()) {
+            List<String> lines = Files.readAllLines(doc);
+            boolean fenced = false;
+            for (int at = 0; at < lines.size(); at++) {
+                String line = lines.get(at);
+                if (line.stripLeading().startsWith("```")) {
+                    fenced = !fenced;
+                    continue;
+                }
+                if (fenced || line.startsWith("|") || line.startsWith("    ")
+                        || line.startsWith("#") || line.contains("](")) {
+                    continue;
+                }
+                if (line.length() > WIDTH) {
+                    wide.add(doc + ":" + (at + 1) + " runs to " + line.length());
+                }
+            }
+        }
+        assertTrue(wide.isEmpty(), () -> String.join("\n", wide)
+                + "\nAGENTS.md asks one width, held, and the paragraph a"
+                + " change touches rewrapped whole.");
+    }
 
     /** Struck in review, lowercase; matched as substrings. */
     private static final List<String> STRUCK = List.of(
@@ -97,7 +142,7 @@ final class HouseStyleTest {
     @Test
     void theDocumentationCarriesNoStruckPhrase() throws IOException {
         List<String> hits = new ArrayList<>();
-        for (Path doc : DOCS) {
+        for (Path doc : documents()) {
             List<String> lines = Files.readAllLines(doc);
             for (int at = 0; at < lines.size(); at++) {
                 // a space in front, so an entry that leads

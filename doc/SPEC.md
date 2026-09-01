@@ -1237,10 +1237,10 @@ a YM tune's stream count at the 25 of §1.5.
 
 **Derivable.** `START_PCM_PREEMPT`'s `X` nibble names the channels the
 trigger stops, which a player already holds: it programmed those timers.
-The skip bits are derivable the same way. The frame write is why the file carries them
-instead: it is one unbroken run of register writes at a fixed cost, and
-a skip settled inside it would put a test on every voice of every frame.
-The bits state the answer where step 1 can apply it.
+The skip bits are derivable the same way. The frame write is why the file
+carries them instead: it is one unbroken run of register writes at a fixed
+cost, and a skip settled inside it would put a test on every voice of
+every frame. The bits state the answer where step 1 can apply it.
 
 A coupling removed is a new format version, and a tune packed at the old
 one is repacked from its source (§1.1). A value a player could derive is

@@ -95,10 +95,11 @@ document made an implementer choose.
 The fifth ran against this kit at the ten tunes it carried then, 29,406
 entries. Three implementers each produced all 29,406, byte for byte the
 reference on every one: no value, no result and no register's presence
-differed anywhere. Two of the three passed the second test. The third read another
-implementer's decoder out of a scratch directory the harness gave all
-three, and reported it; its own decoder was decoding every section a run
-earlier, and the fault was the harness's, not that implementer's.
+differed anywhere. Two of the three passed the second test. The third
+read another implementer's decoder out of a scratch directory the harness
+gave all three, and reported it; its own decoder was decoding every
+section a run earlier, and the fault was the harness's, not that
+implementer's.
 
 Eight entries were marked "decides output", in five distinct places:
 three in Appendix A.3's bitstream - the flag bit against the two class
@@ -204,9 +205,9 @@ document leaves to the host. Three implementers worked from `SPEC.md` and
 that task, with the record kept back.
 
 All three produced every call and every tick of the ten tunes the kit
-held then, byte for byte the record: 29,406 calls and 286,452 ticks each, no value, no
-result, no register and no tick's place differing anywhere. None read an
-implementation.
+held then, byte for byte the record: 29,406 calls and 286,452 ticks each,
+no value, no result, no register and no tick's place differing anywhere.
+None read an implementation.
 
 The record was wrong when they started, and their agreement located the
 fault. All three landed 157,824 ticks in `resume_model` where it held
