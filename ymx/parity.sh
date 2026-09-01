@@ -44,8 +44,19 @@ fi
 
 # The Java class behind each command. ym-to-ymx has none: that tool is C# and
 # Go only, so its cases run in those two.
+# The name a tree gives a command, where the three do not agree. The
+# checker is one tool: ymxcheck as a Go binary, check as the C# dispatcher's
+# subcommand, org.ymx.rig.Check as a Java class.
+tree_command() {
+    case $1:$2 in
+        ymxcheck:dotnet) echo check ;;
+        *)               echo "$1" ;;
+    esac
+}
+
 java_class() {
     case $1 in
+        ymxcheck) echo org.ymx.rig.Check ;;
         ymx)    echo org.ym6.Ymx ;;
         play)   echo org.ym6.Play ;;
         ymsndh) echo org.ym6.YmSndh ;;
@@ -113,9 +124,9 @@ one_case() {
         (
             cd "$d" || exit 1
             case $tree in
-                java)   eval "TOS=/nope java -ea -Dymx.repo=$REPO -cp $REPO/target/classes $klass $argv" ;;
-                dotnet) eval "TOS=/nope YMX_REPO=$REPO dotnet $DLL $command $argv" ;;
-                go)     eval "TOS=/nope $REPO/go/bin/$command $argv" ;;
+                java)   eval "TOS=/nope java -ea -Dymx.repo=$REPO -cp $REPO/target/classes:$REPO/target/test-classes $klass $argv" ;;
+                dotnet) eval "TOS=/nope YMX_REPO=$REPO dotnet $DLL $(tree_command "$command" dotnet) $argv" ;;
+                go)     eval "TOS=/nope $REPO/go/bin/$(tree_command "$command" go) $argv" ;;
             esac
         ) >"$d.out" 2>"$d.err"
         echo $? > "$d.status"
@@ -225,12 +236,25 @@ fixtures() {
     perl -e 'local $/; open F, "<", $ARGV[0]; binmode F; $d = <F>; print substr($d, 0, 30)' \
         "$FX/good.st4" > "$FX/short.st4"
 
+    # a real .ymx, for the checker to read back
+    (cd "$FX" && cp "$TUNE_A" c.ym \
+        && "$REPO/go/bin/ymx" -frames200 c.ym good.ymx >/dev/null 2>&1)
+
     # a real SNDH, and the same one a byte short of its terminator
     (cd "$FX" && cp "$TUNE_A" f.ym \
         && "$REPO/go/bin/ymsndh" good.sndh f.ym >/dev/null 2>&1)
     perl -e 'local $/; open F, "<", $ARGV[0]; binmode F; $d = <F>;
              print substr($d, 0, length($d) - 1)' \
         "$FX/good.sndh" > "$FX/trunc.sndh" 2>/dev/null
+}
+
+# The §9.3 checker, which reads a packed tune back against the rules a
+# player does not check. One tool in three trees, so it belongs here.
+checks() {
+    SETUP="cp $WORK/fx/good.ymx ."    ; one_case check-good     ymxcheck good.ymx
+    SETUP="cp $WORK/fx/notaymx.bin ." ; one_case check-notaymx  ymxcheck notaymx.bin
+    one_case check-missing  ymxcheck nosuch.ymx
+    one_case check-usage    ymxcheck
 }
 
 # What a tool does with a file it cannot read.
@@ -323,6 +347,7 @@ TUNE_A=$(head -1 "$WORK/tunes"); TUNE_B=$(head -2 "$WORK/tunes" | tail -1)
 refusals
 usage_texts
 fixtures
+checks
 malformed
 
 echo

@@ -83,7 +83,18 @@ final class Check {
     public static void main(String[] args) throws IOException {
         int failed = 0;
         for (String name : args) {
-            List<Fault> faults = check(Files.readAllBytes(Path.of(name)));
+            byte[] file;
+            try {
+                file = Files.readAllBytes(Path.of(name));
+            } catch (IOException unreadable) {
+                // A file that is not there is the caller's mistake, not a
+                // fault in a tune: it is reported and not thrown, the way
+                // the Go and C# checkers report it.
+                System.err.println("ymxcheck: cannot read " + name);
+                System.exit(1);
+                return;
+            }
+            List<Fault> faults = check(file);
             System.out.println(name + ": "
                     + (faults.isEmpty() ? "within §9.3"
                             : faults.size() + " outside §9.3"));
