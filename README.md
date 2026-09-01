@@ -16,10 +16,10 @@ and gave every file in the collection its shape. Grazey's long work got the
 chiptunes into the open and keeps them there, which is why there is a
 collection here to measure against. GwEm's maxYMiser is still the most
 advanced tracker and player the ST has, and this player's timer code is
-close to maxYMiser's. Tat's MinYMiser is what the rest is modelled on. Every
-measurement in this repository was taken on Hatari. Behind all of it is the
-wider body of Atari work. YMX rearranges what those established, and could
-not exist without them.
+close to maxYMiser's. Tat's MinYMiser is what the rest is modelled on.
+Every cycle figure in this repository was measured on Hatari. Behind it is
+the wider body of Atari work. YMX rearranges what those established, and
+could not exist without them.
 
 **It is a tool for the people who make the music.** It was written by
 odipar to put that tool in their hands: a musician writes the tune with a

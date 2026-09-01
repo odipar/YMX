@@ -92,9 +92,9 @@ the tool that carries them, not them.
 - The standalone `ym-to-ymx` now covers six platforms rather than three -
   Windows, macOS and Linux on both x64 and arm64 - and each download is
   around 900 KB where it was 30 MB.
-- It is built from a third implementation of the tools, in Go, which is
-  what makes both of those true: one machine cross-compiles to every
-  target with no toolchain installed for any of them.
+- It is built from a third implementation of the tools, in Go, which makes
+  both true: one machine cross-compiles to every target with no toolchain
+  installed for any of them.
 - That implementation writes the same bytes as the other two. Every file
   it produces is checked against the C# tree's, file by file.
 

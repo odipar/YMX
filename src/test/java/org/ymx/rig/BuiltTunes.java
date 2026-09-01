@@ -67,7 +67,7 @@ public final class BuiltTunes {
     /**
      * A retrigger stream whose shape and its rate move on the same frame,
      * which no file in the collection does and the buzzer above
-     * deliberately does not: its shape steps only where a burst starts, so
+     * does not: its shape steps only where a burst starts, so
      * the frame that carries it starts a fresh stream rather than retuning
      * one.
      *

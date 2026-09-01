@@ -1,9 +1,10 @@
 # The conformance kit
 
 Eleven packed tunes, and what the 68000 player writes to the sound chip
-for each. The kit comes to 29,806 entries. The kit exists to test [SPEC.md](../SPEC.md) rather than the code:
-hand it to someone who has never seen this repository, and see whether the
-document alone is enough to decode the tunes.
+for each. The kit comes to 29,806 entries. It exists to test
+[SPEC.md](../SPEC.md) rather than the code: hand it to someone who has
+never seen this repository, and see whether the document alone is enough
+to decode the tunes.
 
 It tests the **reader** of SPEC.md §9.4 - something that produces the
 values a frame writes and drives no chip. A reader is one of the three
@@ -131,6 +132,7 @@ four now.
 | `cut_form` | a loop table, so a stream opens a second section |
 | `wide_ring` | a wide ring at unit size 1, for the word-offset path |
 | `plays_once` | flag bit 0 clear, so a call reports that the run ended |
+| `repeat_trigger` | a channel re-triggering its own sample, every sixth frame |
 | `retrigger` | a retrigger stream, and a toggle stream retuned while it runs |
 | `resume_model` | a released toggle stream resuming: 37 `RESUME` opcodes from frame 2718 |
 
@@ -178,8 +180,8 @@ On `retrigger` the machine and the model differ by one tick in 246 of
 the 86 differing writes are all the envelope shape at a frame that
 changes it. On `resume_model` the same one-tick shift accounts for the
 larger figure, because that stream carries a different value on 27,218
-of its 27,219 ticks, so any shift at all shows in every write of the
-frame it moves.
+of its 27,219 ticks, so any shift shows in every write of the frame it
+moves.
 
 Two causes were measured for that shift, and one of them is fixed. The
 model fires a timer's first tick one period after the frame boundary and
@@ -200,7 +202,7 @@ every figure above worse.
 
 One run has been measured against this record, the first at player level.
 `TASK-player.md` is its task: it asks for the ticks as well as the calls,
-and fixes as its own the four things about when a tick falls that the
+and fixes as its own the five conventions about when a tick falls that the
 document leaves to the host. Three implementers worked from `SPEC.md` and
 that task, with the record kept back.
 
@@ -240,8 +242,8 @@ those ten byte for byte, and the marks fell from seventeen to eleven.
 All three found the same sentence: §3.3, rewritten for the first run, said
 `RESUME` "delivers the next tick one period after the count reaches its
 next underflow", which passes over an underflow that §9.2 does not drop.
-Two of the last three rounds have gone the same way: a fix from one round
-opened a smaller hole for the next to find, so a round's output is not
+Two of the last three runs have gone the same way: a fix from one run
+opened a smaller hole for the next to find, so a run's output is not
 purely additive. The rest of the run named where a PCM trigger's read
 position starts, which prescaler a flag-1 reload multiplies by, and three
 more of the task's own conventions: what a tick coinciding with a call
