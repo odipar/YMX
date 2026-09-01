@@ -285,6 +285,20 @@ if [ -z "$PARITY_NO_BUILD" ]; then
 fi
 
 rm -rf "$WORK"; mkdir -p "$WORK"
+
+# The cores are shared, not per case, so the first tree to want one
+# assembles it into dist/ and prints that it did, where the two after it
+# find it there and print nothing. That is a difference in the runs and
+# not in the trees, and it appears on every release bump, when dist/
+# carries no core at the new version yet. Assemble them before any case
+# runs, for the same reason a case builds its fixture: so the three runs
+# meet the same bytes.
+for flags in "" "-perf" "-nomask"; do
+    # shellcheck disable=SC2086
+    "$REPO/ymx/mkcores.sh" $flags >/dev/null 2>&1 || {
+        echo "parity.sh: cannot assemble the cores$flags" >&2; exit 2; }
+done
+
 count=8
 [ "$QUICK" = yes ] && count=4
 
