@@ -139,6 +139,8 @@ type effectScript struct {
 	drumEnd   [3]int
 	drumOwner [3]int
 	skips     int
+	// entersAt is the frame compiled as though nothing were running, or -1.
+	entersAt  int
 	reopens   [][2]int
 	notes     []string
 	semantics Semantics
@@ -166,11 +168,29 @@ func CompileOnTimers(tune *Tune, timerMap int) *ScriptResult {
 	return script.run()
 }
 
+// CompileEntering is the same, compiled so the source's own loop frame can be
+// entered. A wrap stops every claimed timer, parks its vector and clears the
+// skips (SPEC.md 8), so a frame continuing a stream started earlier plays
+// differently on the second pass and LoopFrame will not keep it. At loopFrame
+// this compiler forgets what it holds, so a stream running in starts there and
+// a skip standing there is set by that frame's own M. It is the source's
+// frame, not the file's: the file's is resolved from the script this returns.
+func CompileEntering(tune *Tune, timerMap, loopFrame int) *ScriptResult {
+	script := newEffectScript(tune, timerMap)
+	if loopFrame > 0 && loopFrame < script.frames {
+		script.entersAt = loopFrame
+	} else {
+		script.entersAt = -1
+	}
+	return script.run()
+}
+
 func newEffectScript(tune *Tune, timerMap int) *effectScript {
 	s := &effectScript{
 		tune:      tune,
 		semantics: tune.Semantics,
 		frames:    tune.Frames,
+		entersAt:  -1,
 	}
 	s.m = make([]byte, s.frames)
 	s.x = make([]byte, s.frames)
@@ -216,6 +236,20 @@ func (s *effectScript) run() *ScriptResult {
 // events in, and the order arbitration is decided by.
 func (s *effectScript) frame(p int) {
 	skipsBefore := s.skips
+	if p == s.entersAt {
+		// What the wrap leaves: no timer claimed, no vector installed, no
+		// parameter patched. Compiling against that makes a running stream
+		// start here.
+		for c := range s.channels {
+			s.channels[c] = &channelState{vec: -1, vecVoice: -1, sel: -1,
+				vol: -1, shape: -1, prescaler: -1}
+		}
+		// A skip standing here is this frame's own to set. Where none
+		// stands there is nothing to re-state.
+		if s.skips != 0 {
+			skipsBefore = ^s.skips
+		}
+	}
 	// X's high nibble is this frame's shape, resolved at pack time.
 	s.x[p] = byte(s.shape(p) << 4)
 

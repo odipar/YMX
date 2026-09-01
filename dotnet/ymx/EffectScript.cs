@@ -164,6 +164,24 @@ namespace Ymx
             return script.Run();
         }
 
+        /// <summary>The same, compiled so the source's own loop frame can be
+        /// entered. A wrap stops every claimed timer, parks its vector and
+        /// clears the skips (SPEC.md 8), so a frame continuing a stream
+        /// started earlier plays differently on the second pass and
+        /// LoopFrame will not keep it. At loopFrame this compiler forgets
+        /// what it holds, so a stream running in starts there and a skip
+        /// standing there is set by that frame's own M. It is the source's
+        /// frame, not the file's: the file's is resolved from the script
+        /// this returns.</summary>
+        public static Result Compile(Tune tune, int timerMap, int loopFrame)
+        {
+            var script = new EffectScript(tune);
+            Array.Fill(script.timers, (byte) timerMap);
+            script.entersAt = loopFrame > 0 && loopFrame < script.frames
+                    ? loopFrame : -1;
+            return script.Run();
+        }
+
         private Result Run()
         {
             for (int p = 0; p < frames; p++)
@@ -182,9 +200,29 @@ namespace Ymx
 
         private int skipsBefore;
 
+        /// <summary>The frame compiled as though nothing were running,
+        /// or -1.</summary>
+        private int entersAt = -1;
+
         private void Frame(int p)
         {
             skipsBefore = skips;
+            if (p == entersAt)
+            {
+                // What the wrap leaves: no timer claimed, no vector
+                // installed, no parameter patched. Compiling against that
+                // makes a running stream start here.
+                for (int c = 0; c < channels.Length; c++)
+                {
+                    channels[c] = new Channel();
+                }
+                // A skip standing here is this frame's own to set. Where
+                // none stands there is nothing to re-state.
+                if (skips != 0)
+                {
+                    skipsBefore = ~skips;
+                }
+            }
             // X's high nibble is this frame's shape, resolved at pack time.
             x[p] = (byte) (Shape(p) << 4);
 

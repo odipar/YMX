@@ -109,7 +109,13 @@ func EncodeOnTimers(tune *Tune, ringSize, chunk int, loops, progress bool,
 			tune.Frames, unit, unit)
 	}
 
-	script := CompileOnTimers(tune, timerMap)
+	// The source's own loop frame is compiled as an entry, so a stream
+	// running into it starts there and LoopFrame can keep it.
+	entering := 0
+	if loops {
+		entering = tune.LoopFrame
+	}
+	script := CompileEntering(tune, timerMap, entering)
 	channels := channelsUsed(script)
 	if problem := CheckShape(ringSize, chunk, unit,
 		LiveStreams(channels)); problem != "" {

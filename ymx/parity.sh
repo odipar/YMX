@@ -249,6 +249,21 @@ fixtures() {
         "$FX/good.sndh" > "$FX/trunc.sndh" 2>/dev/null
 }
 
+# A tune whose own loop frame the packer keeps. The sweep's tunes come off
+# the corpus in name order, and none of the eight has one, so a change to
+# how the loop frame compiles left the three trees packing different bytes
+# with every case still matching. This names the tune rather than hoping
+# for it.
+loop_frame() {
+    LOOPER="$REPO/ym/test/Synergy Wicked Polygons 2.ym"
+    if [ ! -f "$LOOPER" ]; then
+        echo "parity.sh: $LOOPER is gone, and the loop-frame case with it" >&2
+        return
+    fi
+    SETUP="cp '$LOOPER' looper.ym" ; one_case loop-frame     ymx looper.ym out.ymx
+    SETUP="cp '$LOOPER' looper.ym" ; one_case loop-frame-o   ymx -o looper.ym out.ymx
+}
+
 # The §9.3 checker, which reads a packed tune back against the rules a
 # player does not check. One tool in three trees, so it belongs here.
 checks() {
@@ -348,6 +363,7 @@ TUNE_A=$(head -1 "$WORK/tunes"); TUNE_B=$(head -2 "$WORK/tunes" | tail -1)
 refusals
 usage_texts
 fixtures
+loop_frame
 checks
 malformed
 
