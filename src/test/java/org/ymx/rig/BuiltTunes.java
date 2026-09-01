@@ -24,6 +24,8 @@ public final class BuiltTunes {
     public static final int BUZZER_FRAMES = 3000;
     /** The frames the preempt tune runs for. */
     public static final int PREEMPT_FRAMES = 400;
+    /** The frames the retrigger-retune tune runs for. */
+    public static final int RETRIGGER_RETUNE_FRAMES = 600;
 
     /**
      * A sync-buzzer, which no file in the collection carries: a retrigger
@@ -58,6 +60,40 @@ public final class BuiltTunes {
             } else {
                 v[9][f] = 12;
             }
+        }
+        return GenYm.ym6File(frames, v);
+    }
+
+    /**
+     * A retrigger stream whose shape and its rate move on the same frame,
+     * which no file in the collection does and the buzzer above
+     * deliberately does not: its shape steps only where a burst starts, so
+     * the frame that carries it starts a fresh stream rather than retuning
+     * one.
+     *
+     * <p>Here the stream runs unbroken from frame 8 and both the shape and
+     * the prescaler step every fiftieth frame together. A source that
+     * signals a live retune compiles that frame to START_RETRIGGER at
+     * voice 3, the one encoding that moves a retrigger stream's rate and
+     * repatches its shape without stopping the timer (SPEC.md 3.4). The
+     * count steps with them, which the encoding carries in P and which
+     * leaves the code differing in its prescaler bits alone.
+     */
+    public static byte[] retriggerRetune() {
+        int frames = RETRIGGER_RETUNE_FRAMES;
+        byte[][] v = bed(frames);
+        for (int f = 0; f < frames; f++) {
+            v[8][f] = 12;
+            v[9][f] = 12;
+            if (f < 8) {
+                v[10][f] = 11;
+                continue;
+            }
+            int step = (f - 8) / 50;
+            v[1][f] |= (byte) 0xF0;                 // sync-buzzer, voice C
+            v[6][f] |= (byte) ((5 + step % 3) << 5);
+            v[14][f] = (byte) (60 + step % 40);
+            v[10][f] = (byte) (step % 2 == 0 ? 0x0A : 0x0C);
         }
         return GenYm.ym6File(frames, v);
     }

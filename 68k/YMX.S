@@ -400,11 +400,11 @@ YH_SECTIONS     equ     42              ; one offset per stream: its section,
                                         ; loop table covers the rest
 
 YMX_MAGIC       equ     $594D5821       ; 'YMX!'
-YMX_VERSION     equ     $0007           ; the format version: the major in
+YMX_VERSION     equ     $0008           ; the format version: the major in
                                         ; the high byte, the minor in the
-                                        ; low. There is no older version to
-                                        ; stay compatible with; doc/SPEC.md
-                                        ; defines the layout
+                                        ; low. A file of another version is
+                                        ; rejected at init, not read: SPEC.md
+                                        ; §10.5 repacks from source instead
 YMX_FLAG_LOOPS  equ     1               ; header flag: the tune starts over
 YMX_FLAG_CHAN   equ     2               ; and one per timer channel, from bit
                                         ; 1 up: set when the tune uses it,
@@ -622,7 +622,10 @@ YMX_init:
         add.l   d0,d1
         move.l  d1,(a1)+                ; voice B
         add.l   d0,d1
-        move.l  d1,(a1)                 ; voice C
+        move.l  d1,(a1)+                ; voice C
+        move.l  d0,d1                   ; voice 3 takes voice A's offset
+        lsl.l   #3,d1                   ; again: no opcode addresses it, and
+        move.l  d1,(a1)                 ; a malformed file reads in the table
 
 ; The sample table becomes a table of absolute addresses, so a trigger
 ; is one indexed load instead of an entry walk: the DRUM action's byte is
@@ -1318,7 +1321,11 @@ ymx_samples:
         ds.l    64                      ; a pair per sample: its address, and
                                         ; the address it loops back to or 0
 ymx_parmoff:
-        ds.l    3
+        ds.l    4                       ; a long a voice, and a fourth for
+                                        ; voice 3, which no opcode addresses:
+                                        ; ymx_voice indexes at voice*4, and a
+                                        ; malformed file must land inside the
+                                        ; table rather than past it
 
 ; -----------------------------------------------------------------------------
 ; The tick handlers, in maxYMiser's shipping forms: the PSG select and write
@@ -1599,18 +1606,48 @@ ymx_assign:
 ymx_act:
         move.b  (a4),d0                 ; opcode 7-5, voice 4-3, low bits 2-0
         move.w  d0,d1
-        and.w   #$E0,d1
-        lsr.w   #4,d1                   ; opcode * 2
+        and.w   #$F8,d1
+        lsr.w   #2,d1                   ; (opcode * 4 + voice) * 2
         move.w  ymx_opcodes(pc,d1.w),d1
         jmp     ymx_opcodes(pc,d1.w)
+
+; Opcode AND voice select the handler, so the three forms that turn on the
+; voice field cost no test. A voice no opcode addresses repeats that
+; opcode's own entry: §2.4 leaves those bytes undefined and §9.1 leaves a
+; malformed file undefined, and this keeps one landing where its opcode
+; does rather than anywhere.
 ymx_opcodes:
         dc.w    ymx_resume-ymx_opcodes  ; opcode 0: a masked toggle returns
+        dc.w    ymx_resume-ymx_opcodes
+        dc.w    ymx_resume-ymx_opcodes
+        dc.w    ymx_resume_retune-ymx_opcodes   ; voice 3: with a new rate
+        dc.w    ymx_hold-ymx_opcodes
+        dc.w    ymx_hold-ymx_opcodes
+        dc.w    ymx_hold-ymx_opcodes
         dc.w    ymx_hold-ymx_opcodes
         dc.w    ymx_release-ymx_opcodes
+        dc.w    ymx_release-ymx_opcodes
+        dc.w    ymx_release-ymx_opcodes
+        dc.w    ymx_release-ymx_opcodes
         dc.w    ymx_toggle_start-ymx_opcodes
+        dc.w    ymx_toggle_start-ymx_opcodes
+        dc.w    ymx_toggle_start-ymx_opcodes
+        dc.w    ymx_toggle_start-ymx_opcodes
+        dc.w    ymx_retune-ymx_opcodes  ; opcode 4: a voice, so a repatch
         dc.w    ymx_retune-ymx_opcodes
+        dc.w    ymx_retune-ymx_opcodes
+        dc.w    ymx_live-ymx_opcodes    ; voice 3: no voice, no repatch
         dc.w    ymx_retrigger_start-ymx_opcodes
+        dc.w    ymx_retrigger_start-ymx_opcodes
+        dc.w    ymx_retrigger_start-ymx_opcodes
+        dc.w    ymx_retrigger_retune-ymx_opcodes    ; voice 3: shape, live
         dc.w    ymx_pcm-ymx_opcodes
+        dc.w    ymx_pcm-ymx_opcodes
+        dc.w    ymx_pcm-ymx_opcodes
+        dc.w    ymx_pcm-ymx_opcodes
+        dc.w    ymx_pcm_preempt-ymx_opcodes
+        dc.w    ymx_pcm_preempt-ymx_opcodes
+        dc.w    ymx_pcm_preempt-ymx_opcodes
         dc.w    ymx_pcm_preempt-ymx_opcodes
 
 ; The two operands the opcodes read out of the rings: a voice's parameter
@@ -1673,6 +1710,29 @@ ymx_resume:                             ; unmask; reload the count if it
         bset    d1,(a1)
         rts
 
+; RESUME at voice 3: the re-arrival brings a new rate. The low bits are the
+; prescaler, so no flag is left to name the voice and none names the volume
+; either - both are implied. The voice comes back out of the PSG select byte
+; ymx_toggle_start patched, which holds voice+8, and the timer is PROGRAMMED
+; rather than reloaded: after a gap the counter holds an arbitrary count, so
+; a live reload would defer the new rate by up to one old period. No vector
+; is written, so the half the release left standing is the half that returns.
+ymx_resume_retune:
+        movea.l CH_ISR(a5),a2
+        moveq   #0,d5
+        move.b  ISR_TOGGLE_ON_SEL(a2),d5
+        subq.w  #8,d5                   ; the voice
+        lsl.w   #2,d5                   ; voice * 4, the index ymx_voice builds
+        lea     ymx_parmoff(pc),a1
+        move.l  0(a1,d5.w),d1
+        movea.l YMX_CURSOR(a3),a1
+        adda.l  d1,a1                   ; this frame's byte of R8+v
+        move.b  (a1),d1
+        and.w   #15,d1
+        move.b  d1,ISR_TOGGLE_VOL(a2)
+        moveq   #0,d4                   ; no vector: the installed half stands
+        bra     ymx_program             ; stop, load, run - and ends enabled
+
 ymx_hold:                               ; flags: 1 = reload the count, 2 =
         btst    #0,d0                   ; track the toggle volume, 4 =
         beq.s   .tracks                 ; track the retrigger shape - only
@@ -1718,24 +1778,25 @@ ymx_toggle_start:                          ; a fresh square restarts at phase
         bra     ymx_program
 
 ymx_retune:                         ; the vector is NEVER touched: the
-        move.b  d0,d1                   ; square's phase persists through every
-        not.b   d1                      ; retune, and through a resume after
-        and.b   #$18,d1                 ; a PCM stream took the voice.
-        beq.s   ymx_live                ; voice 3 is no voice: see below
-        bsr     ymx_voice
-        move.b  (a1),d1
-        and.w   #15,d1
-        movea.l CH_ISR(a5),a2
-        move.b  d1,ISR_TOGGLE_VOL(a2)
-        moveq   #0,d4
-        bra     ymx_program
+        bsr     ymx_voice               ; square's phase persists through every
+        move.b  (a1),d1                 ; retune, and through a resume after
+        and.w   #15,d1                  ; a PCM stream took the voice. The
+        movea.l CH_ISR(a5),a2           ; parameter is repatched and then the
+        move.b  d1,ISR_TOGGLE_VOL(a2)   ; timer moves LIVE: falls into
+                                        ; ymx_live below
 
 ; The prescaler moves under a RUNNING timer. Nothing is stopped, so the
 ; period already in flight runs to its own end and the reload lands at the
 ; next underflow: a square keeps its phase AND its place inside the half it
-; is in, which is what a source that reprograms live sounds like. Addressed
-; to no voice, so no parameter is repatched - the packer only picks this
-; encoding on a frame where the parameter byte stood still.
+; is in, which is what a source that reprograms live sounds like.
+;
+; Three paths arrive here. A voiced RETUNE falls in from above, having
+; repatched the parameter first. A RETUNE at voice 3 enters from the table,
+; repatching nothing - the packer picks that encoding only on a frame where
+; the parameter byte stood still. A retrigger retune enters below, having
+; patched the shape. The timer must already be running: the control write
+; comes before the data write, so on a stopped timer the first period would
+; run at the previous count.
 ymx_live:
         move.b  0(a4,d3.l),d2           ; the count
         and.b   #7,d0
@@ -1755,6 +1816,12 @@ ymx_live:
         move.w  CH_IERBIT(a5),d1
         bset    d1,(a1)
         rts
+
+ymx_retrigger_retune:               ; voice 3: a running retrigger stream
+        bsr     ymx_shape               ; whose shape AND rate move on one
+        movea.l CH_ISR(a5),a2           ; frame. The vector is already the
+        move.b  d1,ISR_RETRIGGER_SHAPE(a2)  ; retrigger tick, so it stays,
+        bra     ymx_live                ; and the period in flight survives
 
 ymx_retrigger_start:
         bsr     ymx_shape

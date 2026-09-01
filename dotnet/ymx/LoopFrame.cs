@@ -244,6 +244,13 @@ namespace Ymx
         private static bool Starts(int action)
         {
             int opcode = action & 0xE0;
+            // START_RETRIGGER at voice 3 retunes a stream already running
+            // and programs nothing from nothing (SPEC.md 3.4).
+            if (opcode == EffectScript.OpcodeStartRetrigger
+                    && ((action >> 3) & 3) == EffectScript.Voiceless)
+            {
+                return false;
+            }
             return opcode >= EffectScript.OpcodeStartToggle
                     && opcode != EffectScript.OpcodeRetune;
         }

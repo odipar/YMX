@@ -19,7 +19,7 @@ namespace Ymx
         /// <summary>The only version this release writes or reads: the
         /// major in the high byte, the minor in the low, so versions order
         /// numerically.</summary>
-        public const int Version = 0x0007;
+        public const int Version = 0x0008;
 
         /// <summary>
         /// The binaries' own version, which moves when they change and
@@ -33,10 +33,10 @@ namespace Ymx
         public const int ReleaseMajor = 0;
 
         /// <summary>The release's minor number. See ReleaseMajor.</summary>
-        public const int ReleaseMinor = 8;
+        public const int ReleaseMinor = 9;
 
         /// <summary>The release's patch number. See ReleaseMajor.</summary>
-        public const int Patch = 3;
+        public const int Patch = 0;
 
         /// <summary>The release's version as prose,
         /// major.minor.patch.</summary>

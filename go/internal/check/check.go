@@ -370,10 +370,13 @@ func act(faults []Fault, frame, c int, channels []channel, value [][]byte,
 		add("§2.4 A", fmt.Sprintf(
 			"%s names voice %d; the field is written as 0", name, voice))
 	}
-	if opcode != opRetune && opcode != opRelease && voice == noVoice {
+	if opcode != opRetune && opcode != opRelease &&
+		opcode != opStartRetrigger && opcode != opResume &&
+		voice == noVoice {
 		add("§2.4 A", name+" names voice 3")
 	}
-	if programs(opcode) && (low < 1 || low > 7) {
+	if (programs(opcode) || programsAtVoiceThree(opcode, voice)) &&
+		(low < 1 || low > 7) {
 		add("§9.3 actions", fmt.Sprintf(
 			"%s carries prescaler index %d, outside 1 to 7", name, low))
 	}
@@ -484,6 +487,14 @@ func programs(opcode int) bool {
 	return opcode == opRetune || opcode == opStartToggle ||
 		opcode == opStartRetrigger || opcode == opStartPCM ||
 		opcode == opStartPCMPreempt
+}
+
+// programsAtVoiceThree reports whether this byte is one of the two forms
+// whose low bits are a prescaler because voice 3 discriminates them
+// (SPEC.md 3.4, 3.5).
+func programsAtVoiceThree(opcode, voice int) bool {
+	return voice == noVoice &&
+		(opcode == opStartRetrigger || opcode == opResume)
 }
 
 // triggered keeps a trigger's sample and its rate, so the rejoin below can be

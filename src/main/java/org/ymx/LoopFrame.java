@@ -237,9 +237,15 @@ public final class LoopFrame {
     }
 
     /** Whether this action byte programs a timer from nothing: the four start
-     * opcodes, and not the RETUNE that sits among them. */
+     * opcodes, and not the RETUNE that sits among them, nor the
+     * START_RETRIGGER at voice 3 that retunes a stream already running
+     * (SPEC.md §3.4). */
     private static boolean starts(int action) {
         int opcode = action & 0xE0;
+        if (opcode == EffectScript.OPCODE_START_RETRIGGER
+                && ((action >> 3) & 3) == EffectScript.VOICELESS) {
+            return false;
+        }
         return opcode >= EffectScript.OPCODE_START_TOGGLE
                 && opcode != EffectScript.OPCODE_RETUNE;
     }

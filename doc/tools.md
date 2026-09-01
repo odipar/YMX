@@ -220,7 +220,7 @@ Rewrites one of the two versions at every site it reaches.
 
 | flag | what it moves |
 |---|---|
-| `-format` | the compatibility gate: the constants in `org.ymx.YmxFormat`, `dotnet/ymx/YmxFormat.cs`, `go/internal/ymx/format.go` and `68k/YMX.S`, and SPEC.md's three mentions |
+| `-format` | the compatibility gate: the constants in `org.ymx.YmxFormat`, `dotnet/ymx/YmxFormat.cs`, `go/internal/ymx/format.go` and `68k/YMX.S`, and SPEC.md's four mentions |
 | `-release` | the binaries' own version: three numbers in each of the three trees |
 
 The format version word is the major in the high byte, the minor in the

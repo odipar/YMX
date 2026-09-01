@@ -434,8 +434,9 @@ public final class EffectScript {
         }
         int voice = ((code >> 4) & 3) - 1;
         int type = code & 0xC0;
-        if (retunesLive(old, code) && parameterHeld(p, channel, type, voice)) {
-            liveRetune(p, index, channel, code, count);
+        if (retunesLive(old, code)) {
+            liveRetune(p, index, channel, code, count, type, voice,
+                    parameterHeld(p, channel, type, voice));
         } else if (type == KIND_TOGGLE) {         // .toggle
             toggle(p, index, channel, code, count, voice, old);
         } else if (type == KIND_PCM && retunesPcm(old, code)) {
@@ -486,15 +487,34 @@ public final class EffectScript {
     }
 
     /**
-     * A rate under a running effect, with nothing stopped. RETUNE addressed
-     * to voice 3 - no such voice, and the one free corner of the action
-     * byte - is the live path: the vector and the parameter are left alone,
-     * and the control and data registers are written around a running timer.
+     * A rate under a running effect, with nothing stopped. Every form here
+     * leaves the vector alone and moves the timer around it, so the period
+     * in flight completes (SPEC.md §3.1); they differ in which parameter
+     * they repatch on the way.
+     *
+     * <p>Where the parameter stood still there is nothing to repatch, and
+     * RETUNE at voice 3 - no such voice, and the free corner of the action
+     * byte - says so. Where it moved, the form that carries it is the one
+     * to emit: a voiced RETUNE for a toggle stream's volume, and
+     * START_RETRIGGER at voice 3 for a retrigger stream's shape, which no
+     * RETUNE can reach because the shape is in X and not a voice's register
+     * (§3.2, §3.4). Whichever repatches records what it wrote, or the next
+     * {@link #hold} compares against a value the chip no longer holds.
      */
-    private void liveRetune(int p, int index, Channel channel, int code, int count) {
+    private void liveRetune(int p, int index, Channel channel, int code,
+                            int count, int type, int voice, boolean held) {
         channel.tlast = count;
         channel.prescaler = code & 7;
-        emit(p, index, action(OPCODE_RETUNE, VOICELESS, code & 7), count);
+        if (held) {
+            emit(p, index, action(OPCODE_RETUNE, VOICELESS, code & 7), count);
+        } else if (type == KIND_RETRIGGER) {
+            channel.shape = shape(p);
+            emit(p, index, action(OPCODE_START_RETRIGGER, VOICELESS, code & 7),
+                    count);
+        } else {
+            channel.vol = parameter(p, voice);
+            emit(p, index, action(OPCODE_RETUNE, voice, code & 7), count);
+        }
     }
 
     /**
@@ -645,8 +665,13 @@ public final class EffectScript {
         boolean sameSid = channel.vec == KIND_TOGGLE && channel.vecVoice == voice
                 && channel.sel == voice;
         boolean resume = channel.masked && sameSid && channel.prescaler == (code & 7);
-        boolean retune = old != 0 && ((code ^ old) & 0xF0) == 0
-                || channel.masked && sameSid && channel.prescaler != (code & 7);
+        // A gap whose prescaler moved. RESUME at voice 3 programs the timer
+        // at the index it carries, where the voiced RETUNE now moves it live
+        // and would defer the new rate by up to one period of the old one:
+        // after a gap the counter holds an arbitrary count (SPEC.md §3.5).
+        boolean resumeRetuned = channel.masked && sameSid
+                && channel.prescaler != (code & 7);
+        boolean retune = old != 0 && ((code ^ old) & 0xF0) == 0;
         cut(p, index, -1);
         openOld(old);
         skips |= 1 << voice;
@@ -667,6 +692,10 @@ public final class EffectScript {
         channel.tlast = count;
         channel.vol = value;
         channel.prescaler = code & 7;
+        if (resumeRetuned) {
+            emit(p, index, action(OPCODE_RESUME, VOICELESS, code & 7), count);
+            return;
+        }
         if (retune) {
             emit(p, index, action(OPCODE_RETUNE, voice, code & 7), count);
             return;

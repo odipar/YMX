@@ -20,6 +20,35 @@ by someone deciding whether to take the release, not by someone
 reviewing it: the commits carry the reasoning and the measurements, and
 the section carries the list.
 
+## 0.9.0
+
+The player is 3,534 bytes at unit size 2, where 0.8.3 carried 3,434, and
+the PRG stub 3,038. Format version 0.8: a tune packed at 0.7 has to be
+repacked from its `.ym` source. No byte of a file moves but the version
+word; what moves is what a player does with two encodings, and two more
+exist that did not.
+
+- **A retune no longer stops the timer.** `RETUNE` addressed to a voice
+  repatched the parameter and then stopped, loaded and started the timer,
+  truncating the period in flight: a gate-phase jump of up to one timer
+  period, heard as a tick where a sweep crosses a prescaler boundary on a
+  frame the volume also moved. It repatches and moves the timer live now,
+  as the voice-3 form always did, so the period completes and the
+  displacement is the MFP's own 1 to 200 timer clocks.
+- **Two encodings that were not there.** `START_RETRIGGER` at voice 3
+  retunes a running retrigger stream and repatches its shape, which no
+  `RETUNE` could reach because a shape is in stream X and not a voice's
+  register. `RESUME` at voice 3 re-enters a released toggle stream at a
+  prescaler the gap changed, programming the timer so the new rate is
+  exact from the first tick and the installed half stands.
+- **The action byte dispatches on its voice.** Opcode and voice together
+  select a handler, through a table of 32 entries where there were 8. Four
+  cycles less on every action byte, and 24 more off every voice-addressed
+  `RETUNE`.
+- **A malformed voice-3 byte no longer reads past a table.**
+  `ymx_parmoff` held three longs where the index its lookup builds reaches
+  four.
+
 ## 0.8.3
 
 The player is 3,434 bytes at unit size 2, the PRG stub 3,038. Format 0.7.

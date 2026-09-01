@@ -225,9 +225,12 @@ final class Effects {
                     return "effects: frame " + frame + " wrote " + mfp;
                 }
             } else if (frame == 25) {               // prescaler-only change:
-                if (!mfp.equals(List.of(w(PlayerTests.TACR, 0),     // full
-                        w(PlayerTests.TADR, 90), w(PlayerTests.TACR, 2),
-                        w(enableA, 0x20)))) {               // timer reprogram
+                if (!mfp.equals(List.of(w(PlayerTests.TACR, 2),     // one
+                        w(PlayerTests.TADR, 90),                    // control
+                        w(enableA, 0x20)))) {                       // write,
+                    // never through zero, then the reload on the running
+                    // timer: no stop, so the period in flight completes
+                    // (SPEC.md §3.1). It was a four-write stop, load, run.
                     return "effects: frame 25 programmed " + mfp;
                 }
                 long vector = player.uc.value(0x134, 4);

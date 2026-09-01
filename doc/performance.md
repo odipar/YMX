@@ -198,7 +198,7 @@ taken again.
 
 | | bytes |
 |---|---:|
-| player, unit size 2 | 3,434 |
+| player, unit size 2 | 3,534 |
 | ST4 decoder | 288 |
 | PRG stub | 3,038 |
 | workspace, `N` = 960 | 25,658 |

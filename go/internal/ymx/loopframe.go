@@ -216,9 +216,14 @@ func LoopFrameQualifies(tune *Tune, script *ScriptResult, at int) bool {
 }
 
 // starts reports whether this action byte programs a timer from nothing: the
-// four start opcodes, and not the RETUNE that sits among them.
+// four start opcodes, and not the RETUNE that sits among them, nor the
+// START_RETRIGGER at voice 3 that retunes a stream already running
+// (SPEC.md 3.4).
 func starts(action int) bool {
 	opcode := action & 0xE0
+	if opcode == OpcodeStartRetrigger && (action>>3)&3 == Voiceless {
+		return false
+	}
 	return opcode >= OpcodeStartToggle && opcode != OpcodeRetune
 }
 

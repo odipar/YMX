@@ -199,7 +199,12 @@ func carry(values, master []byte, bit int, actions []byte) []byte {
 		read := master[p]&byte(bit) != 0
 		if read && actions != nil {
 			opcode := int(actions[p]) & 0xE0
-			read = opcode >= OpcodeStartToggle ||
+			// RESUME at voice 3 programs the timer, so its low bits are a
+			// prescaler and not the flags ResumeReload sits among: it
+			// always reads a count (SPEC.md 3.5).
+			resumeRetuned := opcode == OpcodeResume &&
+				(int(actions[p])>>3)&3 == Voiceless
+			read = opcode >= OpcodeStartToggle || resumeRetuned ||
 				opcode == OpcodeHold && int(actions[p])&HoldReload != 0 ||
 				opcode == OpcodeResume && int(actions[p])&ResumeReload != 0
 		}

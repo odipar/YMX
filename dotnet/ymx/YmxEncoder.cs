@@ -207,7 +207,13 @@ namespace Ymx
                 if (read && actions != null)
                 {
                     int opcode = actions[p] & 0xE0;
+                    // RESUME at voice 3 programs the timer, so its low bits
+                    // are a prescaler and not the flags ResumeReload sits
+                    // among: it always reads a count (SPEC.md 3.5).
+                    bool resumeRetuned = opcode == EffectScript.OpcodeResume
+                            && ((actions[p] >> 3) & 3) == EffectScript.Voiceless;
                     read = opcode >= EffectScript.OpcodeStartToggle
+                            || resumeRetuned
                             || opcode == EffectScript.OpcodeHold
                                     && (actions[p] & EffectScript.HoldReload) != 0
                             || opcode == EffectScript.OpcodeResume

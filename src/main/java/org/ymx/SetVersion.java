@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 /**
  * {@code ymx/setversion.sh} - rewrite one of the two versions at every
  * site it reaches. The format version reaches seven: the Java, C#, Go and
- * 68k constants and SPEC.md's three mentions. The release version reaches
+ * 68k constants and SPEC.md's four mentions. The release version reaches
  * nine more, three numbers in each of the three trees. The two are set apart because moving
  * the format one stops every tune already packed from playing and moving
  * the release one breaks nothing.
@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
  * skipped, and nothing is written unless every site matched.
  * {@code SpecConsistencyTest} reads the same sites back against
  * {@link YmxFormat#VERSION} and {@link YmxFormat#PATCH}, and holds the
- * prose around the constants to naming no version, so these sixteen are
+ * prose around the constants to naming no version, so these seventeen are
  * the whole list.</p>
  */
 public final class SetVersion {
@@ -87,7 +87,11 @@ public final class SetVersion {
                     "the version is $%04X - %2$s;"),
             new Site("go/internal/ymx/format.go",
                     "const Version = 0x[0-9A-Fa-f]{4}",
-                    "const Version = 0x%04X"));
+                    "const Version = 0x%04X"),
+            new Site("doc/SPEC.md",
+                    "4  [0-9A-F]{2} [0-9A-F]{2}         format version"
+                    + " \\d+\\.\\d+",
+                    "4  %4$02X %5$02X         format version %2$s"));
 
     static final String USAGE = "usage: setversion.sh -format MAJOR.MINOR\n"
             + "       setversion.sh -release MAJOR.MINOR[.PATCH]";

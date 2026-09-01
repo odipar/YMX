@@ -138,7 +138,7 @@ four now.
 `MANIFEST.txt` records a call's own writes, which is the reader of §9.4.
 `MANIFEST-ticks.txt` records the same eleven tunes with the timers run:
 the same calls, and after each one every tick that falls before the next,
-in time order. The eleven come to 332,521 ticks. `ymx/test/rig.sh` regenerates
+in time order. The eleven come to 332,615 ticks. `ymx/test/rig.sh` regenerates
 both and checks both digests.
 
 That is the record §3, §5 and §6 can be checked against. A reader's
@@ -216,6 +216,11 @@ opcodes are. A released stream keeps its timer counting and lands no tick
 frame that re-enabled the interrupt discharged 287 ticks where 51 were
 due. Three independent readings agreed against one implementation, and
 the implementation was at fault.
+
+Both figures there are that exercise's, against the kit as it stood at
+format 0.7. `resume_model` records 157,904 ticks at 0.8: a retune no
+longer stops the timer, so a period that was truncated now completes and
+a few more ticks fall inside the run (SPEC.md §3.1).
 
 Seventeen entries were marked "decides output" across the three. Nine
 places were found by all three of them: what the end marker puts on the
