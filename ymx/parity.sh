@@ -58,6 +58,7 @@ java_class() {
     case $1 in
         ymxcheck) echo org.ymx.rig.Check ;;
         ymx)    echo org.ym6.Ymx ;;
+        ym-to-ymx) echo org.ym6.YmToYmx ;;
         play)   echo org.ym6.Play ;;
         ymsndh) echo org.ym6.YmSndh ;;
         st4)    echo org.st4.St4 ;;
