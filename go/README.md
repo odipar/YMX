@@ -26,7 +26,9 @@ passes over the corpus.
 | `ymxcheck` | read a packed tune back against SPEC.md §9.3 |
 
 `mkrelease`, `setversion`, `rig`, `sweep` and `gendata` stay in the other
-two trees, and `mkcores` in the Java one alone. They assemble the 68000
+two trees, and `mkcores` in the Java one alone. The published standalone
+`ym-to-ymx` is built from the C# tree; this one and the Java one carry the
+same command without carrying the cores. They assemble the 68000
 sources, cut releases and run the test rig, which is the repository's own
 work rather than a user's, and a third copy of them would be three places
 to keep a figure in step.

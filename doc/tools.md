@@ -10,7 +10,7 @@ defaults quoted below are the constants' own values.
 
 | script | class | one line |
 |---|---|---|
-| `ym-to-ymx` (a standalone executable) | `Ym6.YmToYmx` | a `.ym` in, a `.ymx`, SNDH file or TOS program out |
+| `ym-to-ymx` (a standalone executable) | `Ym6.YmToYmx`, `org.ym6.YmToYmx` | a `.ym` in, a `.ymx`, SNDH file or TOS program out |
 | `ymx/ymxplay.sh`, `ymx/ymxplay.cmd` | - | the same, then Hatari plays it |
 | `ymx/publish.sh` | `dotnet publish` | build `ym-to-ymx` for each platform |
 | - (`java -cp target/classes org.ym6.Ymx`) | `org.ym6.Ymx` | pack a `.ym` into a `.ymx` |
@@ -44,7 +44,11 @@ information in one place.
 One command from a YM dump to something that plays. Each release carries
 it as a standalone executable for Windows, macOS and Linux: it needs no
 JVM, no .NET SDK and no checkout, because the SNDH cores and the PRG stub
-travel inside it.
+travel inside it. That executable is built from the C# tree, and the Go
+tree builds the same command; `org.ym6.YmToYmx` is a third reading of the
+command line for `ymx/parity.sh` to hold the others against, and resolves
+the cores out of `dist/` rather than carrying them, so it runs inside this
+repository alone.
 
     ym-to-ymx [options] output.{ymx|sndh|prg} tune.ym [more.ym ...]
 

@@ -511,7 +511,10 @@ public final class MkSndh {
         return dot < 0 ? name : name.substring(0, dot);
     }
 
-    static List<String> readNames(Path file) {
+    /** One subtune name a line, ISO-8859-1, as the SNDH tags take them.
+     * Public because {@code org.ym6.YmToYmx} reads a -N file the same way
+     * {@link MkPrg} does. */
+    public static List<String> readNames(Path file) {
         try {
             return Files.readAllLines(file, StandardCharsets.ISO_8859_1);
         } catch (IOException e) {
