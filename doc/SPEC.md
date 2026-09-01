@@ -8,10 +8,9 @@ carries twenty-five independently compressed streams: fourteen register
 streams, one value per frame, and eleven streams of a **compiled effect
 script** that drives the MFP's timers. A file may carry extension streams
 past those, to a stored count of at most 32; §1.5 separates the stored,
-decoded and carrying counts.
-Each stream is decoded through a ring of `N` bytes, one stream refilled per
-frame, so memory use depends on the player configuration, not on tune
-length.
+decoded and carrying counts. Each stream is decoded through a ring of `N`
+bytes, one stream refilled per frame, so memory use depends on the player
+configuration, not on tune length.
 
 The YM formats - YM4 to YM6 - store "special effects" as values the player
 re-derives every frame from spare register bits. YMX resolves them at pack
@@ -379,9 +378,9 @@ I/O port directions, not sound. The byte written to R7 is
 the host's port directions in bits 7-6. On an Atari ST `ports` is `$C0` -
 both ports output, since port A drives the floppy select lines; port bits
 taken from the file would drive the floppy selects with tune data. A reader
-with no chip to drive uses the Atari ST value. Bits
-5-0 arrive with every sample-playing voice **disconnected** - no generator
-mixed into the voice - applied at pack time (§9.3).
+with no chip to drive uses the Atari ST value. Bits 5-0 arrive with every
+sample-playing voice **disconnected** - no generator mixed into the voice -
+applied at pack time (§9.3).
 
 **R13 has a do-not-write value.** Any write to R13 restarts the envelope,
 so a stream repeating the current shape would restart it every frame.
@@ -579,23 +578,21 @@ carries one voice between one start opcode and the next (§9.3).
 timer's interrupt, the timer keeps counting, and a re-arrival resumes the
 toggle stream at its current phase. At voice 3 it programs the timer
 (§3.5), so it keeps the half the release left standing but not the place
-inside it. A tick that fell due while disabled is
-not delivered: no interrupt is taken and the tick's handler does not run,
-so it writes no register, reads no sample byte, and leaves a toggle stream
-on the half the release left standing. The count runs on under it, and the
-stream owes no tick for the gap: the underflows that fall inside the gap
-land no tick and none of them is delivered late, and the first underflow
-after `RESUME` lands one. The model in use is the writer's choice, fixed
-at pack time.
+inside it. A tick that fell due while disabled is not delivered: no
+interrupt is taken and the tick's handler does not run, so it writes no
+register, reads no sample byte, and leaves a toggle stream on the half the
+release left standing. The count runs on under it, and no tick is
+delivered late: the first underflow after `RESUME` lands one. The model in
+use is the writer's choice, fixed at pack time.
 
 `RESUME` is emitted only where the gap was a disabling release and the
 arriving code continues the same stream and the same voice. Addressed to a
 voice its low bits are flags, so it carries no rate. A channel keeps the
 prescaler index of the last opcode that programmed its timer, and that is
 the index `RESUME`'s flag 1 reloads against, as it is the one `HOLD`'s
-flag 1 reloads against. A prescaler changed across the
-gap re-enters through `RESUME` at voice 3, which programs the timer at the
-index it carries and ends with the interrupt enabled (§3.5, §9.2).
+flag 1 reloads against. A prescaler changed across the gap re-enters
+through `RESUME` at voice 3, which programs the timer at the index it
+carries and ends with the interrupt enabled (§3.5, §9.2).
 
 ### 3.4 The retrigger retune
 
@@ -1111,6 +1108,7 @@ byte of `R8+v` (§3.2):
 | `RETUNE` addressed to a voice | the volume |
 | `HOLD` with flag 2 | the volume |
 | `RESUME` with flag 2 | the volume |
+| `RESUME` addressed to voice 3 | the volume |
 
 A sample number reaches a player through a five-bit register, so a file
 carries at most 32 samples (§6).

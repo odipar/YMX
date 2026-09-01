@@ -76,10 +76,11 @@ import java.util.List;
  * 2 RELEASE            stop this channel's timer; bit 0 masks instead
  * 3 START_TOGGLE       selects, volume, vector := the loud half, full
  *                      program
- * 4 RETUNE             volume, full stop/count/run - the vector is NOT
- *                      touched: the square keeps its place in the cycle.
- *                      Addressed to voice 3, the live form: control nibble
- *                      and reload written with the timer running
+ * 4 RETUNE             volume, then the control nibble and the reload
+ *                      written with the timer running - nothing is
+ *                      stopped and the vector is NOT touched, so the
+ *                      square keeps its place in the cycle. Addressed to
+ *                      voice 3, the same with no volume repatched
  * 5 START_RETRIGGER    shape, vector := the retrigger tick, full program
  * 6 START_PCM          a trigger, fresh or repeated: sample table lookup,
  *                      select, vector, full program
