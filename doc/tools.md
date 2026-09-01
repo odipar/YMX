@@ -445,8 +445,8 @@ step failed.
 
 Without `-full` it runs the steps that need no corpus and no emulator: the
 Maven build, the Go and C# builds, the §9.3 reader in all three trees, the
-damaged-file sweep, and the player rig's quick battery. `-full` adds the parity run, the rig in full,
-the corpus sweep and the tick reference.
+damaged-file sweep, and the player rig's quick battery. `-full` adds the
+parity run, the rig in full, the corpus sweep and the tick reference.
 
 Each step writes its own log, and the table names the log of every step that
 failed.
