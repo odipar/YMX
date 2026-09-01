@@ -81,6 +81,10 @@ namespace Ymx
             new Site("go/internal/ymx/format.go",
                     "const Version = 0x[0-9A-Fa-f]{4}",
                     "const Version = 0x{0:X4}"),
+            new Site("doc/SPEC.md",
+                    "4  [0-9A-F]{2} [0-9A-F]{2}         format version"
+                    + " \\d+\\.\\d+",
+                    "4  {3:X2} {4:X2}         format version {1}"),
         };
 
         internal const string UsageText =

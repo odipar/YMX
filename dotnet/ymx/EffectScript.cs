@@ -246,9 +246,10 @@ namespace Ymx
             }
             int voice = ((code >> 4) & 3) - 1;
             int type = code & 0xC0;
-            if (RetunesLive(old, code) && ParameterHeld(p, channel, type, voice))
+            if (RetunesLive(old, code))
             {
-                LiveRetune(p, index, channel, code, count);
+                LiveRetune(p, index, channel, code, count, type, voice,
+                        ParameterHeld(p, channel, type, voice));
             }
             else if (type == KindToggle)
             {                               // .toggle
@@ -289,13 +290,36 @@ namespace Ymx
             return type == KindPcm || Shape(p) == channel.Shape;
         }
 
-        /// <summary>A rate under a running effect, with nothing stopped:
-        /// RETUNE addressed to voice 3.</summary>
-        private void LiveRetune(int p, int index, Channel channel, int code, int count)
+        /// <summary>A rate under a running effect, with nothing stopped.
+        /// Every form here leaves the vector alone and moves the timer
+        /// around it, so the period in flight completes (SPEC.md 3.1); they
+        /// differ in which parameter they repatch on the way. Where it stood
+        /// still there is nothing to repatch and RETUNE at voice 3 says so;
+        /// where it moved, a voiced RETUNE carries a toggle stream's volume
+        /// and START_RETRIGGER at voice 3 a retrigger stream's shape, which
+        /// no RETUNE reaches because the shape is in X (3.2, 3.4). Whichever
+        /// repatches records what it wrote, or the next Hold compares
+        /// against a value the chip no longer holds.</summary>
+        private void LiveRetune(int p, int index, Channel channel, int code,
+                int count, int type, int voice, bool held)
         {
             channel.Tlast = count;
             channel.Prescaler = code & 7;
-            Emit(p, index, Action(OpcodeRetune, Voiceless, code & 7), count);
+            if (held)
+            {
+                Emit(p, index, Action(OpcodeRetune, Voiceless, code & 7), count);
+            }
+            else if (type == KindRetrigger)
+            {
+                channel.Shape = Shape(p);
+                Emit(p, index, Action(OpcodeStartRetrigger, Voiceless, code & 7),
+                        count);
+            }
+            else
+            {
+                channel.Vol = Parameter(p, voice);
+                Emit(p, index, Action(OpcodeRetune, voice, code & 7), count);
+            }
         }
 
         /// <summary>Whether a changed PCM code is a rate moving under a
@@ -424,8 +448,14 @@ namespace Ymx
                     && channel.Sel == voice;
             bool resume = channel.Masked && sameSid
                     && channel.Prescaler == (code & 7);
-            bool retune = old != 0 && ((code ^ old) & 0xF0) == 0
-                    || channel.Masked && sameSid && channel.Prescaler != (code & 7);
+            // A gap whose prescaler moved. RESUME at voice 3 programs the
+            // timer at the index it carries, where the voiced RETUNE now
+            // moves it live and would defer the new rate by up to one period
+            // of the old one: after a gap the counter holds an arbitrary
+            // count (SPEC.md 3.5).
+            bool resumeRetuned = channel.Masked && sameSid
+                    && channel.Prescaler != (code & 7);
+            bool retune = old != 0 && ((code ^ old) & 0xF0) == 0;
             Cut(p, index, -1);
             OpenOld(old);
             skips |= 1 << voice;
@@ -449,6 +479,11 @@ namespace Ymx
             channel.Tlast = count;
             channel.Vol = value;
             channel.Prescaler = code & 7;
+            if (resumeRetuned)
+            {
+                Emit(p, index, Action(OpcodeResume, Voiceless, code & 7), count);
+                return;
+            }
             if (retune)
             {
                 Emit(p, index, Action(OpcodeRetune, voice, code & 7), count);

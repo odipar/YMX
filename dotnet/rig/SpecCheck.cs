@@ -434,11 +434,14 @@ namespace Rig
                 faults.Add(new Fault(frame, "§2.4 A", name + " names voice "
                         + voice + "; the field is written as 0"));
             }
-            if (opcode != Retune && opcode != Release && voice == NoVoice)
+            if (opcode != Retune && opcode != Release
+                    && opcode != StartRetrigger && opcode != Resume
+                    && voice == NoVoice)
             {
                 faults.Add(new Fault(frame, "§2.4 A", name + " names voice 3"));
             }
-            if (Programs(opcode) && (low < 1 || low > 7))
+            if ((Programs(opcode) || ProgramsAtVoiceThree(opcode, voice))
+                    && (low < 1 || low > 7))
             {
                 faults.Add(new Fault(frame, "§9.3 actions", name
                         + " carries prescaler index " + low + ", outside 1 to 7"));
@@ -596,6 +599,15 @@ namespace Rig
             return opcode == Retune || opcode == StartToggle
                     || opcode == StartRetrigger || opcode == StartPcm
                     || opcode == StartPcmPreempt;
+        }
+
+        /// <summary>Whether this byte is one of the two forms whose low bits
+        /// are a prescaler because voice 3 discriminates them (SPEC.md 3.4,
+        /// 3.5).</summary>
+        private static bool ProgramsAtVoiceThree(int opcode, int voice)
+        {
+            return voice == NoVoice
+                    && (opcode == StartRetrigger || opcode == Resume);
         }
 
         /// <summary>

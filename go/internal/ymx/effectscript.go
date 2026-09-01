@@ -266,8 +266,9 @@ func (s *effectScript) doChannel(p, index int) {
 	}
 	voice := (code>>4)&3 - 1
 	kind := code & 0xC0
-	if s.retunesLive(old, code) && s.parameterHeld(p, channel, kind, voice) {
-		s.liveRetune(p, index, channel, code, count)
+	if s.retunesLive(old, code) {
+		s.liveRetune(p, index, channel, code, count, kind, voice,
+			s.parameterHeld(p, channel, kind, voice))
 	} else if kind == KindToggle { // .toggle
 		s.toggle(p, index, channel, code, count, voice, old)
 	} else if kind == KindPcm && s.retunesPcm(old, code) {
@@ -298,13 +299,29 @@ func (s *effectScript) parameterHeld(p int, channel *channelState,
 	return kind == KindPcm || s.shape(p) == channel.shape
 }
 
-// liveRetune is a rate under a running effect, with nothing stopped: RETUNE
-// addressed to voice 3.
+// liveRetune is a rate under a running effect, with nothing stopped. Every
+// form here leaves the vector alone and moves the timer around it, so the
+// period in flight completes (SPEC.md 3.1); they differ in which parameter
+// they repatch on the way. Where it stood still there is nothing to repatch
+// and RETUNE at voice 3 says so; where it moved, a voiced RETUNE carries a
+// toggle stream's volume and START_RETRIGGER at voice 3 a retrigger stream's
+// shape, which no RETUNE reaches because the shape is in X (3.2, 3.4).
+// Whichever repatches records what it wrote, or the next hold compares
+// against a value the chip no longer holds.
 func (s *effectScript) liveRetune(p, index int, channel *channelState,
-	code, count int) {
+	code, count, kind, voice int, held bool) {
 	channel.tlast = count
 	channel.prescaler = code & 7
-	s.emit(p, index, Action(OpcodeRetune, Voiceless, code&7), count)
+	switch {
+	case held:
+		s.emit(p, index, Action(OpcodeRetune, Voiceless, code&7), count)
+	case kind == KindRetrigger:
+		channel.shape = s.shape(p)
+		s.emit(p, index, Action(OpcodeStartRetrigger, Voiceless, code&7), count)
+	default:
+		channel.vol = s.parameter(p, voice)
+		s.emit(p, index, Action(OpcodeRetune, voice, code&7), count)
+	}
 }
 
 // retunesPcm reports whether a changed PCM code is a rate moving under a
@@ -412,8 +429,12 @@ func (s *effectScript) toggle(p, index int, channel *channelState,
 	sameSid := channel.vec == KindToggle && channel.vecVoice == voice &&
 		channel.sel == voice
 	resume := channel.masked && sameSid && channel.prescaler == code&7
-	retune := old != 0 && (code^old)&0xF0 == 0 ||
-		channel.masked && sameSid && channel.prescaler != code&7
+	// A gap whose prescaler moved. RESUME at voice 3 programs the timer at
+	// the index it carries, where the voiced RETUNE now moves it live and
+	// would defer the new rate by up to one period of the old one: after a
+	// gap the counter holds an arbitrary count (SPEC.md 3.5).
+	resumeRetuned := channel.masked && sameSid && channel.prescaler != code&7
+	retune := old != 0 && (code^old)&0xF0 == 0
 	s.cut(p, index, -1)
 	s.openOld(old)
 	s.skips |= 1 << voice
@@ -434,6 +455,10 @@ func (s *effectScript) toggle(p, index int, channel *channelState,
 	channel.tlast = count
 	channel.vol = value
 	channel.prescaler = code & 7
+	if resumeRetuned {
+		s.emit(p, index, Action(OpcodeResume, Voiceless, code&7), count)
+		return
+	}
 	if retune {
 		s.emit(p, index, Action(OpcodeRetune, voice, code&7), count)
 		return
