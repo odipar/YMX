@@ -87,11 +87,7 @@ public final class SetVersion {
                     "the version is $%04X - %2$s;"),
             new Site("go/internal/ymx/format.go",
                     "const Version = 0x[0-9A-Fa-f]{4}",
-                    "const Version = 0x%04X"),
-            new Site("doc/SPEC.md",
-                    "4  [0-9A-F]{2} [0-9A-F]{2}         format version"
-                    + " \\d+\\.\\d+",
-                    "4  %4$02X %5$02X         format version %2$s"));
+                    "const Version = 0x%04X"));
 
     static final String USAGE = "usage: setversion.sh -format MAJOR.MINOR\n"
             + "       setversion.sh -release MAJOR.MINOR[.PATCH]";
