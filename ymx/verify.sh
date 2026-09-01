@@ -121,8 +121,11 @@ if [ "$FULL" = 1 ]; then
     SWEEP_ABSENT=$RMAC_ABSENT
     [ -n "$SWEEP_ABSENT" ] || SWEEP_ABSENT=$CORPUS_ABSENT
 
+    # The full run takes the full sweep, and the collection with it: the
+    # reduced one packs four tunes taken in name order, which is how a change
+    # to one packing path passed every case at #160.
     step "the three trees agree" parity "$PARITY_ABSENT" \
-        "'$REPO/ymx/parity.sh' -quick"
+        "'$REPO/ymx/parity.sh' -corpus"
     step "the player rig, in full" rig-full "$RMAC_ABSENT" \
         "'$REPO/ymx/test/rig.sh'"
     step "the corpus on the player" sweep "$SWEEP_ABSENT" \

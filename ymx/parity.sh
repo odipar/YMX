@@ -24,6 +24,9 @@
 #
 #   -quick   four tunes and the cases that have caught something, for a test
 #            run; the default sweeps every case over eight tunes.
+#   -corpus  the default, and then every tune in the collection packed by
+#            all three trees. The cases cover the options; this covers the
+#            tunes.
 
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 # TMPDIR carries a trailing slash on macOS, which made every path in the
@@ -34,7 +37,14 @@ WORK=${PARITY_WORK:-${TMP%/}/ymx-parity}
 DLL=$REPO/dotnet/bin/Release/net10.0/ymx.dll
 
 QUICK=no
-[ "$1" = "-quick" ] && QUICK=yes
+WHOLE_CORPUS=no
+for arg in "$@"; do
+    case $arg in
+        -quick)  QUICK=yes ;;
+        -corpus) WHOLE_CORPUS=yes ;;
+        *)       echo "parity.sh: unknown argument $arg" >&2; exit 2 ;;
+    esac
+done
 
 CORPUS=${YM_CORPUS:-$HOME/git/jatari/data/ym_format}
 if [ ! -d "$CORPUS" ]; then
@@ -249,6 +259,31 @@ fixtures() {
         "$FX/good.sndh" > "$FX/trunc.sndh" 2>/dev/null
 }
 
+# Every tune in the collection, packed by all three trees and compared. The
+# cases below cover the options over tunes taken in name order, so a change to
+# a packing path none of those tunes reaches passes all of them: at #160 the
+# sweep matched 272 cases while the trees wrote different bytes for a tune it
+# never packed. This covers the tunes rather than the options, and it names
+# none of them.
+whole_corpus() {
+    n=0
+    while IFS= read -r tune; do
+        n=$((n + 1))
+        # A name holding a quote would end the SETUP string early and leave
+        # the three trees packing nothing, which compares equal. Staging
+        # through one path this script chose keeps the name out of the shell.
+        cp "$tune" "$WORK/staged.ym" || {
+            echo "parity.sh: cannot stage $tune" >&2; fail=$((fail + 1)); continue; }
+        SETUP="cp '$WORK/staged.ym' t.ym"
+        before=$fail
+        one_case "corpus-$n" ymx t.ym out.ymx
+        # A case that matched leaves nothing to read, and the collection fills
+        # a disk if every one of them stays.
+        [ "$fail" -eq "$before" ] && rm -rf "$WORK/corpus-$n"
+    done < "$WORK/tunes"
+    echo "  corpus: $n tunes packed by all three trees"
+}
+
 # A tune whose own loop frame the packer keeps. The sweep's tunes come off
 # the corpus in name order, and none of the eight has one, so a change to
 # how the loop frame compiles left the three trees packing different bytes
@@ -366,6 +401,7 @@ fixtures
 loop_frame
 checks
 malformed
+[ "$WHOLE_CORPUS" = yes ] && whole_corpus
 
 echo
 echo "parity: $pass matched, $fail differed"
