@@ -367,7 +367,7 @@ public sealed class St4Decompressor
         }
         if (outputIndex + length * unit > output.Length)
         {
-            throw new InvalidDataException("the streams overfill the output");
+            throw new InvalidDataException("the streams overran the output");
         }
         for (int i = 0; i < length * unit; i++)
         {
