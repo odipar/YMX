@@ -65,19 +65,21 @@
 ; R7 stream, so its sample is heard alone, and no ring byte is ever edited:
 ; what the reference player resolved per frame, the file states.
 ;
-; STARTING OVER. A packed stream can only be restarted from its beginning. A
-; tune that repeats plays [0, O) once and [L, O) for ever after, L the
-; header's loop frame, so one pass runs O - L frames and O - L against N picks
-; the form. A pass of at most N frames fits a ring: no section is opened
-; twice, the refills stop at O values, and at the wrap the cursor goes back by
-; O - L onto the bytes of the pass just played. A longer pass is decoded
-; again: a stream's section runs out mid-refill and the player opens one from
-; its start - a fresh decoder writing on into the same ring - so the rings
-; always hold one continuous sequence of values and nothing on the read side
-; changes when it happens. Nothing requires the boundary to fall on a group
-; boundary: a refill that straddles it decodes two pieces. The header's loop
-; table says which section is opened: with none, the same section again, so L
-; is 0 and a pass is the whole tune; with one, that stream's loop section and
+; STARTING OVER. A tune that repeats plays [0, O) once and [L, O) for ever
+; after, L the header's loop frame, so one pass runs O - L frames and O - L
+; against N picks the form. A pass of at most N frames fits a ring: no
+; section is opened twice, the refills stop at O values, and at the wrap the
+; cursor goes back by O - L onto the bytes of the pass just played. A longer
+; pass is decoded again: every stream's container carries L as its rewind
+; point, and the player saves the decoder's state when a stream has produced
+; L values and restores all but the write pointer when it has produced O -
+; every pass, so the rings always hold one continuous sequence of values and
+; nothing on the read side changes when it happens. A tune that starts over
+; from frame 0 opens its section again from the start instead. Nothing
+; requires either boundary to fall on a group boundary: a refill that
+; straddles one decodes two pieces. The state saved is the decoder's seven
+; registers, one block a stream, and the container's frames from L are
+; packed on their own so a pass after the first reads the history the first
 ; the same one on every open after it, each stream being two sections, [0, L)
 ; and [L, O). On the frame the tune ends, the player stops every claimed
 ; timer, parks its vector and clears every skip, which is the state the script
@@ -103,16 +105,15 @@
 ; It is always sized for all twenty-five, including the streams a tune
 ; leaves idle:
 ;
-;   YMX_SIZE = YMX_FIXED + 25 * N       ; 1658 + 25 * N bytes
+;   YMX_SIZE = YMX_FIXED + 25 * N       ; 2458 + 25 * N bytes
 ;
-; N is the file's own, the header word at YH_RING, and the packer raises it
-; above the ring size it was asked for where one pass of a tune needs a
-; longer ring: a file packed for 960-byte rings can carry N = 1776. A
-; program sizing at run time reads that word and takes
-; YMX_FIXED+(YMX_STREAMS*N) bytes. A program sizing at build time reserves
-; for the format's cap of 2520 bytes a ring, the largest N a file carries:
+; N is the file's own, the header word at YH_RING: what the tune was packed
+; with, which -nN asked for. A program sizing at run time reads that word
+; and takes YMX_FIXED+(YMX_STREAMS*N) bytes. A program sizing at build time
+; reserves for the format's cap of 2520 bytes a ring, the largest N a file
+; carries:
 ;
-;       ds.b    YMX_FIXED+(YMX_STREAMS*2520)    ; 64658 bytes
+;       ds.b    YMX_FIXED+(YMX_STREAMS*2520)    ; 65458 bytes
 ;
 ; where the parentheses matter: rmac evaluates expressions left to right.
 ; A workspace reserved for 960 holds only the files whose header says 960
@@ -282,19 +283,17 @@ YMX_LIVE        equ     44              ; word  streams still worth decoding:
                                         ; pair off the end
 YMX_BODY        equ     46              ; long  O - L, the frames one pass
                                         ; plays; the countdown reloads with it
-YMX_TABLE       equ     50              ; long  the table ymx_reopen reads a
-                                        ; section out of: the section table
-                                        ; from init, and the loop table from
-                                        ; the first reopen of a file that
-                                        ; carries one
-YMX_SECLEN      equ     54              ; long  how many values a section of
-                                        ; that table carries: L while the
-                                        ; section table is in force, O - L
-                                        ; after the switch, and O for a file
-                                        ; with no loop table. Every stream
-                                        ; runs out at the same value, so the
-                                        ; pair is the workspace's rather than
-                                        ; each state block's
+YMX_REWIND      equ     50              ; word  nonzero when the tune rewinds:
+                                        ; it starts over from L, and a pass
+                                        ; is longer than a ring. A stream
+                                        ; then saves its state after L values
+                                        ; and restores it after every O - L
+YMX_SECLEN      equ     54              ; long  how many values a stream reads
+                                        ; before ymx_reopen: L for a tune
+                                        ; that rewinds, O for the rest. Every
+                                        ; stream runs out at the same value,
+                                        ; so the figure is the workspace's
+                                        ; rather than each state block's
 YMX_STATE       equ     58              ; the decoder states, from an even
                                         ; base. The lea that reaches them
                                         ; carries this as an 8-bit
@@ -337,7 +336,11 @@ CH_SIZE         equ     20              ; the table is indexed, so descriptors
                                         ; are a fixed stride apart
 ; rmac evaluates left to right, so the parentheses here are load-bearing:
 ; without them this reads as (YMX_STATE+YMX_STREAMS)*YMX_STATE_SIZE.
-YMX_FIXED       equ     YMX_STATE+(YMX_STREAMS*YMX_STATE_SIZE)
+; One saved decoder state a stream, for a tune that rewinds: the movem
+; block and the three pointers, as ymx_reopen copies them.
+YMX_SAVE        equ     YMX_STATE+(YMX_STREAMS*YMX_STATE_SIZE)
+YMX_SAVE_SIZE   equ     32
+YMX_FIXED       equ     YMX_SAVE+(YMX_STREAMS*YMX_SAVE_SIZE)
 
 ; One saved ST4_wrap state, plus the ring bounds the wrap check needs. The
 ; first four longs are in movem order - d1, d2, then a0, a1 - so that much of
@@ -357,6 +360,9 @@ YS_LEFT         equ     40              ; long  values left in the current secti
 YS_STORED       equ     44              ; word  set when the section is its own
                                         ; values: fill copies them instead of
                                         ; running a decoder over them
+YS_SAVED        equ     46              ; word  set once this stream's state
+                                        ; has been saved at L: the next time
+                                        ; it runs out it is restored instead
 ; The movem block starts at the top of the state, so the two movems address it
 ; as plain (a2) - see the note where they are used.
 
@@ -382,30 +388,33 @@ YH_LOOP         equ     30              ; long: L, the frame a tune that
                                         ; starts over goes back to; it has a
                                         ; meaning only where the loop flag
                                         ; is set
-YH_LOOPTAB      equ     34              ; long: the loop table, 0 when none.
-                                        ; One offset per stream, read like
-                                        ; the section table: the frames from
-                                        ; L on, which every pass after the
-                                        ; first plays
-YH_REQUIRED     equ     38              ; long: Q, the required-streams mask.
+YH_REQUIRED     equ     34              ; long: Q, the required-streams mask.
                                         ; Bit k requires stream k, and a
                                         ; consumer that does not implement a
                                         ; required stream rejects the file.
                                         ; This build implements the
                                         ; twenty-five and no extension, so it
                                         ; takes the one value and no other
-YH_SECTIONS     equ     42              ; one offset per stream: its section,
-                                        ; covering every frame of the tune,
-                                        ; or the frames before L where a
-                                        ; loop table covers the rest
+YH_SECTIONS     equ     38              ; one offset per stream: its section,
+                                        ; covering every frame of the tune
 
 YMX_MAGIC       equ     $594D5821       ; 'YMX!'
-YMX_VERSION     equ     $0008           ; the format version: the major in
+YMX_VERSION     equ     $0009           ; the format version: the major in
                                         ; the high byte, the minor in the
                                         ; low. A file of another version is
                                         ; rejected at init, not read: SPEC.md
                                         ; §10.5 repacks from source instead
-YMX_FLAG_LOOPS  equ     1               ; header flag: the tune starts over
+YMX_FLAG_LOOPS  equ     1
+; ST4_WINDOW, the window in units a build reads copies for, is optional and
+; ST4_wrap.S defaults it the same way; it is read here first.
+        .if ^^defined ST4_WINDOW
+        .else
+ST4_WINDOW      equ     0
+        .endif
+YMX_FLAG_COPIES equ     32              ; bit 5: a section copies from its
+                                        ; literal stream, so the file plays
+                                        ; only on a build whose ST4_WINDOW
+                                        ; is its ring               ; header flag: the tune starts over
 YMX_FLAG_CHAN   equ     2               ; and one per timer channel, from bit
                                         ; 1 up: set when the tune uses it,
                                         ; which is when a timer is claimed
@@ -467,6 +476,24 @@ YMX_init:
         cmp.l   #YMX_REQUIRED_BASE,YH_REQUIRED(a0)
         bne     .rejected               ; a required stream this build does
                                         ; not implement
+; Copies from the literal stream (flag bit 5) decode only on a build made
+; for the file's ring as its window. A build with a window reads an offset
+; past it as a copy, so it takes no ring wider than its window, with copies
+; or without; a build without one has no copy code, and takes no file with
+; copies at all.
+        move.w  YH_FLAGS(a0),d0
+        and.w   #YMX_FLAG_COPIES,d0
+        .if ST4_WINDOW
+        cmp.w   #ST4_WINDOW*ST4_UNIT,YH_RING(a0)
+        bhi     .rejected               ; a ring past the window
+        beq.s   .window_ready           ; the window itself: either way
+        tst.w   d0
+        bne     .rejected               ; copies for a wider window
+.window_ready:
+        .else
+        tst.w   d0
+        bne     .rejected               ; copies, and no copy code
+        .endif
 
         move.l  YH_FRAMES(a0),YMX_TOTAL(a3)
         move.w  YH_RING(a0),YMX_N(a3)
@@ -497,16 +524,19 @@ YMX_init:
         move.w  #1,YMX_RING(a3)
 .ring_ready:
 
-; The sections init opens are the section table's, and a file with a loop
-; table cuts them at L: they carry L values each, where the sections of a
-; file with no loop table carry O. ymx_reopen moves both fields on to the
-; loop table's when the first stream runs out. Written on every init for
+; A tune that starts over from L with a pass past the ring rewinds: each
+; stream reads L values, saves its state, and reads O - L to every restore.
+; Every other tune reads O values to a reopen. Written on every init for
 ; the same reason the two above are.
-        lea     YH_SECTIONS(a0),a1
-        move.l  a1,YMX_TABLE(a3)
+        clr.w   YMX_REWIND(a3)
         move.l  YH_FRAMES(a0),d1
-        tst.l   YH_LOOPTAB(a0)
+        tst.w   YMX_LOOPS(a3)
         beq.s   .seclen_ready
+        tst.w   YMX_RING(a3)
+        bne.s   .seclen_ready
+        tst.l   YH_LOOP(a0)
+        beq.s   .seclen_ready
+        move.w  #1,YMX_REWIND(a3)
         move.l  YH_LOOP(a0),d1
 .seclen_ready:
         move.l  d1,YMX_SECLEN(a3)
@@ -538,8 +568,7 @@ YMX_init:
 ; How many values each stream reads out of the section it opens below.
 ; Every block is written before the first stream decodes anything, because
 ; a stream whose section is shorter than a group runs out inside its own
-; first fill, and the reopen that follows moves YMX_SECLEN on to the loop
-; table's length - which is not what the streams after it open with.
+; first fill.
         lea     YMX_STATE+YS_LEFT(a3),a1
         move.l  YMX_SECLEN(a3),d0
         moveq   #YMX_STREAMS-1,d1
@@ -568,6 +597,7 @@ YMX_init:
         add.w   #YH_SECTIONS,d0
         movea.l YMX_FILE(a3),a0
         move.l  0(a0,d0.w),d0
+        clr.w   YS_SAVED(a2)            ; nothing saved yet for this tune
         clr.w   YS_STORED(a2)           ; clr writes the flags, so the test
         tst.l   d0                      ; comes after it: the offset's top bit
         bpl.s   .container              ; marks a section stored
@@ -860,36 +890,61 @@ YMX_fill:
         bra     .done                   ; ways back are word displacements
 
 ; -----------------------------------------------------------------------------
-; ymx_reopen: a2 = state block. Opens a section for this stream - a fresh
-; decoder, reading from the top of the section, still writing where the last
-; one stopped. ST4_init needs the ring start so that its packed metadata comes
-; out right; the write pointer is restored from the block, which is why it is
-; stored rather than held in a register.
-;
-; Which section that is comes out of YMX_TABLE, and how many values it
-; carries out of YMX_SECLEN. A file with a loop table moves both on to it
-; here, and every reopen after this one finds them there: the entries are
-; the same two values every time, so the write costs less than the test
-; that would skip it. Every first section runs out at value L, so every
-; stream crosses over on its own refill turn.
+; ymx_reopen: a2 = state block, called when this stream has read the values
+; YS_LEFT counted. A tune that rewinds saves the block the first time - the
+; stream has produced L values - and restores all but the write pointer every
+; time after, so the stream replays the frames from L out of the history the
+; first pass read; YS_LEFT reloads with O - L either way. Every other tune
+; opens the stream's section again from its start: a fresh decoder, still
+; writing where the last one stopped. ST4_init needs the ring start so that
+; its packed metadata comes out right; the write pointer is restored from the
+; block, which is why it is stored rather than held in a register. Every
+; stream runs out at the same value, so each crosses on its own refill turn.
 ; -----------------------------------------------------------------------------
 ; It runs inside YMX_fill, which guarantees d6 = the state block and a6 = the
 ; workspace - the two anchors that survive the decoder call.
 ymx_reopen:
         tst.w   YMX_LOOPS(a3)
-        beq.s   .done                   ; a tune that plays once stops here
+        beq     .done                   ; a tune that plays once stops here
+        tst.w   YMX_REWIND(a3)
+        beq     .again                  ; past the save and the restore
+; The save slot: the block's index, at 32 bytes a slot.
+        move.l  YMX_BODY(a3),YS_LEFT(a2)        ; O - L values to the next one
+        move.l  a2,d0
+        sub.l   a3,d0
+        sub.w   #YMX_STATE,d0
+        lsr.w   #1,d0                   ; k * 64 becomes k * 32
+        lea     YMX_SAVE(a3),a1         ; a 16-bit displacement, then the
+        adda.w  d0,a1                   ; index: d8(An,Xn) reaches 127
+        tst.w   YS_SAVED(a2)
+        bne.s   .restore
+        move.w  #1,YS_SAVED(a2)
+        move.l  YS_D1(a2),(a1)+         ; the seven registers, as fill keeps them
+        move.l  YS_D2(a2),(a1)+
+        move.l  YS_INPUT(a2),(a1)+
+        move.l  YS_WRITE(a2),(a1)+      ; kept in the slot, never restored
+        move.l  YS_LIT(a2),(a1)+
+        move.l  YS_BOFF(a2),(a1)+
+        move.l  YS_WOFF(a2),(a1)+
+        move.w  YS_QUEUE(a2),(a1)
+        rts
+.restore:
+        move.l  (a1)+,YS_D1(a2)         ; all but the write pointer, which
+        move.l  (a1)+,YS_D2(a2)         ; stays where the ring has got to
+        move.l  (a1)+,YS_INPUT(a2)
+        addq.l  #4,a1
+        move.l  (a1)+,YS_LIT(a2)
+        move.l  (a1)+,YS_BOFF(a2)
+        move.l  (a1)+,YS_WOFF(a2)
+        move.w  (a1),YS_QUEUE(a2)
+        rts
+.again:
         movea.l YMX_FILE(a3),a0
-        move.l  YH_LOOPTAB(a0),d0
-        beq.s   .table_ready            ; one table: its sections carry O
-        add.l   a0,d0
-        move.l  d0,YMX_TABLE(a3)        ; the loop table, from here on
-        move.l  YMX_BODY(a3),YMX_SECLEN(a3)     ; O - L values a section
-.table_ready:
         move.l  a2,d0
         sub.l   a3,d0
         sub.w   #YMX_STATE,d0
         lsr.w   #4,d0                   ; k * 64 becomes k * 4, a table index
-        movea.l YMX_TABLE(a3),a1        ; the table holds long offsets
+        lea     YH_SECTIONS(a0),a1      ; the table holds long offsets
         move.l  0(a1,d0.w),d0
         beq.s   .done                   ; this stream has no section
         bpl.s   .container              ; the offset's top bit: stored values
@@ -934,7 +989,7 @@ ymx_open:
         adda.l  12(a0),a4               ; stream C, the byte offsets
         movea.l a0,a5
         adda.l  16(a0),a5               ; stream D, the word offsets
-        lea     20(a0),a0               ; stream A, the bits
+        lea     28(a0),a0               ; stream A, where the header ends
         moveq   #0,d3
         move.w  YMX_N(a3),d3            ; N, ST4_init's argument
         bra     ST4_init

@@ -177,7 +177,7 @@ final class CorpusNumbersTest {
      * tunes the documents work through.
      *
      * <p>The cut costs file bytes: every {@code .ymx} in {@code ym/test} that
-     * carries a loop table is measured beside the same source packed with
+     * rewinds is measured beside the same source packed with
      * {@code -l0} - one set of sections, the file the packer wrote before the
      * cut existed - which is the figure both documents quote, as a range in
      * {@code ym/CONVERSION.md} and tune by tune in {@code doc/terminology.md}.
@@ -200,9 +200,9 @@ final class CorpusNumbersTest {
         List<Path> cut = new ArrayList<>();
         try (Stream<Path> listing = Files.list(Path.of("ym", "test"))) {
             listing.filter(p -> p.toString().endsWith(".ymx")).sorted()
-                    .filter(CorpusNumbersTest::carriesALoopTable).forEach(cut::add);
+                    .filter(CorpusNumbersTest::carriesARewind).forEach(cut::add);
         }
-        assertTrue(!cut.isEmpty(), "no packed tune in ym/test carries a loop table,"
+        assertTrue(!cut.isEmpty(), "no packed tune in ym/test rewinds,"
                 + " so this test is measuring nothing");
         long smallest = Long.MAX_VALUE;
         long largest = 0;
@@ -272,8 +272,8 @@ final class CorpusNumbersTest {
         assertEquals(ringShape[2], ringShape[0] - ringShape[1], "one pass");
         assertEquals(ringSize[0], (int) field(ring, YmxFormat.OFFSET_RING_SIZE, 2),
                 RING_EXAMPLE + "'s ring size");
-        assertEquals(0, (int) field(ring, YmxFormat.OFFSET_LOOP_TABLE, 4),
-                RING_EXAMPLE + " carries a loop table, so it is not the ring form");
+        assertEquals(org.st4.St4Format.NO_REWIND, firstRewind(ring),
+                RING_EXAMPLE + " rewinds, so it is not the ring form");
         assertEquals(ringSize[0], ringFile[1], "the ring the two sentences give");
         assertEquals(ringFile[0], Files.size(RING_EXAMPLE), RING_EXAMPLE + "'s size");
         assertEquals(workspace[0], ringSize[0], "the raised ring");
@@ -288,25 +288,26 @@ final class CorpusNumbersTest {
                         + " ([\\d,]+) frames, and no ring may exceed ([\\d,]+) bytes",
                 "the tune the cut is worked through on");
         int[] halves = numbers(vocabulary,
-                "the first covering frames 0 to ([\\d,]+) and the second ([\\d,]+)"
-                        + " to ([\\d,]+)", "the two sections a cut stream carries");
+                "whose rewind point is frame ([\\d,]+): the frames from ([\\d,]+)"
+                        + " are packed apart", "the rewind point a container carries");
         int[] crossing = numbers(vocabulary,
-                "which happens at frame ([\\d,]+), the same value for every stream,"
-                        + " since every first section holds exactly ([\\d,]+) values",
-                "where the two sections meet");
+                "when it has produced ([\\d,]+) values - the same value for every"
+                        + " stream", "where the player saves");
+        int[] restored = numbers(vocabulary,
+                "When it has produced ([\\d,]+) the player puts them back",
+                "where the player restores");
         assertEquals(cutShape[0], (int) field(streams, YmxFormat.OFFSET_FRAMES, 4),
                 CUT_EXAMPLE + "'s frame count");
         assertEquals(cutShape[1], (int) field(streams, YmxFormat.OFFSET_LOOP_FRAME, 4),
                 CUT_EXAMPLE + "'s loop frame");
         assertEquals(cutShape[2], cutShape[0] - cutShape[1], "one pass");
         assertEquals(cutShape[3], YmxFormat.MAX_RING_SIZE, "the ring cap");
-        assertTrue(field(streams, YmxFormat.OFFSET_LOOP_TABLE, 4) != 0,
-                CUT_EXAMPLE + " carries no loop table, so it is not the cut form");
-        assertEquals(halves[0], cutShape[1] - 1, "the last frame of the first half");
-        assertEquals(halves[1], cutShape[1], "the first frame of the second half");
-        assertEquals(halves[2], cutShape[0] - 1, "the last frame of the tune");
-        assertEquals(crossing[0], cutShape[1], "the frame the sections meet at");
-        assertEquals(crossing[1], cutShape[1], "the values a first section holds");
+        assertTrue(firstRewind(streams) != org.st4.St4Format.NO_REWIND,
+                CUT_EXAMPLE + " does not rewind, so it is not the rewind form");
+        assertEquals(halves[0], cutShape[1], "the rewind point is the loop frame");
+        assertEquals(halves[1], cutShape[1], "the frames packed apart start there");
+        assertEquals(crossing[0], cutShape[1], "the player saves after L values");
+        assertEquals(restored[0], cutShape[0], "and restores after O values");
 
         int[] moved = numbers(vocabulary,
                 "gives ([\\d,]+) and its file carries ([\\d,]+)",
@@ -340,19 +341,27 @@ final class CorpusNumbersTest {
         return said;
     }
 
-    /** Whether a packed file locates a second section per stream. */
-    private static boolean carriesALoopTable(Path packed) {
+    /** Whether a packed file's containers rewind to the loop frame. */
+    private static boolean carriesARewind(Path packed) {
         try {
-            byte[] file = Files.readAllBytes(packed);
-            long offset = 0;
-            for (int at = 0; at < 4; at++) {
-                offset = (offset << 8) | (file[org.ymx.YmxFormat.OFFSET_LOOP_TABLE + at]
-                        & 0xFF);
-            }
-            return offset != 0;
+            return firstRewind(Files.readAllBytes(packed)) != org.st4.St4Format.NO_REWIND;
         } catch (IOException e) {
             throw new IllegalStateException(packed + ": " + e);
         }
+    }
+
+    /** The rewind point the file's first packed section carries, or
+     * {@code NO_REWIND} where every section is stored. */
+    private static int firstRewind(byte[] file) {
+        for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
+            long entry = field(file, YmxFormat.OFFSET_SECTION_TABLE + 4 * stream, 4);
+            if (entry == 0 || YmxFormat.isStored(entry)) {
+                continue;
+            }
+            int start = (int) YmxFormat.sectionOffset(entry);
+            return (int) field(file, start + org.st4.St4Format.OFFSET_REWIND, 4);
+        }
+        return org.st4.St4Format.NO_REWIND;
     }
 
     /** One tune through its own CLI, told to start over from frame 0: the
@@ -516,7 +525,7 @@ final class CorpusNumbersTest {
                     plan = atOne;
                 }
             }
-            cut = plan.cut();
+            cut = plan.rewinds();
         }
         return new Surveyed(name, song.playerHz(), drumFrames, slowest, fastest,
                 effects.sinus(), together, loopFrame, song.frames(), enters, cut);

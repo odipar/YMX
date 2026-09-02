@@ -117,6 +117,8 @@ tells them apart - and writes a `.ymx`.
 | `-nN` | ring size per stream, bytes (default 960). The packer raises it, up to the cap of 2520, where one pass of a tune needs a longer ring, and says so; the ring size the file carries is the header's, not this flag's |
 | `-cC` | values decoded per call, the round-robin group size (default 24) |
 | `-kK` | ST4 unit size 1, 2 or 4 (default 2); an odd tune length is padded with safe duplicate frames |
+| `-copies` | let a match beyond the ring copy from the literal stream (SPEC.md Appendix A.5); the file sets flag bit 5 and plays only on a player built with `ST4_WINDOW` = N/K, which `mksndh` and `mkprg` take from a core built for the ring: the release's `-copies` core at the default ring, one they assemble on the spot at another (`mkcores.sh -copies -nN`) |
+| `-copiesS` | the same, searching S seconds a stream for a better parse |
 | `-minM` `-secS` | trim: drop everything before M:S |
 | `-startframeF` `-endframeF` `-framesN` | the same window in frames: start, end, or a length cap |
 | `-drumhzH` | the drum rate ceiling (default 25600): a faster drum is resampled to fit, with a warning |
@@ -188,7 +190,14 @@ combiners run no assembler: `mksndh.sh` and `mkprg.sh` call this step in
 when a binary under `dist/` is missing or stale, and `mkrelease.sh` runs
 it for every variant.
 
-    ymx/mkcores.sh [-perf] [-nomask] [outdir]
+    ymx/mkcores.sh [-perf] [-nomask] [-copies [-nN]] [outdir]
+
+`-copies` builds the cores for the default ring as the window, the ones
+the release carries; `-copies -nN` builds them for a ring of N bytes,
+named `-copies-nN`. A tune with copies plays only on a core whose window
+is its ring, so the combiners assemble that core when a set asks for a
+ring the release has no core for. A unit the ring is not a whole number
+of gets no core, and the run says so.
 
 ### mkrelease.sh
 
@@ -249,13 +258,13 @@ Pack, build a program with the exit marker, and run it under Hatari. SPACE
 in the emulator window stops; everything built lands in a work directory
 next to the first tune, named after it and the shape.
 
-    ym/play.sh [-perf] [-nomask] [-nRING] [-cCHUNK] [-kUNIT] [-o] song.ym...
+    ym/play.sh [-perf] [-nomask] [-nRING] [-cCHUNK] [-kUNIT] [-copies[S]] [-o] song.ym...
 
 | flag | meaning |
 |---|---|
 | `-perf` | build with the raster monitor |
 | `-nomask` | build with the frame write unmasked |
-| `-nN` `-cC` `-kK` `-o` | passed to the packer, as its own |
+| `-nN` `-cC` `-kK` `-copies[S]` `-o` | passed to the packer, as its own |
 | `-h`, `--help` | print the usage and stop |
 
 Any other `-flag` goes to the packer unread - the trim window and
@@ -408,17 +417,20 @@ verdict - it must reach DONE, and no line may report BAD.
 The ST4 compressor's own command line, for packing and unpacking
 plain ST4 containers outside a `.ymx`:
 
-    st4 [-f] [-kK] [-mN] [-lN] input [output.st4]
-    dst4 [-f] input.st4 [output]
+    st4 [-f] [-c[S]] [-kK] [-mN] [-lN] [-rR] input [output.st4]
+    dst4 [-f] [-rN] input.st4 [output]
 
 `-kK` is the unit size, `-mN` limits back-references to N units, `-lN`
-splits matches so no operation exceeds N units. Run them as
+splits matches so no operation exceeds N units, `-rR` loops the stream
+from unit R, and `-c` lets a match beyond `-m` copy from the literal
+stream, `-cS` searching S seconds for a better parse. `dst4 -rN` writes
+the pass and then N - 1 repeats of the loop. Run them as
 `dotnet dotnet/bin/Release/net10.0/ymx.dll st4 ...` or from the Java tree
 with `java -cp target/classes org.st4.St4 ...`.
 
 ## Holding the three trees together
 
-    ymx/parity.sh [-quick]
+    ymx/parity.sh [-quick | -corpus]
 
 Runs one command line through the Java, C# and Go trees and compares stdout,
 stderr, the exit status and every file the run leaves. Each case runs three
@@ -434,8 +446,11 @@ stack trace in the third. A sweep over output files alone sees none of it.
 
 `YM_CORPUS` names the directory holding the `.ym` collection, and the other
 two trees have to be built first. `-quick` is four tunes and the cases that
-have caught something; the default is eight tunes and every case.
-`ParityTest` runs `-quick` and is skipped where `YM_CORPUS` is unset.
+have caught something; the default is eight tunes and every case; `-corpus`
+adds every tune in the collection, packed by all three trees in parallel: the
+cases cover the options, and the collection covers the tunes. `ParityTest`
+runs `-quick` and is skipped where `YM_CORPUS` is unset; `verify.sh -full`
+runs `-corpus`.
 
 ## Every check, in one run
 

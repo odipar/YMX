@@ -136,14 +136,9 @@ func report(out io.Writer, result *ymx.EncodeResult, streams bool) {
 			if stream.Register >= ymx.RegisterStreams {
 				name = effectNames[stream.Register-ymx.RegisterStreams] + " "
 			}
-			split := ""
-			if stream.LoopSize != 0 {
-				split = fmt.Sprintf("  %6d + %d", stream.FirstSize(),
-					stream.LoopSize)
-			}
-			fmt.Fprintf(out, "  %s %6d -> %6d bytes (%5.1f%%)%s\n",
+			fmt.Fprintf(out, "  %s %6d -> %6d bytes (%5.1f%%)\n",
 				name, stream.Frames, stream.PackedSize,
-				percent(stream.PackedSize, stream.Frames), split)
+				percent(stream.PackedSize, stream.Frames))
 		}
 	}
 

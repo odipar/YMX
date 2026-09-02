@@ -75,9 +75,28 @@ final class PlayerTests {
      */
     static String runShape(int frames, int ring, int chunk, String label,
             boolean loops, int passes, int unit, int loopFrame) {
+        return runShape(frames, ring, chunk, label, loops, passes, unit, loopFrame, 0);
+    }
+
+    /**
+     * The same on a build for {@code window} units, the tune packed with
+     * copies from the literal stream: the window is the ring in units, and
+     * the file's flag bit 5 says the build must have one.
+     */
+    static String runShape(int frames, int ring, int chunk, String label,
+            boolean loops, int passes, int unit, int loopFrame, int window) {
         byte[][] source = GenYm.registers(frames);
-        byte[] packed = Rig.pack(GenYm.ym6File(frames, loopFrame, source), ring,
-                chunk, loops, unit);
+        byte[] packed = window == 0
+                ? Rig.pack(GenYm.ym6File(frames, loopFrame, source), ring, chunk,
+                        loops, unit)
+                : Rig.pack(GenYm.ym6File(frames, loopFrame, source), ring, chunk,
+                        loops, unit, "-copies");
+        // Whether the search found a copy worth taking is the data's: a
+        // file without one plays on the window build as well, since its
+        // offsets stay inside the window. The label says which it was.
+        if (window != 0) {
+            label += (header(packed, 6, 2) & 0x20) != 0 ? ", with copies" : ", no copy taken";
+        }
         int carried = header(packed, YMX_LOOP_FRAME, 4);
         if (carried != (loops ? loopFrame : 0)) {
             return label + ": the file carries L=" + carried + ", not " + loopFrame;
@@ -86,7 +105,7 @@ final class PlayerTests {
         List<GenYm.ChipState> expected = GenYm.chipStates(frames, source, loops,
                 carried, played);
 
-        Player player = new Player(packed, unit);
+        Player player = new Player(packed, unit, false, window);
         if (player.init() != 0) {
             return label + ": YMX_init rejected the file";
         }
@@ -253,7 +272,6 @@ final class PlayerTests {
         longWord(out, table);
         word(out, 1);                               // one sample
         longWord(out, 0);                           // L: back to the beginning
-        longWord(out, 0);                           // no loop table
         longWord(out, org.ymx.YmxFormat.REQUIRED_BASE);     // Q: no extension
         for (int stream = 0; stream < Rig.STREAMS; stream++) {
             longWord(out, 0x80000000 | where[stream]);  // bit 31: stored
@@ -268,21 +286,23 @@ final class PlayerTests {
     }
 
     /**
-     * A file cut in two at its loop frame, every section stored: the section
-     * table locates frames {@code [0, L)} and the loop table {@code [L, O)}.
-     * A short replay packs smaller stored than as a container, so this is a
-     * shape a writer reaches; here it also puts the loop table's own entries
-     * on the stored path. {@code L} is under one group, so the first refill
-     * of every stream already runs into the second section.
+     * A file whose pass is longer than its ring, every section stored: one
+     * section per stream covering frames {@code [0, O)}, and {@code L} in the
+     * header, so the player saves each stream's state after {@code L}
+     * values and restores it after {@code O}. A stored section has no
+     * container to carry a rewind point, so the header's {@code L} is all
+     * the player has, and its state is the read position. {@code L} is
+     * under one group, so the first refill of every stream already crosses
+     * it.
      */
-    static String runStoredCut() {
+    static String runStoredRewind() {
         int frames = 96;
         int loop = 12;
         int ring = 48;
-        byte[] file = storedCutYmx(frames, loop, ring, 24);
+        byte[] file = storedRewindYmx(frames, loop, ring, 24);
         Player player = new Player(file, 1);
         if (player.init() != 0) {
-            return "stored cut: YMX_init rejected the file";
+            return "stored rewind: YMX_init rejected the file";
         }
         // Two passes past the first: R0 carries the frame number, so the
         // values written to it are the frames the player played.
@@ -297,37 +317,31 @@ final class PlayerTests {
                 }
             }
             if (got == null || got != wanted) {
-                return "stored cut: call " + index + " wrote R0=" + got
+                return "stored rewind: call " + index + " wrote R0=" + got
                         + ", want frame " + wanted;
             }
         }
         return "";
     }
 
-    /** The file {@link #runStoredCut} plays: twenty-five stored sections of
-     * {@code loop} values, twenty-five more of the rest, and the two tables
-     * that locate them. R0 carries the frame number and every other stream
-     * holds one value, so what reaches the chip says which frame is playing. */
-    private static byte[] storedCutYmx(int frames, int loop, int ring, int chunk) {
-        int table = align(org.ymx.YmxFormat.HEADER_SIZE);
-        int at = table + 4 * Rig.STREAMS;
-        int[] first = new int[Rig.STREAMS];
-        int[] second = new int[Rig.STREAMS];
+    /** The file {@link #runStoredRewind} plays: twenty-five stored sections
+     * of {@code frames} values and the table that locates them. R0 carries
+     * the frame number and every other stream holds one value, so what
+     * reaches the chip says which frame is playing. */
+    private static byte[] storedRewindYmx(int frames, int loop, int ring, int chunk) {
+        int at = org.ymx.YmxFormat.HEADER_SIZE;
+        int[] where = new int[Rig.STREAMS];
         ByteArrayOutputStream body = new ByteArrayOutputStream();
-        for (int half = 0; half < 2; half++) {
-            for (int stream = 0; stream < Rig.STREAMS; stream++) {
-                while (at % 4 != 0) {
-                    body.write(0);
-                    at++;
-                }
-                int from = half == 0 ? 0 : loop;
-                int to = half == 0 ? loop : frames;
-                (half == 0 ? first : second)[stream] = at;
-                for (int frame = from; frame < to; frame++) {
-                    body.write(streamByte(stream, frame));
-                }
-                at += to - from;
+        for (int stream = 0; stream < Rig.STREAMS; stream++) {
+            while (at % 4 != 0) {
+                body.write(0);
+                at++;
             }
+            where[stream] = at;
+            for (int frame = 0; frame < frames; frame++) {
+                body.write(streamByte(stream, frame));
+            }
+            at += frames;
         }
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -343,16 +357,9 @@ final class PlayerTests {
         longWord(out, 0);                           // no samples
         word(out, 0);
         longWord(out, loop);                        // L, where it starts over
-        longWord(out, table);                       // and the table for [L, O)
         longWord(out, org.ymx.YmxFormat.REQUIRED_BASE);     // Q: no extension
         for (int stream = 0; stream < Rig.STREAMS; stream++) {
-            longWord(out, 0x80000000 | first[stream]);  // bit 31: stored
-        }
-        while (out.size() < table) {
-            out.write(0);
-        }
-        for (int stream = 0; stream < Rig.STREAMS; stream++) {
-            longWord(out, 0x80000000 | second[stream]);
+            longWord(out, 0x80000000 | where[stream]);  // bit 31: stored
         }
         out.writeBytes(body.toByteArray());
         return out.toByteArray();
@@ -1004,16 +1011,24 @@ final class PlayerTests {
                 new Object[] {600, 240, 24, "a body past the ring", true, 2, 1, 100},
                 new Object[] {600, 960, 24, "loops from frame 200, unit 2",
                     true, 2, 2, 200},
-                // A body past the largest ring the format allows: the packer
-                // cuts every stream at the loop frame and the file carries a
-                // loop table, so the wrap opens the second section rather
-                // than moving the cursor back.
-                new Object[] {2688, 960, 24, "cut at frame 100", true, 2, 1, 100},
-                // A first section shorter than a group: every stream runs out
-                // of it inside its own first fill, at init, and opens the
-                // loop table's before frame 0 is played.
-                new Object[] {2688, 960, 24, "cut at frame 12, unit 2",
-                    true, 2, 2, 12}));
+                // A body past the ring: every container carries the loop
+                // frame as its rewind point, so the wrap restores each
+                // stream's saved state rather than moving the cursor back.
+                new Object[] {2688, 960, 24, "rewinds to frame 100", true, 2, 1, 100},
+                // A loop frame under one group: every stream reaches it
+                // inside its own first fill, at init, and saves before
+                // frame 0 is played.
+                new Object[] {2688, 960, 24, "rewinds to frame 12, unit 2",
+                    true, 2, 2, 12},
+                // Copies from the literal stream, on a build for the ring as
+                // its window: flag bit 5, and the descriptor's window word.
+                new Object[] {600, 960, 24, "copies, unit 1", true, 2, 1, 0, 960},
+                new Object[] {600, 960, 24, "copies, unit 2", true, 2, 2, 200, 480},
+                new Object[] {2688, 960, 24, "copies, rewinds to frame 12, unit 2",
+                    true, 2, 2, 12, 480},
+                // A ring too small to match across, where a copy from the
+                // literal stream is what reaches back: 48 bytes, unit 1.
+                new Object[] {600, 48, 24, "copies at a 48-byte ring", true, 2, 1, 0, 48}));
         if (!quick) {
             shapes.add(new Object[] {4000, 960, 24, "four thousand frames",
                     true, 1, 1});
@@ -1030,9 +1045,10 @@ final class PlayerTests {
             String label = (String) shape[3];
             boolean loops = (Boolean) shape[4];
             int loopFrame = shape.length > 7 ? (Integer) shape[7] : 0;
+            int window = shape.length > 8 ? (Integer) shape[8] : 0;
             String problem = runShape((Integer) shape[0], (Integer) shape[1],
                     (Integer) shape[2], label, loops, (Integer) shape[5],
-                    (Integer) shape[6], loopFrame);
+                    (Integer) shape[6], loopFrame, window);
             if (!problem.isEmpty()) {
                 System.out.println("FAIL " + problem);
                 failures++;
@@ -1061,8 +1077,8 @@ final class PlayerTests {
             // it back.
             String build = perf ? ", PERF build" : "";
         }
-        failures += report(runStoredCut(),
-                "the stored cut           (both tables, values not containers)");
+        failures += report(runStoredRewind(),
+                "the stored rewind        (one table, values not containers)");
         failures += report(runLoopPointResolve(),
                 "the loop-point resolve   (an unsigned word, $8000 and up)");
         failures += report(runReadmeSizes(),

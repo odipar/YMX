@@ -32,6 +32,10 @@ public final class Play {
               ym/play.sh song.ym                  # 960-byte rings, 24 values per call
               ym/play.sh -n256 song.ym            # smaller rings: less RAM, worse ratio
               ym/play.sh -n2048 -c32 song.ym      # longer calls: cheaper on average
+              ym/play.sh -copies song.ym          # copies from the literal stream: the
+                                                  # player is built for the ring as its
+                                                  # window; -copies5 searches five
+                                                  # seconds a stream for a better parse
               ym/play.sh -o song.ym               # play once and stop, instead of
                                                   # starting over at the end
               ym/play.sh -min13 -sec52 song.ym    # trim: start deep in a long tune
@@ -72,6 +76,11 @@ public final class Play {
             } else if (a.equals("-h") || a.equals("--help")) {
                 System.out.println(USAGE);
                 return;
+            } else if (a.equals("-copies")) {
+                extra.add(a);           // the packer's: copies, the opening passes
+            } else if (a.startsWith("-copies")) {
+                number(a.substring(7)); // a search of that many seconds, checked
+                extra.add(a);           // here as -k is
             } else if (a.startsWith("-n")) {
                 ring = number(a.substring(2));
             } else if (a.startsWith("-c")) {
@@ -91,7 +100,7 @@ public final class Play {
         }
         if (yms.isEmpty()) {
             throw Tools.fail("usage: play.sh [-perf] [-nomask] [-nRING]"
-                    + " [-cCHUNK] [-kUNIT] [-o] song.ym...");
+                    + " [-cCHUNK] [-kUNIT] [-copies[S]] [-o] song.ym...");
         }
         String hatari = env("HATARI", "hatari");
         Path tos = Path.of(env("TOS", System.getProperty("user.home")
@@ -122,8 +131,16 @@ public final class Play {
         TuneSet set = TuneSet.of(yms);
         System.out.println("play.sh: packing " + join(yms));
         List<Path> packed = Packing.pack(yms, work, flags);
-        MkPrg.build(new MkPrg.Options(work.resolve("PLAY.PRG"), packed, set.title(),
-                set.composer(), set.names(), perf, maskBurst, true));
+        try {
+            MkPrg.build(new MkPrg.Options(work.resolve("PLAY.PRG"), packed, set.title(),
+                    set.composer(), set.names(), perf, maskBurst, true));
+        } catch (IllegalArgumentException e) {
+            // A set the core cannot serve: the combiner's own words, as
+            // the Go tree prints them. getMessage() is @Nullable, so give
+            // it something to fall back on.
+            String reason = e.getMessage();
+            throw Tools.fail(reason != null ? reason : "play.sh: cannot build the program");
+        }
 
         Path marker = work.resolve("YMXDONE.MRK");
         Packing.deleteQuietly(marker);

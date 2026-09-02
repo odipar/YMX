@@ -159,7 +159,8 @@ final class WorkspaceSizingTest {
     private static int fixedFromEquates() throws IOException {
         String source = Files.readString(PLAYER);
         return equate(source, "YMX_STATE")
-                + equate(source, "YMX_STREAMS") * equate(source, "YMX_STATE_SIZE");
+                + equate(source, "YMX_STREAMS") * equate(source, "YMX_STATE_SIZE")
+                + equate(source, "YMX_STREAMS") * equate(source, "YMX_SAVE_SIZE");
     }
 
     private static int equate(String source, String name) {

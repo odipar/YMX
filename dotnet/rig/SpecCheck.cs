@@ -138,8 +138,7 @@ namespace Rig
             int ring = WordAt(file, YmxFormat.OffsetRingSize);
             int flags = WordAt(file, YmxFormat.OffsetFlags);
             int loopFrame = LongAt(file, YmxFormat.OffsetLoopFrame);
-            int loopTable = LongAt(file, YmxFormat.OffsetLoopTable);
-            Shape(file, faults, frames, streams, ring, loopFrame, loopTable);
+            Shape(file, faults, frames, streams, ring, loopFrame);
             if (faults.Count > 0)
             {
                 return faults;
@@ -172,8 +171,7 @@ namespace Rig
             {
                 try
                 {
-                    value[stream] = Stream(file, stream, frames, loopFrame,
-                            loopTable);
+                    value[stream] = Stream(file, stream, frames);
                 }
                 catch (Exception e) when (e is SystemException
                         || e is AssertionException)
@@ -196,7 +194,7 @@ namespace Rig
         // -----------------------------------------------------------------
 
         private static void Shape(byte[] file, List<Fault> faults, int frames,
-                int streams, int ring, int loopFrame, int loopTable)
+                int streams, int ring, int loopFrame)
         {
             if (frames < 1)
             {
@@ -234,51 +232,41 @@ namespace Rig
                         "L is " + loopFrame + ", not below O at " + frames));
                 return;                     // O - L is read below
             }
-            if (loopTable == 0)
-            {
-                if (loopFrame != 0 && frames - loopFrame > ring)
-                {
-                    faults.Add(new Fault(-1, "§9.3 shape",
-                            "one section per stream and O - L is "
-                            + (frames - loopFrame) + ", past the ring at "
-                            + ring + ": a wrap reaches back further than a"
-                            + " pass"));
-                }
-                return;
-            }
-            if (loopTable % 4 != 0)
-            {
-                faults.Add(new Fault(-1, "§9.3 shape", "the loop table is at "
-                        + loopTable + ", off a long boundary"));
-            }
-            if (loopFrame == 0)
-            {
-                faults.Add(new Fault(-1, "§9.3 shape",
-                        "the file carries a loop table and L is 0"));
-            }
-            if (frames - loopFrame <= ring)
-            {
-                faults.Add(new Fault(-1, "§9.3 shape",
-                        "the file carries a loop table and O - L is "
-                        + (frames - loopFrame) + ", within the ring at " + ring
-                        + ": one section per stream is the form"));
-            }
-            // The table's own extent, which the entries below are read from: a
-            // header naming a table past the file's end has no entries to read.
-            if (loopTable < 0
-                    || loopTable > file.Length - 4 * YmxFormat.Streams)
-            {
-                faults.Add(new Fault(-1, "§9.3 shape", "the loop table is at "
-                        + loopTable + ", outside the file at " + file.Length
-                        + " bytes"));
-                return;
-            }
+            // The loop form every container carries: a rewind point of L bytes
+            // where a pass is longer than a ring, none where it is not. A
+            // container's own header says which, and the twenty-five say the
+            // same thing or the player cannot tell (section 8).
+            int rewind = loopFrame != 0 && frames - loopFrame > ring
+                    ? loopFrame : St4.St4Format.NoRewind;
             for (int stream = 0; stream < YmxFormat.Streams; stream++)
             {
-                if (Entry(file, loopTable, stream) == 0)
+                long entry = Entry(file, YmxFormat.OffsetSectionTable, stream);
+                if (entry == 0 || YmxFormat.IsStored(entry))
                 {
-                    faults.Add(new Fault(-1, "§9.3 shape",
-                            "loop-table entry " + stream + " is 0"));
+                    continue;
+                }
+                int start = (int) YmxFormat.SectionOffset(entry);
+                if (start < 0 || start + St4.St4Format.HeaderSize > file.Length)
+                {
+                    continue;               // reported where the section is read
+                }
+                int carried = LongAt(file, start + St4.St4Format.OffsetRewind);
+                int window = LongAt(file, start + St4.St4Format.OffsetWindow);
+                if (carried != rewind)
+                {
+                    faults.Add(new Fault(-1, "§9.3 shape", "stream " + stream
+                            + "'s container carries rewind point " + carried
+                            + " where O - L is " + (frames - loopFrame)
+                            + " against a ring of " + ring + ": every container carries "
+                            + rewind));
+                }
+                int unit = file[start + 3];
+                if (unit > 0 && window != ring / unit)
+                {
+                    faults.Add(new Fault(-1, "§9.3 shape", "stream " + stream
+                            + "'s container carries window " + window
+                            + " where the ring of " + ring + " at unit " + unit
+                            + " gives " + ring / unit));
                 }
             }
         }
@@ -794,21 +782,9 @@ namespace Rig
 
         /// <summary>One stream's O values, out of its section and its loop
         /// section.</summary>
-        private static byte[] Stream(byte[] file, int index, int frames,
-                int loopFrame, int loopTable)
+        private static byte[] Stream(byte[] file, int index, int frames)
         {
-            if (loopTable == 0)
-            {
-                return Section(file, YmxFormat.OffsetSectionTable, index,
-                        frames);
-            }
-            byte[] head = Section(file, YmxFormat.OffsetSectionTable, index,
-                    loopFrame);
-            byte[] tail = Section(file, loopTable, index, frames - loopFrame);
-            byte[] whole = new byte[frames];
-            Array.Copy(head, whole, Math.Min(head.Length, frames));
-            Array.Copy(tail, 0, whole, loopFrame, frames - loopFrame);
-            return whole;
+            return Section(file, YmxFormat.OffsetSectionTable, index, frames);
         }
 
         /// <summary>One section, decoded to at least count values.</summary>
@@ -828,9 +804,20 @@ namespace Rig
             }
             St4.St4Format.Container container = St4.St4Format.Read(
                     RangeOf(file, start, Next(file, start)));
-            byte[] outValues = St4.St4Decompressor.Decompress(container.Control,
-                    container.Literal, container.ByteOffsets,
-                    container.WordOffsets, container.Unit, container.Size);
+            // Decoded at the window and the rewind point the container
+            // carries, so a match past the ring or before the rewind point is
+            // a fault rather than a value, and a stream that repeats is one
+            // too: a section of this version ends (section 1.4).
+            St4.St4Decompressor.Decoded decoded = St4.St4Decompressor.Decode(
+                    container.Control, container.Literal, container.ByteOffsets,
+                    container.WordOffsets, container.Unit, container.Size,
+                    container.Window, container.Rewind);
+            if (decoded.RepeatIndex >= 0)
+            {
+                throw new InvalidOperationException("the section repeats from unit "
+                        + decoded.RepeatIndex + ", and a section ends");
+            }
+            byte[] outValues = decoded.Output;
             if (outValues.Length < count)
             {
                 throw new InvalidOperationException(outValues.Length
@@ -865,20 +852,10 @@ namespace Rig
             {
                 offsets.Add(sampleTable);
             }
-            int loopTable = LongAt(file, YmxFormat.OffsetLoopTable);
-            if (loopTable != 0)
-            {
-                offsets.Add(loopTable);
-            }
             for (int index = 0; index < YmxFormat.Streams; index++)
             {
                 offsets.Add((int) YmxFormat.SectionOffset(
                         Entry(file, YmxFormat.OffsetSectionTable, index)));
-                if (loopTable != 0)
-                {
-                    offsets.Add((int) YmxFormat.SectionOffset(
-                            Entry(file, loopTable, index)));
-                }
             }
             foreach (int offset in offsets)
             {

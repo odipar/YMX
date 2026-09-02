@@ -375,6 +375,10 @@ namespace Ym6
                 + "  ym/play.sh song.ym                  # 960-byte rings, 24 values per call\n"
                 + "  ym/play.sh -n256 song.ym            # smaller rings: less RAM, worse ratio\n"
                 + "  ym/play.sh -n2048 -c32 song.ym      # longer calls: cheaper on average\n"
+                + "  ym/play.sh -copies song.ym          # copies from the literal stream: the\n"
+                + "                                      # player is built for the ring as its\n"
+                + "                                      # window; -copies5 searches five\n"
+                + "                                      # seconds a stream for a better parse\n"
                 + "  ym/play.sh -o song.ym               # play once and stop, instead of\n"
                 + "                                      # starting over at the end\n"
                 + "  ym/play.sh -min13 -sec52 song.ym    # trim: start deep in a long tune\n"
@@ -396,7 +400,7 @@ namespace Ym6
                 + "  HATARI=/path/to/hatari TOS=/path/to/tos.img ym/play.sh song.ym";
 
         private const string UsageText =
-                "usage: play.sh [-perf] [-nomask] [-nRING] [-cCHUNK] [-kUNIT] [-o] song.ym...";
+                "usage: play.sh [-perf] [-nomask] [-nRING] [-cCHUNK] [-kUNIT] [-copies[S]] [-o] song.ym...";
 
         public static void Main(string[] args)
         {
@@ -428,6 +432,15 @@ namespace Ym6
                     Console.WriteLine(HelpText);
                     return;
                 }
+                else if (a == "-copies")
+                {
+                    extra.Add(a);       // the packer's: copies, the opening passes
+                }
+                else if (a.StartsWith("-copies"))
+                {
+                    Number(a.Substring(7)); // a search of that many seconds, checked
+                    extra.Add(a);           // here as -k is
+                }
                 else if (a.StartsWith("-n"))
                 {
                     ring = Number(a[2..]);
@@ -455,7 +468,7 @@ namespace Ym6
             if (yms.Count == 0)
             {
                 throw Tools.Fail("usage: play.sh [-perf] [-nomask] [-nRING]"
-                        + " [-cCHUNK] [-kUNIT] [-o] song.ym...");
+                        + " [-cCHUNK] [-kUNIT] [-copies[S]] [-o] song.ym...");
             }
             foreach (string ym in yms)
             {
@@ -498,8 +511,17 @@ namespace Ym6
             TuneSet set = TuneSet.Of("play.sh", yms);
             Console.WriteLine("play.sh: packing " + string.Join(" ", yms));
             List<string> packed = Packing.Pack("play.sh", yms, work, flags);
-            MkPrg.Build(new MkPrg.Options(Path.Combine(work, "PLAY.PRG"), packed,
-                    set.Title, set.Composer, set.Names, perf, maskBurst, true));
+            try
+            {
+                MkPrg.Build(new MkPrg.Options(Path.Combine(work, "PLAY.PRG"), packed,
+                        set.Title, set.Composer, set.Names, perf, maskBurst, true));
+            }
+            catch (ArgumentException e)
+            {
+                // A set the core cannot serve: the combiner's own words, as
+                // the Go tree prints them.
+                throw Tools.Fail(e.Message);
+            }
 
             string marker = Path.Combine(work, "YMXDONE.MRK");
             File.Delete(marker);

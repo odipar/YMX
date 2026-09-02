@@ -6,6 +6,7 @@ import java.util.List;
 import org.st4.St4;
 import org.st4.St4Compressor;
 import org.st4.St4EventOptimizer;
+import org.st4.St4LiteralCopySearch;
 import org.st4.St4Format;
 import org.st4.Units;
 
@@ -47,15 +48,7 @@ public final class YmxEncoder {
     /** What packing one stream's vector produced; the first fourteen stream
      * indices are registers, then the script streams in file order - M, X,
      * T, and each channel's A and P. */
-    public record Stream(int register, int frames, int packedSize, int longestOp,
-                         int loopSize) {
-
-        /** The bytes of the section covering the frames before the loop
-         * frame: the whole of a stream that is not cut. */
-        public int firstSize() {
-            return packedSize - loopSize;
-        }
-    }
+    public record Stream(int register, int frames, int packedSize, int longestOp) {}
 
     /** The finished file plus the per-stream numbers the CLI reports; the
      * tune is the one that was packed, the padded one where the
@@ -152,6 +145,19 @@ public final class YmxEncoder {
      */
     public static Result encode(Tune tune, int ringSize, int chunk, boolean loops,
                                 boolean progress, int unit, int timerMap) {
+        return encode(tune, ringSize, chunk, loops, progress, unit, timerMap, -1);
+    }
+
+    /**
+     * As above, with copies from the literal stream (SPEC.md Appendix A.5):
+     * {@code copies} below 0 packs none, 0 packs the search's opening passes,
+     * and above 0 searches for that many seconds a stream. A file with a
+     * copy in it sets flag bit 5 and plays only on a player built for its
+     * ring as a window.
+     */
+    public static Result encode(Tune tune, int ringSize, int chunk, boolean loops,
+                                boolean progress, int unit, int timerMap,
+                                double copies) {
         // The floor first, on what every tune decodes; the exact check waits
         // for the script, since a tune that leaves channels idle decodes
         // fewer streams and may use a smaller chunk.
@@ -182,11 +188,8 @@ public final class YmxEncoder {
             throw new IllegalArgumentException(problem);
         }
 
-        // The loop frame comes before the packing rather than after it: a body
-        // that needs a bigger ring gets one, and a bigger ring lets a
-        // back-reference reach further, so the sections are packed against the
-        // ring the file ends up carrying. A plan that cuts the streams doubles
-        // the sections there are to pack.
+        // The loop frame comes before the packing: a plan that rewinds packs
+        // the frames from it on their own, so every pass reads one history.
         LoopFrame.Plan plan = LoopFrame.resolve(tune, script, loops, ringSize, chunk,
                 unit);
         ringSize = plan.ringSize();
@@ -219,29 +222,28 @@ public final class YmxEncoder {
                     carry(script.counts()[c], script.m(), acts, action);
         }
 
-        // One section per stream, or two where the plan cuts them at the loop
-        // frame: the first covers the frames before it, the second the frames
-        // from it, and the pair is what the stream reports as its cost.
+        // One section per stream. Where the plan rewinds, the container's
+        // rewind point is the loop frame and the frames from it are parsed on
+        // their own, so a pass after the first reads the history the first
+        // one did (SPEC.md §8).
         var streams = new ArrayList<Stream>(YmxFormat.STREAMS);
         var sections = new Section[YmxFormat.STREAMS];
-        Section[] loopSections = plan.cut() ? new Section[YmxFormat.STREAMS] : null;
+        int rewindAt = plan.rewinds() ? plan.frame() : -1;
+        boolean copied = false;
         for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
             byte[] values = vectors[stream];
-            if (loopSections == null) {
-                sections[stream] = pack(progress, values, offsetLimit, unit);
-            } else {
-                sections[stream] = pack(progress,
-                        Arrays.copyOfRange(values, 0, plan.frame()), offsetLimit, unit);
-                loopSections[stream] = pack(progress,
-                        Arrays.copyOfRange(values, plan.frame(), values.length),
-                        offsetLimit, unit);
-            }
-            streams.add(measure(stream, values.length, sections[stream],
-                    loopSections == null ? null : loopSections[stream]));
+            sections[stream] = pack(progress, values, offsetLimit, unit, rewindAt, copies);
+            copied |= sections[stream].copies() > 0;
+            streams.add(new Stream(stream, values.length, sections[stream].bytes().length,
+                    sections[stream].longestOp()));
         }
+        // The twenty-five containers of one file take one loop form. A
+        // stream's section holds one byte a frame, so every container's rewind
+        // point is the loop frame in bytes, or none.
+        loopsAlign(sections, rewindAt, offsetLimit);
 
         byte[] file = build(tune, ringSize, chunk, frames, loops, plan.frame(),
-                sections, loopSections, tune.samples(), channels);
+                sections, tune.samples(), channels | (copied ? YmxFormat.FLAG_COPIES : 0));
         return new Result(file, List.copyOf(streams), ringSize, chunk, loops, unit,
                 plan.frame(), tune, script, plan.notes());
     }
@@ -282,74 +284,101 @@ public final class YmxEncoder {
         return out;
     }
 
-    /** One section as it goes into the file: packed, or the values themselves. */
-    private record Section(byte[] bytes, boolean stored, int longestOp) {
+    /** One section as it goes into the file: packed, or the values
+     * themselves; {@code copies} counts the blocks copied from the literal
+     * stream. */
+    private record Section(byte[] bytes, boolean stored, int longestOp, int copies) {
 
-        static final Section ABSENT = new Section(new byte[0], false, 0);
+        static final Section ABSENT = new Section(new byte[0], false, 0, 0);
     }
 
     /**
      * Packs one section of one stream; an empty section produces nothing.
+     * {@code rewindAt} is the frame the container carries as its rewind
+     * point, or -1: the frames from it are parsed apart from the frames
+     * before it, so no match in the loop reaches before it.
      *
-     * <p>A short section costs more as a container than as itself: twenty of
-     * the bytes are header before a value is written down, and a one-frame
-     * tune carries one value. Where the values are the smaller of the two,
-     * they are what the file gets, and the section's offset says so.
+     * <p>A short section costs more as a container than as itself:
+     * twenty-eight of the bytes are header before a value is written down,
+     * and a one-frame tune carries one value. Where the values are the
+     * smaller of the two, they are what the file gets, and the section's
+     * offset says so.
      */
     private static Section pack(boolean progress, byte[] values, int offsetLimit,
-                                int unit) {
+                                int unit, int rewindAt, double copies) {
         if (values.length == 0) {
             return Section.ABSENT;
         }
         int[] units = Units.split(values, unit);
-        St4Compressor.Result result = St4Compressor.compress(
-                St4EventOptimizer.optimize(units, unit, offsetLimit, progress),
-                units, unit, St4Format.MAX_OP);
+        St4Compressor.Result result;
+        if (rewindAt < 0) {
+            result = St4Compressor.compress(
+                    parse(units, unit, offsetLimit, copies, progress),
+                    units, unit, St4Format.MAX_OP, -1, offsetLimit);
+        } else {
+            // A value is one byte, so the rewind point in units is the frame
+            // over the unit size; the plan holds the frame to a unit boundary.
+            int rewindIndex = rewindAt / unit;
+            int[] intro = Arrays.copyOfRange(units, 0, rewindIndex);
+            int[] loop = Arrays.copyOfRange(units, rewindIndex, units.length);
+            result = St4Compressor.compressRewinding(
+                    parse(intro, unit, offsetLimit, copies, progress),
+                    parse(loop, unit, offsetLimit, copies, progress),
+                    units, unit, St4Format.MAX_OP, rewindIndex, offsetLimit);
+        }
         byte[] container = St4.container(result);
         boolean stored = values.length < container.length;
-        return new Section(stored ? values : container, stored, result.longestOp());
+        return new Section(stored ? values : container, stored, result.longestOp(),
+                stored ? 0 : result.copies());
     }
 
-    /** What one stream costs the file: its frames, and the bytes of the one
-     * section covering them or of the two that share them. */
-    private static Stream measure(int stream, int frames, Section first,
-                                  @org.jspecify.annotations.Nullable Section second) {
-        if (second == null) {
-            return new Stream(stream, frames, first.bytes().length,
-                    first.longestOp(), 0);
+    /** The parse: the event-driven optimizer, or with copies the search
+     * that copies from the literal stream, for {@code copies} seconds. */
+    private static org.st4.St4Block parse(int[] units, int unit, int window,
+                                          double copies, boolean progress) {
+        if (copies < 0) {
+            return St4EventOptimizer.optimize(units, unit, window, progress);
         }
-        return new Stream(stream, frames,
-                first.bytes().length + second.bytes().length,
-                Math.max(first.longestOp(), second.longestOp()),
-                second.bytes().length);
+        return St4LiteralCopySearch.optimize(units, unit, window, St4Format.MAX_OP,
+                copies, progress && copies > 0);
+    }
+
+    /**
+     * Every container of the file carries the one loop form the plan chose:
+     * a rewind point of {@code rewindAt} bytes, or none, and the window the
+     * ring gives. A stored section carries no header and takes its form from
+     * the file's. A writer that let one stream differ would hand the player
+     * a file it cannot detect and cannot play, so the check is here.
+     */
+    private static void loopsAlign(Section[] sections, int rewindAt, int window) {
+        int want = rewindAt < 0 ? St4Format.NO_REWIND : rewindAt;
+        for (int stream = 0; stream < sections.length; stream++) {
+            if (sections[stream].stored() || sections[stream].bytes().length == 0) {
+                continue;
+            }
+            St4Format.Container container = St4Format.read(sections[stream].bytes());
+            if (container.rewind() != want) {
+                throw new IllegalStateException("stream " + stream + " carries rewind "
+                        + container.rewind() + " where the file's loop form is " + want);
+            }
+            if (container.window() != window) {
+                throw new IllegalStateException("stream " + stream + " carries window "
+                        + container.window() + " where the ring gives " + window);
+            }
+        }
     }
 
     private static byte[] build(Tune tune, int ringSize, int chunk, int frames,
                                 boolean loops, int loopFrame, Section[] sections,
-                                Section @org.jspecify.annotations.Nullable [] loopSections,
                                 byte[][] samples, int channels) {
         // Containers carry alignment rules of their own - stream A and D
         // are read a word at a time - so each is placed on a long boundary. A
         // stored section is read a byte at a time and needs none, but it takes
         // the same boundary: one placement rule, and the four bytes it can
         // cost are what a section of its size is trying to save.
-        //
-        // The loop table, where there is one, sits between the header and the
-        // sections: one more table of the same shape, on a long boundary like
-        // everything else in the body.
         int total = YmxFormat.HEADER_SIZE;
-        int loopTable = 0;
-        if (loopSections != null) {
-            loopTable = align(total);
-            total = loopTable + 4 * YmxFormat.STREAMS;
-        }
         for (Section section : sections) {
             total = align(total) + section.bytes().length;
-        }
-        if (loopSections != null) {
-            for (Section section : loopSections) {
-                total = align(total) + section.bytes().length;
-            }
         }
         int sampleTable = samples.length == 0 ? 0 : align(total);
         if (samples.length > 0) {
@@ -376,21 +405,13 @@ public final class YmxEncoder {
         putLong(file, YmxFormat.OFFSET_SAMPLE_TABLE, sampleTable);
         putWord(file, YmxFormat.OFFSET_SAMPLE_COUNT, samples.length);
         // L, the frame the tune starts over from: 0 where it plays once
-        // through, and 0 where the packer could not keep the source's own. The
-        // loop table offset is 0 where the sections cover the whole tune, and
-        // otherwise where the second set of them is located from.
+        // through, and 0 where the packer could not keep the source's own.
         putLong(file, YmxFormat.OFFSET_LOOP_FRAME, loopFrame);
-        putLong(file, YmxFormat.OFFSET_LOOP_TABLE, loopTable);
         // Q: this version carries no extension stream, so the mask names the
         // twenty-five §2 defines and nothing above them (SPEC.md §1.6).
         putLong(file, YmxFormat.OFFSET_REQUIRED, YmxFormat.REQUIRED_BASE);
 
-        int at = place(file, YmxFormat.OFFSET_SECTION_TABLE, sections,
-                loopTable == 0 ? YmxFormat.HEADER_SIZE
-                        : loopTable + 4 * YmxFormat.STREAMS);
-        if (loopSections != null) {
-            place(file, loopTable, loopSections, at);
-        }
+        place(file, YmxFormat.OFFSET_SECTION_TABLE, sections, YmxFormat.HEADER_SIZE);
 
         // The sample table: entries first, then the samples, each closed by the
         // end marker the PCM tick handler stops on.

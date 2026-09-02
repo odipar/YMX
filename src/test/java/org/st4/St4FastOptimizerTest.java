@@ -9,11 +9,10 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * {@link St4FastOptimizer} against {@link St4Optimizer}: the whole point of the
- * fast one is that it finds the SAME parse, so all four streams must match byte
- * for byte on every input shape, unit size and window - including the shapes
- * that once broke it: lone matches before an offset's first state, degenerate
- * runs, and inputs of a byte or two.
+ * {@link St4FastOptimizer} against {@link St4Optimizer}: the fast one finds
+ * the same parse, so all four streams match byte for byte on every input
+ * shape, unit size and window, lone matches before an offset's first state,
+ * degenerate runs and inputs of a byte or two included.
  */
 final class St4FastOptimizerTest {
 

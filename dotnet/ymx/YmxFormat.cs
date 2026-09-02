@@ -19,7 +19,7 @@ namespace Ymx
         /// <summary>The only version this release writes or reads: the
         /// major in the high byte, the minor in the low, so versions order
         /// numerically.</summary>
-        public const int Version = 0x0008;
+        public const int Version = 0x0009;
 
         /// <summary>
         /// The binaries' own version, which moves when they change and
@@ -33,7 +33,7 @@ namespace Ymx
         public const int ReleaseMajor = 0;
 
         /// <summary>The release's minor number. See ReleaseMajor.</summary>
-        public const int ReleaseMinor = 9;
+        public const int ReleaseMinor = 10;
 
         /// <summary>The release's patch number. See ReleaseMajor.</summary>
         public const int Patch = 0;
@@ -60,6 +60,11 @@ namespace Ymx
 
         /// <summary>Flag bit 0: the tune starts over at frame 0.</summary>
         public const int FlagLoops = 1;
+
+        /// <summary>Flag bit 5: a section copies from its literal stream
+        /// (SPEC.md section 1.4), so the file plays only on a player built
+        /// for its ring as a window.</summary>
+        public const int FlagCopies = 0x20;
 
         /// <summary>Flag bit 1 + channel: the tune uses that timer channel.</summary>
         public static int FlagChannel(int channel)
@@ -144,12 +149,6 @@ namespace Ymx
         /// once through carries 0.</summary>
         public const int OffsetLoopFrame = 30;
 
-        /// <summary>Byte offset of the loop table: one long per stream, read
-        /// exactly as the section table is, locating the section that covers
-        /// frames [L, O). Zero where one section per stream covers the whole
-        /// tune, which is every file whose pass fits a ring.</summary>
-        public const int OffsetLoopTable = 34;
-
         /// <summary>Bit 31 of a section offset: the bytes there are the
         /// section's values, one per frame, with no container around them.</summary>
         public const long SectionStored = 0x8000_0000L;
@@ -167,14 +166,17 @@ namespace Ymx
             return (entry & SectionStored) != 0;
         }
 
-        /// <summary>One long offset per stream, in stream order.</summary>
-        public const int OffsetSectionTable = 42;
+        /// <summary>One long offset per stream, in stream order: where its
+        /// section is. A section covers the whole tune; where a pass is longer
+        /// than a ring, its container carries L as its rewind point (SPEC.md
+        /// section 8).</summary>
+        public const int OffsetSectionTable = 38;
 
         /// <summary>Q, the required-streams mask: bit k for stream k. A set
         /// bit requires the stream, and a consumer that does not implement
         /// it rejects the file; a clear bit on a stream the file carries
         /// makes it advisory (SPEC.md section 1.6).</summary>
-        public const int OffsetRequired = 38;
+        public const int OffsetRequired = 34;
 
         /// <summary>The mask a file carrying no extension stream holds: the
         /// twenty-five streams section 2 defines, and nothing above
@@ -394,15 +396,10 @@ namespace Ymx
                         + " - repack the tune from its .ym source");
             }
             // A stored section carries no signature, so the unit size comes
-            // from the first section that is a container - out of either
-            // table, since a file cut at its loop frame may store the frames
-            // before it and pack the frames from it.
+            // from the first section that is a container. A tune short enough
+            // to store every section reads the same at any unit size, and its
+            // unit here is 0.
             int section = Container(file, YmxFormat.OffsetSectionTable);
-            long loopTable = LongAt(file, YmxFormat.OffsetLoopTable);
-            if (section == 0 && loopTable != 0)
-            {
-                section = Container(file, (int) loopTable);
-            }
             if (section + 3 >= file.Length)
             {
                 throw new IOException(path + " has no readable first section");
@@ -445,9 +442,11 @@ namespace Ymx
                 throw new IOException(path + ": its timer stream is not"
                         + " readable: " + e.Message);
             }
+            // Decoded at the window the container carries: an offset past it
+            // is a copy from the literal stream, not a match.
             return St4Decompressor.Decompress(section.Control, section.Literal,
                     section.ByteOffsets, section.WordOffsets, section.Unit,
-                    section.Size)[0];
+                    section.Size, section.Window)[0];
         }
 
         /// <summary>The offset of one table's first section that is a

@@ -20,20 +20,29 @@ namespace Ymx
     /// </summary>
     public static class MkRelease
     {
-        /// <summary>One core build: a unit size and the two assembly flags.</summary>
-        internal sealed record Variant(int Unit, bool Perf, bool Nomask)
+        /// <summary>One core build: a unit size, the two assembly flags, and
+        /// whether it is built for the default ring as a window.</summary>
+        internal sealed record Variant(int Unit, bool Perf, bool Nomask, bool Copies)
         {
             internal string FileName()
             {
-                return "ymxsndh-k" + Unit + (Perf ? "-perf" : "")
-                        + (Nomask ? "-nomask" : "") + Tools.BinarySuffix()
-                        + ".bin";
+                return "ymxsndh-k" + Unit + (Copies ? "-copies" : "")
+                        + (Perf ? "-perf" : "") + (Nomask ? "-nomask" : "")
+                        + Tools.BinarySuffix() + ".bin";
             }
 
             internal int Flags()
             {
                 return (Perf ? MkSndh.CoreFlagPerf : 0)
-                        | (Nomask ? MkSndh.CoreFlagNomask : 0);
+                        | (Nomask ? MkSndh.CoreFlagNomask : 0)
+                        | (Copies ? MkSndh.CoreFlagCopies : 0);
+            }
+
+            /// <summary>The window the core is built for, in units: 0
+            /// without copies.</summary>
+            internal int Window()
+            {
+                return Copies ? YmxFormat.DefaultRingSize / Unit : 0;
             }
         }
 
@@ -43,10 +52,10 @@ namespace Ymx
             var variants = new List<Variant>();
             foreach (int unit in new[] {1, 2, 4})
             {
-                for (int flags = 0; flags < 4; flags++)
+                for (int flags = 0; flags < 8; flags++)
                 {
                     variants.Add(new Variant(unit, (flags & 1) != 0,
-                            (flags & 2) != 0));
+                            (flags & 2) != 0, (flags & 4) != 0));
                 }
             }
             return variants;
@@ -120,9 +129,10 @@ namespace Ymx
                 throw Tools.Fail("mkrelease: cannot clear " + dir);
             }
 
-            for (int flags = 0; flags < 4; flags++)
+            for (int flags = 0; flags < 8; flags++)
             {
-                MkCores.Cores(dir, (flags & 1) != 0, (flags & 2) != 0);
+                MkCores.Cores(dir, (flags & 1) != 0, (flags & 2) != 0,
+                        (flags & 4) != 0);
             }
             MkCores.Stub(dir);
             CarryStandalone(dir);
@@ -130,7 +140,8 @@ namespace Ymx
             var manifest = new StringBuilder();
             manifest.Append("YMX player binaries - release ")
                     .Append(YmxFormat.ReleaseName()).Append(", format version ")
-                    .Append(YmxFormat.VersionName()).Append(", descriptor version 1\n");
+                    .Append(YmxFormat.VersionName()).Append(", descriptor version ")
+                    .Append(MkSndh.CoreDescriptorVersion).Append('\n');
             manifest.Append("source commit ").Append(commit).Append('\n');
             manifest.Append("doc/BINARIES.md is the combine contract\n\n");
             manifest.Append("name  bytes  sha256  unit  flags\n");
@@ -565,11 +576,12 @@ namespace Ymx
                 throw new ArgumentException(variant.FileName()
                         + " is not an SNDH core");
             }
-            if (MkSndh.Word(core, MkSndh.CoreVersion) != 1)
+            if (MkSndh.Word(core, MkSndh.CoreVersion) != MkSndh.CoreDescriptorVersion)
             {
                 throw new ArgumentException(variant.FileName()
                         + " carries descriptor version "
-                        + MkSndh.Word(core, MkSndh.CoreVersion) + ", not 1");
+                        + MkSndh.Word(core, MkSndh.CoreVersion) + ", not "
+                        + MkSndh.CoreDescriptorVersion);
             }
             if (MkSndh.Word(core, MkSndh.CoreFormat) != YmxFormat.Version)
             {
@@ -596,6 +608,12 @@ namespace Ymx
                 throw new ArgumentException(variant.FileName() + " gives F = "
                         + fixedBytes + ", the workspace bytes before the rings:"
                         + " nonzero and even");
+            }
+            if (MkSndh.Word(core, MkSndh.CoreWindow) != variant.Window())
+            {
+                throw new ArgumentException(variant.FileName() + " carries window "
+                        + MkSndh.Word(core, MkSndh.CoreWindow) + ", its name says "
+                        + variant.Window());
             }
             if (!ZeroLong(core, MkSndh.CoreTableOff))
             {

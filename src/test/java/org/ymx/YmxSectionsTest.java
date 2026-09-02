@@ -93,12 +93,12 @@ final class YmxSectionsTest {
     }
 
     /**
-     * A tune whose replay is longer than the largest ring: the packer cuts
-     * every stream at the loop frame, the file carries a loop table, and the
-     * two sections of a stream hold the frames before and from it.
+     * A tune whose replay is longer than the ring: every stream's container
+     * carries the loop frame as its rewind point, decodes to the whole
+     * stream, and the frames from it are packed on their own.
      */
     @Test
-    void aTuneCutAtItsLoopFrameCarriesBothHalves() {
+    void aTuneWhosePassIsPastTheRingRewindsToItsLoopFrame() {
         int frames = 2688;
         int loop = 100;
         byte[][] registers = Ym6TestData.registers(frames);
@@ -113,25 +113,33 @@ final class YmxSectionsTest {
 
         assertEquals(loop, longAt(file, YmxFormat.OFFSET_LOOP_FRAME),
                 "the frame the file starts over from");
-        int loopTable = longAt(file, YmxFormat.OFFSET_LOOP_TABLE);
-        assertTrue(loopTable != 0, "a body past the largest ring carries a"
-                + " loop table");
-        assertEquals(0, loopTable % 4, "the loop table is on a long boundary");
         assertEquals(960, word(file, YmxFormat.OFFSET_RING_SIZE),
-                "a cut leaves the ring where it was");
+                "a rewind leaves the ring where it was");
 
         byte[][] expected = YmxEncoderTest.expectedVectors(source);
+        int rewinding = 0;
         for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
-            long first = entry(file, stream);
-            long second = longAt(file, loopTable + 4 * stream) & 0xFFFF_FFFFL;
-            assertTrue(second != 0, "stream " + stream + " has no loop section");
-            assertArrayEquals(Arrays.copyOfRange(expected[stream], 0, loop),
-                    sectionValues(file, first, loop),
-                    "stream " + stream + " before the loop frame");
-            assertArrayEquals(Arrays.copyOfRange(expected[stream], loop, frames),
-                    sectionValues(file, second, frames - loop),
-                    "stream " + stream + " from the loop frame");
+            long entry = entry(file, stream);
+            assertArrayEquals(expected[stream], sectionValues(file, entry, frames),
+                    "stream " + stream + " decodes to the whole stream");
+            if (YmxFormat.isStored(entry)) {
+                continue;
+            }
+            int start = (int) YmxFormat.sectionOffset(entry);
+            org.st4.St4Format.Container container = org.st4.St4Format.read(
+                    Arrays.copyOfRange(file, start, file.length));
+            assertEquals(loop, container.rewind(), "stream " + stream
+                    + "'s container rewinds to the loop frame, in bytes");
+            assertEquals(960 / container.unit(), container.window(),
+                    "stream " + stream + "'s window is the ring in units");
+            // The loop parsed on its own: decoded held to its rewind point,
+            // which refuses a match reaching before it.
+            org.st4.St4Decompressor.decode(container.control(), container.literal(),
+                    container.byteOffsets(), container.wordOffsets(), container.unit(),
+                    container.size(), container.window(), container.rewind());
+            rewinding++;
         }
+        assertTrue(rewinding > 0, "no stream was packed, so nothing rewinds");
     }
 
     @Test

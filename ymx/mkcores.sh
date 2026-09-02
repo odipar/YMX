@@ -1,13 +1,15 @@
 #!/bin/sh
 # mkcores.sh - assemble the prebuilt player binaries into dist/.
 #
-#   ymx/mkcores.sh [-perf] [-nomask] [outdir]
+#   ymx/mkcores.sh [-perf] [-nomask] [-copies [-nN]] [outdir]
 #
 # The build step that runs rmac. It assembles the SNDH cores - one per
 # ST4 unit size, suffixed by the flags - and, in a plain run, the PRG stub.
 # org.ymx.MkSndh and org.ymx.MkPrg combine the results without an
 # assembler; doc/BINARIES.md is the contract. -perf builds cores with the
-# raster monitor in, -nomask cores whose frame write runs unmasked.
+# raster monitor in, -nomask cores whose frame write runs unmasked, and
+# -copies cores built for the default ring as a window, which decode copies
+# from the literal stream; -copies -nN builds them for a ring of N bytes.
 #
 # The work is org.ymx.MkCores's; this only finds the repo and the classes.
 # Needs rmac on PATH.

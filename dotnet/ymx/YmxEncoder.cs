@@ -23,12 +23,7 @@ namespace Ymx
     {
         /// <summary>What packing one stream's vector produced.</summary>
         public sealed record Stream(int Register, int Frames, int PackedSize,
-                int LongestOp, int LoopSize)
-        {
-            /// <summary>The bytes of the section covering the frames before
-            /// the loop frame: the whole of a stream that is not cut.</summary>
-            public int FirstSize => PackedSize - LoopSize;
-        }
+                int LongestOp);
 
         /// <summary>The finished file plus the per-stream numbers the CLI
         /// reports; Tune is the one packed, the padded one where the
@@ -93,6 +88,17 @@ namespace Ymx
         /// format the tune was read out of.</summary>
         public static Result Encode(Tune tune, int ringSize, int chunk,
                 bool loops, bool progress, int unit, int timerMap)
+        {
+            return Encode(tune, ringSize, chunk, loops, progress, unit, timerMap, -1);
+        }
+
+        /// <summary>As above, with copies from the literal stream (SPEC.md
+        /// Appendix A.5): copies below 0 packs none, 0 packs the search's
+        /// opening passes, and above 0 searches for that many seconds a
+        /// stream. A file with a copy in it sets flag bit 5 and plays only on
+        /// a player built for its ring as a window.</summary>
+        public static Result Encode(Tune tune, int ringSize, int chunk,
+                bool loops, bool progress, int unit, int timerMap, double copies)
         {
             // The floor first, on what every tune decodes; the exact check
             // waits for the script, since a tune that leaves channels idle
@@ -163,34 +169,31 @@ namespace Ymx
                         Carry(script.Counts[c], script.M, acts, action);
             }
 
-            // One section per stream, or two where the plan cuts them at the
-            // loop frame: the first covers the frames before it, the second the
-            // frames from it, and the pair is what the stream reports as its
-            // cost.
+            // One section per stream. Where the plan rewinds, the container's
+            // rewind point is the loop frame and the frames from it are parsed
+            // on their own, so a pass after the first reads the history the
+            // first one did (SPEC.md section 8).
             var streams = new List<Stream>(YmxFormat.Streams);
             var sections = new Section[YmxFormat.Streams];
-            Section[]? loopSections = plan.Cut ? new Section[YmxFormat.Streams] : null;
+            int rewindAt = plan.Rewinds ? plan.Frame : -1;
+            bool copied = false;
             for (int stream = 0; stream < YmxFormat.Streams; stream++)
             {
                 byte[] values = vectors[stream];
-                if (loopSections == null)
-                {
-                    sections[stream] = Pack(progress, values, offsetLimit, unit);
-                }
-                else
-                {
-                    sections[stream] = Pack(progress, Slice(values, 0, plan.Frame),
-                            offsetLimit, unit);
-                    loopSections[stream] = Pack(progress,
-                            Slice(values, plan.Frame, values.Length), offsetLimit,
-                            unit);
-                }
-                streams.Add(Measure(stream, values.Length, sections[stream],
-                        loopSections == null ? null : loopSections[stream]));
+                sections[stream] = Pack(progress, values, offsetLimit, unit, rewindAt,
+                        copies);
+                copied |= sections[stream].Copies > 0;
+                streams.Add(new Stream(stream, values.Length,
+                        sections[stream].Bytes.Length, sections[stream].LongestOp));
             }
+            // The twenty-five containers of one file take one loop form. A
+            // stream's section holds one byte a frame, so every container's
+            // rewind point is the loop frame in bytes, or none.
+            LoopsAlign(sections, rewindAt, offsetLimit);
 
             byte[] file = Build(tune, ringSize, chunk, frames, loops, plan.Frame,
-                    sections, loopSections, tune.Samples, channels);
+                    sections, tune.Samples,
+                    channels | (copied ? YmxFormat.FlagCopies : 0));
             return new Result(file, streams, ringSize, chunk, loops, unit,
                     plan.Frame, tune, script, plan.Notes);
         }
@@ -235,85 +238,110 @@ namespace Ymx
         }
 
         /// <summary>One section as it goes into the file: packed, or the
-        /// values themselves.</summary>
-        private sealed record Section(byte[] Bytes, bool Stored, int LongestOp)
+        /// values themselves; Copies counts the blocks copied from the
+        /// literal stream.</summary>
+        private sealed record Section(byte[] Bytes, bool Stored, int LongestOp,
+                int Copies)
         {
             internal static readonly Section Absent =
-                    new Section(new byte[0], false, 0);
+                    new Section(new byte[0], false, 0, 0);
         }
 
         /// <summary>Packs one section; a short section costs more as a
         /// container than as itself, and then the values are what the file
-        /// gets, with the section's offset saying so.</summary>
+        /// gets, with the section's offset saying so. rewindAt is the frame
+        /// the container carries as its rewind point, or -1: the frames from
+        /// it are parsed apart from the frames before it.</summary>
         private static Section Pack(bool progress, byte[] values, int offsetLimit,
-                int unit)
+                int unit, int rewindAt, double copies)
         {
             if (values.Length == 0)
             {
                 return Section.Absent;
             }
             int[] units = Units.Split(values, unit);
-            St4Compressor.Result result = St4Compressor.Compress(
-                    St4EventOptimizer.Optimize(units, unit, offsetLimit, progress),
-                    units, unit, St4Format.MaxOp);
+            St4Compressor.Result result;
+            if (rewindAt < 0)
+            {
+                result = St4Compressor.Compress(
+                        Parse(units, unit, offsetLimit, copies, progress),
+                        units, unit, St4Format.MaxOp, -1, offsetLimit);
+            }
+            else
+            {
+                // A value is one byte, so the rewind point in units is the
+                // frame over the unit size; the plan holds the frame to a unit
+                // boundary.
+                int rewindIndex = rewindAt / unit;
+                int[] intro = new int[rewindIndex];
+                int[] loop = new int[units.Length - rewindIndex];
+                Array.Copy(units, 0, intro, 0, intro.Length);
+                Array.Copy(units, rewindIndex, loop, 0, loop.Length);
+                result = St4Compressor.CompressRewinding(
+                        Parse(intro, unit, offsetLimit, copies, progress),
+                        Parse(loop, unit, offsetLimit, copies, progress),
+                        units, unit, St4Format.MaxOp, rewindIndex, offsetLimit);
+            }
             byte[] container = St4Cli.Container(result);
             bool stored = values.Length < container.Length;
-            return new Section(stored ? values : container, stored, result.LongestOp);
+            return new Section(stored ? values : container, stored, result.LongestOp,
+                    stored ? 0 : result.Copies);
         }
 
-        /// <summary>What one stream costs the file: its frames, and the bytes
-        /// of the one section covering them or of the two that share
-        /// them.</summary>
-        private static Stream Measure(int stream, int frames, Section first,
-                Section? second)
+        /// <summary>The parse: the event-driven optimizer, or with copies the
+        /// search that copies from the literal stream, for copies
+        /// seconds.</summary>
+        private static St4Block Parse(int[] units, int unit, int window,
+                double copies, bool progress)
         {
-            if (second == null)
+            if (copies < 0)
             {
-                return new Stream(stream, frames, first.Bytes.Length,
-                        first.LongestOp, 0);
+                return St4EventOptimizer.Optimize(units, unit, window, progress);
             }
-            return new Stream(stream, frames,
-                    first.Bytes.Length + second.Bytes.Length,
-                    Math.Max(first.LongestOp, second.LongestOp),
-                    second.Bytes.Length);
+            return St4LiteralCopySearch.Optimize(units, unit, window, St4Format.MaxOp,
+                    copies, progress && copies > 0);
         }
 
-        /// <summary>One stream's values for frames [from, to).</summary>
-        private static byte[] Slice(byte[] values, int from, int to)
+        /// <summary>Every container of the file carries the one loop form the
+        /// plan chose: a rewind point of rewindAt bytes, or none, and the
+        /// window the ring gives. A stored section carries no header and takes
+        /// its form from the file's.</summary>
+        private static void LoopsAlign(Section[] sections, int rewindAt, int window)
         {
-            byte[] part = new byte[to - from];
-            Array.Copy(values, from, part, 0, part.Length);
-            return part;
+            int want = rewindAt < 0 ? St4Format.NoRewind : rewindAt;
+            for (int stream = 0; stream < sections.Length; stream++)
+            {
+                if (sections[stream].Stored || sections[stream].Bytes.Length == 0)
+                {
+                    continue;
+                }
+                St4Format.Container container = St4Format.Read(sections[stream].Bytes);
+                if (container.Rewind != want)
+                {
+                    throw new InvalidOperationException("stream " + stream
+                            + " carries rewind " + container.Rewind
+                            + " where the file's loop form is " + want);
+                }
+                if (container.Window != window)
+                {
+                    throw new InvalidOperationException("stream " + stream
+                            + " carries window " + container.Window
+                            + " where the ring gives " + window);
+                }
+            }
         }
 
         private static byte[] Build(Tune tune, int ringSize, int chunk, int frames,
-                bool loops, int loopFrame, Section[] sections,
-                Section[]? loopSections, byte[][] samples, int channels)
+                bool loops, int loopFrame, Section[] sections, byte[][] samples,
+                int channels)
         {
             // Each section is placed on a long boundary: containers carry
             // alignment rules of their own, and a stored section takes the
             // same boundary - one placement rule.
-            //
-            // The loop table, where there is one, sits between the header and
-            // the sections: one more table of the same shape, on a long
-            // boundary like everything else in the body.
             int total = YmxFormat.HeaderSize;
-            int loopTable = 0;
-            if (loopSections != null)
-            {
-                loopTable = Align(total);
-                total = loopTable + 4 * YmxFormat.Streams;
-            }
             foreach (Section section in sections)
             {
                 total = Align(total) + section.Bytes.Length;
-            }
-            if (loopSections != null)
-            {
-                foreach (Section section in loopSections)
-                {
-                    total = Align(total) + section.Bytes.Length;
-                }
             }
             int sampleTable = samples.Length == 0 ? 0 : Align(total);
             if (samples.Length > 0)
@@ -342,21 +370,12 @@ namespace Ymx
             PutWord(file, YmxFormat.OffsetSampleCount, samples.Length);
             // L, the frame the tune starts over from: 0 where it plays once
             // through, and 0 where the packer could not keep the source's own.
-            // The loop table offset is 0 where the sections cover the whole
-            // tune, and otherwise where the second set of them is located from.
             PutLong(file, YmxFormat.OffsetLoopFrame, loopFrame);
-            PutLong(file, YmxFormat.OffsetLoopTable, loopTable);
             // Q: this version carries no extension stream, so the mask names
             // the twenty-five section 2 defines and nothing above them.
             PutLong(file, YmxFormat.OffsetRequired, YmxFormat.RequiredBase);
 
-            int at = Place(file, YmxFormat.OffsetSectionTable, sections,
-                    loopTable == 0 ? YmxFormat.HeaderSize
-                            : loopTable + 4 * YmxFormat.Streams);
-            if (loopSections != null)
-            {
-                Place(file, loopTable, loopSections, at);
-            }
+            Place(file, YmxFormat.OffsetSectionTable, sections, YmxFormat.HeaderSize);
 
             // The sample table: entries first, then the samples, each closed
             // by the end marker the PCM tick handler stops on.

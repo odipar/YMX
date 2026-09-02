@@ -14,7 +14,7 @@ const Magic = 0x594D5821
 
 // Version is the only format version this build writes or reads: the major
 // in the high byte, the minor in the low, so versions order numerically.
-const Version = 0x0008
+const Version = 0x0009
 
 // ReleaseMajor is the binaries' own version, which moves when they change
 // and stands when they do not. It is three plain numbers rather than a
@@ -25,7 +25,7 @@ const Version = 0x0008
 const ReleaseMajor = 0
 
 // ReleaseMinor is the release's minor number. See [ReleaseMajor].
-const ReleaseMinor = 9
+const ReleaseMinor = 10
 
 // Patch is the release's patch number. See [ReleaseMajor].
 const Patch = 0
@@ -53,6 +53,10 @@ const FlagLoops = 1
 func FlagChannel(channel int) int {
 	return 2 << channel
 }
+
+// FlagCopies is header flag bit 5: a stream copies from its literal stream,
+// so the player must be built with the ring as its window.
+const FlagCopies = 0x20
 
 // The stream counts: R0..R13 plus the script streams M, X, T and four A/P
 // pairs.
@@ -129,20 +133,14 @@ const (
 	// once through carries 0.
 	OffsetLoopFrame = 30
 
-	// OffsetLoopTable is the byte offset of the loop table: one long per
-	// stream, read exactly as the section table is, locating the section
-	// that covers frames [L, O). Zero where one section per stream covers
-	// the whole tune, which is every file whose pass fits a ring.
-	OffsetLoopTable = 34
-
 	// OffsetRequired is Q, the required-streams mask: bit k for stream k. A
 	// set bit requires the stream, and a consumer that does not implement it
 	// rejects the file; a clear bit on a stream the file carries makes it
 	// advisory.
-	OffsetRequired = 38
+	OffsetRequired = 34
 
 	// OffsetSectionTable is one long offset per stream, in stream order.
-	OffsetSectionTable = 42
+	OffsetSectionTable = 38
 )
 
 // SectionStored is bit 31 of a section offset: the bytes there are the

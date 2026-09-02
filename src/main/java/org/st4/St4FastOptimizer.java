@@ -2,35 +2,14 @@ package org.st4;
 
 
 /**
- * {@link St4Optimizer}, restructured to not allocate: the same parse, found the
- * same way, producing byte-identical output - measured at a fraction of the
- * time.
- *
- * <p>The original walks the same dynamic program but materialises every
- * candidate as an {@link St4Block}, and nearly all of them lose and become
- * garbage: packing a 300 KB asset was measured allocating 37 GB of blocks.
- * This version runs in two passes:
- *
- * <ol>
- *   <li><b>Forward</b>, the identical DP on primitive arrays: per offset, the
- *       cost and end of the best chain ending in a match and in a literal run;
- *       per position, the winning cost and a three-int descriptor of which
- *       candidate won - its kind, its offset, and the one value that cannot be
- *       recomputed later.</li>
- *   <li><b>Backward</b>, chain reconstruction: only the blocks the winning
- *       parse actually contains are built, by replaying each recorded winner's
- *       local decision from the descriptor, the winning costs, and the data
- *       itself. A match run's extent and the previous match at an offset are
- *       found by scanning the units, which costs what the chain covers; the
- *       best split of a new-offset match is re-derived from the same recorded
- *       costs the forward pass minimised over.</li>
- * </ol>
- *
- * <p>The candidates are evaluated in the same order with the same
- * strictly-better replacement rule, so ties fall exactly as in the original
- * and the output is byte-identical - which the equivalence test asserts, and
- * which is the reason {@link St4Optimizer} stays in the tree: it is the
- * specification this class is checked against.
+ * {@link St4Optimizer} without allocation: the same parse, the same bytes
+ * out, measured 4 to 7 times faster. The reference makes every candidate an
+ * {@link St4Block}, nearly all of them garbage. This runs the same DP forward
+ * on primitive arrays, records per position the winning cost and a three-int
+ * descriptor of the winner, and {@link St4ChainRebuilder} builds only the
+ * winning chain. Candidates are evaluated in the same order with the same
+ * strictly-better rule, so ties fall as in the reference and the output is
+ * byte-identical, which a test asserts.
  */
 public final class St4FastOptimizer {
 
@@ -62,16 +41,16 @@ public final class St4FastOptimizer {
     }
 
     /**
-     * Returns the last block of the optimal parse of {@code units}, reporting
-     * progress on stdout while it works.
+     * The last block of the optimal parse of {@code units}, reporting
+     * progress on stdout.
      */
     public static St4Block optimize(int[] units, int unit, int offsetLimit) {
         return optimize(units, unit, offsetLimit, true);
     }
 
     /**
-     * Returns the last block of the optimal parse of {@code units} - the same
-     * chain {@link St4Optimizer#optimize} returns, byte for byte.
+     * The last block of the optimal parse of {@code units}: the chain
+     * {@link St4Optimizer#optimize} returns, byte for byte.
      *
      * @param unit        bytes per unit, which sets what a literal costs
      * @param offsetLimit the furthest a match may reach back, in units
@@ -87,8 +66,8 @@ public final class St4FastOptimizer {
 
     /**
      * The winning cost per position, for the tests that hold other optimizers
-     * to this one: the optimum is unique, so any exact optimizer must produce
-     * this exact array.
+     * to this one: the optimum is unique, so an exact optimizer produces this
+     * array.
      */
     static int[] costs(int[] units, int unit, int offsetLimit) {
         var optimizer = new St4FastOptimizer(units, unit, offsetLimit);
@@ -104,11 +83,11 @@ public final class St4FastOptimizer {
 
     /**
      * The DP of {@link St4Optimizer#optimize}, candidate for candidate, on
-     * primitives. State per offset: the best chain ending in a match at
+     * primitives. Per offset: the best chain ending in a match at
      * {@code stateEnd} costing {@code stateBits}, and the best chain ending in
      * a literal run at {@code litEnd} costing {@code litBits}. A position's
-     * winner is recorded the moment it takes the lead; replacement is strictly
-     * better, as {@code better()} was, so ties keep the earlier candidate.
+     * winner is recorded when it takes the lead, and replaced only by a
+     * strictly better one, so ties keep the earlier candidate.
      */
     private void forward(boolean progress) {
         int count = units.length;

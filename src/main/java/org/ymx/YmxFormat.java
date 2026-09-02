@@ -78,7 +78,7 @@ public final class YmxFormat {
      * high byte, the minor in the low, so versions order numerically.
      * There is no version history here to be compatible with;
      * doc/SPEC.md defines the layout. */
-    public static final int VERSION = 0x0008;
+    public static final int VERSION = 0x0009;
 
     /**
      * The binaries' own version, which moves when they change and stands
@@ -91,7 +91,7 @@ public final class YmxFormat {
     public static final int RELEASE_MAJOR = 0;
 
     /** The release's minor number. See {@link #RELEASE_MAJOR}. */
-    public static final int RELEASE_MINOR = 9;
+    public static final int RELEASE_MINOR = 10;
 
     /** The release's patch number. See {@link #RELEASE_MAJOR}. */
     public static final int PATCH = 0;
@@ -113,6 +113,10 @@ public final class YmxFormat {
 
     /** Flag bit 0: the tune starts over at frame 0 instead of ending. */
     public static final int FLAG_LOOPS = 1;
+
+    /** Flag bit 5: a section copies from its literal stream (SPEC.md §1.4),
+     * so the file plays only on a player built for its ring as a window. */
+    public static final int FLAG_COPIES = 0x20;
 
     /** Flag bit {@code 1 + channel}: the tune uses that timer channel, so
      * the player claims a timer for it. Every channel says so the same
@@ -206,18 +210,13 @@ public final class YmxFormat {
      * once through carries 0. */
     public static final int OFFSET_LOOP_FRAME = 30;
 
-    /** Byte offset of the loop table: one long per stream, read exactly as
-     * the section table is, locating the section that covers frames
-     * {@code [L, O)}. Zero where one section per stream covers the whole
-     * tune, which is every file whose pass fits a ring. */
-    public static final int OFFSET_LOOP_TABLE = 34;
-
     /**
      * Bit 31 of a section offset: the bytes at that offset are the section's
      * values, one per frame, and there is no container around them.
      *
-     * <p>Twenty of a container's bytes are header, so a section shorter than
-     * that costs more packed than plain - a one-frame tune carries one value.
+     * <p>Twenty-eight of a container's bytes are header, so a section shorter
+     * than that costs more packed than plain - a one-frame tune carries one
+     * value.
      * The offset's top bit says which a section is, and a file is far too
      * small for the bit to be an offset.
      */
@@ -233,10 +232,10 @@ public final class YmxFormat {
         return (entry & SECTION_STORED) != 0;
     }
 
-    /** One long offset per stream, in stream order: where its section is -
-     * the whole tune, or the frames before {@code L} where the file carries a
-     * loop table. */
-    public static final int OFFSET_SECTION_TABLE = 42;
+    /** One long offset per stream, in stream order: where its section is.
+     * A section covers the whole tune; where a pass is longer than a ring,
+     * its container carries {@code L} as its rewind point (SPEC.md §8). */
+    public static final int OFFSET_SECTION_TABLE = 38;
 
     /**
      * {@code Q}, the required-streams mask: bit {@code k} for stream
@@ -244,7 +243,7 @@ public final class YmxFormat {
      * implement it rejects the file; a clear bit on a stream the file
      * carries makes it advisory (SPEC.md §1.6).
      */
-    public static final int OFFSET_REQUIRED = 38;
+    public static final int OFFSET_REQUIRED = 34;
 
     /** The mask a file carrying no extension stream holds: the twenty-five
      * streams §2 defines, and nothing above them. */

@@ -20,6 +20,42 @@ by someone deciding whether to take the release, not by someone
 reviewing it: the commits carry the reasoning and the measurements, and
 the section carries the list.
 
+## 0.10.0
+
+The player is 3,654 bytes at unit size 2, where 0.9.0 carried 3,534, and
+the PRG stub 3,038. Format version 0.9: a tune packed at 0.8 has to be
+repacked from its `.ym` source. Every packed section moves: its header is
+twenty-eight bytes where it was twenty, and its signature names ST4
+version 7.
+
+- **The ST4 container is version 7.** The packer, the three decoders and
+  the specification's Appendix A follow the ST4 repository at that
+  version. A container carries a rewind point and a window, and its end
+  code carries a repeat bit; a section of this version uses none of the
+  three - it ends, its rewind field is `$FFFFFFFF` and its window is
+  `N/k` - so a file decodes as it did, eight bytes longer a section. The
+  stream decoder is 320 bytes where it was 288.
+- **A pass longer than the ring rewinds instead of being cut.** Every
+  stream's container carries `L` as its rewind point and the frames from
+  `L` packed on their own; the player saves each decoder's state after
+  `L` values and restores all but the write pointer after `O`, every pass.
+  The loop table goes: twenty-five headers and the table itself, per tune
+  that used to be cut. The header is 138 bytes where it was 142. The long
+  at offset 30 is `L`, as it was. The long at offset 34 is `Q`. The
+  section table follows at 38. The workspace before the rings holds a
+  saved state per stream: 2,458 bytes where it held 1,658.
+- **Copies from the literal stream.** `ymx -copies` lets a match beyond
+  the ring copy from the literal stream, `-copiesS` searching S seconds a
+  stream for a better parse; `st4 -c[S]` and `-rR` and `dst4 -rN` are
+  ST4's own. Such a file sets flag bit 5 and plays only on a player built
+  for its ring as a window: the `-copies` cores, twelve more in the
+  binaries release, whose descriptor is version 2 and carries the window.
+  Those are built for the default ring; a copies tune at another ring
+  gets a core named for it, `-copies-nN`, which the Java and C#
+  combiners assemble on the spot and `mkcores.sh -copies -nN` assembles
+  for the Go tree. A player without a window rejects the file rather than
+  decode a copy to other bytes.
+
 ## 0.9.0
 
 The player is 3,534 bytes at unit size 2, where 0.8.3 carried 3,434, and

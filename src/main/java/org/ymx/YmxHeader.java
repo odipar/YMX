@@ -73,15 +73,10 @@ public record YmxHeader(int ring, int chunk, int unit, int hz, int flags, int fr
                     + " - repack the tune from its .ym source");
         }
         // A stored section carries no signature, so the unit size comes from
-        // the first section that is a container - out of either table, since
-        // a file cut at its loop frame may store the frames before it and
-        // pack the frames from it. A tune short enough to store every
-        // section reads the same at any unit size, and its unit here is 0.
+        // the first section that is a container. A tune short enough to store
+        // every section reads the same at any unit size, and its unit here
+        // is 0.
         int section = container(file, YmxFormat.OFFSET_SECTION_TABLE);
-        long loopTable = longAt(file, YmxFormat.OFFSET_LOOP_TABLE);
-        if (section == 0 && loopTable != 0) {
-            section = container(file, (int) loopTable);
-        }
         if (section + 3 >= file.length) {
             throw new IOException(path + " has no readable first section");
         }
@@ -117,9 +112,11 @@ public record YmxHeader(int ring, int chunk, int unit, int hz, int flags, int fr
             throw new IOException(path + ": its timer stream is not readable: "
                     + e.getMessage());
         }
+        // Decoded at the window the container carries: an offset past it is
+        // a copy from the literal stream, not a match.
         return St4Decompressor.decompress(section.control(), section.literal(),
                 section.byteOffsets(), section.wordOffsets(), section.unit(),
-                section.size())[0] & 0xFF;
+                section.size(), section.window())[0] & 0xFF;
     }
 
     /** The offset of one table's first section that is a container, or 0

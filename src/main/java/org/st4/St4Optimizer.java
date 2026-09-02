@@ -3,20 +3,13 @@ package org.st4;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Optimal LZ parser for ST4: ZX1's optimal parser (jx1's, in odipar/ST1),
- * moved from bytes to k-byte units.
- *
- * <p>The algorithm is unchanged - for every position it keeps, per offset, the
- * cheapest chain that ends in a literal run and the cheapest that ends in a
- * match, then picks the best of the two - because the format's shape is
- * unchanged. Only the units differ, and with them two things in the cost model:
- * a literal unit costs {@code 8 * k} bits rather than 8, and an offset counts
- * units rather than bytes, so the byte encoding reaches {@code 512 * k} bytes
- * back. A new-offset match pays three control bits - the flag and the two that
- * name its offset's width and bank - plus eight or sixteen for the offset
- * itself.
- *
- * <p>The result is a chain of {@link St4Block}s, last block first, which
+ * The optimal parser: ZX1's, moved from bytes to k-byte units, and the
+ * readable reference the fast optimizers are held to. For every position it
+ * keeps, per offset, the cheapest chain ending in a literal run and the
+ * cheapest ending in a match, and takes the best. Only the costs differ from
+ * ZX1's: a literal unit costs {@code 8 * k} bits, an offset counts units, a
+ * new-offset match pays three control bits and a byte or a word. The result
+ * is a chain of {@link St4Block}s, last block first, which
  * {@link St4Compressor} walks in reverse.
  */
 public final class St4Optimizer {
@@ -25,18 +18,8 @@ public final class St4Optimizer {
     public static final int INITIAL_OFFSET = 1;
 
     /**
-     * Inner-loop steps this parse will take, known before it starts.
-     *
-     * <p>The COUNT is exact and owes nothing to the data: position {@code
-     * index} is tried against every offset from 1 to {@code clamp(index, 1,
-     * offsetLimit)}. What the steps cost is another matter entirely - one that
-     * finds a match allocates a block and walks the best-length ladder, one
-     * that finds nothing does neither - so this measures the parse's progress,
-     * not its remaining time. The time comes from {@link #estimate} instead.
-     *
-     * <p>Positions are also not equal work: the early ones try a handful of
-     * offsets and the later ones the whole window, which is why counting
-     * positions rather than steps would run fast and then crawl.
+     * Inner-loop steps of the parse, known before it starts: position
+     * {@code index} tries offsets 1 to {@code clamp(index, 1, offsetLimit)}.
      */
     private static long totalSteps(int count, int offsetLimit) {
         long ramp = Math.min(count - 1L, offsetLimit);      // 1..L, one step longer each
@@ -46,31 +29,19 @@ public final class St4Optimizer {
 
     private St4Optimizer() {}
 
-    /**
-     * Percent of the work to finish before estimating anything, so the JIT's
-     * warm-up is not counted against the rest.
-     */
+    /** Percent of the work done before estimating, so the JIT's warm-up is not counted. */
     private static final int WARMUP = 5;
 
-    /**
-     * Percent of history the fit needs before it says anything. A curve drawn
-     * through three points a couple of percent apart is mostly noise, and a
-     * confidently wrong number is worse than no number.
-     */
+    /** Percent of history the fit needs before it says anything. */
     private static final int BASELINE = 15;
 
 
 
     /**
-     * Time left, or "" until there is enough history to say.
-     *
-     * <p>Elapsed time is fitted as {@code a*x + b*x^2} in the percentage x,
-     * through the warm-up point, the midpoint and now. The square makes
-     * it work on real assets: a step costs what its neighbourhood costs, so a
-     * parse that finds more matches as it goes gets steadily slower, and a rate
-     * measured over any window - however recent - keeps predicting the past. On
-     * an asset whose cost per step is flat, {@code b} comes out near zero and
-     * this is the straight-line estimate it should be.
+     * Time left, or "" until there is enough history to say: the elapsed time
+     * fitted as {@code a*x + b*x^2} in the percentage x through the warm-up
+     * point, the midpoint and now. The square term follows a parse that
+     * slows as it finds more matches.
      */
     private static String estimate(int percent, long now, long[] tickNanos) {
         int base = WARMUP;
@@ -98,7 +69,7 @@ public final class St4Optimizer {
         return duration((long) left) + " left";
     }
 
-    /** Seconds, in the shortest form that stays readable, rounded not floored. */
+    /** Seconds, rounded, as 42s or 3m 05s. */
     private static String duration(long nanos) {
         long seconds = (Math.max(0, nanos) + 500_000_000L) / 1_000_000_000L;
         return seconds < 60 ? seconds + "s"
@@ -119,8 +90,8 @@ public final class St4Optimizer {
     }
 
     /**
-     * Returns the last block of the optimal parse of {@code units}, drawing a
-     * progress bar on stdout while it works.
+     * The last block of the optimal parse of {@code units}, reporting
+     * progress on stdout.
      *
      * @param unit        bytes per unit, which sets what a literal costs
      * @param offsetLimit the furthest a match may reach back, in units
@@ -130,17 +101,14 @@ public final class St4Optimizer {
     }
 
     /**
-     * Returns the last block of the optimal parse of {@code units}.
-     *
-     * <p>This is the slow half of packing - every position against every offset
-     * - so it reports as it goes, exactly as jx1 does. Callers that are not a
-     * person waiting at a terminal pass {@code false}.
+     * The last block of the optimal parse of {@code units}: every position
+     * against every offset, reporting as it goes.
      *
      * @param unit        bytes per unit, which sets what a literal costs
      * @param offsetLimit the furthest a match may reach back, in units
-     * @param progress    whether to report on stdout: a percentage of the
-     *                    parse's steps, which is exact, and a time estimate
-     *                    fitted to how the parse has been slowing, which is not
+     * @param progress    whether to report on stdout: an exact percentage of
+     *                    the steps, and a time estimate fitted to how the
+     *                    parse has been slowing
      */
     public static St4Block optimize(int[] units, int unit, int offsetLimit,
                                     boolean progress) {
@@ -167,8 +135,8 @@ public final class St4Optimizer {
             int bestLengthSize = 2;
             for (int offset = 1; offset <= maxOffset; offset++) {
                 if (index != 0 && index >= offset && units[index] == units[index - offset]) {
-                    // Match reusing the last offset: its length may be one unit,
-                    // which at k = 4 replaces four bytes with a couple of bits.
+                    // A match reusing the last offset: one unit at least, which
+                    // at k = 4 replaces four bytes with a few bits.
                     St4Block literal = lastLiteral[offset];
                     if (literal != null) {
                         int length = index - literal.index();
@@ -177,8 +145,7 @@ public final class St4Optimizer {
                         lastMatch[offset] = match;
                         optimal[index] = better(optimal[index], match);
                     }
-                    // Match with a new offset, which the format cannot express
-                    // shorter than two units.
+                    // A match with a new offset: two units at least.
                     if (++matchLength[offset] > 1) {
                         if (bestLengthSize < matchLength[offset]) {
                             St4Block best = optimal[index - bestLength[bestLengthSize]];

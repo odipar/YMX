@@ -469,33 +469,32 @@ the pass it packs two sections instead, and gives the `N` that would have
 held it.
 
 `Turrican - world 4-3` is this case, packed with `-n1776`. Its file is
-2,536 bytes, the same as it would be with no loop, and its header gives
+2,736 bytes, the same as it would be with no loop, and its header gives
 `N` = 1,776.
 
 ### The pass is too long to keep
 
 `Dragon Flight 4 - Finish 1` is 5,440 frames and goes back to 1,440. One
 pass is 4,000 frames, and no ring may exceed 2,520 bytes, so the pass
-cannot be kept. Here each of the twenty-five streams is compressed as
-two sections rather than one, the first covering frames 0 to 1,439 and
-the second 1,440 to 5,439.
+cannot be kept. Here each of the twenty-five streams is one container
+whose rewind point is frame 1,440: the frames from 1,440 are packed apart
+from the frames before it, so no match in the loop reaches before it.
 
-A second table of twenty-five offsets says where each stream's second
-section begins. The header carries that table's position at offset 34,
-and 0 where there is none.
+The rewind point is in each container's own header, in bytes, and a
+stream's value is one byte, so every container of the file carries the
+same 1,440. The YMX header carries nothing more than `L`.
 
-Playing it: each stream decodes its first section, and when that section
-runs out - which happens at frame 1,440, the same value for every stream,
-since every first section holds exactly 1,440 values - the stream opens
-the second section instead. From then on, every time a stream runs out it
-opens that same second section again. The rings are unchanged; only
-which section is opened is new.
+Playing it: each stream decodes its container, and when it has produced
+1,440 values - the same value for every stream - the player saves the
+decoder's seven registers. When it has produced 5,440 the player puts
+them back, all but the write pointer, and the decoder reads the loop
+again from where it read it the first time. The rings are unchanged; a
+saved state per stream is new, 32 bytes of workspace each.
 
-This costs bytes. The two halves cannot compress against each other, so a
-match in the second half cannot reach back into the first, and the file
-carries twenty-five more section headers. Of the 99 tunes with a loop
+This costs bytes. The loop cannot compress against the intro, so a match
+in it cannot reach back before frame 1,440. Of the 99 tunes with a loop
 frame, 58 need the cut, and on the six of them in `ym/test` the file
-grows by 1.3%, 7.8%, 13.8%, 25.1%, 33.1% and 40.8%, each against the same
+grows by 0.0%, 1.9%, 2.8%, 5.8%, 9.6% and 10.3%, each against the same
 tune packed with `-l0` at the unit size it is packed at. It costs no
 memory.
 

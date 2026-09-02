@@ -43,7 +43,9 @@ final class Rig {
 
     static final int STREAMS = 25;              // fourteen register, eleven script
     static final int YMX_DEFAULT_MAP = 0x9C;    // the packer's: 0->A 1->D 2->B 3->C
-    static final int YMX_FIXED = 58 + STREAMS * 64; // the workspace before the rings
+    /** The workspace before the rings: the fields, one decoder state a
+     * stream, and one saved state a stream for a tune that rewinds. */
+    static final int YMX_FIXED = 58 + STREAMS * 64 + STREAMS * 32;
     static final int OFFSET_RING_SIZE = 16;     // the header's ring word
 
     private Rig() {}
@@ -74,17 +76,24 @@ final class Rig {
      * frame write is unmasked, the tools' -nomask.
      */
     static Build assemble(int unit, boolean perf) {
-        return assemble(unit, perf, System.getenv("YMX_NOMASK") == null);
+        return assemble(unit, perf, System.getenv("YMX_NOMASK") == null, 0);
+    }
+
+    /** The same, built for {@code window} units: a build that decodes
+     * copies from the literal stream, and takes no ring wider than it. */
+    static Build assemble(int unit, boolean perf, int window) {
+        return assemble(unit, perf, System.getenv("YMX_NOMASK") == null, window);
     }
 
     /** The masked build regardless of YMX_NOMASK: the README's byte
      * counts quote it, so the size check measures it. */
     static Build assembleMasked(int unit, boolean perf) {
-        return assemble(unit, perf, true);
+        return assemble(unit, perf, true, 0);
     }
 
-    private static Build assemble(int unit, boolean perf, boolean masked) {
-        String tag = unit + (perf ? "p" : "") + (masked ? "" : "n");
+    private static Build assemble(int unit, boolean perf, boolean masked, int window) {
+        String tag = unit + (perf ? "p" : "") + (masked ? "" : "n")
+                + (window == 0 ? "" : "w" + window);
         Build built = ASSEMBLED.get(tag);
         if (built != null) {
             return built;
@@ -93,6 +102,7 @@ final class Rig {
             Files.createDirectories(SCRATCH);
             Path source = SCRATCH.resolve("link" + tag + ".S");
             Files.writeString(source, "ST4_UNIT    equ     " + unit + "\n"
+                    + (window == 0 ? "" : "ST4_WINDOW  equ     " + window + "\n")
                     + (perf ? "YMX_PERF    equ     1\n" : "")
                     + (masked ? "" : "YMX_MASK_BURST equ  0\n")
                     + "        include \"YMX.S\"\n"

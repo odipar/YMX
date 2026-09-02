@@ -90,7 +90,10 @@ final class BinariesConsistencyTest {
                     + Tools.binarySuffix() + ".bin"));
             assertEquals('Y', core[MkSndh.CORE_MAGIC], "core k" + unit);
             assertEquals('C', core[MkSndh.CORE_MAGIC + 3], "core k" + unit);
-            assertEquals(1, MkSndh.word(core, MkSndh.CORE_VERSION), "core k" + unit);
+            assertEquals(MkSndh.CORE_DESCRIPTOR_VERSION,
+                    MkSndh.word(core, MkSndh.CORE_VERSION), "core k" + unit);
+            assertEquals(0, MkSndh.word(core, MkSndh.CORE_WINDOW),
+                    "core k" + unit + " is built for no window");
             assertEquals(unit, MkSndh.word(core, MkSndh.CORE_UNIT), "core k" + unit);
             assertEquals(0, MkSndh.word(core, MkSndh.CORE_FLAGS), "core k" + unit);
             assertEquals(YmxFormat.VERSION, MkSndh.word(core, MkSndh.CORE_FORMAT),
@@ -98,6 +101,33 @@ final class BinariesConsistencyTest {
             assertEquals(fixed, MkSndh.word(core, MkSndh.CORE_WORK_FIXED),
                     "core k" + unit + "'s workspace fixed size");
             assertEquals(0, core.length & 1, "core k" + unit + " is even-sized");
+        }
+
+        // The window builds: the descriptor says the window and the flag.
+        MkCores.cores(dir, false, false, true);
+        for (int unit : new int[] {1, 2, 4}) {
+            byte[] core = Files.readAllBytes(dir.resolve("ymxsndh-k" + unit
+                    + "-copies" + Tools.binarySuffix() + ".bin"));
+            assertEquals(MkSndh.CORE_FLAG_COPIES, MkSndh.word(core, MkSndh.CORE_FLAGS),
+                    "core k" + unit + "-copies flags");
+            assertEquals(YmxFormat.DEFAULT_RING_SIZE / unit,
+                    MkSndh.word(core, MkSndh.CORE_WINDOW),
+                    "core k" + unit + "-copies is built for the default ring");
+            assertEquals(fixed, MkSndh.word(core, MkSndh.CORE_WORK_FIXED),
+                    "core k" + unit + "-copies workspace fixed size");
+        }
+
+        // A window build for a ring other than the default: named for the
+        // ring, the window the ring in units, so a tune with copies at that
+        // ring plays on it and on no other.
+        MkCores.cores(dir, false, false, 440);
+        for (int unit : new int[] {1, 2, 4}) {
+            byte[] core = Files.readAllBytes(dir.resolve("ymxsndh-k" + unit
+                    + "-copies-n440" + Tools.binarySuffix() + ".bin"));
+            assertEquals(MkSndh.CORE_FLAG_COPIES, MkSndh.word(core, MkSndh.CORE_FLAGS),
+                    "core k" + unit + "-copies-n440 flags");
+            assertEquals(440 / unit, MkSndh.word(core, MkSndh.CORE_WINDOW),
+                    "core k" + unit + "-copies-n440 is built for a ring of 440");
         }
 
         byte[] stub = Files.readAllBytes(
@@ -170,7 +200,8 @@ final class BinariesConsistencyTest {
             equates.put(equ.group(1), Integer.parseInt(equ.group(2)));
         }
         return equate(equates, "YMX_STATE")
-                + equate(equates, "YMX_STREAMS") * equate(equates, "YMX_STATE_SIZE");
+                + equate(equates, "YMX_STREAMS") * equate(equates, "YMX_STATE_SIZE")
+                + equate(equates, "YMX_STREAMS") * equate(equates, "YMX_SAVE_SIZE");
     }
 
     private static int equate(Map<String, Integer> equates, String name) {

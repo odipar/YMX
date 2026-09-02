@@ -26,18 +26,25 @@ import java.util.zip.ZipOutputStream;
  */
 public final class MkRelease {
 
-    /** One core build: a unit size and the two assembly flags. */
-    record Variant(int unit, boolean perf, boolean nomask) {
+    /** One core build: a unit size, the two assembly flags, and whether
+     * it is built for the default ring as a window. */
+    record Variant(int unit, boolean perf, boolean nomask, boolean copies) {
 
         String name() {
-            return "ymxsndh-k" + unit + (perf ? "-perf" : "")
-                    + (nomask ? "-nomask" : "") + Tools.binarySuffix()
-                    + ".bin";
+            return "ymxsndh-k" + unit + (copies ? "-copies" : "")
+                    + (perf ? "-perf" : "") + (nomask ? "-nomask" : "")
+                    + Tools.binarySuffix() + ".bin";
         }
 
         int flags() {
             return (perf ? MkSndh.CORE_FLAG_PERF : 0)
-                    | (nomask ? MkSndh.CORE_FLAG_NOMASK : 0);
+                    | (nomask ? MkSndh.CORE_FLAG_NOMASK : 0)
+                    | (copies ? MkSndh.CORE_FLAG_COPIES : 0);
+        }
+
+        /** The window the core is built for, in units: 0 without copies. */
+        int window() {
+            return copies ? YmxFormat.DEFAULT_RING_SIZE / unit : 0;
         }
     }
 
@@ -45,8 +52,9 @@ public final class MkRelease {
     static List<Variant> matrix() {
         List<Variant> variants = new ArrayList<>();
         for (int unit : new int[] {1, 2, 4}) {
-            for (int flags = 0; flags < 4; flags++) {
-                variants.add(new Variant(unit, (flags & 1) != 0, (flags & 2) != 0));
+            for (int flags = 0; flags < 8; flags++) {
+                variants.add(new Variant(unit, (flags & 1) != 0, (flags & 2) != 0,
+                        (flags & 4) != 0));
             }
         }
         return variants;
@@ -102,8 +110,8 @@ public final class MkRelease {
             throw Tools.fail("mkrelease: cannot clear " + dir);
         }
 
-        for (int flags = 0; flags < 4; flags++) {
-            MkCores.cores(dir, (flags & 1) != 0, (flags & 2) != 0);
+        for (int flags = 0; flags < 8; flags++) {
+            MkCores.cores(dir, (flags & 1) != 0, (flags & 2) != 0, (flags & 4) != 0);
         }
         MkCores.stub(dir);
         carryStandalone(dir);
@@ -111,7 +119,8 @@ public final class MkRelease {
         StringBuilder manifest = new StringBuilder();
         manifest.append("YMX player binaries - release ")
                 .append(YmxFormat.releaseName()).append(", format version ")
-                .append(YmxFormat.versionName()).append(", descriptor version 1\n");
+                .append(YmxFormat.versionName()).append(", descriptor version ")
+                .append(MkSndh.CORE_DESCRIPTOR_VERSION).append('\n');
         manifest.append("source commit ").append(commit).append('\n');
         manifest.append("doc/BINARIES.md is the combine contract\n\n");
         manifest.append("name  bytes  sha256  unit  flags\n");
@@ -480,10 +489,11 @@ public final class MkRelease {
                 || core[MkSndh.CORE_MAGIC + 3] != 'C') {
             throw new IllegalArgumentException(variant.name() + " is not an SNDH core");
         }
-        if (MkSndh.word(core, MkSndh.CORE_VERSION) != 1) {
+        if (MkSndh.word(core, MkSndh.CORE_VERSION) != MkSndh.CORE_DESCRIPTOR_VERSION) {
             throw new IllegalArgumentException(variant.name()
                     + " carries descriptor version "
-                    + MkSndh.word(core, MkSndh.CORE_VERSION) + ", not 1");
+                    + MkSndh.word(core, MkSndh.CORE_VERSION) + ", not "
+                    + MkSndh.CORE_DESCRIPTOR_VERSION);
         }
         if (MkSndh.word(core, MkSndh.CORE_FORMAT) != YmxFormat.VERSION) {
             throw new IllegalArgumentException(variant.name() + " reads format version "
@@ -505,6 +515,11 @@ public final class MkRelease {
             throw new IllegalArgumentException(variant.name() + " gives F = "
                     + fixed + ", the workspace bytes before the rings:"
                     + " nonzero and even");
+        }
+        if (MkSndh.word(core, MkSndh.CORE_WINDOW) != variant.window()) {
+            throw new IllegalArgumentException(variant.name() + " carries window "
+                    + MkSndh.word(core, MkSndh.CORE_WINDOW) + ", its name says "
+                    + variant.window());
         }
         if (!zeroLong(core, MkSndh.CORE_TABLE_OFF)) {
             throw new IllegalArgumentException(variant.name() + " carries a"

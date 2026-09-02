@@ -14,6 +14,8 @@ Two kinds of binary:
 | file | contents |
 |---|---|
 | `ymxsndh-k1-v<release>.bin`, `-k2`, `-k4` | an **SNDH core**: the player and its SNDH glue, one per ST4 unit size |
+| `ymxsndh-k1-copies-v<release>.bin`, `-k2-copies`, `-k4-copies` | the same, built for the default ring as a window: the core a tune with copies from the literal stream needs (`SPEC.md` §1.2, flag bit 5), and one that takes no ring wider than 960 bytes |
+| `ymxsndh-k1-copies-n<N>-v<release>.bin`, `-k2-copies-n<N>`, `-k4-copies-n<N>` | the same for a ring of N bytes, which `ymx/mkcores.sh -copies -nN` assembles; a combiner with rmac at hand assembles it on the spot, and the release carries none |
 | `ymxprg-v<release>.bin` | the **PRG stub**: a TOS program that drives an appended SNDH file |
 
 Every name ends with the release version, the binaries' own, which moves
@@ -27,8 +29,9 @@ word below says which, so a combiner verifies rather than parses names.
 Every variant is published at
 [github.com/odipar/YMX/releases](https://github.com/odipar/YMX/releases)
 under the tag `binaries-v<release>`, staged by `ymx/mkrelease.sh`:
-`ymx-binaries-v<release>.zip`, holding twelve cores - three unit sizes
-by the four flag combinations - and the stub; one `ym-to-ymx` zip per
+`ymx-binaries-v<release>.zip`, holding twenty-four cores - three unit
+sizes by the four flag combinations, with and without a window - and the
+stub; one `ym-to-ymx` zip per
 platform; and a `MANIFEST.txt` of sizes and SHA-256 digests with the
 source commit, the release version and the format version. The manifest
 is published both inside the binaries zip and beside it, so its digests
@@ -80,13 +83,14 @@ Position-independent. Fixed layout at its start:
 | 4 | 4 | `bra.w` to exit |
 | 8 | 4 | `bra.w` to play |
 | 12 | 4 | `'YMXC'` |
-| 16 | 2 | descriptor version - **1** |
+| 16 | 2 | descriptor version - **2** |
 | 18 | 2 | the ST4 unit size this core decodes: 1, 2 or 4 |
-| 20 | 2 | flags: bit 0 = raster monitor built in, bit 1 = frame write unmasked |
+| 20 | 2 | flags: bit 0 = raster monitor built in, bit 1 = frame write unmasked, bit 2 = built for a window |
 | 22 | 2 | the format version the core reads - a combiner combines only tunes of the same version |
 | 24 | 2 | `F`, the workspace bytes before the rings |
-| 26 | 4 | table offset - written 0, patched by the combiner |
-| 30 | 4 | workspace offset - written 0, patched by the combiner |
+| 26 | 2 | `W`, the window in units, 0 for a core with no copy code: a tune with copies needs `W · k` to be its ring, and any tune needs its ring at most that where `W` is not 0 |
+| 28 | 4 | table offset - written 0, patched by the combiner |
+| 32 | 4 | workspace offset - written 0, patched by the combiner |
 
 Both patched offsets are relative to the core's first byte and must be even.
 
@@ -269,8 +273,12 @@ The whole build for a system with no assembler and no JVM.
    inside it.
 2. **Pick the core** for the unit size the tunes are packed at - the
    fourth byte of any packed section's ST4 signature (`SPEC.md` §1.4) -
-   and for the flags wanted. Verify its descriptor (§1): `'YMXC'`,
-   descriptor version 1, the tunes' format version, the unit, the flags.
+   and for the flags wanted, the `-copies` core where any tune's header
+   has flag bit 5 set, built for that tune's ring as the window: the
+   release's at the default ring, `-copies-n<N>` at another. Verify its
+   descriptor (§1): `'YMXC'`, descriptor
+   version 2, the tunes' format version, the unit, the flags, and the
+   window against every tune's ring.
 3. **Read each tune's header** (`SPEC.md` §1.1; flag bit 0 in §1.2):
    frame count, rate, ring size, and flag bit 0 for the `FRMS` entry. One
    rate across the set.

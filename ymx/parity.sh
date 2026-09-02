@@ -94,13 +94,20 @@ sweep() {
     one_case y2y-ymx-$1     ym-to-ymx out.ymx @T
     one_case y2y-sndh-$1    ym-to-ymx out.sndh @T @U
     one_case y2y-prg-$1     ym-to-ymx out.prg @T
+    one_case y2y-copies-$1  ym-to-ymx -copies out.ymx @T
     one_case play-trim-$1   play -min0 -sec2 @T
     one_case play-unit-$1   play -k1 @T
+    one_case play-copies-$1 play -copies @T
 
     if [ "$QUICK" = no ]; then
         one_case st4-k1-$1   st4 -k1 @T out.st4
         one_case st4-k2-$1   st4 -k2 @T out.st4
         one_case st4-k4-$1   st4 -k4 @T out.st4
+        # copies from the literal stream, and loops: the search's opening
+        # passes are the same steps from the same seed in every tree
+        one_case copies-$1   ymx -copies @T out.ymx
+        one_case st4-c-$1    st4 -c -m1024 -k2 @T out.st4
+        one_case st4-r-$1    st4 -k1 -r0 @T out.st4
         one_case perf-$1     ymsndh -perf out.sndh @T
         one_case nomask-$1   ym-to-ymx -nomask out.prg @T
     fi
@@ -137,8 +144,9 @@ fixtures() {
     perl -e 'print "\0" x 13, "##", "\0"' > "$FX/hash16.bin"
     perl -e 'print pack("C*", map { ($_ * 7) % 256 } 0 .. 31)' > "$FX/notaymx.bin"
 
-    # a real ST4 container, and the same one cut short
+    # a real ST4 container, one that loops, and the first one cut short
     "$REPO/go/bin/st4" -f "$FX/in.bin" "$FX/good.st4" >/dev/null 2>&1
+    "$REPO/go/bin/st4" -f -r0 "$FX/in.bin" "$FX/loop.st4" >/dev/null 2>&1
     perl -e 'local $/; open F, "<", $ARGV[0]; binmode F; $d = <F>; print substr($d, 0, 30)' \
         "$FX/good.st4" > "$FX/short.st4"
 
@@ -260,6 +268,9 @@ refusals() {
     one_case play-empty-k  play -k @T
     one_case st4-no-input  st4 nosuch.bin out.st4
     one_case dst4-no-input dst4 nosuch.st4 out.bin
+    # a loop played twice, and a stream with no loop to play twice
+    SETUP="cp $WORK/fx/loop.st4 ."     ; one_case dst4-r-loop   dst4 -r2 loop.st4 out.bin
+    SETUP="cp $WORK/fx/good.st4 ."     ; one_case dst4-r-once   dst4 -r2 good.st4 out.bin
 }
 
 # Build the Go commands first. go/bin is not built by anything else, and a
@@ -268,7 +279,7 @@ refusals() {
 # catch. The build cache makes this cheap when nothing changed. The Java tree
 # is built by whoever runs mvn; PARITY_NO_BUILD skips the C# build for a
 # caller who has just done it.
-for c in ymx ym-to-ymx play ymsndh mksndh mkprg st4 dst4; do
+for c in ymx ym-to-ymx play ymsndh mksndh mkprg st4 dst4 ymxcheck; do
     (cd "$REPO/go" && go build -o "bin/$c" "./cmd/$c") || {
         echo "parity.sh: cannot build go/cmd/$c" >&2; exit 2; }
 done

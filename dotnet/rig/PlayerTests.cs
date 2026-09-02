@@ -61,9 +61,31 @@ namespace Rig
         public static string RunShape(int frames, int ring, int chunk,
                 string label, bool loops, int passes, int unit, int loopFrame)
         {
+            return RunShape(frames, ring, chunk, label, loops, passes, unit,
+                    loopFrame, 0);
+        }
+
+        /// <summary>The same on a build for window units, 0 for none: the
+        /// tune is packed with -copies, and the file's flag bit 5 says the
+        /// build must have one.</summary>
+        public static string RunShape(int frames, int ring, int chunk,
+                string label, bool loops, int passes, int unit, int loopFrame,
+                int window)
+        {
             byte[][] source = GenYm.Registers(frames);
-            byte[] packed = Rig.Pack(GenYm.Ym6File(frames, loopFrame, source),
-                    ring, chunk, loops, unit);
+            byte[] packed = window == 0
+                    ? Rig.Pack(GenYm.Ym6File(frames, loopFrame, source),
+                            ring, chunk, loops, unit)
+                    : Rig.Pack(GenYm.Ym6File(frames, loopFrame, source),
+                            ring, chunk, loops, unit, "-copies");
+            // Whether the search found a copy worth taking is the data's: a
+            // file without one plays on the window build as well, since its
+            // offsets stay inside the window. The label says which it was.
+            if (window != 0)
+            {
+                label += (Header(packed, 6, 2) & 0x20) != 0
+                        ? ", with copies" : ", no copy taken";
+            }
             int carried = Header(packed, YmxLoopFrame, 4);
             if (carried != (loops ? loopFrame : 0))
             {
@@ -74,7 +96,7 @@ namespace Rig
             List<GenYm.ChipState> expected = GenYm.ChipStates(frames, source,
                     loops, carried, played);
 
-            var player = new Player(packed, unit);
+            var player = new Player(packed, unit, false, window);
             if (player.Init() != 0)
             {
                 return label + ": YMX_init rejected the file";
@@ -287,7 +309,6 @@ namespace Rig
             LongWord(outStream, table);
             Word(outStream, 1);             // one sample
             LongWord(outStream, 0);         // L: back to the beginning
-            LongWord(outStream, 0);         // no loop table
             LongWord(outStream, Ymx.YmxFormat.RequiredBase);  // Q: no extension
             for (int stream = 0; stream < Rig.Streams; stream++)
             {
@@ -303,23 +324,24 @@ namespace Rig
         }
 
         /// <summary>
-        /// A file cut in two at its loop frame, every section stored: the
-        /// section table locates frames [0, L) and the loop table [L, O). A
-        /// short replay packs smaller stored than as a container, so this is a
-        /// shape a writer reaches; here it also puts the loop table's own
-        /// entries on the stored path. L is under one group, so the first
-        /// refill of every stream already runs into the second section.
+        /// A file whose pass is longer than its ring, every section stored:
+        /// one section per stream covering frames [0, O), and L in the
+        /// header, so the player saves each stream's state after L values
+        /// and restores it after O. A stored section has no container to
+        /// carry a rewind point, so the header's L is all the player has,
+        /// and its state is the read position. L is under one group, so the
+        /// first refill of every stream already crosses it.
         /// </summary>
-        public static string RunStoredCut()
+        public static string RunStoredRewind()
         {
             int frames = 96;
             int loop = 12;
             int ring = 48;
-            byte[] file = StoredCutYmx(frames, loop, ring, 24);
+            byte[] file = StoredRewindYmx(frames, loop, ring, 24);
             var player = new Player(file, 1);
             if (player.Init() != 0)
             {
-                return "stored cut: YMX_init rejected the file";
+                return "stored rewind: YMX_init rejected the file";
             }
             // Two passes past the first: R0 carries the frame number, so the
             // values written to it are the frames the player played.
@@ -338,43 +360,36 @@ namespace Rig
                 }
                 if (got != wanted)
                 {
-                    return "stored cut: call " + index + " wrote R0=" + got
+                    return "stored rewind: call " + index + " wrote R0=" + got
                             + ", want frame " + wanted;
                 }
             }
             return "";
         }
 
-        /// <summary>The file RunStoredCut plays: twenty-five stored sections of
-        /// loop values, twenty-five more of the rest, and the two tables that
-        /// locate them. R0 carries the frame number and every other stream
-        /// holds one value, so what reaches the chip says which frame is
-        /// playing.</summary>
-        private static byte[] StoredCutYmx(int frames, int loop, int ring, int chunk)
+        /// <summary>The file RunStoredRewind plays: twenty-five stored
+        /// sections of frames values and the table that locates them. R0
+        /// carries the frame number and every other stream holds one value,
+        /// so what reaches the chip says which frame is playing.</summary>
+        private static byte[] StoredRewindYmx(int frames, int loop, int ring,
+                int chunk)
         {
-            int table = Align(Ymx.YmxFormat.HeaderSize);
-            int at = table + 4 * Rig.Streams;
-            int[] first = new int[Rig.Streams];
-            int[] second = new int[Rig.Streams];
+            int at = Ymx.YmxFormat.HeaderSize;
+            int[] where = new int[Rig.Streams];
             var body = new MemoryStream();
-            for (int half = 0; half < 2; half++)
+            for (int stream = 0; stream < Rig.Streams; stream++)
             {
-                for (int stream = 0; stream < Rig.Streams; stream++)
+                while (at % 4 != 0)
                 {
-                    while (at % 4 != 0)
-                    {
-                        body.WriteByte(0);
-                        at++;
-                    }
-                    int from = half == 0 ? 0 : loop;
-                    int to = half == 0 ? loop : frames;
-                    (half == 0 ? first : second)[stream] = at;
-                    for (int frame = from; frame < to; frame++)
-                    {
-                        body.WriteByte(StreamByte(stream, frame));
-                    }
-                    at += to - from;
+                    body.WriteByte(0);
+                    at++;
                 }
+                where[stream] = at;
+                for (int frame = 0; frame < frames; frame++)
+                {
+                    body.WriteByte(StreamByte(stream, frame));
+                }
+                at += frames;
             }
 
             var outStream = new MemoryStream();
@@ -390,20 +405,11 @@ namespace Rig
             LongWord(outStream, 0);         // no samples
             Word(outStream, 0);
             LongWord(outStream, loop);      // L, where it starts over
-            LongWord(outStream, table);     // and the table for [L, O)
             LongWord(outStream, Ymx.YmxFormat.RequiredBase);  // Q: no extension
             for (int stream = 0; stream < Rig.Streams; stream++)
             {
-                LongWord(outStream, unchecked((int) 0x80000000) | first[stream]);
+                LongWord(outStream, unchecked((int) 0x80000000) | where[stream]);
             }                               // bit 31: stored
-            while (outStream.Length < table)
-            {
-                outStream.WriteByte(0);
-            }
-            for (int stream = 0; stream < Rig.Streams; stream++)
-            {
-                LongWord(outStream, unchecked((int) 0x80000000) | second[stream]);
-            }
             body.WriteTo(outStream);
             return outStream.ToArray();
         }
@@ -641,8 +647,6 @@ namespace Rig
         {
             string cores = Path.Combine(Rig.Scratch, "cores");
             MkCores.Cores(cores, false, false);
-            string core = Path.Combine(cores,
-                    "ymxsndh-k2" + Tools.BinarySuffix() + ".bin");
             var pinned = new List<string>();
             foreach (string where in new[] {"ym", "ymr"})
             {
@@ -657,7 +661,7 @@ namespace Rig
             }
             foreach (string tune in pinned)
             {
-                string problem = SndhAgainstPlayer(tune, core);
+                string problem = SndhAgainstPlayer(tune, cores);
                 if (problem.Length != 0)
                 {
                     return problem;
@@ -666,15 +670,22 @@ namespace Rig
             return "";
         }
 
-        /// <summary>One pinned tune down both paths, frame by frame.</summary>
-        private static string SndhAgainstPlayer(string tune, string core)
+        /// <summary>One pinned tune down both paths, frame by frame. A core
+        /// reads one unit size and rejects a tune packed for another, so the
+        /// tune's own header selects both the core and the player it is read
+        /// by.</summary>
+        private static string SndhAgainstPlayer(string tune, string cores)
         {
             byte[] packed = File.ReadAllBytes(tune);
             string name = Path.GetFileName(tune);
             int frames = Header(packed, 8, 4);
             int budget = Math.Min(frames + 40, 400);
 
-            var straight = new Player(packed, 2);
+            Ymx.YmxHeader read = Ymx.YmxHeader.Read(tune);
+            int unit = read.AnyUnit() ? 2 : read.Unit;
+            string core = Path.Combine(cores,
+                    "ymxsndh-k" + unit + Tools.BinarySuffix() + ".bin");
+            var straight = new Player(packed, unit);
             if (straight.Init() != 0)
             {
                 return "sndh corpus: " + name + ": YMX_init rejected the tune";
@@ -1118,18 +1129,26 @@ namespace Rig
                 new object[] {600, 960, 24, "loops from frame 200", true, 2, 1, 200},
                 new object[] {600, 960, 24, "loops from frame 599", true, 3, 1, 599},
                 new object[] {600, 240, 24, "a body past the ring", true, 2, 1, 100},
-                // A body past the largest ring the format allows: the packer
-                // cuts every stream at the loop frame and the file carries a
-                // loop table, so the wrap opens the second section rather than
-                // moving the cursor back.
-                new object[] {2688, 960, 24, "cut at frame 100", true, 2, 1, 100},
-                // A first section shorter than a group: every stream runs out
-                // of it inside its own first fill, at init, and opens the loop
-                // table's before frame 0 is played.
-                new object[] {2688, 960, 24, "cut at frame 12, unit 2",
-                    true, 2, 2, 12},
                 new object[] {600, 960, 24, "loops from frame 200, unit 2",
                     true, 2, 2, 200},
+                // A body past the ring: every container carries the loop
+                // frame as its rewind point, so the wrap restores each
+                // stream's saved state rather than moving the cursor back.
+                new object[] {2688, 960, 24, "rewinds to frame 100", true, 2, 1, 100},
+                // A loop frame under one group: every stream reaches it
+                // inside its own first fill, at init, and saves before
+                // frame 0 is played.
+                new object[] {2688, 960, 24, "rewinds to frame 12, unit 2",
+                    true, 2, 2, 12},
+                // Copies from the literal stream, on a build for the ring as
+                // its window: flag bit 5, and the descriptor's window word.
+                new object[] {600, 960, 24, "copies, unit 1", true, 2, 1, 0, 960},
+                new object[] {600, 960, 24, "copies, unit 2", true, 2, 2, 200, 480},
+                new object[] {2688, 960, 24, "copies, rewinds to frame 12, unit 2",
+                    true, 2, 2, 12, 480},
+                // A ring too small to match across, where a copy from the
+                // literal stream is what reaches back: 48 bytes, unit 1.
+                new object[] {600, 48, 24, "copies at a 48-byte ring", true, 2, 1, 0, 48},
             };
             if (!quick)
             {
@@ -1149,9 +1168,10 @@ namespace Rig
                 string label = (string) shape[3];
                 bool loops = (bool) shape[4];
                 int loopFrame = shape.Length > 7 ? (int) shape[7] : 0;
+                int window = shape.Length > 8 ? (int) shape[8] : 0;
                 string problem = RunShape((int) shape[0], (int) shape[1],
                         (int) shape[2], label, loops, (int) shape[5],
-                        (int) shape[6], loopFrame);
+                        (int) shape[6], loopFrame, window);
                 if (problem.Length != 0)
                 {
                     Console.WriteLine("FAIL " + problem);
@@ -1174,8 +1194,8 @@ namespace Rig
                     "the pinned tunes combined (both paths, same chip writes)");
             failures += Report(RunRequiredExtension(),
                     "a required extension     (the mask rejects, the ceiling holds)");
-            failures += Report(RunStoredCut(),
-                    "the stored cut           (both tables, values not containers)");
+            failures += Report(RunStoredRewind(),
+                    "the stored rewind        (one table, values not containers)");
             failures += Report(RunLoopPointResolve(),
                     "the loop-point resolve   (an unsigned word, $8000 and up)");
             failures += Report(RunReadmeSizes(),

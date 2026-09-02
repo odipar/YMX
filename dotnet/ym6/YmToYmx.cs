@@ -97,6 +97,10 @@ namespace Ym6
                 {
                     names = MkSndh.ReadNames(flag[2..]);
                 }
+                else if (flag.StartsWith("-copies"))
+                {
+                    packerFlags.Add(flag);      // the packer's, not a composer
+                }
                 else if (flag.StartsWith("-c") && flag.Length > 2
                         && !char.IsDigit(flag[2]))
                 {

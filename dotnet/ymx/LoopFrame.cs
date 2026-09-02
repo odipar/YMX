@@ -22,21 +22,21 @@ namespace Ymx
     ///
     /// <para>The second is how the player reaches the frame again, in one of
     /// two ways. A wrap that moves the read position in every ring back O - L
-    /// bytes needs O - L at or under N; raising N to hold the body costs
-    /// workspace and no file bytes, so that is what the packer does, up to the
-    /// format's cap. Past the cap the file carries two sections per stream
-    /// instead - frames [0, L) in the section table's, [L, O) in the loop
-    /// table's - which the player opens in turn (SPEC.md 1.4, 8), and that one
+    /// bytes needs O - L at or under N, and the rings stay the size they were
+    /// asked for. Past that every stream's container carries L as its rewind
+    /// point, the frames from L packed on their own, and the player replays
+    /// them from the decoder state it saved there (SPEC.md 1.4, 8), which
     /// costs file bytes. Where the state rule holds for no frame within the
-    /// budget, and where a cut has no frame it can start at, L is 0 and the
-    /// packer reports it.</para>
+    /// budget the tune starts over at L regardless, and where no frame from
+    /// there on falls on a unit, L is 0 and the packer reports it.</para>
     /// </summary>
     public static class LoopFrame
     {
         /// <summary>How far past the frame its source gives the packer looks
         /// for one it can enter, in seconds. The advance moves the repeat that
-        /// much later, which bounds it; past the bound the file carries 0 and
-        /// the tune starts over from its first frame.</summary>
+        /// much later, which bounds it; past the bound the tune starts over at
+        /// the source's frame anyway, and what an earlier frame left running
+        /// is not running on the second pass.</summary>
         public const int BudgetSeconds = 1;
 
         /// <summary>The budget in frames, for a tune at frameRate frames a
@@ -47,18 +47,18 @@ namespace Ymx
         }
 
         /// <summary>What the packer settled on: the Frame the file carries,
-        /// the RingSize it needs to reach it, whether the streams are Cut in
-        /// two at that frame, and the Notes saying what moved and what it
+        /// the RingSize the file carries, whether the streams Rewind to that
+        /// frame every pass, and the Notes saying what moved and what it
         /// cost.</summary>
-        public sealed record Plan(int Frame, int RingSize, bool Cut,
+        public sealed record Plan(int Frame, int RingSize, bool Rewinds,
                 IReadOnlyList<string> Notes);
 
         /// <summary>Resolves the frame a file starts over from. loops is what
         /// the file's flag bit 0 will say; ringSize and chunk are the shape the
-        /// caller asked for, and the plan's ring size is that one or a larger
-        /// multiple of the chunk. unit is the size the sections are packed at,
-        /// which a cut has to fall on: each of the two sections is a whole
-        /// number of units.</summary>
+        /// caller asked for, and the plan carries the ring size it was given.
+        /// unit is the size the sections are packed at, which a rewind point
+        /// has to fall on: each of the two parts is a whole number of
+        /// units.</summary>
         public static Plan Resolve(Tune tune, EffectScript.Result script, bool loops,
                 int ringSize, int chunk, int unit)
         {
@@ -72,12 +72,12 @@ namespace Ymx
             int last = Math.Min(given + budget, tune.Frames - 1);
             // The loop point the file carries is the source's, or the first
             // frame from it that can be entered. The form follows from that
-            // frame: the rings carry the body where they hold it, and a cut
+            // frame: the rings carry the body where they hold it, and a rewind
             // carries it otherwise. Neither moves the loop point to suit
             // itself.
             int entered = -1;
             int ringFrame = -1;
-            int cutFrame = -1;
+            int rewindFrame = -1;
             for (int candidate = given; candidate <= last; candidate++)
             {
                 if (Qualifies(tune, script, candidate))
@@ -110,8 +110,8 @@ namespace Ymx
             }
             else
             {
-                // Each section is a whole number of units, so a cut falls on
-                // one. The search runs to the end of the tune, since a cut
+                // Each part is a whole number of units, so a rewind point falls
+                // on one. The search runs to the end of the tune, since a rewind
                 // holds any body: the loop point stays as near the source's as
                 // a unit allows.
                 for (int candidate = entered; candidate < tune.Frames; candidate++)
@@ -119,11 +119,11 @@ namespace Ymx
                     if (candidate % unit == 0
                             && (forced || Qualifies(tune, script, candidate)))
                     {
-                        cutFrame = candidate;
+                        rewindFrame = candidate;
                         break;
                     }
                 }
-                if (cutFrame < 0)
+                if (rewindFrame < 0)
                 {
                     notes.Add(string.Format("The tune starts over at frame {0}, and no"
                             + " frame from there on falls on a {1}-byte unit and can"
@@ -136,7 +136,7 @@ namespace Ymx
                 }
             }
 
-            int frame = ringFrame >= 0 ? ringFrame : cutFrame;
+            int frame = ringFrame >= 0 ? ringFrame : rewindFrame;
             if (entered != given)
             {
                 notes.Add(string.Format("The source starts over at frame {0}, which"
@@ -159,11 +159,11 @@ namespace Ymx
             }
             int replayed = tune.Frames - frame;
             notes.Add(string.Format("The {0} frames from frame {1} are past the {2}"
-                    + " bytes the rings hold, so every stream is packed as two"
-                    + " sections - one of the {3} frames before it, one of the {4}"
-                    + " from it - and the file carries a loop table locating the"
-                    + " second: file bytes rather than workspace", replayed, frame,
-                    ringSize, frame, replayed));
+                    + " bytes the rings hold, so every stream's container carries"
+                    + " frame {3} as its rewind point: the {4} frames from it are"
+                    + " packed on their own, and the player replays them from the"
+                    + " decoder state it saved there. File bytes rather than"
+                    + " workspace", replayed, frame, ringSize, frame, replayed));
             notes.Add(IdealNote(tune, frame, chunk, ringSize));
             return new Plan(frame, ringSize, true, notes);
         }

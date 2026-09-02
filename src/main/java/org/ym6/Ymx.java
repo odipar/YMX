@@ -101,7 +101,7 @@ public final class Ymx {
                 packOne(args[input], dir.resolve(stem + ".ymx").toString(),
                         flags.ringSize, flags.chunk, flags.unit, flags.playOnce,
                         flags.forcedMode, flags.drumHz, flags.sidResume,
-                        flags.timerMap, 0, 0, -1, -1, -1, flags.loopFrame);
+                        flags.timerMap, 0, 0, -1, -1, -1, flags.loopFrame, flags.copies);
             }
             return;
         }
@@ -131,6 +131,11 @@ public final class Ymx {
                               tune length is padded with safe duplicate frames
                               - inaudible - to fit the unit. The player must be
                               built with the same ST4_UNIT
+                      -copies Let a match beyond the ring copy from the literal
+                              stream; the player must then be built with
+                              ST4_WINDOW = N/K, and mksndh takes the -copies core
+                      -copiesS   The same, searching S seconds a stream for a
+                              better parse
                       -minM -secS   Trim: drop everything before M:S, so a
                               moment deep in a long tune plays immediately
                       -drumhzH   The drum rate ceiling (default 25600): a drum
@@ -165,7 +170,7 @@ public final class Ymx {
         packOne(args[i], outputName, flags.ringSize, flags.chunk, flags.unit,
                 flags.playOnce, flags.forcedMode, flags.drumHz, flags.sidResume,
                 flags.timerMap, flags.startMin, flags.startSec, flags.startFrame,
-                flags.endFrame, flags.frameCount, flags.loopFrame);
+                flags.endFrame, flags.frameCount, flags.loopFrame, flags.copies);
     }
 
     /** The command line's flags, and where the inputs start. */
@@ -184,6 +189,8 @@ public final class Ymx {
         int loopFrame = -1;                     // -1 until -lF: the header's own
         int drumHz = YmEffects.MAX_TIMER_HZ;
         int timerMap = YmxFormat.DEFAULT_TIMERS;
+        double copies = -1;                     // -copies: 0 the opening passes,
+                                                // S a search of S seconds
         int inputs = 0;                         // the first argument that is
     }                                           // not a flag
 
@@ -222,6 +229,10 @@ public final class Ymx {
                         flags.startSec = parseNumber(args[i].substring(4), true);
                     } else if (args[i].startsWith("-n")) {
                         flags.ringSize = parseNumber(args[i].substring(2));
+                    } else if (args[i].equals("-copies")) {
+                        flags.copies = 0;
+                    } else if (args[i].startsWith("-copies")) {
+                        flags.copies = parseNumber(args[i].substring(7));
                     } else if (args[i].startsWith("-c")) {
                         flags.chunk = parseNumber(args[i].substring(2));
                     } else if (args[i].startsWith("-k")) {
@@ -289,7 +300,8 @@ public final class Ymx {
                                 int chunk, int unit, boolean playOnce,
                                 boolean forcedMode, int drumHz, boolean sidResume,
                                 int timerMap, int startMin, int startSec, int startFrame,
-                                int endFrame, int frameCount, int loopFrame) {
+                                int endFrame, int frameCount, int loopFrame,
+                                double copies) {
         // The floor only: how many streams a tune decodes depends on the
         // channels it names, which the encoder derives when it compiles the
         // script and checks again there.
@@ -419,12 +431,12 @@ public final class Ymx {
         YmxEncoder.Result result;
         try {
             result = YmxEncoder.encode(tune, ringSize, chunk, startsOver, true, unit,
-                    timerMap);
-            // A section is a whole number of units, so a cut falls on a unit
-            // boundary and a loop point that is not one leaves the tune
-            // starting over from frame 0. Every frame is a boundary at unit 1:
-            // where the unit was not asked for, the packer packs at 1 and
-            // keeps the loop point.
+                    timerMap, copies);
+            // A section is a whole number of units, so a rewind point falls
+            // on a unit boundary and a loop point that is not one leaves the
+            // tune starting over from frame 0. Every frame is a boundary at
+            // unit 1: where the unit was not asked for, the packer packs at 1
+            // and keeps the loop point.
             if (!unitAsked && unit > 1 && startsOver && unpadded.loopFrame() > 0
                     && result.loopFrame() != unpadded.loopFrame()) {
                 // The pack at the shape asked for has already succeeded, so
@@ -433,7 +445,7 @@ public final class Ymx {
                 YmxEncoder.Result atOne;
                 try {
                     atOne = YmxEncoder.encode(unpadded, ringSize, chunk,
-                            startsOver, true, 1, timerMap);
+                            startsOver, true, 1, timerMap, copies);
                 } catch (IllegalArgumentException rejected) {
                     atOne = result;
                 }
@@ -568,11 +580,9 @@ public final class Ymx {
             String name = stream.register() < YmxFormat.REGISTER_STREAMS
                     ? String.format("R%-2d", stream.register())
                     : effectNames[stream.register() - YmxFormat.REGISTER_STREAMS] + " ";
-            System.out.printf(Locale.ROOT, "  %s %6d -> %6d bytes (%5.1f%%)%s%n", name,
+            System.out.printf(Locale.ROOT, "  %s %6d -> %6d bytes (%5.1f%%)%n", name,
                     stream.frames(), stream.packedSize(),
-                    100.0 * stream.packedSize() / stream.frames(),
-                    stream.loopSize() == 0 ? "" : String.format("  %6d + %d",
-                            stream.firstSize(), stream.loopSize()));
+                    100.0 * stream.packedSize() / stream.frames());
         }
         System.out.printf(Locale.ROOT, "Packed %d register bytes into %d (%.1f%%), file %d bytes%n",
                 raw, result.packedSize(), 100.0 * result.packedSize() / raw, result.file().length);

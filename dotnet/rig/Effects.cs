@@ -286,11 +286,14 @@ namespace Rig
                     }
                 }
                 else if (frame == 25)
-                {                           // prescaler-only change: full
-                    if (!MfpIs(player, new W(PlayerTests.Tacr, 0),  // timer
-                            new W(PlayerTests.Tadr, 90),        // reprogram...
-                            new W(PlayerTests.Tacr, 2), new W(enableA, 0x20)))
+                {                           // prescaler-only change:
+                    if (!MfpIs(player, new W(PlayerTests.Tacr, 2),  // one
+                            new W(PlayerTests.Tadr, 90),        // control
+                            new W(enableA, 0x20)))              // write,
                     {
+                        // never through zero, then the reload on the running
+                        // timer: no stop, so the period in flight completes
+                        // (SPEC.md §3.1). It was a four-write stop, load, run.
                         return "effects: frame 25 programmed " + ShowMfp(player);
                     }
                     long vector = player.Uc.Value(0x134, 4);
