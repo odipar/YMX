@@ -117,6 +117,8 @@ tells them apart - and writes a `.ymx`.
 | `-nN` | ring size per stream, bytes (default 960). The packer raises it, up to the cap of 2520, where one pass of a tune needs a longer ring, and says so; the ring size the file carries is the header's, not this flag's |
 | `-cC` | values decoded per call, the round-robin group size (default 24) |
 | `-kK` | ST4 unit size 1, 2 or 4 (default 2); an odd tune length is padded with safe duplicate frames |
+| `-copies` | let a match beyond the ring copy from the literal stream (SPEC.md Appendix A.5); the file sets flag bit 5 and plays only on a player built with `ST4_WINDOW` = N/K, which `mksndh` and `mkprg` take from the `-copies` cores |
+| `-copiesS` | the same, searching S seconds a stream for a better parse |
 | `-minM` `-secS` | trim: drop everything before M:S |
 | `-startframeF` `-endframeF` `-framesN` | the same window in frames: start, end, or a length cap |
 | `-drumhzH` | the drum rate ceiling (default 25600): a faster drum is resampled to fit, with a warning |
@@ -188,7 +190,7 @@ combiners run no assembler: `mksndh.sh` and `mkprg.sh` call this step in
 when a binary under `dist/` is missing or stale, and `mkrelease.sh` runs
 it for every variant.
 
-    ymx/mkcores.sh [-perf] [-nomask] [outdir]
+    ymx/mkcores.sh [-perf] [-nomask] [-copies] [outdir]
 
 ### mkrelease.sh
 
@@ -408,11 +410,14 @@ verdict - it must reach DONE, and no line may report BAD.
 The ST4 compressor's own command line, for packing and unpacking
 plain ST4 containers outside a `.ymx`:
 
-    st4 [-f] [-kK] [-mN] [-lN] input [output.st4]
-    dst4 [-f] input.st4 [output]
+    st4 [-f] [-c[S]] [-kK] [-mN] [-lN] [-rR] input [output.st4]
+    dst4 [-f] [-rN] input.st4 [output]
 
 `-kK` is the unit size, `-mN` limits back-references to N units, `-lN`
-splits matches so no operation exceeds N units. Run them as
+splits matches so no operation exceeds N units, `-rR` loops the stream
+from unit R, and `-c` lets a match beyond `-m` copy from the literal
+stream, `-cS` searching S seconds for a better parse. `dst4 -rN` writes
+the pass and then N - 1 repeats of the loop. Run them as
 `dotnet dotnet/bin/Release/net10.0/ymx.dll st4 ...` or from the Java tree
 with `java -cp target/classes org.st4.St4 ...`.
 

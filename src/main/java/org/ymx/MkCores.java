@@ -18,22 +18,34 @@ public final class MkCores {
 
     /** The three cores for one flag combination, named for it. */
     public static void cores(Path out, boolean perf, boolean nomask) {
+        cores(out, perf, nomask, false);
+    }
+
+    /**
+     * As above, {@code copies} building for the default ring as the
+     * window: a core that decodes copies from the literal stream, and takes
+     * no ring wider than that window.
+     */
+    public static void cores(Path out, boolean perf, boolean nomask, boolean copies) {
         try {
             Files.createDirectories(out);
         } catch (IOException e) {
             throw Tools.fail("mkcores: cannot make " + out);
         }
-        String suffix = (perf ? "-perf" : "") + (nomask ? "-nomask" : "");
+        String suffix = (copies ? "-copies" : "") + (perf ? "-perf" : "")
+                + (nomask ? "-nomask" : "");
         Path work = out.resolve(".cores_work");
         try {
             Files.createDirectories(work);
             for (int unit : new int[] {1, 2, 4}) {
                 Files.writeString(work.resolve("core.S"), """
                         ST4_UNIT        equ     %d
+                        ST4_WINDOW      equ     %d
                         YMX_PERF        equ     %d
                         YMX_MASK_BURST  equ     %d
                                 include "YMX_sndh.S"
-                        """.formatted(unit, perf ? 1 : 0, nomask ? 0 : 1),
+                        """.formatted(unit, copies ? YmxFormat.DEFAULT_RING_SIZE / unit : 0,
+                                perf ? 1 : 0, nomask ? 0 : 1),
                         StandardCharsets.ISO_8859_1);
                 Path core = out.resolve("ymxsndh-k" + unit + suffix
                         + Tools.binarySuffix() + ".bin");
@@ -63,17 +75,20 @@ public final class MkCores {
     }
 
     private static final String USAGE =
-            "usage: mkcores.sh [-perf] [-nomask] [outdir]";
+            "usage: mkcores.sh [-perf] [-nomask] [-copies] [outdir]";
 
     public static void main(String[] args) {
         boolean perf = false;
         boolean nomask = false;
+        boolean copies = false;
         int i = 0;
         for (; i < args.length; i++) {
             if (args[i].equals("-perf")) {
                 perf = true;
             } else if (args[i].equals("-nomask")) {
                 nomask = true;
+            } else if (args[i].equals("-copies")) {
+                copies = true;
             } else if (args[i].startsWith("-")) {
                 throw Tools.fail(USAGE);
             } else {
@@ -85,8 +100,8 @@ public final class MkCores {
         }
         Path out = i < args.length ? Path.of(args[i])
                 : Tools.repo().resolve("dist");
-        cores(out, perf, nomask);
-        if (!perf && !nomask) {
+        cores(out, perf, nomask, copies);
+        if (!perf && !nomask && !copies) {
             stub(out);
         }
     }

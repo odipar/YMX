@@ -114,6 +114,10 @@ public final class YmxFormat {
     /** Flag bit 0: the tune starts over at frame 0 instead of ending. */
     public static final int FLAG_LOOPS = 1;
 
+    /** Flag bit 5: a section copies from its literal stream (SPEC.md §1.4),
+     * so the file plays only on a player built for its ring as a window. */
+    public static final int FLAG_COPIES = 0x20;
+
     /** Flag bit {@code 1 + channel}: the tune uses that timer channel, so
      * the player claims a timer for it. Every channel says so the same
      * way; a channel left clear costs the host nothing. */

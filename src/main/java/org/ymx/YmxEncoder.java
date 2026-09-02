@@ -6,6 +6,7 @@ import java.util.List;
 import org.st4.St4;
 import org.st4.St4Compressor;
 import org.st4.St4EventOptimizer;
+import org.st4.St4LiteralCopySearch;
 import org.st4.St4Format;
 import org.st4.Units;
 
@@ -144,6 +145,19 @@ public final class YmxEncoder {
      */
     public static Result encode(Tune tune, int ringSize, int chunk, boolean loops,
                                 boolean progress, int unit, int timerMap) {
+        return encode(tune, ringSize, chunk, loops, progress, unit, timerMap, -1);
+    }
+
+    /**
+     * As above, with copies from the literal stream (SPEC.md Appendix A.5):
+     * {@code copies} below 0 packs none, 0 packs the search's opening passes,
+     * and above 0 searches for that many seconds a stream. A file with a
+     * copy in it sets flag bit 5 and plays only on a player built for its
+     * ring as a window.
+     */
+    public static Result encode(Tune tune, int ringSize, int chunk, boolean loops,
+                                boolean progress, int unit, int timerMap,
+                                double copies) {
         // The floor first, on what every tune decodes; the exact check waits
         // for the script, since a tune that leaves channels idle decodes
         // fewer streams and may use a smaller chunk.
@@ -215,9 +229,11 @@ public final class YmxEncoder {
         var streams = new ArrayList<Stream>(YmxFormat.STREAMS);
         var sections = new Section[YmxFormat.STREAMS];
         int rewindAt = plan.rewinds() ? plan.frame() : -1;
+        boolean copied = false;
         for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
             byte[] values = vectors[stream];
-            sections[stream] = pack(progress, values, offsetLimit, unit, rewindAt);
+            sections[stream] = pack(progress, values, offsetLimit, unit, rewindAt, copies);
+            copied |= sections[stream].copies() > 0;
             streams.add(new Stream(stream, values.length, sections[stream].bytes().length,
                     sections[stream].longestOp()));
         }
@@ -227,7 +243,7 @@ public final class YmxEncoder {
         loopsAlign(sections, rewindAt, offsetLimit);
 
         byte[] file = build(tune, ringSize, chunk, frames, loops, plan.frame(),
-                sections, tune.samples(), channels);
+                sections, tune.samples(), channels | (copied ? YmxFormat.FLAG_COPIES : 0));
         return new Result(file, List.copyOf(streams), ringSize, chunk, loops, unit,
                 plan.frame(), tune, script, plan.notes());
     }
@@ -268,10 +284,12 @@ public final class YmxEncoder {
         return out;
     }
 
-    /** One section as it goes into the file: packed, or the values themselves. */
-    private record Section(byte[] bytes, boolean stored, int longestOp) {
+    /** One section as it goes into the file: packed, or the values
+     * themselves; {@code copies} counts the blocks copied from the literal
+     * stream. */
+    private record Section(byte[] bytes, boolean stored, int longestOp, int copies) {
 
-        static final Section ABSENT = new Section(new byte[0], false, 0);
+        static final Section ABSENT = new Section(new byte[0], false, 0, 0);
     }
 
     /**
@@ -287,7 +305,7 @@ public final class YmxEncoder {
      * offset says so.
      */
     private static Section pack(boolean progress, byte[] values, int offsetLimit,
-                                int unit, int rewindAt) {
+                                int unit, int rewindAt, double copies) {
         if (values.length == 0) {
             return Section.ABSENT;
         }
@@ -295,7 +313,7 @@ public final class YmxEncoder {
         St4Compressor.Result result;
         if (rewindAt < 0) {
             result = St4Compressor.compress(
-                    St4EventOptimizer.optimize(units, unit, offsetLimit, progress),
+                    parse(units, unit, offsetLimit, copies, progress),
                     units, unit, St4Format.MAX_OP, -1, offsetLimit);
         } else {
             // A value is one byte, so the rewind point in units is the frame
@@ -304,13 +322,25 @@ public final class YmxEncoder {
             int[] intro = Arrays.copyOfRange(units, 0, rewindIndex);
             int[] loop = Arrays.copyOfRange(units, rewindIndex, units.length);
             result = St4Compressor.compressRewinding(
-                    St4EventOptimizer.optimize(intro, unit, offsetLimit, progress),
-                    St4EventOptimizer.optimize(loop, unit, offsetLimit, progress),
+                    parse(intro, unit, offsetLimit, copies, progress),
+                    parse(loop, unit, offsetLimit, copies, progress),
                     units, unit, St4Format.MAX_OP, rewindIndex, offsetLimit);
         }
         byte[] container = St4.container(result);
         boolean stored = values.length < container.length;
-        return new Section(stored ? values : container, stored, result.longestOp());
+        return new Section(stored ? values : container, stored, result.longestOp(),
+                stored ? 0 : result.copies());
+    }
+
+    /** The parse: the event-driven optimizer, or with copies the search
+     * that copies from the literal stream, for {@code copies} seconds. */
+    private static org.st4.St4Block parse(int[] units, int unit, int window,
+                                          double copies, boolean progress) {
+        if (copies < 0) {
+            return St4EventOptimizer.optimize(units, unit, window, progress);
+        }
+        return St4LiteralCopySearch.optimize(units, unit, window, St4Format.MAX_OP,
+                copies, progress && copies > 0);
     }
 
     /**

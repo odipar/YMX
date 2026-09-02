@@ -31,7 +31,7 @@ final class MkReleaseTest {
         for (MkRelease.Variant variant : MkRelease.matrix()) {
             assertTrue(names.add(variant.name()), variant.name() + " twice");
         }
-        assertEquals(12, names.size(), "three units by four flag combinations");
+        assertEquals(24, names.size(), "three units by eight flag combinations");
         assertTrue(names.contains(
                 "ymxsndh-k2" + Tools.binarySuffix() + ".bin"));
         assertTrue(names.contains(
@@ -47,7 +47,7 @@ final class MkReleaseTest {
         String release = YmxFormat.RELEASE_MAJOR + "." + YmxFormat.RELEASE_MINOR
                 + "." + YmxFormat.PATCH;
         assertEquals("ymxsndh-k2-v" + release + ".bin",
-                new MkRelease.Variant(2, false, false).name());
+                new MkRelease.Variant(2, false, false, false).name());
         assertEquals("binaries-v" + release, MkRelease.tag());
         assertTrue(Tools.binarySuffix().endsWith("." + YmxFormat.PATCH),
                 "the binaries' suffix drops the patch: " + Tools.binarySuffix());
@@ -343,16 +343,16 @@ final class MkReleaseTest {
 
     @Test
     void aCoreIsVerifiedAgainstTheVariantItIsNamedFor() {
-        MkRelease.Variant plain = new MkRelease.Variant(1, false, false);
+        MkRelease.Variant plain = new MkRelease.Variant(1, false, false, false);
         byte[] core = MkSndhTest.core(1);
         MkRelease.verifyCore(core, plain);
 
         RuntimeException wrongUnit = assertThrows(RuntimeException.class,
-                () -> MkRelease.verifyCore(core, new MkRelease.Variant(2, false, false)));
+                () -> MkRelease.verifyCore(core, new MkRelease.Variant(2, false, false, false)));
         assertTrue(String.valueOf(wrongUnit.getMessage()).contains("unit"));
 
         RuntimeException wrongFlags = assertThrows(RuntimeException.class,
-                () -> MkRelease.verifyCore(core, new MkRelease.Variant(1, true, false)));
+                () -> MkRelease.verifyCore(core, new MkRelease.Variant(1, true, false, false)));
         assertTrue(String.valueOf(wrongFlags.getMessage()).contains("flags"));
 
         byte[] wrongFormat = core.clone();
@@ -366,7 +366,7 @@ final class MkReleaseTest {
      * four magic bytes, F, and the two longs a combiner patches. */
     @Test
     void aCoreIsVerifiedAgainstTheDescriptorItCarries() {
-        MkRelease.Variant plain = new MkRelease.Variant(1, false, false);
+        MkRelease.Variant plain = new MkRelease.Variant(1, false, false, false);
         for (int letter = 0; letter < 4; letter++) {
             byte[] core = MkSndhTest.core(1);
             core[MkSndh.CORE_MAGIC + letter] = '?';

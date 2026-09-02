@@ -38,7 +38,7 @@ final class MkSndhTest {
         core[13] = 'M';
         core[14] = 'X';
         core[15] = 'C';
-        core[17] = 1;                               // descriptor version
+        core[17] = (byte) MkSndh.CORE_DESCRIPTOR_VERSION;   // descriptor version
         core[19] = (byte) unit;
         core[22] = (byte) (YmxFormat.VERSION >> 8); // format version, a word
         core[23] = (byte) YmxFormat.VERSION;

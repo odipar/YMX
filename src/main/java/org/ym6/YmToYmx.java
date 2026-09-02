@@ -82,8 +82,9 @@ public final class YmToYmx {
                 maskBurst = false;
             } else if (flag.equals("-m")) {
                 marker = true;
-            } else if (flag.startsWith("-timers")) {
-                packerFlags.add(flag);          // the packer's, not a title
+            } else if (flag.startsWith("-timers") || flag.startsWith("-copies")) {
+                packerFlags.add(flag);          // the packer's, not a title or
+                                                // a composer
             } else if (flag.startsWith("-t") && flag.length() > 2) {
                 title = flag.substring(2);
             } else if (flag.startsWith("-N") && flag.length() > 2) {

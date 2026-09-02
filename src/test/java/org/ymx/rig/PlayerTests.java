@@ -75,9 +75,28 @@ final class PlayerTests {
      */
     static String runShape(int frames, int ring, int chunk, String label,
             boolean loops, int passes, int unit, int loopFrame) {
+        return runShape(frames, ring, chunk, label, loops, passes, unit, loopFrame, 0);
+    }
+
+    /**
+     * The same on a build for {@code window} units, the tune packed with
+     * copies from the literal stream: the window is the ring in units, and
+     * the file's flag bit 5 says the build must have one.
+     */
+    static String runShape(int frames, int ring, int chunk, String label,
+            boolean loops, int passes, int unit, int loopFrame, int window) {
         byte[][] source = GenYm.registers(frames);
-        byte[] packed = Rig.pack(GenYm.ym6File(frames, loopFrame, source), ring,
-                chunk, loops, unit);
+        byte[] packed = window == 0
+                ? Rig.pack(GenYm.ym6File(frames, loopFrame, source), ring, chunk,
+                        loops, unit)
+                : Rig.pack(GenYm.ym6File(frames, loopFrame, source), ring, chunk,
+                        loops, unit, "-copies");
+        // Whether the search found a copy worth taking is the data's: a
+        // file without one plays on the window build as well, since its
+        // offsets stay inside the window. The label says which it was.
+        if (window != 0) {
+            label += (header(packed, 6, 2) & 0x20) != 0 ? ", with copies" : ", no copy taken";
+        }
         int carried = header(packed, YMX_LOOP_FRAME, 4);
         if (carried != (loops ? loopFrame : 0)) {
             return label + ": the file carries L=" + carried + ", not " + loopFrame;
@@ -86,7 +105,7 @@ final class PlayerTests {
         List<GenYm.ChipState> expected = GenYm.chipStates(frames, source, loops,
                 carried, played);
 
-        Player player = new Player(packed, unit);
+        Player player = new Player(packed, unit, false, window);
         if (player.init() != 0) {
             return label + ": YMX_init rejected the file";
         }
@@ -992,16 +1011,24 @@ final class PlayerTests {
                 new Object[] {600, 240, 24, "a body past the ring", true, 2, 1, 100},
                 new Object[] {600, 960, 24, "loops from frame 200, unit 2",
                     true, 2, 2, 200},
-                // A body past the largest ring the format allows: the packer
-                // cuts every stream at the loop frame and the file carries a
-                // loop table, so the wrap opens the second section rather
-                // than moving the cursor back.
-                new Object[] {2688, 960, 24, "cut at frame 100", true, 2, 1, 100},
-                // A first section shorter than a group: every stream runs out
-                // of it inside its own first fill, at init, and opens the
-                // loop table's before frame 0 is played.
-                new Object[] {2688, 960, 24, "cut at frame 12, unit 2",
-                    true, 2, 2, 12}));
+                // A body past the ring: every container carries the loop
+                // frame as its rewind point, so the wrap restores each
+                // stream's saved state rather than moving the cursor back.
+                new Object[] {2688, 960, 24, "rewinds to frame 100", true, 2, 1, 100},
+                // A loop frame under one group: every stream reaches it
+                // inside its own first fill, at init, and saves before
+                // frame 0 is played.
+                new Object[] {2688, 960, 24, "rewinds to frame 12, unit 2",
+                    true, 2, 2, 12},
+                // Copies from the literal stream, on a build for the ring as
+                // its window: flag bit 5, and the descriptor's window word.
+                new Object[] {600, 960, 24, "copies, unit 1", true, 2, 1, 0, 960},
+                new Object[] {600, 960, 24, "copies, unit 2", true, 2, 2, 200, 480},
+                new Object[] {2688, 960, 24, "copies, rewinds to frame 12, unit 2",
+                    true, 2, 2, 12, 480},
+                // A ring too small to match across, where a copy from the
+                // literal stream is what reaches back: 48 bytes, unit 1.
+                new Object[] {600, 48, 24, "copies at a 48-byte ring", true, 2, 1, 0, 48}));
         if (!quick) {
             shapes.add(new Object[] {4000, 960, 24, "four thousand frames",
                     true, 1, 1});
@@ -1018,9 +1045,10 @@ final class PlayerTests {
             String label = (String) shape[3];
             boolean loops = (Boolean) shape[4];
             int loopFrame = shape.length > 7 ? (Integer) shape[7] : 0;
+            int window = shape.length > 8 ? (Integer) shape[8] : 0;
             String problem = runShape((Integer) shape[0], (Integer) shape[1],
                     (Integer) shape[2], label, loops, (Integer) shape[5],
-                    (Integer) shape[6], loopFrame);
+                    (Integer) shape[6], loopFrame, window);
             if (!problem.isEmpty()) {
                 System.out.println("FAIL " + problem);
                 failures++;

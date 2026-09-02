@@ -15,20 +15,23 @@
 ;    4  bra.w  exit            combined file's outer header branches into
 ;    8  bra.w  play
 ;   12  'YMXC'                 core descriptor
-;   16  .w  1                  descriptor version
+;   16  .w  2                  descriptor version
 ;   18  .w  ST4_UNIT           the unit size this build decodes
 ;   20  .w  flags              bit 0 = the raster monitor is built in,
-;                              bit 1 = the frame write runs unmasked
+;                              bit 1 = the frame write runs unmasked,
+;                              bit 2 = built for a window: copies from
+;                              the literal stream decode
 ;   22  .w  YMX_VERSION        the format version this build reads: a tool
 ;                              combines only tunes of the same version
 ;   24  .w  YMX_FIXED          workspace bytes before the rings: a tool
 ;                              sizes the workspace as this + 25 x the
-;                              largest N in the combined tunes' headers,
-;                              which the packer raises above the ring size
-;                              it was asked for
-;   26  .l  0                  table offset, patched by the tool: a word
+;                              largest N in the combined tunes' headers
+;   26  .w  ST4_WINDOW         the window in units, 0 without copy code:
+;                              a tune with copies needs a core whose
+;                              window is its ring
+;   28  .l  0                  table offset, patched by the tool: a word
 ;                              subtune count, then a long offset per tune
-;   30  .l  0                  workspace offset, patched by the tool
+;   32  .l  0                  workspace offset, patched by the tool
 ;
 ; Every patched offset is relative to sndh_core and even. The combined file
 ; is loaded anywhere even; nothing in here is absolute.
@@ -61,16 +64,23 @@ SAV_DATA        equ     20              ; 4 bytes: the data registers
 SAV_BITS        equ     24              ; byte: enable bits in the low nibble,
 SAV_SIZE        equ     26              ; mask bits in the high, timer order
 
+; The window is read in the descriptor before YMX.S defaults it.
+        .if ^^defined ST4_WINDOW
+        .else
+ST4_WINDOW      equ     0
+        .endif
+
 sndh_core:
         bra.w   sndh_init
         bra.w   sndh_exit
         bra.w   sndh_play
         dc.b    'YMXC'
-        dc.w    1
+        dc.w    2
         dc.w    ST4_UNIT
-        dc.w    YMX_PERF+((1-YMX_MASK_BURST)*2)
+        dc.w    YMX_PERF+((1-YMX_MASK_BURST)*2)+((ST4_WINDOW<>0)*4)
         dc.w    YMX_VERSION
         dc.w    YMX_FIXED
+        dc.w    ST4_WINDOW
 sndh_table_off:
         dc.l    0
 sndh_work_off:

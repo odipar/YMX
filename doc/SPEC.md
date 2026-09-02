@@ -100,7 +100,8 @@ four.
 | 2 | timer channel 1 |
 | 3 | timer channel 2 |
 | 4 | timer channel 3 |
-| 5-15 | reserved, written as 0 |
+| 5 | a section copies from its literal stream (§1.4, Appendix A.5): the file plays only on a player built for its ring as a window (§9.1) |
+| 6-15 | reserved, written as 0 |
 
 A player claims an MFP timer only for channels whose flags are set; other
 timers are not touched. Which timer a flagged channel gets is defined by
@@ -167,8 +168,11 @@ format comes from the [ST4](https://github.com/odipar/ST4) repository,
 and an implementation follows the appendix rather than that repository.
 A writer with no ST4 compressor stores every section instead (below) and
 emits no container. A section of this version ends rather than repeats,
-carries no rewind point, and records the window `N/k`: what a container
-may carry beyond that, Appendix A states and §9.3 rules out.
+carries a rewind point only as §8 gives it, and records the window
+`N/k`. An offset past the window is a copy from the literal stream
+(Appendix A.5): a writer emits one only with flag bit 5 set, and a file
+with the bit set plays only on a player built for `N/k` as its window
+(§9.1). What a container may carry beyond that, §9.3 rules out.
 
 **Two fixed parameters.** No back-reference exceeds `N` bytes (§1.3),
 and no operation exceeds 65535 units.
@@ -883,7 +887,12 @@ values.
 - every section that is a container carries an ST4 signature matching the
   format version and unit size the player was built for - a tune packed
   for a different one is rejected, not garbled. A stored section has no
-  signature to check.
+  signature to check;
+- a player built with no window rejects a file with flag bit 5 set: it
+  has no copy code, and would decode a copy to other bytes. A player
+  built for a window of `W` units rejects a file whose `N` is larger than
+  `W · k`, since it reads an offset past `W` as a copy, and rejects a file
+  with flag bit 5 set whose `N` is not `W · k` exactly.
 
 Beyond that a player checks nothing - §9.3 lists the unchecked rules - and
 a malformed file is undefined behaviour.
@@ -955,8 +964,9 @@ The shape:
   the frames from `L` reaches before `L`. At a unit size above 1, `L` is
   a multiple of the unit size.
 - No container repeats: the bit after its end code is 0. Every container's
-  window is `N` over the unit size, and no offset exceeds it: a section of
-  this version copies nothing from its literal stream (Appendix A.5).
+  window is `N` over the unit size. An offset past it is a copy from the
+  literal stream (Appendix A.5), and a file carries one only with flag
+  bit 5 set; with the bit clear no offset exceeds the window.
 - Every section decodes to values of one byte. No back-reference exceeds
   `N` bytes and no operation exceeds 65535 units (§1.4).
 - The sample table is within §6: at most 32 samples, the `$80` marker at
