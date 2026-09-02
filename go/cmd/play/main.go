@@ -23,6 +23,10 @@ const helpText = `play.sh - test drive a YM tune: pack it, build a player, run i
   ym/play.sh song.ym                  # 960-byte rings, 24 values per call
   ym/play.sh -n256 song.ym            # smaller rings: less RAM, worse ratio
   ym/play.sh -n2048 -c32 song.ym      # longer calls: cheaper on average
+  ym/play.sh -copies song.ym          # copies from the literal stream: the
+                                      # player is built for the ring as its
+                                      # window; -copies5 searches five
+                                      # seconds a stream for a better parse
   ym/play.sh -o song.ym               # play once and stop, instead of
                                       # starting over at the end
   ym/play.sh -min13 -sec52 song.ym    # trim: start deep in a long tune
@@ -43,7 +47,7 @@ work directory next to the first tune. The trim flags take one tune.
 
   HATARI=/path/to/hatari TOS=/path/to/tos.img ym/play.sh song.ym`
 
-const usageText = "usage: play.sh [-perf] [-nomask] [-nRING] [-cCHUNK] [-kUNIT] [-o] song.ym..."
+const usageText = "usage: play.sh [-perf] [-nomask] [-nRING] [-cCHUNK] [-kUNIT] [-copies[S]] [-o] song.ym..."
 
 // The first value the packer has no use for, held until the TOS image has
 // been looked for: that is the order the other trees report them in.
@@ -89,6 +93,10 @@ flags:
 			options.StartMin = number(a[len("-min"):], true)
 		case strings.HasPrefix(a, "-sec"):
 			options.StartSec = number(a[len("-sec"):], true)
+		case a == "-copies":
+			options.Copies = 0
+		case strings.HasPrefix(a, "-copies"):
+			options.Copies = float64(number(a[len("-copies"):], false))
 		case strings.HasPrefix(a, "-n"):
 			options.Ring = number(a[2:], false)
 		case strings.HasPrefix(a, "-c"):

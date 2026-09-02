@@ -96,6 +96,7 @@ sweep() {
     one_case y2y-prg-$1     ym-to-ymx out.prg @T
     one_case play-trim-$1   play -min0 -sec2 @T
     one_case play-unit-$1   play -k1 @T
+    one_case play-copies-$1 play -copies @T
 
     if [ "$QUICK" = no ]; then
         one_case st4-k1-$1   st4 -k1 @T out.st4

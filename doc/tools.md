@@ -251,13 +251,13 @@ Pack, build a program with the exit marker, and run it under Hatari. SPACE
 in the emulator window stops; everything built lands in a work directory
 next to the first tune, named after it and the shape.
 
-    ym/play.sh [-perf] [-nomask] [-nRING] [-cCHUNK] [-kUNIT] [-o] song.ym...
+    ym/play.sh [-perf] [-nomask] [-nRING] [-cCHUNK] [-kUNIT] [-copies[S]] [-o] song.ym...
 
 | flag | meaning |
 |---|---|
 | `-perf` | build with the raster monitor |
 | `-nomask` | build with the frame write unmasked |
-| `-nN` `-cC` `-kK` `-o` | passed to the packer, as its own |
+| `-nN` `-cC` `-kK` `-copies[S]` `-o` | passed to the packer, as its own |
 | `-h`, `--help` | print the usage and stop |
 
 Any other `-flag` goes to the packer unread - the trim window and
