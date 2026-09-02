@@ -131,6 +131,10 @@ func main() {
 				fail(err.Error())
 			}
 			names = read
+		case a == "-copies":
+			options.Copies = 0
+		case strings.HasPrefix(a, "-copies"):
+			options.Copies = float64(number(a[len("-copies"):], false))
 		case strings.HasPrefix(a, "-c") && len(a) > 2 && !isDigit(a[2]):
 			composer = a[2:] // -c with digits is the packer's chunk size
 		case strings.HasPrefix(a, "-n"):

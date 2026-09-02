@@ -81,14 +81,8 @@ func ReadHeader(path string) (Header, error) {
 			VersionName(version), FormatName())
 	}
 	// A stored section carries no signature, so the unit size comes from the
-	// first section that is a container - out of either table, since a file
-	// cut at its loop frame may store the frames before it and pack the
-	// frames from it.
+	// first section that is a container.
 	section := headerContainer(file, OffsetSectionTable)
-	loopTable := headerLong(file, OffsetLoopTable)
-	if section == 0 && loopTable != 0 {
-		section = headerContainer(file, int(loopTable))
-	}
 	if section+3 >= len(file) {
 		return Header{}, fmt.Errorf("%s has no readable first section", path)
 	}
@@ -129,8 +123,11 @@ func headerTimerMap(file []byte, path string) (int, error) {
 		return 0, fmt.Errorf("%s: its timer stream is not readable: %w",
 			path, err)
 	}
-	values, err := st4.Decompress(section.Control, section.Literal,
-		section.ByteOffsets, section.WordOffsets, section.Unit, section.Size)
+	// Decoded at the window the container carries: an offset past it is a
+	// copy from the literal stream, not a match.
+	values, err := st4.DecompressWindow(section.Control, section.Literal,
+		section.ByteOffsets, section.WordOffsets, section.Unit, section.Size,
+		section.Window)
 	if err != nil {
 		return 0, fmt.Errorf("%s: its timer stream is not readable: %w",
 			path, err)

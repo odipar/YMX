@@ -268,7 +268,7 @@ refusals() {
 # catch. The build cache makes this cheap when nothing changed. The Java tree
 # is built by whoever runs mvn; PARITY_NO_BUILD skips the C# build for a
 # caller who has just done it.
-for c in ymx ym-to-ymx play ymsndh mksndh mkprg st4 dst4; do
+for c in ymx ym-to-ymx play ymsndh mksndh mkprg st4 dst4 ymxcheck; do
     (cd "$REPO/go" && go build -o "bin/$c" "./cmd/$c") || {
         echo "parity.sh: cannot build go/cmd/$c" >&2; exit 2; }
 done

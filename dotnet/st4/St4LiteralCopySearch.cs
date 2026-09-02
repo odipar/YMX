@@ -21,7 +21,7 @@ namespace St4;
 /// <remarks>
 /// A dictionary is a set of forced literals: they stay literal, a copy comes
 /// only from them, the parse decides the rest. The opening passes, what
-/// <c>nt4 -c</c> alone writes, take the literals of a full-window parse, fill
+/// <c>st4 -c</c> alone writes, take the literals of a full-window parse, fill
 /// holes of a few units, and shrink the dictionary to what gets copied from.
 /// Given time, a sweep frees or trims every literal run, keeping what packs
 /// smaller; then random moves free, seed, extend or trim runs, accepted when

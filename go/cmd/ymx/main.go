@@ -33,6 +33,11 @@ const usage = `Usage: YMX [-f] [-o] [-lF] [-nN] [-cC] [-kK] input.ym [output.ymx
           tune length is padded with safe duplicate frames
           - inaudible - to fit the unit. The player must be
           built with the same ST4_UNIT
+  -copies Let a match beyond the ring copy from the literal
+          stream; the player must then be built with
+          ST4_WINDOW = N/K, and mksndh takes the -copies core
+  -copiesS   The same, searching S seconds a stream for a
+          better parse
   -minM -secS   Trim: drop everything before M:S, so a
           moment deep in a long tune plays immediately
   -drumhzH   The drum rate ceiling (default 25600): a drum
@@ -130,6 +135,10 @@ func main() {
 			o.StartSec = number(a[len("-sec"):], true)
 		case strings.HasPrefix(a, "-n"):
 			o.Ring = number(a[2:], false)
+		case a == "-copies":
+			o.Copies = 0
+		case strings.HasPrefix(a, "-copies"):
+			o.Copies = float64(number(a[len("-copies"):], false))
 		case strings.HasPrefix(a, "-c"):
 			o.Chunk = number(a[2:], false)
 		case strings.HasPrefix(a, "-k"):

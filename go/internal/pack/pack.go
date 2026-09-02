@@ -42,6 +42,11 @@ type Options struct {
 	// LoopFrame says where the tune starts over, in the frames of the tune
 	// being packed, and -1 leaves the header's own.
 	LoopFrame int
+
+	// Copies below 0 packs no copy from the literal stream, 0 packs the
+	// search's opening passes, and above 0 searches for that many seconds a
+	// stream.
+	Copies float64
 }
 
 // Defaults are the shape the packer uses where the caller names none.
@@ -59,6 +64,7 @@ func Defaults() Options {
 		EndFrame:   -1,
 		FrameCount: -1,
 		LoopFrame:  -1,
+		Copies:     -1,
 	}
 }
 
@@ -143,21 +149,21 @@ func Pack(input []byte, o Options) (*Packed, error) {
 	beforeSong := len(notes)
 	notes = append(notes, songNotes(song, effects)...)
 
-	result, err := ymx.EncodeOnTimers(tune, o.Ring, o.Chunk, o.Loops,
-		o.Progress, unit, o.TimerMap)
+	result, err := ymx.EncodeCopying(tune, o.Ring, o.Chunk, o.Loops,
+		o.Progress, unit, o.TimerMap, o.Copies)
 	if err != nil {
 		return nil, err
 	}
-	// A section is a whole number of units, so a cut falls on a unit boundary
-	// and a loop point that is not one leaves the tune starting over from
-	// frame 0. Every frame is a boundary at unit 1: where the unit was not
+	// A section is a whole number of units, so a rewind point falls on a unit
+	// boundary and a loop point that is not one leaves the tune starting over
+	// from frame 0. Every frame is a boundary at unit 1: where the unit was not
 	// asked for, the packer packs at 1 and keeps the loop point. The pack at
 	// the shape asked for has already succeeded, so a shape the encoder
 	// rejects here leaves that one standing rather than failing the tune.
 	if !unitAsked && unit > 1 && o.Loops && unpadded.LoopFrame > 0 &&
 		result.LoopFrame != unpadded.LoopFrame {
-		atOne, oneErr := ymx.EncodeOnTimers(unpadded, o.Ring, o.Chunk, o.Loops,
-			o.Progress, 1, o.TimerMap)
+		atOne, oneErr := ymx.EncodeCopying(unpadded, o.Ring, o.Chunk, o.Loops,
+			o.Progress, 1, o.TimerMap, o.Copies)
 		// Unit 1 stands only where it starts the tune over where the source
 		// says. Where the frame moved for another reason it moves at unit 1
 		// too, and the shape asked for is the cheaper of the two.

@@ -22,7 +22,7 @@ public static class St4Cli
     /// <summary>Runs the packer command.</summary>
     /// <param name="args">
     /// Arguments after the executable name. Syntax:
-    /// <c>nt4 [-f] [-c[S]] [-kK] [-mN] [-lN] [-rR] input [output.st4]</c>.
+    /// <c>st4 [-f] [-c[S]] [-kK] [-mN] [-lN] [-rR] input [output.st4]</c>.
     /// </param>
     /// <returns>Zero on success; one after a user-facing argument or file error.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="args"/> is null.</exception>
@@ -119,7 +119,7 @@ public static class St4Cli
         else
         {
             return Cli.Usage(
-                "Usage: nt4 [-f] [-c[S]] [-kK] [-mN] [-lN] [-rR] input [output.st4]\n"
+                "Usage: st4 [-f] [-c[S]] [-kK] [-mN] [-lN] [-rR] input [output.st4]\n"
                 + "  -f      Force overwrite of output file\n"
                 + "  -c      Let a match beyond the -m window copy from the\n"
                 + "          literal stream; needs a decoder built with copies\n"

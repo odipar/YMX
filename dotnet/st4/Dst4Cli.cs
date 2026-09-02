@@ -22,7 +22,7 @@ public static class Dst4Cli
     /// <summary>Runs the unpacker command.</summary>
     /// <param name="args">
     /// Arguments after the executable name. Syntax:
-    /// <c>dnt4 [-f] [-rN] input.st4 [output]</c>.
+    /// <c>dst4 [-f] [-rN] input.st4 [output]</c>.
     /// </param>
     /// <returns>Zero on success; one after a user-facing argument, file, or data error.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="args"/> is null.</exception>
@@ -88,7 +88,7 @@ public static class Dst4Cli
         else
         {
             return Cli.Usage(
-                "Usage: dnt4 [-f] [-rN] input.st4 [output]\n"
+                "Usage: dst4 [-f] [-rN] input.st4 [output]\n"
                 + "  -f      Force overwrite of output file\n"
                 + "  -rN     Play a looping stream's loop N times: the whole pass, then\n"
                 + "          N-1 repeats of its loop section (default 1, the pass)\n"

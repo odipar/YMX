@@ -19,8 +19,8 @@ import (
 const SndhMaxSubtunes = 99
 
 // The core descriptor: 'YMXC' at this offset, then version, unit, flags,
-// format version and the workspace's fixed size, words; then the two offsets
-// this tool patches, longs.
+// format version, the workspace's fixed size and the window in units,
+// words; then the two offsets this tool patches, longs.
 const (
 	CoreMagic     = 12
 	CoreVersion   = 16
@@ -28,14 +28,19 @@ const (
 	CoreFlags     = 20
 	CoreFormat    = 22
 	CoreWorkFixed = 24
-	CoreTableOff  = 26
-	CoreWorkOff   = 30
+	CoreWindow    = 26
+	CoreTableOff  = 28
+	CoreWorkOff   = 32
+
+	// CoreDescriptorVersion is the descriptor this tool reads and writes.
+	CoreDescriptorVersion = 2
 )
 
 // Core flag bits, matching YMX_sndh.S.
 const (
 	CoreFlagPerf   = 1
 	CoreFlagNomask = 2
+	CoreFlagCopies = 4
 )
 
 // SndhOptions is what the caller asked for; every field but the tunes has a
@@ -347,11 +352,18 @@ func sndhResolveCore(options SndhOptions) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	copies, err := sndhCopiesIn(options.Tunes)
+	if err != nil {
+		return "", err
+	}
 	repo, err := sndhRepo()
 	if err != nil {
 		return "", err
 	}
 	suffix := ""
+	if copies {
+		suffix += "-copies"
+	}
 	if options.Perf {
 		suffix += "-perf"
 	}
@@ -414,6 +426,22 @@ func sndhStale(repo, binary string, sources ...string) bool {
 	return false
 }
 
+// sndhCopiesIn reports whether a tune of the set copies from its literal
+// stream (flag bit 5), which asks for a core built with its ring as the
+// window.
+func sndhCopiesIn(tunes []string) (bool, error) {
+	for _, tune := range tunes {
+		header, err := ReadHeader(tune)
+		if err != nil {
+			return false, fmt.Errorf("mksndh: %w", err)
+		}
+		if header.Flags&FlagCopies != 0 {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // sndhUnitOf gives the unit the set is packed at: the first tune that names
 // one, and 2 for a set of tunes that read at any unit.
 func sndhUnitOf(tunes []string) (int, error) {
@@ -436,19 +464,24 @@ func sndhReadCore(path string, options SndhOptions) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("mksndh: cannot read the core %s", path)
 	}
-	if len(core) < 34 || core[CoreMagic] != 'Y' || core[CoreMagic+1] != 'M' ||
+	if len(core) < 36 || core[CoreMagic] != 'Y' || core[CoreMagic+1] != 'M' ||
 		core[CoreMagic+2] != 'X' || core[CoreMagic+3] != 'C' {
 		return nil, fmt.Errorf("%s is not an SNDH core", path)
 	}
-	if sndhWord(core, CoreVersion) != 1 {
+	if sndhWord(core, CoreVersion) != CoreDescriptorVersion {
 		return nil, fmt.Errorf("%s is core descriptor version %d, this tool"+
-			" writes 1", path, sndhWord(core, CoreVersion))
+			" writes %d", path, sndhWord(core, CoreVersion),
+			CoreDescriptorVersion)
 	}
 	if sndhWord(core, CoreFormat) != Version {
 		return nil, fmt.Errorf("%s reads format version %s and the tunes carry"+
 			" %s - take the core for %s from the binaries release, or"+
 			" reassemble it with ymx/mkcores.sh", path,
 			VersionName(sndhWord(core, CoreFormat)), FormatName(), FormatName())
+	}
+	copies, err := sndhCopiesIn(options.Tunes)
+	if err != nil {
+		return nil, err
 	}
 	flags := 0
 	if options.Perf {
@@ -457,9 +490,34 @@ func sndhReadCore(path string, options SndhOptions) ([]byte, error) {
 	if !options.MaskBurst {
 		flags |= CoreFlagNomask
 	}
+	if copies {
+		flags |= CoreFlagCopies
+	}
 	if sndhWord(core, CoreFlags) != flags {
 		return nil, fmt.Errorf("%s is built with flags %d, the options ask"+
 			" for %d", path, sndhWord(core, CoreFlags), flags)
+	}
+	// A core built for a window reads an offset past it as a copy, so no
+	// tune of the set may carry a wider ring; a tune with copies needs the
+	// window to be its ring exactly (SPEC.md §9.1).
+	window := sndhWord(core, CoreWindow) * sndhWord(core, CoreUnit)
+	if window != 0 {
+		for _, tune := range options.Tunes {
+			header, err := ReadHeader(tune)
+			if err != nil {
+				return nil, fmt.Errorf("mksndh: %w", err)
+			}
+			copied := header.Flags&FlagCopies != 0
+			if header.Ring > window || copied && header.Ring != window {
+				with := ""
+				if copied {
+					with = " with copies"
+				}
+				return nil, fmt.Errorf("%s is packed for rings of %d%s, and %s"+
+					" is built for a window of %d bytes", tune, header.Ring,
+					with, path, window)
+			}
+		}
 	}
 	return core, nil
 }

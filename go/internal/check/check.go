@@ -118,8 +118,7 @@ func Check(file []byte) []Fault {
 	ring := wordAt(file, ymx.OffsetRingSize)
 	flags := wordAt(file, ymx.OffsetFlags)
 	loopFrame := longAt(file, ymx.OffsetLoopFrame)
-	loopTable := longAt(file, ymx.OffsetLoopTable)
-	faults = shape(file, faults, frames, streams, ring, loopFrame, loopTable)
+	faults = shape(file, faults, frames, streams, ring, loopFrame)
 	if len(faults) > 0 {
 		return faults
 	}
@@ -147,7 +146,7 @@ func Check(file []byte) []Fault {
 
 	value := make([][]byte, ymx.Streams)
 	for stream := 0; stream < ymx.Streams; stream++ {
-		decoded, err := streamOf(file, stream, frames, loopFrame, loopTable)
+		decoded, err := streamOf(file, stream, frames)
 		if err != nil {
 			add(-1, "§1.4 section", fmt.Sprintf(
 				"stream %d does not decode: %s", stream, err))
@@ -167,8 +166,8 @@ func Check(file []byte) []Fault {
 // The shape
 // -----------------------------------------------------------------
 
-func shape(file []byte, faults []Fault, frames, streams, ring, loopFrame,
-	loopTable int) []Fault {
+func shape(file []byte, faults []Fault, frames, streams, ring,
+	loopFrame int) []Fault {
 	add := func(detail string) {
 		faults = append(faults, Fault{-1, "§9.3 shape", detail})
 	}
@@ -197,36 +196,35 @@ func shape(file []byte, faults []Fault, frames, streams, ring, loopFrame,
 		add(fmt.Sprintf("L is %d, not below O at %d", loopFrame, frames))
 		return faults // O - L is read below
 	}
-	if loopTable == 0 {
-		if loopFrame != 0 && frames-loopFrame > ring {
-			add(fmt.Sprintf("one section per stream and O - L is %d, past"+
-				" the ring at %d: a wrap reaches back further than a pass",
-				frames-loopFrame, ring))
-		}
-		return faults
-	}
-	if loopTable%4 != 0 {
-		add(fmt.Sprintf("the loop table is at %d, off a long boundary",
-			loopTable))
-	}
-	if loopFrame == 0 {
-		add("the file carries a loop table and L is 0")
-	}
-	if frames-loopFrame <= ring {
-		add(fmt.Sprintf("the file carries a loop table and O - L is %d,"+
-			" within the ring at %d: one section per stream is the form",
-			frames-loopFrame, ring))
-	}
-	// The table's own extent, which the entries below are read from: a
-	// header naming a table past the file's end has no entries to read.
-	if loopTable < 0 || loopTable > len(file)-4*ymx.Streams {
-		add(fmt.Sprintf("the loop table is at %d, outside the file at %d"+
-			" bytes", loopTable, len(file)))
-		return faults
+	// The loop form every container carries: a rewind point of L bytes
+	// where a pass is longer than a ring, none where it is not. A
+	// container's own header says which, and the twenty-five say the same
+	// thing or the player cannot tell (§8).
+	rewind := st4.NoRewind
+	if loopFrame != 0 && frames-loopFrame > ring {
+		rewind = loopFrame
 	}
 	for stream := 0; stream < ymx.Streams; stream++ {
-		if entry(file, loopTable, stream) == 0 {
-			add(fmt.Sprintf("loop-table entry %d is 0", stream))
+		item := entry(file, ymx.OffsetSectionTable, stream)
+		if item == 0 || ymx.IsStored(item) {
+			continue
+		}
+		start := int(ymx.SectionOffset(item))
+		if start < 0 || start+st4.HeaderSize > len(file) {
+			continue // reported where the section is read
+		}
+		carried := longAt(file, start+st4.OffsetRewind)
+		window := longAt(file, start+st4.OffsetWindow)
+		if carried != rewind {
+			add(fmt.Sprintf("stream %d's container carries rewind point %d"+
+				" where O - L is %d against a ring of %d: every container"+
+				" carries %d", stream, carried, frames-loopFrame, ring, rewind))
+		}
+		unit := int(file[start+3])
+		if unit > 0 && window != ring/unit {
+			add(fmt.Sprintf("stream %d's container carries window %d where"+
+				" the ring of %d at unit %d gives %d", stream, window, ring,
+				unit, ring/unit))
 		}
 	}
 	return faults
@@ -634,24 +632,9 @@ func ownership(faults []Fault, frame, skips int, channels []channel,
 // Reading the container
 // -----------------------------------------------------------------
 
-// streamOf is one stream's O values, out of its section and its loop section.
-func streamOf(file []byte, index, frames, loopFrame,
-	loopTable int) ([]byte, error) {
-	if loopTable == 0 {
-		return section(file, ymx.OffsetSectionTable, index, frames)
-	}
-	head, err := section(file, ymx.OffsetSectionTable, index, loopFrame)
-	if err != nil {
-		return nil, err
-	}
-	tail, err := section(file, loopTable, index, frames-loopFrame)
-	if err != nil {
-		return nil, err
-	}
-	whole := make([]byte, frames)
-	copy(whole, head)
-	copy(whole[loopFrame:], tail[:frames-loopFrame])
-	return whole, nil
+// streamOf is one stream's O values, out of its section.
+func streamOf(file []byte, index, frames int) ([]byte, error) {
+	return section(file, ymx.OffsetSectionTable, index, frames)
 }
 
 // section is one section, decoded to at least count values.
@@ -669,12 +652,21 @@ func section(file []byte, table, index, count int) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	out, err := st4.Decompress(container.Control, container.Literal,
+	// Decoded at the window and the rewind point the container carries, so
+	// a match past the ring or before the rewind point is a fault rather
+	// than a value, and a stream that repeats is one too: a section of this
+	// version ends (§1.4).
+	decoded, err := st4.Decode(container.Control, container.Literal,
 		container.ByteOffsets, container.WordOffsets, container.Unit,
-		container.Size)
+		container.Size, container.Window, container.Rewind)
 	if err != nil {
 		return nil, err
 	}
+	if decoded.RepeatIndex >= 0 {
+		return nil, fmt.Errorf("the section repeats from unit %d, and a"+
+			" section ends", decoded.RepeatIndex)
+	}
+	out := decoded.Output
 	if len(out) < count {
 		return nil, fmt.Errorf("%d values, not %d", len(out), count)
 	}
@@ -699,17 +691,9 @@ func next(file []byte, start int) int {
 	if sampleTable := longAt(file, ymx.OffsetSampleTable); sampleTable != 0 {
 		offsets = append(offsets, sampleTable)
 	}
-	loopTable := longAt(file, ymx.OffsetLoopTable)
-	if loopTable != 0 {
-		offsets = append(offsets, loopTable)
-	}
 	for index := 0; index < ymx.Streams; index++ {
 		offsets = append(offsets, int(ymx.SectionOffset(
 			entry(file, ymx.OffsetSectionTable, index))))
-		if loopTable != 0 {
-			offsets = append(offsets, int(ymx.SectionOffset(
-				entry(file, loopTable, index))))
-		}
 	}
 	sort.Ints(offsets)
 	for _, offset := range offsets {

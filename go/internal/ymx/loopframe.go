@@ -18,19 +18,23 @@ import "fmt"
 // that writes R13.
 //
 // The second is how the player reaches the frame again, in one of two ways. A
-// wrap that moves the read position in every ring back O - L bytes needs O - L
-// at or under N; raising N to hold the body costs workspace and no file bytes,
-// so that is what the packer does, up to the format's cap. Past the cap the
-// file carries two sections per stream instead - frames [0, L) in the section
-// table's, [L, O) in the loop table's - which the player opens in turn
-// (SPEC.md 1.4, 8), and that one costs file bytes. Where the state rule holds
-// for no frame within the budget, and where a cut has no frame it can start
-// at, L is 0 and the packer reports it.
+// wrap that moves the read position in every ring back O - L bytes reaches
+// only as far as the ring holds, so it needs O - L at or under N. Past that
+// the file carries one container per stream whose rewind point is L: frames
+// [L, O) packed on their own, which the player replays from the decoder
+// state it saved there (SPEC.md 1.4, 8). That one costs file bytes, since the
+// replayed frames are packed on their own, so the ring form is taken where
+// it reaches and the rewind only past it. Where a rewind has no frame it can
+// start at, L is 0: the tune starts over from its first frame, and the packer
+// reports it. Where the state rule holds for no frame within the budget, the
+// tune starts over at the source's frame anyway, and the packer reports what
+// that carries in.
 
 // LoopBudgetSeconds is how far past the frame its source gives the packer
 // looks for one it can enter, in seconds. The advance moves the repeat that
-// much later, which bounds it; past the bound the file carries 0 and the tune
-// starts over from its first frame.
+// much later, which bounds it; past the bound the tune starts over at the
+// source's frame anyway, and what an earlier frame left running is not
+// running on the second pass.
 const LoopBudgetSeconds = 1
 
 // LoopBudget is the budget in frames, for a tune at frameRate frames a second.
@@ -39,25 +43,25 @@ func LoopBudget(frameRate int) int {
 }
 
 // LoopPlan is what the packer settled on: the Frame the file carries, the
-// RingSize it needs to reach it, whether the streams are Cut in two at that
-// frame, and the Notes saying what moved and what it cost.
+// RingSize the file carries, whether the streams Rewind to that frame every
+// pass, and the Notes saying what moved and what it cost.
 type LoopPlan struct {
 	Frame    int
 	RingSize int
-	Cut      bool
+	Rewinds  bool
 	Notes    []string
 }
 
 // ResolveLoopFrame resolves the frame a file starts over from. loops is what
 // the file's flag bit 0 will say; ringSize and chunk are the shape the caller
 // asked for, and the plan carries the ring size it was given. unit is the size
-// the sections are packed at, which a cut has to fall on: each of the two
-// sections is a whole number of units.
+// the sections are packed at, which a rewind point has to fall on: each of
+// the two parts is a whole number of units.
 func ResolveLoopFrame(tune *Tune, script *ScriptResult, loops bool,
 	ringSize, chunk, unit int) LoopPlan {
 	var notes []string
 	if !loops || tune.LoopFrame == 0 {
-		return LoopPlan{Frame: 0, RingSize: ringSize, Cut: false, Notes: notes}
+		return LoopPlan{Frame: 0, RingSize: ringSize, Rewinds: false, Notes: notes}
 	}
 	given := tune.LoopFrame
 	budget := LoopBudget(tune.FrameRate)
@@ -67,11 +71,11 @@ func ResolveLoopFrame(tune *Tune, script *ScriptResult, loops bool,
 	}
 	// The loop point the file carries is the source's, or the first frame from
 	// it that can be entered. The form follows from that frame: the rings carry
-	// the body where they hold it, and a cut carries it otherwise. Neither
+	// the body where they hold it, and a rewind carries it otherwise. Neither
 	// moves the loop point to suit itself.
 	entered := -1
 	ringFrame := -1
-	cutFrame := -1
+	rewindFrame := -1
 	for candidate := given; candidate <= last; candidate++ {
 		if LoopFrameQualifies(tune, script, candidate) {
 			entered = candidate
@@ -97,17 +101,17 @@ func ResolveLoopFrame(tune *Tune, script *ScriptResult, loops bool,
 	if tune.Frames-entered <= ringSize {
 		ringFrame = entered
 	} else {
-		// Each section is a whole number of units, so a cut falls on one. The
-		// search runs to the end of the tune, since a cut holds any body: the
-		// loop point stays as near the source's as a unit allows.
+		// Each part is a whole number of units, so a rewind point falls on
+		// one. The search runs to the end of the tune, since a rewind holds any
+		// body: the loop point stays as near the source's as a unit allows.
 		for candidate := entered; candidate < tune.Frames; candidate++ {
 			if candidate%unit == 0 &&
 				(forced || LoopFrameQualifies(tune, script, candidate)) {
-				cutFrame = candidate
+				rewindFrame = candidate
 				break
 			}
 		}
-		if cutFrame < 0 {
+		if rewindFrame < 0 {
 			notes = append(notes, fmt.Sprintf("The tune starts over at frame %d,"+
 				" and no frame from there on falls on a %d-byte unit and can be"+
 				" entered with the timers stopped, the skips cleared and the"+
@@ -115,11 +119,11 @@ func ResolveLoopFrame(tune *Tune, script *ScriptResult, loops bool,
 				" frame 0 instead, so its first %d frames are heard on every"+
 				" pass", given, unit, given))
 			notes = append(notes, idealNote(tune, entered, chunk, ringSize))
-			return LoopPlan{Frame: 0, RingSize: ringSize, Cut: false, Notes: notes}
+			return LoopPlan{Frame: 0, RingSize: ringSize, Rewinds: false, Notes: notes}
 		}
 	}
 
-	frame := cutFrame
+	frame := rewindFrame
 	if ringFrame >= 0 {
 		frame = ringFrame
 	}
@@ -131,7 +135,7 @@ func ResolveLoopFrame(tune *Tune, script *ScriptResult, loops bool,
 			given, entered, entered-given, plural(entered-given)))
 	}
 	if ringFrame >= 0 {
-		return LoopPlan{Frame: frame, RingSize: ringSize, Cut: false, Notes: notes}
+		return LoopPlan{Frame: frame, RingSize: ringSize, Rewinds: false, Notes: notes}
 	}
 	if frame != entered {
 		notes = append(notes, fmt.Sprintf("Frame %d is not a whole number of"+
@@ -139,14 +143,14 @@ func ResolveLoopFrame(tune *Tune, script *ScriptResult, loops bool,
 			" frame %d instead, %d frame%s later", entered, unit, frame,
 			frame-entered, plural(frame-entered)))
 	}
-	replayed := tune.Frames - frame
+	body := tune.Frames - frame
 	notes = append(notes, fmt.Sprintf("The %d frames from frame %d are past the"+
-		" %d bytes the rings hold, so every stream is packed as two sections -"+
-		" one of the %d frames before it, one of the %d from it - and the file"+
-		" carries a loop table locating the second: file bytes rather than"+
-		" workspace", replayed, frame, ringSize, frame, replayed))
+		" %d bytes the rings hold, so every stream's container carries frame %d"+
+		" as its rewind point: the %d frames from it are packed on their own,"+
+		" and the player replays them from the decoder state it saved there."+
+		" File bytes rather than workspace", body, frame, ringSize, frame, body))
 	notes = append(notes, idealNote(tune, frame, chunk, ringSize))
-	return LoopPlan{Frame: frame, RingSize: ringSize, Cut: true, Notes: notes}
+	return LoopPlan{Frame: frame, RingSize: ringSize, Rewinds: true, Notes: notes}
 }
 
 // idealNote gives the rings that hold the frames replayed from at, against the
