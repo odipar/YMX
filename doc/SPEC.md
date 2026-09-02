@@ -100,7 +100,7 @@ four.
 | 2 | timer channel 1 |
 | 3 | timer channel 2 |
 | 4 | timer channel 3 |
-| 5 | a section copies from its literal stream (§1.4, Appendix A.5): the file plays only on a player built for its ring as a window (§9.1) |
+| 5 | a section copies from its literal stream (§1.4, Appendix A.5): the file plays only on a player built with the copy code (§9.1) |
 | 6-15 | reserved, written as 0 |
 
 A player claims an MFP timer only for channels whose flags are set; other
@@ -168,11 +168,12 @@ format comes from the [ST4](https://github.com/odipar/ST4) repository,
 and an implementation follows the appendix rather than that repository.
 A writer with no ST4 compressor stores every section instead (below) and
 emits no container. A section of this version ends rather than repeats,
-carries a rewind point only as §8 gives it, and records the window
-`N/k`. An offset past the window is a copy from the literal stream
-(Appendix A.5): a writer emits one only with flag bit 5 set, and a file
-with the bit set plays only on a player built for `N/k` as its window
-(§9.1). What a container may carry beyond that, §9.3 rules out.
+carries a rewind point only as §8 gives it, and records the window `N/k`.
+An offset past the window is a copy from the literal stream (Appendix
+A.5): a writer emits one only with flag bit 5 set, and a file with the bit
+set plays only on a player built with the copy code, which takes `N/k` as
+its window at init (§9.1). What a container may carry beyond that, §9.3
+rules out.
 
 **Two fixed parameters.** No back-reference exceeds `N` bytes (§1.3),
 and no operation exceeds 65535 units.
@@ -888,11 +889,10 @@ values.
   format version and unit size the player was built for - a tune packed
   for a different one is rejected, not garbled. A stored section has no
   signature to check;
-- a player built with no window rejects a file with flag bit 5 set: it
-  has no copy code, and would decode a copy to other bytes. A player
-  built for a window of `W` units rejects a file whose `N` is larger than
-  `W · k`, since it reads an offset past `W` as a copy, and rejects a file
-  with flag bit 5 set whose `N` is not `W · k` exactly.
+- a player built without the copy code rejects a file with flag bit 5 set:
+  it would decode a copy to other bytes. A player built with the copy code
+  takes `N/k` as its window at init, and so plays a file with the bit set
+  at any `N`.
 
 Beyond that a player checks nothing - §9.3 lists the unchecked rules - and
 a malformed file is undefined behaviour.

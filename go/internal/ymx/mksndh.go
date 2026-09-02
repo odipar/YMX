@@ -19,8 +19,8 @@ import (
 const SndhMaxSubtunes = 99
 
 // The core descriptor: 'YMXC' at this offset, then version, unit, flags,
-// format version, the workspace's fixed size and the window in units,
-// words; then the two offsets this tool patches, longs.
+// format version and the workspace's fixed size, words; then the two
+// offsets this tool patches, longs.
 const (
 	CoreMagic     = 12
 	CoreVersion   = 16
@@ -28,9 +28,8 @@ const (
 	CoreFlags     = 20
 	CoreFormat    = 22
 	CoreWorkFixed = 24
-	CoreWindow    = 26
-	CoreTableOff  = 28
-	CoreWorkOff   = 32
+	CoreTableOff  = 26
+	CoreWorkOff   = 30
 
 	// CoreDescriptorVersion is the descriptor this tool reads and writes.
 	CoreDescriptorVersion = 2
@@ -352,7 +351,7 @@ func sndhResolveCore(options SndhOptions) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	ring, err := sndhCopiesRing(options.Tunes)
+	copies, err := sndhCopiesIn(options.Tunes)
 	if err != nil {
 		return "", err
 	}
@@ -360,15 +359,13 @@ func sndhResolveCore(options SndhOptions) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// The name says the window and the flags, and the mkcores command that
-	// assembles it says the same in its own words.
-	suffix := sndhWindowSuffix(ring)
+	// The name says the flags, and the mkcores command that assembles the
+	// core says the same in its own words.
+	suffix := ""
 	assemble := "ymx/mkcores.sh"
-	if ring != 0 {
+	if copies {
+		suffix += "-copies"
 		assemble += " -copies"
-		if ring != DefaultRingSize {
-			assemble += " -n" + strconv.Itoa(ring)
-		}
 	}
 	if options.Perf {
 		suffix += "-perf"
@@ -380,8 +377,7 @@ func sndhResolveCore(options SndhOptions) (string, error) {
 	}
 	name := "ymxsndh-k" + strconv.Itoa(unit) + suffix +
 		sndhBinarySuffix() + ".bin"
-	published := ring == 0 || ring == DefaultRingSize
-	core, err := sndhPrebuilt(repo, name, assemble, published,
+	core, err := sndhPrebuilt(repo, name, assemble,
 		"YMX_sndh.S", "YMX.S", "ST4_wrap.S")
 	if err != nil {
 		return "", fmt.Errorf("mksndh: %w", err)
@@ -400,11 +396,9 @@ func sndhResolveCore(options SndhOptions) (string, error) {
 // rule: a binary older than a source it was assembled from is stale wherever
 // it sits.
 //
-// published says the binaries release carries a core of this name; a core
-// for a ring other than the default is assembled and never published, and
-// the message says which.
-func sndhPrebuilt(repo, name, assemble string, published bool,
-	sources ...string) (string, error) {
+// assemble is the mkcores command that assembles a core of this name, for
+// the message.
+func sndhPrebuilt(repo, name, assemble string, sources ...string) (string, error) {
 	beside := filepath.Join(repo, "dist", name)
 	if !sndhStale(repo, beside, sources...) {
 		return beside, nil
@@ -412,11 +406,6 @@ func sndhPrebuilt(repo, name, assemble string, published bool,
 	staged := filepath.Join(repo, "dist", "release", name)
 	if !sndhStale(repo, staged, sources...) {
 		return staged, nil
-	}
-	if !published {
-		return "", fmt.Errorf("%s is missing or older than the sources it is"+
-			" assembled from, and so is %s; the binaries release carries no"+
-			" core for that ring - assemble it with %s", beside, staged, assemble)
 	}
 	return "", fmt.Errorf("%s is missing or older than the sources it is"+
 		" assembled from, and so is %s - take it from the binaries release,"+
@@ -445,36 +434,20 @@ func sndhStale(repo, binary string, sources ...string) bool {
 	return false
 }
 
-// sndhCopiesRing is the ring the set's core is built for as its window: the
-// ring of the first tune that copies from its literal stream (flag bit 5),
-// or 0 where none does. A tune with copies plays only on a core whose window
-// is its ring, and sndhReadCore holds every tune of the set to the core's
-// window.
-func sndhCopiesRing(tunes []string) (int, error) {
+// sndhCopiesIn reports whether a tune of the set copies from its literal
+// stream (flag bit 5), which asks for a core with the copy code; that core
+// reads the window off each tune's ring at init, so it serves any ring.
+func sndhCopiesIn(tunes []string) (bool, error) {
 	for _, tune := range tunes {
 		header, err := ReadHeader(tune)
 		if err != nil {
-			return 0, fmt.Errorf("mksndh: %w", err)
+			return false, fmt.Errorf("mksndh: %w", err)
 		}
 		if header.Flags&FlagCopies != 0 {
-			return header.Ring, nil
+			return true, nil
 		}
 	}
-	return 0, nil
-}
-
-// sndhWindowSuffix is the part of a core's name that says its window:
-// nothing for none, -copies for the default ring, -copies-n<ring> for
-// another. The release carries the first two; mkcores.sh assembles the
-// third.
-func sndhWindowSuffix(ring int) string {
-	if ring == 0 {
-		return ""
-	}
-	if ring == DefaultRingSize {
-		return "-copies"
-	}
-	return "-copies-n" + strconv.Itoa(ring)
+	return false, nil
 }
 
 // sndhUnitOf gives the unit the set is packed at: the first tune that names
@@ -499,7 +472,7 @@ func sndhReadCore(path string, options SndhOptions) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("mksndh: cannot read the core %s", path)
 	}
-	if len(core) < 36 || core[CoreMagic] != 'Y' || core[CoreMagic+1] != 'M' ||
+	if len(core) < 34 || core[CoreMagic] != 'Y' || core[CoreMagic+1] != 'M' ||
 		core[CoreMagic+2] != 'X' || core[CoreMagic+3] != 'C' {
 		return nil, fmt.Errorf("%s is not an SNDH core", path)
 	}
@@ -514,11 +487,10 @@ func sndhReadCore(path string, options SndhOptions) ([]byte, error) {
 			" reassemble it with ymx/mkcores.sh", path,
 			VersionName(sndhWord(core, CoreFormat)), FormatName(), FormatName())
 	}
-	ring, err := sndhCopiesRing(options.Tunes)
+	copies, err := sndhCopiesIn(options.Tunes)
 	if err != nil {
 		return nil, err
 	}
-	copies := ring != 0
 	flags := 0
 	if options.Perf {
 		flags |= CoreFlagPerf
@@ -532,28 +504,6 @@ func sndhReadCore(path string, options SndhOptions) ([]byte, error) {
 	if sndhWord(core, CoreFlags) != flags {
 		return nil, fmt.Errorf("%s is built with flags %d, the options ask"+
 			" for %d", path, sndhWord(core, CoreFlags), flags)
-	}
-	// A core built for a window reads an offset past it as a copy, so no
-	// tune of the set may carry a wider ring; a tune with copies needs the
-	// window to be its ring exactly (SPEC.md §9.1).
-	window := sndhWord(core, CoreWindow) * sndhWord(core, CoreUnit)
-	if window != 0 {
-		for _, tune := range options.Tunes {
-			header, err := ReadHeader(tune)
-			if err != nil {
-				return nil, fmt.Errorf("mksndh: %w", err)
-			}
-			copied := header.Flags&FlagCopies != 0
-			if header.Ring > window || copied && header.Ring != window {
-				with := ""
-				if copied {
-					with = " with copies"
-				}
-				return nil, fmt.Errorf("%s is packed for rings of %d%s, and %s"+
-					" is built for a window of %d bytes", tune, header.Ring,
-					with, path, window)
-			}
-		}
 	}
 	return core, nil
 }

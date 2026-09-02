@@ -40,11 +40,11 @@ final class Player {
      * ring out of its header, since the packer raises that above the size it
      * was asked for. No caller passes a size, so none can pass a short one. */
     Player(byte[] packed, int unit, boolean perf) {
-        this(packed, unit, perf, 0);
+        this(packed, unit, perf, false);
     }
 
-    /** The same on a build for {@code window} units, 0 for none. */
-    Player(byte[] packed, int unit, boolean perf, int window) {
+    /** The same on a build with the copy code, where {@code copies}. */
+    Player(byte[] packed, int unit, boolean perf, boolean copies) {
         int workspaceSize = Rig.workspaceFor(packed);
         long[][] map = {{Rig.CODE, 0x4000}, {Rig.FILE, 0x30000},
                 {Rig.WORK, 0x40000}, {Rig.STACK_TOP - 0x8000, 0x8000},
@@ -53,7 +53,7 @@ final class Player {
         for (long[] region : map) {
             uc.map(region[0], region[1]);
         }
-        Rig.Build build = Rig.assemble(unit, perf, window);
+        Rig.Build build = Rig.assemble(unit, perf, copies);
         binary = build.binary();
         symbols = build.symbols();
         uc.write(Rig.CODE, binary);

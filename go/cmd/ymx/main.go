@@ -34,8 +34,8 @@ const usage = `Usage: YMX [-f] [-o] [-lF] [-nN] [-cC] [-kK] input.ym [output.ymx
           - inaudible - to fit the unit. The player must be
           built with the same ST4_UNIT
   -copies Let a match beyond the ring copy from the literal
-          stream; the player must then be built with
-          ST4_WINDOW = N/K, and mksndh takes the -copies core
+          stream; the player must then be built with the
+          copy code, and mksndh takes the -copies core
   -copiesS   The same, searching S seconds a stream for a
           better parse
   -minM -secS   Trim: drop everything before M:S, so a

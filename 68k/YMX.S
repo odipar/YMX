@@ -404,17 +404,17 @@ YMX_VERSION     equ     $0009           ; the format version: the major in
                                         ; low. A file of another version is
                                         ; rejected at init, not read: SPEC.md
                                         ; §10.5 repacks from source instead
-YMX_FLAG_LOOPS  equ     1
-; ST4_WINDOW, the window in units a build reads copies for, is optional and
-; ST4_wrap.S defaults it the same way; it is read here first.
+YMX_FLAG_LOOPS  equ     1               ; header flag: the tune starts over
+; ST4_WINDOW, set to 1, builds the copy code into the decoder, which reads
+; the window off the ring size at init. It is optional, and ST4_wrap.S
+; defaults it the same way; it is read here first.
         .if ^^defined ST4_WINDOW
         .else
 ST4_WINDOW      equ     0
         .endif
 YMX_FLAG_COPIES equ     32              ; bit 5: a section copies from its
                                         ; literal stream, so the file plays
-                                        ; only on a build whose ST4_WINDOW
-                                        ; is its ring               ; header flag: the tune starts over
+                                        ; only on a build with the copy code
 YMX_FLAG_CHAN   equ     2               ; and one per timer channel, from bit
                                         ; 1 up: set when the tune uses it,
                                         ; which is when a timer is claimed
@@ -476,22 +476,12 @@ YMX_init:
         cmp.l   #YMX_REQUIRED_BASE,YH_REQUIRED(a0)
         bne     .rejected               ; a required stream this build does
                                         ; not implement
-; Copies from the literal stream (flag bit 5) decode only on a build made
-; for the file's ring as its window. A build with a window reads an offset
-; past it as a copy, so it takes no ring wider than its window, with copies
-; or without; a build without one has no copy code, and takes no file with
-; copies at all.
+; Copies from the literal stream (flag bit 5) decode only on a build with
+; the copy code, which takes the window off the ring size at init and so
+; serves any ring; a build without it takes no file with copies at all.
+        .if ST4_WINDOW=0
         move.w  YH_FLAGS(a0),d0
         and.w   #YMX_FLAG_COPIES,d0
-        .if ST4_WINDOW
-        cmp.w   #ST4_WINDOW*ST4_UNIT,YH_RING(a0)
-        bhi     .rejected               ; a ring past the window
-        beq.s   .window_ready           ; the window itself: either way
-        tst.w   d0
-        bne     .rejected               ; copies for a wider window
-.window_ready:
-        .else
-        tst.w   d0
         bne     .rejected               ; copies, and no copy code
         .endif
 

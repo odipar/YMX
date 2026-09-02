@@ -63,31 +63,31 @@ namespace Rig
         public static Build Assemble(int unit, bool perf)
         {
             return Assemble(unit, perf,
-                    Environment.GetEnvironmentVariable("YMX_NOMASK") == null, 0);
+                    Environment.GetEnvironmentVariable("YMX_NOMASK") == null, false);
         }
 
-        /// <summary>The same, built for window units: a build that decodes
-        /// copies from the literal stream, and takes no ring wider than
-        /// it.</summary>
-        public static Build Assemble(int unit, bool perf, int window)
+        /// <summary>The same with the copy code built in: a build that
+        /// decodes copies from the literal stream, at the window it reads
+        /// off the ring at init.</summary>
+        public static Build Assemble(int unit, bool perf, bool copies)
         {
             return Assemble(unit, perf,
                     Environment.GetEnvironmentVariable("YMX_NOMASK") == null,
-                    window);
+                    copies);
         }
 
         /// <summary>The masked build regardless of YMX_NOMASK: the README's
         /// byte counts quote it, so the size check measures it.</summary>
         public static Build AssembleMasked(int unit, bool perf)
         {
-            return Assemble(unit, perf, true, 0);
+            return Assemble(unit, perf, true, false);
         }
 
         private static Build Assemble(int unit, bool perf, bool masked,
-                int window)
+                bool copies)
         {
             string tag = unit + (perf ? "p" : "") + (masked ? "" : "n")
-                    + (window == 0 ? "" : "w" + window);
+                    + (copies ? "c" : "");
             if (Assembled.TryGetValue(tag, out Build? held))
             {
                 return held;
@@ -95,7 +95,7 @@ namespace Rig
             Directory.CreateDirectory(Scratch);
             string source = Path.Combine(Scratch, "link" + tag + ".S");
             File.WriteAllText(source, "ST4_UNIT    equ     " + unit + "\n"
-                    + (window == 0 ? "" : "ST4_WINDOW  equ     " + window + "\n")
+                    + (copies ? "ST4_WINDOW  equ     1\n" : "")
                     + (perf ? "YMX_PERF    equ     1\n" : "")
                     + (masked ? "" : "YMX_MASK_BURST equ  0\n")
                     + "        include \"YMX.S\"\n"
