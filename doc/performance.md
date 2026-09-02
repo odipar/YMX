@@ -202,14 +202,14 @@ taken again.
 
 | | bytes |
 |---|---:|
-| player, unit size 2 | 3,534 |
+| player, unit size 2 | 3,640 |
 | ST4 decoder | 320 |
 | PRG stub | 3,038 |
 | workspace, `N` = 960 | 25,658 |
 | workspace, `N` = 1776 | 46,058 |
 | workspace, `N` = 2520 (the cap) | 64,658 |
 
-The workspace is `1658 + 25·N` and is sized for all twenty-five streams,
+The workspace is `2458 + 25·N` and is sized for all twenty-five streams,
 including the ones a tune leaves idle: a tune with no timer channel
 decodes seventeen, a YM tune twenty-one, so between 3.8 and 7.7 KB of a
 default workspace is ring nothing reads. The packed file is resident too -

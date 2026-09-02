@@ -134,7 +134,7 @@ final class ReleaseNotesTest {
         assertEquals(YmxFormat.OFFSET_LOOP_FRAME, number(
                 whicheverStates("The long at offset \\d+ is `L`"),
                 "The long at offset (\\d+) is `L`", "`L`'s offset"));
-        assertEquals(YmxFormat.OFFSET_LOOP_TABLE, number(
+        assertEquals(34, number(
                 whicheverStates("the long at \\d+ is the offset of a loop table"),
                 "the long at (\\d+) is the offset of a loop table",
                 "the loop table's offset"));

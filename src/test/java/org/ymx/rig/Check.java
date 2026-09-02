@@ -126,8 +126,7 @@ final class Check {
         int ring = wordAt(file, YmxFormat.OFFSET_RING_SIZE);
         int flags = wordAt(file, YmxFormat.OFFSET_FLAGS);
         int loopFrame = longAt(file, YmxFormat.OFFSET_LOOP_FRAME);
-        int loopTable = longAt(file, YmxFormat.OFFSET_LOOP_TABLE);
-        shape(file, faults, frames, streams, ring, loopFrame, loopTable);
+        shape(file, faults, frames, streams, ring, loopFrame);
         if (!faults.isEmpty()) {
             return faults;
         }
@@ -154,7 +153,7 @@ final class Check {
         byte[][] value = new byte[YmxFormat.STREAMS][];
         for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
             try {
-                value[stream] = stream(file, stream, frames, loopFrame, loopTable);
+                value[stream] = stream(file, stream, frames);
             } catch (RuntimeException | AssertionError e) {
                 faults.add(new Fault(-1, "§1.4 section",
                         "stream " + stream + " does not decode: " + e.getMessage()));
@@ -173,7 +172,7 @@ final class Check {
     // -----------------------------------------------------------------
 
     private static void shape(byte[] file, List<Fault> faults, int frames,
-            int streams, int ring, int loopFrame, int loopTable) {
+            int streams, int ring, int loopFrame) {
         if (frames < 1) {
             faults.add(new Fault(-1, "§9.3 shape", "O is " + frames + ", not at least 1"));
         }
@@ -201,39 +200,34 @@ final class Check {
                     "L is " + loopFrame + ", not below O at " + frames));
             return;                         // O - L is read below
         }
-        if (loopTable == 0) {
-            if (loopFrame != 0 && frames - loopFrame > ring) {
-                faults.add(new Fault(-1, "§9.3 shape", "one section per stream and O - L is "
-                        + (frames - loopFrame) + ", past the ring at " + ring
-                        + ": a wrap reaches back further than a pass"));
-            }
-            return;
-        }
-        if (loopTable % 4 != 0) {
-            faults.add(new Fault(-1, "§9.3 shape",
-                    "the loop table is at " + loopTable + ", off a long boundary"));
-        }
-        if (loopFrame == 0) {
-            faults.add(new Fault(-1, "§9.3 shape", "the file carries a loop table and L is 0"));
-        }
-        if (frames - loopFrame <= ring) {
-            faults.add(new Fault(-1, "§9.3 shape", "the file carries a loop table and O - L is "
-                    + (frames - loopFrame) + ", within the ring at " + ring
-                    + ": one section per stream is the form"));
-        }
-        // The table's own extent, which the entries below are read from: a
-        // header naming a table past the file's end has no entries to read.
-        if (loopTable < 0
-                || loopTable > file.length - 4 * YmxFormat.STREAMS) {
-            faults.add(new Fault(-1, "§9.3 shape", "the loop table is at "
-                    + loopTable + ", outside the file at " + file.length
-                    + " bytes"));
-            return;
-        }
+        // The loop form every container carries: a rewind point of L bytes
+        // where a pass is longer than a ring, none where it is not. A
+        // container's own header says which, and the twenty-five say the
+        // same thing or the player cannot tell (§8).
+        int rewind = loopFrame != 0 && frames - loopFrame > ring
+                ? loopFrame : St4Format.NO_REWIND;
         for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
-            if (entry(file, loopTable, stream) == 0) {
-                faults.add(new Fault(-1, "§9.3 shape",
-                        "loop-table entry " + stream + " is 0"));
+            long entry = entry(file, YmxFormat.OFFSET_SECTION_TABLE, stream);
+            if (entry == 0 || YmxFormat.isStored(entry)) {
+                continue;
+            }
+            int start = (int) YmxFormat.sectionOffset(entry);
+            if (start < 0 || start + St4Format.HEADER_SIZE > file.length) {
+                continue;                       // reported where the section is read
+            }
+            int carried = longAt(file, start + St4Format.OFFSET_REWIND);
+            int window = longAt(file, start + St4Format.OFFSET_WINDOW);
+            if (carried != rewind) {
+                faults.add(new Fault(-1, "§9.3 shape", "stream " + stream
+                        + "'s container carries rewind point " + carried + " where O - L is "
+                        + (frames - loopFrame) + " against a ring of " + ring
+                        + ": every container carries " + rewind));
+            }
+            int unit = file[start + 3] & 0xFF;
+            if (unit > 0 && window != ring / unit) {
+                faults.add(new Fault(-1, "§9.3 shape", "stream " + stream
+                        + "'s container carries window " + window + " where the ring of "
+                        + ring + " at unit " + unit + " gives " + ring / unit));
             }
         }
     }
@@ -635,17 +629,9 @@ final class Check {
     // Reading the container
     // -----------------------------------------------------------------
 
-    /** One stream's O values, out of its section and its loop section. */
-    private static byte[] stream(byte[] file, int index, int frames,
-            int loopFrame, int loopTable) {
-        if (loopTable == 0) {
-            return section(file, YmxFormat.OFFSET_SECTION_TABLE, index, frames);
-        }
-        byte[] head = section(file, YmxFormat.OFFSET_SECTION_TABLE, index, loopFrame);
-        byte[] tail = section(file, loopTable, index, frames - loopFrame);
-        byte[] whole = Arrays.copyOf(head, frames);
-        System.arraycopy(tail, 0, whole, loopFrame, frames - loopFrame);
-        return whole;
+    /** One stream's O values, out of its section. */
+    private static byte[] stream(byte[] file, int index, int frames) {
+        return section(file, YmxFormat.OFFSET_SECTION_TABLE, index, frames);
     }
 
     /** One section, decoded to at least {@code count} values. */
@@ -663,9 +649,19 @@ final class Check {
         }
         byte[] bytes = Arrays.copyOfRange(file, start, next(file, start));
         St4Format.Container container = St4Format.read(bytes);
-        byte[] out = St4Decompressor.decompress(container.control(), container.literal(),
-                container.byteOffsets(), container.wordOffsets(),
-                container.unit(), container.size());
+        // Decoded at the window and the rewind point the container carries,
+        // so a match past the ring or before the rewind point is a fault
+        // rather than a value, and a stream that repeats is one too: a
+        // section of this version ends (§1.4).
+        St4Decompressor.Decoded decoded = St4Decompressor.decode(container.control(),
+                container.literal(), container.byteOffsets(), container.wordOffsets(),
+                container.unit(), container.size(), container.window(),
+                container.rewind());
+        if (decoded.repeatIndex() >= 0) {
+            throw new IllegalStateException("the section repeats from unit "
+                    + decoded.repeatIndex() + ", and a section ends");
+        }
+        byte[] out = decoded.output();
         if (out.length < count) {
             throw new IllegalStateException(out.length + " values, not " + count);
         }
@@ -684,16 +680,9 @@ final class Check {
         if (sampleTable != 0) {
             offsets.add(sampleTable);
         }
-        int loopTable = longAt(file, YmxFormat.OFFSET_LOOP_TABLE);
-        if (loopTable != 0) {
-            offsets.add(loopTable);
-        }
         for (int index = 0; index < YmxFormat.STREAMS; index++) {
             offsets.add((int) YmxFormat.sectionOffset(
                     entry(file, YmxFormat.OFFSET_SECTION_TABLE, index)));
-            if (loopTable != 0) {
-                offsets.add((int) YmxFormat.sectionOffset(entry(file, loopTable, index)));
-            }
         }
         Integer end = offsets.higher(start);
         return end == null ? file.length : end;

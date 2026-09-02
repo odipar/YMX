@@ -170,7 +170,8 @@ final class BinariesConsistencyTest {
             equates.put(equ.group(1), Integer.parseInt(equ.group(2)));
         }
         return equate(equates, "YMX_STATE")
-                + equate(equates, "YMX_STREAMS") * equate(equates, "YMX_STATE_SIZE");
+                + equate(equates, "YMX_STREAMS") * equate(equates, "YMX_STATE_SIZE")
+                + equate(equates, "YMX_STREAMS") * equate(equates, "YMX_SAVE_SIZE");
     }
 
     private static int equate(Map<String, Integer> equates, String name) {

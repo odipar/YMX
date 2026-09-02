@@ -119,10 +119,23 @@ final class DamagedFileTest {
      * that the table lies inside the file.
      */
     @Test
-    void aLoopTableOutsideTheFileIsAFault() throws IOException {
+    void aRewindPointOutsideItsSectionIsAFault() throws IOException {
         byte[] damaged = tune();
-        putLong(damaged, YmxFormat.OFFSET_LOOP_TABLE, 0x7FFF_FFFC);
-        assertReports(damaged, "outside the file at");
+        // The first packed section's rewind field, set past its output.
+        int start = -1;
+        for (int stream = 0; stream < YmxFormat.STREAMS && start < 0; stream++) {
+            long entry = 0;
+            for (int at = 0; at < 4; at++) {
+                entry = (entry << 8) | (damaged[YmxFormat.OFFSET_SECTION_TABLE
+                        + 4 * stream + at] & 0xFF);
+            }
+            if (entry != 0 && !YmxFormat.isStored(entry)) {
+                start = (int) YmxFormat.sectionOffset(entry);
+            }
+        }
+        assertTrue(start >= 0, "the tune stores every section");
+        putLong(damaged, start + org.st4.St4Format.OFFSET_REWIND, 0x7FFF_FFFC);
+        assertReports(damaged, "rewind point");
     }
 
     /** The reader returns a fault whose text carries {@code wanted}. */

@@ -43,7 +43,9 @@ final class Rig {
 
     static final int STREAMS = 25;              // fourteen register, eleven script
     static final int YMX_DEFAULT_MAP = 0x9C;    // the packer's: 0->A 1->D 2->B 3->C
-    static final int YMX_FIXED = 58 + STREAMS * 64; // the workspace before the rings
+    /** The workspace before the rings: the fields, one decoder state a
+     * stream, and one saved state a stream for a tune that rewinds. */
+    static final int YMX_FIXED = 58 + STREAMS * 64 + STREAMS * 32;
     static final int OFFSET_RING_SIZE = 16;     // the header's ring word
 
     private Rig() {}

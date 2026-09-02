@@ -52,7 +52,6 @@ final class SpecConsistencyTest {
         java.put("sample table", YmxFormat.OFFSET_SAMPLE_TABLE);
         java.put("sample count", YmxFormat.OFFSET_SAMPLE_COUNT);
         java.put("`L`, the frame", YmxFormat.OFFSET_LOOP_FRAME);
-        java.put("loop table", YmxFormat.OFFSET_LOOP_TABLE);
         java.put("required-streams mask", YmxFormat.OFFSET_REQUIRED);
         java.put("section", YmxFormat.OFFSET_SECTION_TABLE);
 
@@ -79,7 +78,6 @@ final class SpecConsistencyTest {
                 Map.entry("YH_SAMPLES", YmxFormat.OFFSET_SAMPLE_TABLE),
                 Map.entry("YH_SAMPLECOUNT", YmxFormat.OFFSET_SAMPLE_COUNT),
                 Map.entry("YH_LOOP", YmxFormat.OFFSET_LOOP_FRAME),
-                Map.entry("YH_LOOPTAB", YmxFormat.OFFSET_LOOP_TABLE),
                 Map.entry("YH_REQUIRED", YmxFormat.OFFSET_REQUIRED),
                 Map.entry("YH_SECTIONS", YmxFormat.OFFSET_SECTION_TABLE));
         offsets.forEach((name, at) -> assertEquals(at.intValue(), equate(asm, name), name));
@@ -133,30 +131,29 @@ final class SpecConsistencyTest {
     }
 
     /**
-     * SPEC §9.3's rules on {@code L} and the loop table, against every packed
-     * file in the tree.
+     * SPEC §9.3's rules on {@code L} and the rewind point, against every
+     * packed file in the tree.
      *
      * <p>The rules are what a player is built on: a wrap either moves the read
      * position in every ring back one pass, which a file whose pass is longer
-     * than a ring cannot do, or opens a second section per stream, which needs
-     * a loop table naming twenty-five of them. Nothing in a player checks
-     * either (§9.1), which puts the whole of it on the packer - and the pinned
-     * files are what the packer wrote.
+     * than a ring cannot do, or restores every stream's decoder to the state
+     * it saved at {@code L}, which needs every container to carry {@code L}
+     * as its rewind point. Nothing in a player checks either (§9.1), which
+     * puts the whole of it on the packer - and the pinned files are what the
+     * packer wrote.
      */
     @Test
     void everyPackedFileKeepsTheLoopRulesTheDocumentStates() throws IOException {
         String said = flat();
-        assertTrue(said.contains("Where the loop table offset is 0, each"
-                        + " carried stream's section decodes to `O` values,"
-                        + " and `L` is 0 or leaves `O` - `L` at most `N`"),
-                "SPEC §9.3's rule on a file with no loop table has been"
+        assertTrue(said.contains("Where `L` is 0 or `O` - `L` is at most `N`,"
+                        + " every container carries `$FFFFFFFF` as its rewind"
+                        + " point"),
+                "SPEC §9.3's rule on a file whose pass fits a ring has been"
                         + " reworded: this test reads the bounds it checks the"
                         + " packed files against out of it");
-        assertTrue(said.contains("Where the loop table offset is not 0 it is a"
-                        + " long boundary, `L` is not 0, and the loop table's"
-                        + " entry for every carried stream is nonzero, `O` -"
-                        + " `L` is larger than `N`"),
-                "SPEC §9.3's rule on a file with a loop table has been"
+        assertTrue(said.contains("Where `O` - `L` is larger than `N`, every"
+                        + " container carries `L` as its rewind point"),
+                "SPEC §9.3's rule on a file that rewinds has been"
                         + " reworded: this test reads the bounds it checks the"
                         + " packed files against out of it");
         List<Path> packed = new ArrayList<>();
@@ -174,36 +171,32 @@ final class SpecConsistencyTest {
             int frames = (int) field(bytes, YmxFormat.OFFSET_FRAMES, 4);
             int ring = (int) field(bytes, YmxFormat.OFFSET_RING_SIZE, 2);
             int loopFrame = (int) field(bytes, YmxFormat.OFFSET_LOOP_FRAME, 4);
-            int loopTable = (int) field(bytes, YmxFormat.OFFSET_LOOP_TABLE, 4);
-            if (loopFrame == 0) {
-                assertEquals(0, loopTable, file + " carries a loop table"
-                        + " without a loop frame");
-                continue;
+            int rewind = loopFrame != 0 && frames - loopFrame > ring
+                    ? loopFrame : org.st4.St4Format.NO_REWIND;
+            if (loopFrame != 0) {
+                withLoopFrame++;
+                assertTrue(loopFrame < frames, file + " starts over at frame "
+                        + loopFrame + " of " + frames);
             }
-            withLoopFrame++;
-            assertTrue(loopFrame < frames, file + " starts over at frame "
-                    + loopFrame + " of " + frames);
-            if (loopTable == 0) {
-                assertTrue(frames - loopFrame <= ring, file + " replays "
-                        + (frames - loopFrame) + " frames through rings of "
-                        + ring + " with no loop table");
-                continue;
+            if (rewind >= 0) {
+                withLoopTable++;
             }
-            withLoopTable++;
-            assertTrue(frames - loopFrame > ring, file + " replays "
-                    + (frames - loopFrame) + " frames through rings of " + ring
-                    + " and still carries a loop table");
-            assertEquals(0, loopTable % 4, file + "'s loop table is at "
-                    + loopTable + ", off a long boundary");
             for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
-                assertTrue(field(bytes, loopTable + 4 * stream, 4) != 0,
-                        file + "'s loop table has no section for stream " + stream);
+                long entry = field(bytes, YmxFormat.OFFSET_SECTION_TABLE + 4 * stream, 4);
+                if (YmxFormat.isStored(entry)) {
+                    continue;
+                }
+                int start = (int) YmxFormat.sectionOffset(entry);
+                assertEquals(rewind, (int) field(bytes,
+                        start + org.st4.St4Format.OFFSET_REWIND, 4),
+                        file + "'s stream " + stream + " carries another rewind"
+                                + " point than the file's loop form gives");
             }
         }
         assertTrue(withLoopFrame > 0, "no packed tune carries a loop frame, so"
                 + " this test is checking nothing");
-        assertTrue(withLoopTable > 0, "no packed tune carries a loop table, so"
-                + " this test is checking nothing");
+        assertTrue(withLoopTable > 0, "no packed tune rewinds, so this test is"
+                + " checking nothing");
     }
 
     /** One big-endian header field of a packed file. */
@@ -539,7 +532,7 @@ final class SpecConsistencyTest {
     @Test
     void theWorkedFileIsAFileInTheTree() throws IOException {
         String said = flat();
-        assertTrue(said.contains("A file of 244 bytes, four frames, every"
+        assertTrue(said.contains("A file of 240 bytes, four frames, every"
                         + " section stored."),
                 "SPEC Appendix B describes another file");
 
@@ -548,19 +541,19 @@ final class SpecConsistencyTest {
             for (Path each : walk.filter(p -> p.toString().endsWith(".ymx"))
                     .sorted().toList()) {
                 byte[] file = Files.readAllBytes(each);
-                if (file.length == 244 && longAt(file, YmxFormat.OFFSET_FRAMES) == 4) {
+                if (file.length == 240 && longAt(file, YmxFormat.OFFSET_FRAMES) == 4) {
                     found = file;
                     break;
                 }
             }
         }
-        assertTrue(found != null, "Appendix B walks through a 244-byte,"
+        assertTrue(found != null, "Appendix B walks through a 240-byte,"
                 + " four-frame file and ym/test holds none");
 
         byte[] file = found == null ? new byte[240] : found;
-        assertEquals(144, (int) YmxFormat.sectionOffset(
+        assertEquals(140, (int) YmxFormat.sectionOffset(
                         longAt(file, YmxFormat.OFFSET_SECTION_TABLE)),
-                "Appendix B says the first body item is at 144");
+                "Appendix B says the first body item is at 140");
         for (int stream = 0; stream < YmxFormat.STREAMS; stream++) {
             assertTrue(YmxFormat.isStored(longAt(file,
                             YmxFormat.OFFSET_SECTION_TABLE + 4 * stream)),

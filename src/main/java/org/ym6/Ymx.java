@@ -568,11 +568,9 @@ public final class Ymx {
             String name = stream.register() < YmxFormat.REGISTER_STREAMS
                     ? String.format("R%-2d", stream.register())
                     : effectNames[stream.register() - YmxFormat.REGISTER_STREAMS] + " ";
-            System.out.printf(Locale.ROOT, "  %s %6d -> %6d bytes (%5.1f%%)%s%n", name,
+            System.out.printf(Locale.ROOT, "  %s %6d -> %6d bytes (%5.1f%%)%n", name,
                     stream.frames(), stream.packedSize(),
-                    100.0 * stream.packedSize() / stream.frames(),
-                    stream.loopSize() == 0 ? "" : String.format("  %6d + %d",
-                            stream.firstSize(), stream.loopSize()));
+                    100.0 * stream.packedSize() / stream.frames());
         }
         System.out.printf(Locale.ROOT, "Packed %d register bytes into %d (%.1f%%), file %d bytes%n",
                 raw, result.packedSize(), 100.0 * result.packedSize() / raw, result.file().length);

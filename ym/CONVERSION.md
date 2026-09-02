@@ -122,20 +122,17 @@ above it is dropped here.
   do not, the rings grow to the smallest multiple of `C` that holds them,
   which costs workspace and no file bytes.
 
-  Where the largest ring the format allows still will not hold them, the
-  packer takes the first later frame within the budget that a ring does
-  reach. Where the budget holds none, every stream is packed as two
-  sections instead - the frames before `L`, then the frames from `L` on -
-  and the player opens the second at the wrap. That one costs file bytes,
-  since the replayed frames are packed on their own and no match reaches
-  across the cut: on the six tunes in `test` that take it, the file is
-  2 to 45 per cent larger than the same tune packed with `-l0` at the same
+  Where the rings do not hold them, every stream's container carries `L`
+  as its rewind point and the frames from `L` packed on their own, and the
+  player replays them from the decoder state it saved at `L`. That one
+  costs file bytes, since no match in the replayed frames reaches before
+  `L`: on the six tunes in `test` that take it, the file is
+  0 to 10 per cent larger than the same tune packed with `-l0` at the same
   unit size. The rings stay the size they were.
 
-  A section is a whole number of units, so at `-k2` or `-k4` the cut falls on
-  a unit boundary: where no frame near `L` that the wrap can enter falls on
-  one, the file carries 0 and the tune starts over from its first frame, as
-  every file before format version 0.5 did.
+  A rewind point is a whole number of units, so at `-k2` or `-k4` it falls
+  on a unit boundary: where `L` does not, the packer packs at `-k1`, where
+  every frame is one.
 
   Each conversion says what it did with the frame. `-lF` gives a frame of its
   own, and `-l0` starts the tune over from the beginning.

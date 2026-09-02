@@ -32,14 +32,14 @@ import java.util.List;
  * bytes reaches only as far as the ring holds, so it needs {@code O - L} at or
  * under {@code N}; raising {@code N} to hold the body costs workspace and no
  * file bytes, so that is what the packer does, up to the format's cap. Past
- * the cap the file carries two sections per stream instead - frames
- * {@code [0, L)} in the section table's, {@code [L, O)} in the loop table's -
+ * the cap the file carries one container per stream whose rewind
+ * point is {@code L}: frames {@code [L, O)} packed on their own -
  * which the player opens in turn (SPEC.md 1.4, 8). That one costs file bytes,
  * since the replayed frames are packed on their own, so the ring form is
- * taken where it reaches and the cut only past the cap.
+ * taken where it reaches and the rewind only past it.
  *
  * <p>Where the state rule holds for no frame within the budget, and where a
- * cut has no frame it can start at, {@code L} is 0: the tune starts over from
+ * rewind has no frame it can start at, {@code L} is 0: the tune starts over from
  * its first frame, as every file before format version 0.5 did, and the packer
  * reports it.
  */
@@ -63,10 +63,10 @@ public final class LoopFrame {
     /**
      * What the packer settled on: the {@code frame} the file carries, the
      * {@code ringSize} it needs to reach it, whether the streams are
-     * {@code cut} in two at that frame, and the {@code notes} saying what moved
+     * {@code rewinds} to that frame every pass, and the {@code notes} saying what moved
      * and what it cost.
      */
-    public record Plan(int frame, int ringSize, boolean cut, List<String> notes) {
+    public record Plan(int frame, int ringSize, boolean rewinds, List<String> notes) {
 
         public Plan {
             notes = List.copyOf(notes);
@@ -80,7 +80,7 @@ public final class LoopFrame {
      * plays once through has no loop frame and carries 0. {@code ringSize} and
      * {@code chunk} are the shape the caller asked for; the plan's ring size is
      * that one or a larger multiple of the chunk. {@code unit} is the size the
-     * sections are packed at, which a cut has to fall on: each of the two
+     * sections are packed at, which a rewind point has to fall on: each of the two
      * sections is a whole number of units.
      */
     public static Plan resolve(Tune tune, EffectScript.Result script, boolean loops,
@@ -94,11 +94,11 @@ public final class LoopFrame {
         int last = Math.min(given + budget, tune.frames() - 1);
         // The loop point the file carries is the source's, or the first frame
         // from it that can be entered. The form follows from that frame: the
-        // rings carry the body where they hold it, and a cut carries it
+        // rings carry the body where they hold it, and a rewind carries it
         // otherwise. Neither moves the loop point to suit itself.
         int entered = -1;
         int ringFrame = -1;
-        int cutFrame = -1;
+        int rewindFrame = -1;
         for (int candidate = given; candidate <= last; candidate++) {
             if (qualifies(tune, script, candidate)) {
                 entered = candidate;
@@ -125,17 +125,17 @@ public final class LoopFrame {
         if (tune.frames() - entered <= ringSize) {
             ringFrame = entered;
         } else {
-            // Each section is a whole number of units, so a cut falls on one.
-            // The search runs to the end of the tune, since a cut holds any
+            // Each part is a whole number of units, so a rewind point falls on
+            // one. The search runs to the end of the tune, since a rewind holds any
             // body: the loop point stays as near the source's as a unit allows.
             for (int candidate = entered; candidate < tune.frames(); candidate++) {
                 if (candidate % unit == 0
                         && (forced || qualifies(tune, script, candidate))) {
-                    cutFrame = candidate;
+                    rewindFrame = candidate;
                     break;
                 }
             }
-            if (cutFrame < 0) {
+            if (rewindFrame < 0) {
                 notes.add(String.format("The tune starts over at frame %d, and no"
                         + " frame from there on falls on a %d-byte unit and can be"
                         + " entered with the timers stopped, the skips cleared and"
@@ -147,7 +147,7 @@ public final class LoopFrame {
             }
         }
 
-        int frame = ringFrame >= 0 ? ringFrame : cutFrame;
+        int frame = ringFrame >= 0 ? ringFrame : rewindFrame;
         if (entered != given) {
             notes.add(String.format("The source starts over at frame %d, which cannot be"
                     + " entered with the timers stopped, the skips cleared and the"
@@ -166,10 +166,11 @@ public final class LoopFrame {
         }
         int body = tune.frames() - frame;
         notes.add(String.format("The %d frames from frame %d are past the %d bytes the"
-                + " rings hold, so every stream is packed as two sections - one of"
-                + " the %d frames before it, one of the %d from it - and the file"
-                + " carries a loop table locating the second: file bytes rather than"
-                + " workspace", body, frame, ringSize, frame, body));
+                + " rings hold, so every stream's container carries frame %d as its"
+                + " rewind point: the %d frames from it are packed on their own,"
+                + " and the player replays them from the decoder state it saved"
+                + " there. File bytes rather than workspace", body, frame, ringSize,
+                frame, body));
         notes.add(idealNote(tune, frame, chunk, ringSize));
         return new Plan(frame, ringSize, true, notes);
     }

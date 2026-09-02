@@ -61,7 +61,7 @@ final class LoopFrameTest {
         return resolve(tune, ringSize, 1);
     }
 
-    /** The same, packing at {@code unit} bytes a unit: a cut falls on one. */
+    /** The same, packing at {@code unit} bytes a unit: a rewind point falls on one. */
     private static LoopFrame.Plan resolve(Tune tune, int ringSize, int unit) {
         return LoopFrame.resolve(tune, EffectScript.compile(tune), true,
                 ringSize, 24, unit);
@@ -127,38 +127,38 @@ final class LoopFrameTest {
         LoopFrame.Plan plan = resolve(tune, 1776);
         assertEquals(160, plan.frame(), "the frame survives");
         assertEquals(1776, plan.ringSize(), "the rings stay the size asked for");
-        assertFalse(plan.cut(), "the rings carry it, so no section is cut");
+        assertFalse(plan.rewinds(), "the rings carry it, so no container rewinds");
     }
 
     /** A body past the largest ring is replayed out of a second section per
-     * stream instead, cut at the frame the file carries. */
+     * stream instead, rewound to the frame the file carries. */
     @Test
-    void aBodyPastTheLargestRingIsCutInTwo() {
+    void aBodyPastTheRingRewinds() {
         LoopFrame.Plan plan = resolve(longTune(), 960);
-        assertEquals(101, plan.frame(), "the frame survives the cut");
-        assertTrue(plan.cut(), "the streams are cut at it");
-        assertEquals(960, plan.ringSize(), "a cut leaves the ring where it was");
-        assertTrue(plan.notes().stream().anyMatch(n -> n.contains("two sections")),
-                "the cut is reported: " + plan.notes());
+        assertEquals(101, plan.frame(), "the frame survives the rewind");
+        assertTrue(plan.rewinds(), "the containers rewind to it");
+        assertEquals(960, plan.ringSize(), "a rewind leaves the ring where it was");
+        assertTrue(plan.notes().stream().anyMatch(n -> n.contains("rewind point")),
+                "the rewind is reported: " + plan.notes());
     }
 
-    /** Each of the two sections is a whole number of units, so a cut at a
-     * unit size above 1 falls on one. Frame 101 cannot be cut at, and the
+    /** Each of the two parts is a whole number of units, so a rewind at a
+     * unit size above 1 falls on one. Frame 101 cannot be rewound to, and the
      * next frame that can be entered is 103, which cannot either. */
     @Test
     void aCutWithNoUnitBoundaryToFallOnFallsBack() {
         LoopFrame.Plan plan = resolve(longTune(), 960, 2);
-        assertEquals(0, plan.frame(), "no frame the tune can be cut at");
+        assertEquals(0, plan.frame(), "no frame the tune can rewind to");
         assertTrue(plan.notes().stream().anyMatch(n -> n.contains("2-byte unit")),
-                "the unit the cut needs is reported: " + plan.notes());
+                "the unit the rewind needs is reported: " + plan.notes());
     }
 
-    /** With a frame on a unit boundary in reach, the cut moves to it. */
+    /** With a frame on a unit boundary in reach, the rewind moves to it. */
     @Test
     void aCutMovesToAUnitBoundary() {
         LoopFrame.Plan plan = resolve(plainOfLength(3000, 100, 101, 104), 960, 4);
         assertEquals(104, plan.frame(), "the first frame a section can end on");
-        assertTrue(plan.cut(), "the streams are cut at it");
+        assertTrue(plan.rewinds(), "the containers rewind to it");
         assertTrue(plan.notes().stream().anyMatch(n -> n.contains("4-byte units")),
                 "the move is reported: " + plan.notes());
     }

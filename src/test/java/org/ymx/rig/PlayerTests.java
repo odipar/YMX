@@ -253,7 +253,6 @@ final class PlayerTests {
         longWord(out, table);
         word(out, 1);                               // one sample
         longWord(out, 0);                           // L: back to the beginning
-        longWord(out, 0);                           // no loop table
         longWord(out, org.ymx.YmxFormat.REQUIRED_BASE);     // Q: no extension
         for (int stream = 0; stream < Rig.STREAMS; stream++) {
             longWord(out, 0x80000000 | where[stream]);  // bit 31: stored
@@ -268,21 +267,23 @@ final class PlayerTests {
     }
 
     /**
-     * A file cut in two at its loop frame, every section stored: the section
-     * table locates frames {@code [0, L)} and the loop table {@code [L, O)}.
-     * A short replay packs smaller stored than as a container, so this is a
-     * shape a writer reaches; here it also puts the loop table's own entries
-     * on the stored path. {@code L} is under one group, so the first refill
-     * of every stream already runs into the second section.
+     * A file whose pass is longer than its ring, every section stored: one
+     * section per stream covering frames {@code [0, O)}, and {@code L} in the
+     * header, so the player saves each stream's state after {@code L}
+     * values and restores it after {@code O}. A stored section has no
+     * container to carry a rewind point, so the header's {@code L} is all
+     * the player has, and its state is the read position. {@code L} is
+     * under one group, so the first refill of every stream already crosses
+     * it.
      */
-    static String runStoredCut() {
+    static String runStoredRewind() {
         int frames = 96;
         int loop = 12;
         int ring = 48;
-        byte[] file = storedCutYmx(frames, loop, ring, 24);
+        byte[] file = storedRewindYmx(frames, loop, ring, 24);
         Player player = new Player(file, 1);
         if (player.init() != 0) {
-            return "stored cut: YMX_init rejected the file";
+            return "stored rewind: YMX_init rejected the file";
         }
         // Two passes past the first: R0 carries the frame number, so the
         // values written to it are the frames the player played.
@@ -297,37 +298,31 @@ final class PlayerTests {
                 }
             }
             if (got == null || got != wanted) {
-                return "stored cut: call " + index + " wrote R0=" + got
+                return "stored rewind: call " + index + " wrote R0=" + got
                         + ", want frame " + wanted;
             }
         }
         return "";
     }
 
-    /** The file {@link #runStoredCut} plays: twenty-five stored sections of
-     * {@code loop} values, twenty-five more of the rest, and the two tables
-     * that locate them. R0 carries the frame number and every other stream
-     * holds one value, so what reaches the chip says which frame is playing. */
-    private static byte[] storedCutYmx(int frames, int loop, int ring, int chunk) {
-        int table = align(org.ymx.YmxFormat.HEADER_SIZE);
-        int at = table + 4 * Rig.STREAMS;
-        int[] first = new int[Rig.STREAMS];
-        int[] second = new int[Rig.STREAMS];
+    /** The file {@link #runStoredRewind} plays: twenty-five stored sections
+     * of {@code frames} values and the table that locates them. R0 carries
+     * the frame number and every other stream holds one value, so what
+     * reaches the chip says which frame is playing. */
+    private static byte[] storedRewindYmx(int frames, int loop, int ring, int chunk) {
+        int at = org.ymx.YmxFormat.HEADER_SIZE;
+        int[] where = new int[Rig.STREAMS];
         ByteArrayOutputStream body = new ByteArrayOutputStream();
-        for (int half = 0; half < 2; half++) {
-            for (int stream = 0; stream < Rig.STREAMS; stream++) {
-                while (at % 4 != 0) {
-                    body.write(0);
-                    at++;
-                }
-                int from = half == 0 ? 0 : loop;
-                int to = half == 0 ? loop : frames;
-                (half == 0 ? first : second)[stream] = at;
-                for (int frame = from; frame < to; frame++) {
-                    body.write(streamByte(stream, frame));
-                }
-                at += to - from;
+        for (int stream = 0; stream < Rig.STREAMS; stream++) {
+            while (at % 4 != 0) {
+                body.write(0);
+                at++;
             }
+            where[stream] = at;
+            for (int frame = 0; frame < frames; frame++) {
+                body.write(streamByte(stream, frame));
+            }
+            at += frames;
         }
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -343,16 +338,9 @@ final class PlayerTests {
         longWord(out, 0);                           // no samples
         word(out, 0);
         longWord(out, loop);                        // L, where it starts over
-        longWord(out, table);                       // and the table for [L, O)
         longWord(out, org.ymx.YmxFormat.REQUIRED_BASE);     // Q: no extension
         for (int stream = 0; stream < Rig.STREAMS; stream++) {
-            longWord(out, 0x80000000 | first[stream]);  // bit 31: stored
-        }
-        while (out.size() < table) {
-            out.write(0);
-        }
-        for (int stream = 0; stream < Rig.STREAMS; stream++) {
-            longWord(out, 0x80000000 | second[stream]);
+            longWord(out, 0x80000000 | where[stream]);  // bit 31: stored
         }
         out.writeBytes(body.toByteArray());
         return out.toByteArray();
@@ -1061,8 +1049,8 @@ final class PlayerTests {
             // it back.
             String build = perf ? ", PERF build" : "";
         }
-        failures += report(runStoredCut(),
-                "the stored cut           (both tables, values not containers)");
+        failures += report(runStoredRewind(),
+                "the stored rewind        (one table, values not containers)");
         failures += report(runLoopPointResolve(),
                 "the loop-point resolve   (an unsigned word, $8000 and up)");
         failures += report(runReadmeSizes(),

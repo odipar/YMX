@@ -145,7 +145,7 @@ stops caring. [68k/YMX.S](68k/YMX.S) gives both forms.
 
 <!-- The two byte counts below are measured by the rig (ymx/test/rig.sh),
      which reads them back out of this sentence: keep the shape of it. -->
-[68k/YMX.S](68k/YMX.S) is the player, 3,534 bytes at the `ST4_UNIT` 2 below,
+[68k/YMX.S](68k/YMX.S) is the player, 3,640 bytes at the `ST4_UNIT` 2 below,
 plus the 320 of [68k/ST4_wrap.S](68k/ST4_wrap.S), the stream decoder it is
 built on. Include both, with the unit size defined first:
 

@@ -129,7 +129,7 @@ four now.
 | `plain_packed` | packed sections at unit size 2 |
 | `unit1`, `unit4` | the same tune at the other two unit sizes |
 | `ring_form` | a ring raised to hold one pass, so the wrap rewinds |
-| `cut_form` | a loop table, so a stream opens a second section |
+| `cut_form` | a rewind point in every container, so a stream replays from its saved state |
 | `wide_ring` | a wide ring at unit size 1, for the word-offset path |
 | `plays_once` | flag bit 0 clear, so a call reports that the run ended |
 | `repeat_trigger` | a channel re-triggering its own sample, every sixth frame |
