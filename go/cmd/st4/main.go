@@ -164,7 +164,7 @@ func parse(units []uint32, unit, window, maxOp int, copies bool,
 	if !copies {
 		return st4.OptimizeEvents(units, unit, window, true)
 	}
-	return st4.OptimizeCopies(units, unit, window, maxOp, seconds, seconds > 0)
+	return st4.OptimizeCopies(units, unit, window, maxOp, seconds, true)
 }
 
 // number reads a numeric flag value, stopping with the reason it cannot be

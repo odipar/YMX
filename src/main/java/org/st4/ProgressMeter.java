@@ -28,8 +28,18 @@ public final class ProgressMeter {
         // The meter redraws one line with a carriage return, which a terminal
         // overwrites and a file or a pipe keeps, so every redraw would land in
         // a redirected log: it draws only when standard output is a terminal.
-        this.enabled = enabled && System.console() != null;
+        this.enabled = enabled && atTerminal();
         this.started = System.nanoTime();
+    }
+
+    /**
+     * Whether standard output is a terminal. Since JDK 22 {@code
+     * System.console()} is an object whether or not the streams are a
+     * terminal, and {@code isTerminal()} is what says so.
+     */
+    public static boolean atTerminal() {
+        java.io.Console console = System.console();
+        return console != null && console.isTerminal();
     }
 
     /** The parse's total steps: positions {@code skip..count-1}, each against its window. */

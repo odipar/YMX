@@ -420,8 +420,9 @@ plain ST4 containers outside a `.ymx`:
 `-kK` is the unit size, `-mN` limits back-references to N units, `-lN`
 splits matches so no operation exceeds N units, `-rR` loops the stream
 from unit R, and `-c` lets a match beyond `-m` copy from the literal
-stream, `-cS` searching S seconds for a better parse. `dst4 -rN` writes
-the pass and then N - 1 repeats of the loop. Run them as
+stream, reporting each opening pass as it runs, `-cS` then searching S
+seconds for a better parse and printing each improvement. `dst4 -rN`
+writes the pass and then N - 1 repeats of the loop. Run them as
 `dotnet dotnet/bin/Release/net10.0/ymx.dll st4 ...` or from the Java tree
 with `java -cp target/classes org.st4.St4 ...`.
 

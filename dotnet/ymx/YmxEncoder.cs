@@ -289,8 +289,9 @@ namespace Ymx
         }
 
         /// <summary>The parse: the event-driven optimizer, or with copies the
-        /// search that copies from the literal stream, for copies
-        /// seconds.</summary>
+        /// search that copies from the literal stream, for copies seconds. Both
+        /// report as they go where progress asks: the search its opening
+        /// passes, then each improvement.</summary>
         private static St4Block Parse(int[] units, int unit, int window,
                 double copies, bool progress)
         {
@@ -299,7 +300,7 @@ namespace Ymx
                 return St4EventOptimizer.Optimize(units, unit, window, progress);
             }
             return St4LiteralCopySearch.Optimize(units, unit, window, St4Format.MaxOp,
-                    copies, progress && copies > 0);
+                    copies, progress);
         }
 
         /// <summary>Every container of the file carries the one loop form the

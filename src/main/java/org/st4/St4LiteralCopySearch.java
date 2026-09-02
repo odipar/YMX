@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Random;
 import org.jspecify.annotations.Nullable;
 
@@ -69,13 +70,14 @@ public final class St4LiteralCopySearch {
      * @param window      the furthest a match may reach back, in units
      * @param maxOpLength the compressor's operation limit, which the score
      *                    counts
-     * @param progress    whether to report improvements on stdout
+     * @param progress    whether to report on stdout: the opening passes as
+     *                    {@link ProgressMeter} does, then each improvement
      */
     public static St4Block optimize(int[] units, int unit, int window, int maxOpLength,
                                     double seconds, boolean progress) {
         long deadline = System.nanoTime() + (long) (seconds * 1e9);
-        return new Search(units, unit, window, maxOpLength, 1).run(deadline, Long.MAX_VALUE,
-                progress);
+        return new Search(units, unit, window, maxOpLength, 1, progress)
+                .run(deadline, Long.MAX_VALUE);
     }
 
     /**
@@ -84,8 +86,8 @@ public final class St4LiteralCopySearch {
      */
     static St4Block optimize(int[] units, int unit, int window, int maxOpLength, long steps,
                              long seed) {
-        return new Search(units, unit, window, maxOpLength, seed).run(Long.MAX_VALUE, steps,
-                false);
+        return new Search(units, unit, window, maxOpLength, seed, false)
+                .run(Long.MAX_VALUE, steps);
     }
 
     // ---------------------------------------------------------------- search
@@ -114,41 +116,56 @@ public final class St4LiteralCopySearch {
         private long stepsAllowed;
         private long started;
         private long step;
+        private long accepted;
         private long lastBest;
-        private boolean progress;
+        private final boolean progress;
 
-        Search(int[] units, int unit, int window, int maxOpLength, long seed) {
+        Search(int[] units, int unit, int window, int maxOpLength, long seed,
+               boolean progress) {
             this.units = units;
             this.unit = unit;
             this.window = window;
             this.maxOpLength = maxOpLength;
             this.count = units.length;
             this.random = new Random(seed);
+            this.progress = progress;
             this.parser = new Parser(units, unit, window);
+            started = System.nanoTime();
             // The opening passes: the full-window parse's literals, holes
             // filled, shrunk to what gets copied from.
             int reach = St4Format.maxOffsetUnits(unit);
             boolean[] dictionary = filled(St4LiteralCopySearch.literalMask(
-                    St4EventOptimizer.optimize(units, unit, reach, false), count));
-            St4Block first = parser.parse(dictionary);
+                    St4EventOptimizer.optimize(units, unit, reach, progress), count));
+            St4Block first = parser.parse(dictionary, progress);
             chain = first;
             forced = St4LiteralCopySearch.literalMask(first, count);
             adopt(dictionary, first);
             best = chain;
             bestBits = bits;
+            reportPass(1);
             for (int pass = 1; pass < PASSES; pass++) {
                 boolean[] next = filled(referenced());
                 if (Arrays.equals(next, dictionary)) {
                     break;
                 }
                 dictionary = next;
-                adopt(dictionary, parser.parse(dictionary));
+                adopt(dictionary, parser.parse(dictionary, progress));
                 if (bits < bestBits) {
                     best = chain;
                     bestBits = bits;
                 }
+                reportPass(pass + 1);
             }
             returnToBest();
+        }
+
+        private void reportPass(int pass) {
+            // The line carries the time, so it draws only where the meter
+            // draws: at a terminal, not into a redirected log.
+            if (progress && ProgressMeter.atTerminal()) {
+                System.out.printf(Locale.ROOT, "%7.1fs pass %d: %d bits, %d bytes%n",
+                        (System.nanoTime() - started) / 1e9, pass, bits, (bits + 7) / 8);
+            }
         }
 
         /** Parses the best dictionary again, so the parser's base is the best. */
@@ -201,15 +218,9 @@ public final class St4LiteralCopySearch {
             return referenced;
         }
 
-        St4Block run(long deadline, long steps, boolean progress) {
+        St4Block run(long deadline, long steps) {
             this.deadline = deadline;
             this.stepsAllowed = steps;
-            this.progress = progress;
-            started = System.nanoTime();
-            long accepted = 0;
-            if (progress) {
-                report("start");
-            }
             // Descend first: most of what the opening passes force packs
             // smaller free, and a sweep finds that run by run.
             sweep();
@@ -235,7 +246,7 @@ public final class St4LiteralCopySearch {
                     lastBest = step;
                 }
             }
-            if (progress) {
+            if (progress && step > 0) {
                 System.out.printf("%d steps, %d accepted: %d bits, %d bytes%n", step, accepted,
                         bestBits, (bestBits + 7) / 8);
             }
@@ -304,6 +315,7 @@ public final class St4LiteralCopySearch {
             int score = evaluate(parsed);
             if (score < bits) {
                 adopt(proposal, parsed);
+                accepted++;
                 noteBest(move);
                 return true;
             }
@@ -311,7 +323,7 @@ public final class St4LiteralCopySearch {
         }
 
         private void report(String move) {
-            System.out.printf("%7.1fs %8d steps: %d bits, %d bytes  (%s)%n",
+            System.out.printf(Locale.ROOT, "%7.1fs %8d steps: %d bits, %d bytes  (%s)%n",
                     (System.nanoTime() - started) / 1e9, step, bestBits, (bestBits + 7) / 8, move);
         }
 
@@ -643,6 +655,11 @@ public final class St4LiteralCopySearch {
         }
 
         St4Block parse(boolean[] dictionary) {
+            return parse(dictionary, false);
+        }
+
+        /** As above, reporting on stdout as {@link ProgressMeter} does. */
+        St4Block parse(boolean[] dictionary, boolean progress) {
             int from = 0;
             if (hasBase) {
                 from = count - 1;
@@ -669,6 +686,8 @@ public final class St4LiteralCopySearch {
             for (int p = start; p < count; p++) {
                 forcedBefore[p + 1] = forcedBefore[p] + (forced[p] ? 1 : 0);
             }
+            var meter = new ProgressMeter(ProgressMeter.totalSteps(count, start, window),
+                    progress);
             for (int index = start; index < count; index++) {
                 if (index > 0 && index % checkpoint == 0) {
                     snapshot(proposal[index / checkpoint], index);
@@ -803,7 +822,9 @@ public final class St4LiteralCopySearch {
                     update(index + 1, ((long) (bestMatch - index * literalBits) << 32)
                             | (index + 1));
                 }
+                meter.advance(Math.clamp((long) index, St4Optimizer.INITIAL_OFFSET, window));
             }
+            meter.finish();
             return rebuild(winNode[count - 1]);
         }
 

@@ -268,7 +268,12 @@ refusals() {
     one_case play-empty-k  play -k @T
     one_case st4-no-input  st4 nosuch.bin out.st4
     one_case dst4-no-input dst4 nosuch.st4 out.bin
-    # a loop played twice, and a stream with no loop to play twice
+}
+
+# A looping container played twice, and a stream with no loop asked to. The
+# fixtures come first: a case that copies one before it exists compares a
+# missing file, which every tree cannot read the same way.
+loops() {
     SETUP="cp $WORK/fx/loop.st4 ."     ; one_case dst4-r-loop   dst4 -r2 loop.st4 out.bin
     SETUP="cp $WORK/fx/good.st4 ."     ; one_case dst4-r-once   dst4 -r2 good.st4 out.bin
 }
@@ -327,6 +332,7 @@ TUNE_A=$(head -1 "$WORK/tunes"); TUNE_B=$(head -2 "$WORK/tunes" | tail -1)
 refusals
 usage_texts
 fixtures
+loops
 loop_frame
 checks
 malformed
