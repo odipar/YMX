@@ -5,47 +5,22 @@ import java.util.PriorityQueue;
 import java.util.TreeSet;
 
 /**
- * The event-driven ST4 optimizer: the same costs as {@link St4FastOptimizer},
- * without visiting every (position, offset) pair.
+ * The event-driven optimizer: the costs of {@link St4FastOptimizer} without
+ * visiting every (position, offset) pair.
  *
- * <p>The DP's per-step work is redundant in a specific way: between the start
- * and end of a match run, and along a literal stretch, every candidate's cost
- * is a closed form of the position. Only two kinds of event change anything -
- * a match run starting, and one ending - and on real data there are orders of
- * magnitude fewer of those than there are DP steps: 2,922 runs against 76
- * million steps on one measured disk image. So this class walks positions
- * emitting three channel minima per position from range structures, and does
- * per-offset work only at run boundaries:
- *
- * <ul>
- *   <li><b>Literal channel</b>: a chain ending in literals costs
- *       {@code S + 1 + gamma(j-e) + (j-e)*literalBits} for a state (S, e). With
- *       keys stored as {@code S - e*literalBits} in a min-tree indexed by e,
- *       the candidate is key + a per-age-class constant - so one range-min per
- *       gamma class of the age answers the whole window, and nothing moves as
- *       j advances: the query ranges do.</li>
- *   <li><b>Rep-match channel</b>: a run reusing its offset costs
- *       {@code lit + 1 + gamma(j-s+1)} for a run started at s whose literal
- *       cost was frozen then - the same trick, keyed by run start, entries
- *       inserted at run starts and removed at run ends.</li>
- *   <li><b>New-offset channel</b>: the best split length only needs, per gamma
- *       class of the length, a range-min over the recorded position costs,
- *       cut to the longest active run of each offset class - and the longest
- *       active run is just the position minus the oldest active run start.</li>
- * </ul>
- *
- * <p>This reproduces {@link St4FastOptimizer}'s cost array exactly - the
- * equivalence test asserts it element for element - including the reference
- * DP's state-overwrite semantics, replicated by replacing an offset's literal
- * key when its run ends. Where candidates tie, the recorded winner may differ,
- * so the chain (and the packed bytes) can differ from the fast optimizer's
- * while the packed size cannot: both are optimal parses of the same cost.
- *
- * <p>The trade is per-event overhead for per-step savings, so this is ahead
- * where runs are long (repetitive, aligned data) and behind where nearly every
- * match run is a step or two long. {@link #optimize} therefore counts the
- * events first - one cheap pass - and falls back to {@link St4FastOptimizer}
- * when the runs are that short.
+ * <p>Between the start and end of a match run, and along a literal stretch,
+ * every candidate's cost is a closed form of the position; only a run
+ * starting or ending changes anything, and on repetitive data those are
+ * orders of magnitude fewer than DP steps. So this class walks positions
+ * taking three channel minima from range structures, the literal channel
+ * keyed by state end, the rep channel by run start, the new-offset channel a
+ * range minimum over recorded costs per gamma class, and does per-offset
+ * work only at run boundaries, found through occurrence chains keyed by
+ * (value, predecessor) and (value, successor). It reproduces the fast
+ * optimizer's cost array exactly, which a test asserts; where candidates tie
+ * the chain may differ, the packed size cannot. Per-event overhead loses
+ * where runs are a step or two long, so {@link #optimize} counts the events
+ * first and falls back to {@link St4FastOptimizer} on such data.
  */
 public final class St4EventOptimizer {
 
@@ -108,10 +83,9 @@ public final class St4EventOptimizer {
     }
 
     /**
-     * Returns the last block of an optimal parse of {@code units} - the same
-     * cost as {@link St4FastOptimizer}, not necessarily the same chain. Falls
-     * back to the fast optimizer when a cheap event count says the runs are
-     * short enough that the DP would be faster.
+     * The last block of an optimal parse of {@code units}: the cost of
+     * {@link St4FastOptimizer}, not always its chain. Falls back to the fast
+     * optimizer when an event count says the DP would be faster.
      */
     public static St4Block optimize(int[] units, int unit, int offsetLimit,
                                     boolean progress) {
@@ -145,9 +119,9 @@ public final class St4EventOptimizer {
     /**
      * Run starts at j: offsets whose unit matches at j but not at j-1. Those
      * are the in-window occurrences p of units[j] whose predecessor differs
-     * from units[j-1] - or that have no predecessor - so the chains
-     * keyed by (value, predecessor) enumerate exactly them, newest first,
-     * stopping at the window's edge.
+     * from units[j-1], or that have none, so the chains keyed by (value,
+     * predecessor) enumerate exactly them, newest first, stopping at the
+     * window's edge.
      */
     private interface RunEvent {
         void accept(int offset);
@@ -201,7 +175,7 @@ public final class St4EventOptimizer {
         }
     }
 
-    /** One cheap pass counting run events, to decide engine or plain DP. */
+    /** One pass counting run events, to choose events or the plain DP. */
     private long countEvents() {
         long[] events = {0};
         for (int j = 0; j < units.length; j++) {
@@ -211,7 +185,7 @@ public final class St4EventOptimizer {
             }
             chain(j);
         }
-        // The pass consumed the chains; rebuild them empty for the real run.
+        // The pass filled the chains; the real run fills them again.
         byPred.clear();
         bySucc.clear();
         return events[0];
@@ -224,8 +198,8 @@ public final class St4EventOptimizer {
         var meter = new ProgressMeter(
                 ProgressMeter.totalSteps(count, 0, offsetLimit), progress);
 
-        // The fake state every chain hangs from: offset one, just before the
-        // stream, as the reference DP seeds it.
+        // The fake state every chain hangs from: offset one, before the
+        // stream, as the reference seeds it.
         stateS[1] = -1;
         stateE[1] = -1;
         literalTree.insert(0, encode(-1 - (-1) * literalBits, 1));
@@ -363,8 +337,8 @@ public final class St4EventOptimizer {
         }
         if (state != Integer.MAX_VALUE) {
             if (stateE[offset] != NONE) {
-                // The reference DP overwrites an offset's state at its next
-                // match run regardless of cost; replicate that exactly.
+                // The reference overwrites an offset's state at its next match
+                // run whatever the cost; this does the same.
                 literalTree.remove(stateE[offset] + 1,
                         encode(stateS[offset] - stateE[offset] * literalBits, offset));
             }
@@ -462,7 +436,7 @@ public final class St4EventOptimizer {
         }
     }
 
-    /** A min tree whose slots hold sets, so entries can retire exactly. */
+    /** A min tree whose slots hold sets, so an entry can be removed. */
     private static final class SlotTree extends MinTree {
         private final HashMap<Integer, TreeSet<Long>> slots = new HashMap<>();
 

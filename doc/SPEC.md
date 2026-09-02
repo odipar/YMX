@@ -1,6 +1,6 @@
 # The YMX format - specification
 
-Version 0.8. Big-endian throughout.
+Version 0.9. Big-endian throughout.
 
 YMX is a streaming register-dump format for the YM2149 sound chip in the
 Atari ST, playable by a 68000 without the tune resident in memory. A file
@@ -67,7 +67,7 @@ source formats and their tools use:
 | offset | size | field |
 |---:|---:|---|
 | 0 | 4 | `'YMX!'` - `$594D5821` |
-| 4 | 2 | format version, the major byte then the minor - **$0008**, version 0.8 |
+| 4 | 2 | format version, the major byte then the minor - **$0009**, version 0.9 |
 | 6 | 2 | flags (§1.2) |
 | 8 | 4 | `O`, the frame count |
 | 12 | 2 | frame rate in Hz: how often the player is called |
@@ -163,12 +163,14 @@ each frame in one of the pair, and the second is where a pass after the
 first reads its values (§8).
 
 **Packed sections.** A packed section is a complete ST4 container - a
-twenty-byte header whose first long is the signature, then four streams.
-Appendix A states the container and its bitstream in full. The format
-comes from the [ST4](https://github.com/odipar/ST4) repository, and an
-implementation follows the appendix rather than that repository.
+twenty-eight-byte header whose first long is the signature, then four
+streams. Appendix A states the container and its bitstream in full. The
+format comes from the [ST4](https://github.com/odipar/ST4) repository,
+and an implementation follows the appendix rather than that repository.
 A writer with no ST4 compressor stores every section instead (below) and
-emits no container.
+emits no container. A section of this version ends rather than repeats,
+carries no rewind point, and records the window `N/k`: what a container
+may carry beyond that, Appendix A states and §9.3 rules out.
 
 **Two fixed parameters.** No back-reference exceeds `N` bytes (§1.3),
 and no operation exceeds 65535 units.
@@ -176,8 +178,8 @@ and no operation exceeds 65535 units.
 **Unit size.** Every section in a file is packed at one unit size - 1, 2
 or 4 bytes, recorded with the ST4 format version in the section's
 signature, not in the YMX header. A packed section's first long is
-`$53 $34 $04 k`: `'S'`, `'4'`, ST4 format version 4, and the unit size
-`k`, one of 1, 2 or 4. Version 4 is the version this document defines. A
+`$53 $34 $07 k`: `'S'`, `'4'`, ST4 format version 7, and the unit size
+`k`, one of 1, 2 or 4. Version 7 is the version this document defines. A
 player built for one unit size rejects a container whose fourth byte
 differs; a player that decodes all three rejects a file whose sections do
 not share one unit size (§9.1). The unit size binds the packing and not
@@ -187,9 +189,9 @@ order at every unit size, as a stored section's bytes are.
 **Stored sections.** A section may instead be stored: the bytes at its
 offset are the values, one per frame, with no header and no signature.
 Bit 31 of an entry set marks a stored section, in either table; bits 30-0
-are the offset. A container's header is twenty bytes, so a section
-shorter than twenty bytes is smaller stored (a one-frame tune stores one
-byte per stream). A stored section is read the same at any unit size; a
+are the offset. A container's header is twenty-eight bytes, so a section
+shorter than that is smaller stored (a one-frame tune stores one byte per
+stream). A stored section is read the same at any unit size; a
 file with only stored sections plays on any build.
 
 **Alignment.** Every section, packed or stored, begins on a long
@@ -876,7 +878,7 @@ stream crosses on its own refill turn and none crosses before it has read
 ### 9.1 What a player checks
 
 - the magic is `'YMX!'`;
-- the version is $0008 - 0.8;
+- the version is $0009 - 0.9;
 - the stream count `S` is 25 to 32;
 - the required-streams mask names no stream the consumer does not
   implement: `Q AND NOT implemented` is zero, where bit `k` of
@@ -1249,21 +1251,27 @@ in this section, and moves the format none.
 
 A packed section is one ST4 container. This appendix states it in full, so
 a reader implements this document without a second one. The format is
-ST4's; version 4 is the version stated here.
+ST4's; version 7 is the version stated here.
 
-### A.1 The header, twenty bytes
+### A.1 The header, twenty-eight bytes
 
 | offset | size | field |
 |---:|---:|---|
-| 0 | 4 | signature `$53 $34 $04 k`: `'S'`, `'4'`, format version 4, unit size `k` |
+| 0 | 4 | signature `$53 $34 $07 k`: `'S'`, `'4'`, format version 7, unit size `k` |
 | 4 | 4 | output size in bytes, a multiple of `k` |
 | 8 | 4 | where stream B starts, in bytes from the header's first byte |
 | 12 | 4 | where stream C starts |
 | 16 | 4 | where stream D starts |
+| 20 | 4 | the rewind point in bytes, or `$FFFFFFFF` where there is none |
+| 24 | 4 | `M`, the window in units |
 
-Stream A begins at offset 20. The three offsets locate the others, so a
+Stream A begins at offset 28. The three offsets locate the others, so a
 stream's length is the distance to the next one, and the bytes between the
-last byte stream A uses and stream B's first are padding.
+last byte stream A uses and stream B's first are padding. The rewind point
+and the window are read by a decoder that replays a loop or copies from
+the literal stream (A.5); a section that does neither carries `$FFFFFFFF`
+and `N/k`, and a reader of this version checks the two (§9.3) and reads
+them no further.
 
 ### A.2 The four streams
 
@@ -1314,7 +1322,7 @@ match at the last offset leave it as it was.
 | `1 0` | byte offset from stream C, 1 to 256 units back |
 | `1 1` | byte offset from stream C, 257 to 512 units back |
 | `0 0` | word offset from stream D |
-| `0 1` | end of the stream |
+| `0 1` | end of the stream, followed by one repeat bit |
 
 In the table above the left bit is the one stream A delivers first.
 
@@ -1326,9 +1334,13 @@ and divide that by `k` for `n`. A byte class counts units where the word
 class counts bytes, so no division by `k` applies to it: recover its `n`
 from the formula above and no other way.
 
-A decoder stops on the end-of-stream class, having written the header's
-output size in bytes. No offset reaches further back than 32512 bytes at
-any `k`, and a match at a new offset is at least 2 units long.
+A decoder reads one more bit after the end-of-stream class, the repeat
+bit. A `0` ends the stream, and the decoder stops having written the
+header's output size in bytes. A `1` repeats it: one last word offset is
+read from stream D, the distance back to a loop point, and the stream
+continues as a match that far back for as long as output is read (A.5).
+No offset reaches further back than 32512 bytes at any `k`, and a match
+at a new offset is at least 2 units long.
 
 A decoder that has written the output size has also read streams A, B and
 C to within the padding A.1 describes - three bytes at most, since the
@@ -1337,6 +1349,35 @@ a decoder: a reading of A.3's blocks that is wrong reads the same flag
 bits and the same gamma values, stops on an end-of-stream class, and
 writes the output size in full with the wrong bytes in it. How much of
 those three streams is left over separates the two.
+
+### A.5 Loops and copies
+
+The header's rewind point and window, and the repeat bit, are the
+container's own loop and copy forms. A section of this version uses none
+of them: it ends, its rewind field is `$FFFFFFFF`, and no offset exceeds
+`N/k`, its window (§1.4, §9.3). They are stated so a reader of the
+container is complete.
+
+**A repeat.** A container packed with a loop point `R` stands for the
+output `[0, R)` then `[R, O)` for ever. Where `O - R` is at most the
+window, the repeat bit is set and the word after it in stream D is the
+distance `O - R`; the decoder installs it as any other offset and matches
+it for as long as output is read, so after one pass every unit is the one
+`O - R` units back.
+
+**A rewind.** Where `O - R` is larger than the window, the stream ends
+plainly and the header gives `R` in bytes. The reader saves the decoder's
+state when the output reaches `R` and restores it, all but the write
+position, when it reaches `O`, on every pass. No match in `[R, O)` reaches
+before `R`, so every pass reads the same history.
+
+**A copy.** An offset larger than the window `M` is a copy from the
+literal stream rather than a match from the output: it copies
+`offset - M` units from behind the stream B read position, leaves that
+position where it is, and advances the offset by the units copied, so a
+match at the last offset after a copy resumes past it. A copy is shorter
+than its distance, so the offset never reaches zero. A byte offset reaches
+`512 - M` literal units back; a word offset as far as its word allows.
 
 ---
 
@@ -1350,7 +1391,7 @@ section is read, and what a call reports.
 
 ```
    0  59 4D 58 21   'YMX!'
-   4  00 08         format version 0.8
+   4  00 09         format version 0.9
    6  00 01         flags: bit 0 set, the tune starts over
    8  00 00 00 04   O = 4 frames
   12  00 32         50 Hz

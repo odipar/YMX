@@ -400,7 +400,7 @@ YH_SECTIONS     equ     42              ; one offset per stream: its section,
                                         ; loop table covers the rest
 
 YMX_MAGIC       equ     $594D5821       ; 'YMX!'
-YMX_VERSION     equ     $0008           ; the format version: the major in
+YMX_VERSION     equ     $0009           ; the format version: the major in
                                         ; the high byte, the minor in the
                                         ; low. A file of another version is
                                         ; rejected at init, not read: SPEC.md
@@ -934,7 +934,7 @@ ymx_open:
         adda.l  12(a0),a4               ; stream C, the byte offsets
         movea.l a0,a5
         adda.l  16(a0),a5               ; stream D, the word offsets
-        lea     20(a0),a0               ; stream A, the bits
+        lea     28(a0),a0               ; stream A, where the header ends
         moveq   #0,d3
         move.w  YMX_N(a3),d3            ; N, ST4_init's argument
         bra     ST4_init

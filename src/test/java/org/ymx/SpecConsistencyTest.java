@@ -434,8 +434,8 @@ final class SpecConsistencyTest {
     @Test
     void theSt4AppendixIsTheContainerTheDecoderReads() throws IOException {
         String said = flat();
-        assertTrue(said.contains("signature `$53 $34 $04 k`: `'S'`, `'4'`,"
-                        + " format version 4, unit size `k`"),
+        assertTrue(said.contains("signature `$53 $34 $07 k`: `'S'`, `'4'`,"
+                        + " format version 7, unit size `k`"),
                 "SPEC Appendix A's signature row has been reworded");
         assertTrue(said.contains("**The last offset is a count of units, and"
                         + " begins at one.**"),

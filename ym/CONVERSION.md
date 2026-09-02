@@ -129,7 +129,7 @@ above it is dropped here.
   and the player opens the second at the wrap. That one costs file bytes,
   since the replayed frames are packed on their own and no match reaches
   across the cut: on the six tunes in `test` that take it, the file is
-  1 to 41 per cent larger than the same tune packed with `-l0` at the same
+  2 to 45 per cent larger than the same tune packed with `-l0` at the same
   unit size. The rings stay the size they were.
 
   A section is a whole number of units, so at `-k2` or `-k4` the cut falls on

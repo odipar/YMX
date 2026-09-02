@@ -219,6 +219,12 @@ release.
 a day, the saving is permanent, and it costs nothing extra to carry once the
 compatibility break is being paid for anyway.
 
+The format bumped for another reason (2026-09-02): ST4 version 7, whose
+header is twenty-eight bytes where version 4's was twenty. The forty-two
+pinned tunes come to 409,748 bytes where they came to 400,176, eight bytes
+more a packed section. The eight-byte header above is unbuilt on version 7
+and the figure it would save has grown with the header it would replace.
+
 ---
 
 ## Diagnosed and fixed

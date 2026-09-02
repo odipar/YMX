@@ -3,39 +3,46 @@ package org.st4;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Locale;
 
 /**
- * Command-line ST4 packer: ZX1's blocks at a chosen unit granularity, with the
- * literal payload in a stream of its own.
- *
- * <p>{@code -k1} is ZX1's granularity and should pack to within a byte or two
- * of jx1; {@code -k2} and {@code -k4} trade ratio for a decoder that runs half
- * or a quarter as many operations and copies two or four bytes at a time.
+ * Command-line ST4 packer. {@code -k1} is ZX1's unit size and packs to within
+ * a few percent of jx1, which a test holds; {@code -k2} and {@code -k4} trade
+ * ratio for a decoder that runs half or a quarter as many operations.
  */
 public final class St4 {
 
     private St4() {}
 
     public static void main(String[] args) {
-        System.out.println("ST4: aligned split-stream packer v4.0 by Robbert van Dalen, "
+        System.out.println("ST4: aligned split-stream packer v7.0 by Robbert van Dalen, "
                 + "based on ZX1 v1.5 by Einar Saukas");
 
         int unit = 1;
         int offsetLimit = St4Format.MAX_OFFSET;
         int maxOpLength = St4Format.MAX_OP;
+        int repeatIndex = -1;
+        boolean copies = false;
+        double search = 0;
         boolean forcedMode = false;
         int i = 0;
         for (; i < args.length && args[i].startsWith("-"); i++) {
             switch (args[i]) {
                 case "-f" -> forcedMode = true;
+                case "-c" -> copies = true;
                 default -> {
-                    if (args[i].startsWith("-k")) {
+                    if (args[i].startsWith("-c")) {
+                        copies = true;
+                        search = parseNumber(args[i].substring(2));
+                    } else if (args[i].startsWith("-k")) {
                         unit = parseNumber(args[i].substring(2));
                     } else if (args[i].startsWith("-m")) {
                         offsetLimit = parseNumber(args[i].substring(2));
                     } else if (args[i].startsWith("-l")) {
                         maxOpLength = parseNumber(args[i].substring(2));
+                    } else if (args[i].startsWith("-r")) {
+                        repeatIndex = parseIndex(args[i].substring(2));
                     } else {
                         throw error("Invalid parameter " + args[i]);
                     }
@@ -50,13 +57,18 @@ public final class St4 {
             outputName = args[i + 1];
         } else {
             usage("""
-                    Usage: st4 [-f] [-kK] [-mN] [-lN] input [output.st4]
+                    Usage: st4 [-f] [-c[S]] [-kK] [-mN] [-lN] [-rR] input [output.st4]
                       -f      Force overwrite of output file
+                      -c      Let a match beyond the -m window copy from the
+                              literal stream; needs a decoder built with copies
+                      -cS     The same, searching for S seconds for a better parse
                       -kK     Unit size: 1, 2 or 4 bytes (default 1). Lengths and
                               offsets count units, so the output is padded to a
                               whole number of them
                       -mN     Limit back-references to N units
-                      -lN     Split matches so no operation exceeds N units""");
+                      -lN     Split matches so no operation exceeds N units
+                      -rR     Loop: after the last unit, the output continues
+                              from unit R, forever""");
             return;
         }
 
@@ -64,8 +76,8 @@ public final class St4 {
         if (!problem.isEmpty()) {
             throw error(problem);
         }
-        // A word offset is stored pre-scaled, so the window is a byte figure:
-        // reaching 32512 units at k=4 would not fit the word it is kept in.
+        // A word offset is stored scaled to bytes, so the window is a byte
+        // figure: 32512 units at k=4 would not fit the word.
         if (offsetLimit > St4Format.maxOffsetUnits(unit)) {
             offsetLimit = St4Format.maxOffsetUnits(unit);
         }
@@ -86,8 +98,31 @@ public final class St4 {
         }
 
         int[] units = Units.split(input, unit);
-        St4Compressor.Result result = St4Compressor.compress(
-                St4EventOptimizer.optimize(units, unit, offsetLimit), units, unit, maxOpLength);
+        if (repeatIndex >= units.length) {
+            throw error("-r" + repeatIndex + " is not a unit of the input, which is "
+                    + units.length + " units");
+        }
+        St4Compressor.Result result;
+        int window = offsetLimit;
+        if (repeatIndex >= 0 && units.length - repeatIndex > offsetLimit) {
+            // The loop is longer than the window, so no match reaches across
+            // it and the caller replays the stream from the state it saved at
+            // the loop point. The loop is parsed on its own, so every pass
+            // sees the same history.
+            int[] intro = Arrays.copyOfRange(units, 0, repeatIndex);
+            int[] loop = Arrays.copyOfRange(units, repeatIndex, units.length);
+            result = St4Compressor.compressRewinding(
+                    intro.length == 0 ? null
+                            : parse(intro, unit, offsetLimit, maxOpLength, copies, search),
+                    parse(loop, unit, offsetLimit, maxOpLength, copies, search),
+                    units, unit, maxOpLength, repeatIndex, window);
+        } else {
+            // The loop fits the window: the end is an endless match back to
+            // the loop point.
+            result = St4Compressor.compress(
+                    parse(units, unit, offsetLimit, maxOpLength, copies, search), units,
+                    unit, maxOpLength, repeatIndex, window);
+        }
 
         try {
             Files.write(outputPath, container(result));
@@ -96,30 +131,49 @@ public final class St4 {
         }
 
         int padded = Units.paddedLength(input.length, unit);
-        // Locale.ROOT, not the JVM's default: a dot in the ratio and ASCII
-        // digits in the counts.
-        System.out.printf(Locale.ROOT,
-                "Packed %d bytes%s into %d (%.1f%%): A %d, B %d, C %d, D %d, "
-                + "%d operations%n",
+        System.out.printf(Locale.ROOT, "Packed %d bytes%s into %d (%.1f%%): A %d, B %d, C %d, D %d, "
+                + "%d operations%s%n",
                 input.length, padded == input.length ? "" : " padded to " + padded,
                 result.packedSize(), 100.0 * result.packedSize() / input.length,
                 result.control().length, result.literal().length,
                 result.byteOffsets().length, result.wordOffsets().length,
-                result.operations());
+                result.operations(),
+                (result.copies() == 0 ? "" : ", " + result.copies()
+                        + " copies from the literal stream")
+                        + (repeatIndex < 0 ? "" : ", loops from unit " + repeatIndex
+                        + (result.rewindIndex() < 0 ? "" : " by rewind")));
+        if (result.rewindIndex() >= 0) {
+            System.out.printf(Locale.ROOT, "The loop is longer than the -m%d window, so the decoder cannot "
+                    + "loop it alone: save its state at unit %d and restore it at unit %d, "
+                    + "every pass%n", offsetLimit, repeatIndex, units.length);
+        }
         if (result.longestOp() > maxOpLength) {
-            System.out.printf(Locale.ROOT,
-                    "Warning: longest operation is %d units, over the -l%d limit: "
+            System.out.printf(Locale.ROOT, "Warning: longest operation is %d units, over the -l%d limit: "
                     + "a literal run, which the format cannot split%n",
                     result.longestOp(), maxOpLength);
         }
     }
 
     /**
-     * Twenty bytes of header, then A, B, C and D in order, each starting on a
-     * long boundary. Nothing says how long a stream is: it runs to the next.
+     * The parse: the event-driven optimizer, or with {@code -c} the opening
+     * passes of the search that copies from the literal stream, and with
+     * seconds the search from there.
      */
-    // Public because a container is also how other formats embed an ST4
-    // stream: a YMX file holds up to fifty of them.
+    private static St4Block parse(int[] units, int unit, int window, int maxOpLength,
+                                  boolean copies, double seconds) {
+        if (!copies) {
+            return St4EventOptimizer.optimize(units, unit, window);
+        }
+        return St4LiteralCopySearch.optimize(units, unit, window, maxOpLength, seconds,
+                seconds > 0);
+    }
+
+    /**
+     * Twenty-eight bytes of header, then A, B, C and D, each on a long
+     * boundary. No length is stored: a stream runs to the next, and the last
+     * to whatever the caller loads after the container. Public because other
+     * formats embed containers, many at once.
+     */
     public static byte[] container(St4Compressor.Result result) {
         int controlAt = St4Format.HEADER_SIZE;                  // already a multiple of 4
         int literalAt = align(controlAt + result.control().length);
@@ -132,6 +186,9 @@ public final class St4 {
         putLong(file, St4Format.OFFSET_LITERAL, literalAt);
         putLong(file, St4Format.OFFSET_BYTE_OFFSETS, byteAt);
         putLong(file, St4Format.OFFSET_WORD_OFFSETS, wordAt);
+        putLong(file, St4Format.OFFSET_REWIND, result.rewindIndex() < 0
+                ? St4Format.NO_REWIND : result.rewindIndex() * result.unit());
+        putLong(file, St4Format.OFFSET_WINDOW, result.window());
         System.arraycopy(result.control(), 0, file, controlAt, result.control().length);
         System.arraycopy(result.literal(), 0, file, literalAt, result.literal().length);
         System.arraycopy(result.byteOffsets(), 0, file, byteAt,
@@ -170,6 +227,19 @@ public final class St4 {
         try {
             int value = Integer.parseInt(argument);
             if (value <= 0) {
+                throw error("Invalid parameter value " + argument);
+            }
+            return value;
+        } catch (NumberFormatException e) {
+            throw error("Invalid parameter value " + argument);
+        }
+    }
+
+    /** As {@link #parseNumber}, but an index may be zero: -r0 loops it all. */
+    private static int parseIndex(String argument) {
+        try {
+            int value = Integer.parseInt(argument);
+            if (value < 0) {
                 throw error("Invalid parameter value " + argument);
             }
             return value;

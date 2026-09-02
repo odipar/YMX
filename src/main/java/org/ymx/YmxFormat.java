@@ -78,7 +78,7 @@ public final class YmxFormat {
      * high byte, the minor in the low, so versions order numerically.
      * There is no version history here to be compatible with;
      * doc/SPEC.md defines the layout. */
-    public static final int VERSION = 0x0008;
+    public static final int VERSION = 0x0009;
 
     /**
      * The binaries' own version, which moves when they change and stands
@@ -91,7 +91,7 @@ public final class YmxFormat {
     public static final int RELEASE_MAJOR = 0;
 
     /** The release's minor number. See {@link #RELEASE_MAJOR}. */
-    public static final int RELEASE_MINOR = 9;
+    public static final int RELEASE_MINOR = 10;
 
     /** The release's patch number. See {@link #RELEASE_MAJOR}. */
     public static final int PATCH = 0;

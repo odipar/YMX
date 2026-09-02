@@ -469,7 +469,7 @@ the pass it packs two sections instead, and gives the `N` that would have
 held it.
 
 `Turrican - world 4-3` is this case, packed with `-n1776`. Its file is
-2,536 bytes, the same as it would be with no loop, and its header gives
+2,740 bytes, the same as it would be with no loop, and its header gives
 `N` = 1,776.
 
 ### The pass is too long to keep
@@ -495,7 +495,7 @@ This costs bytes. The two halves cannot compress against each other, so a
 match in the second half cannot reach back into the first, and the file
 carries twenty-five more section headers. Of the 99 tunes with a loop
 frame, 58 need the cut, and on the six of them in `ym/test` the file
-grows by 1.3%, 7.8%, 13.8%, 25.1%, 33.1% and 40.8%, each against the same
+grows by 1.7%, 7.5%, 16.5%, 28.3%, 37.8% and 44.8%, each against the same
 tune packed with `-l0` at the unit size it is packed at. It costs no
 memory.
 

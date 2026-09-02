@@ -5,22 +5,14 @@ import java.util.HashMap;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Rebuilds an optimal parse chain from what a forward cost pass recorded: the
- * winning cost per position and a three-int descriptor of the winning
- * candidate - its kind, its offset, and the one value that cannot be
- * recomputed later.
- *
- * <p>Everything else is re-derived on demand from those costs and the data
- * itself: a match run's extent and the previous match at an offset by scanning
- * the units, which costs what the chain covers; the best split of a new-offset
- * match by minimising over the same recorded costs the forward pass minimised
- * over. Only the blocks the winning chain actually contains are ever built.
- *
- * <p>Both {@link St4FastOptimizer} and {@link St4EventOptimizer} feed this
- * class. Their descriptors may name different winners where candidates tie -
- * any winner a forward pass records reconstructs to a chain of exactly the
- * recorded cost - so the chains may differ between them while the packed size
- * cannot.
+ * Rebuilds a parse chain from what a forward cost pass recorded: the winning
+ * cost per position and a three-int descriptor of the winner, its kind, its
+ * offset, and the one value that cannot be recomputed. The rest is derived
+ * from those costs and the data: a match run's extent by scanning the units,
+ * the best split of a new-offset match by minimising over the recorded
+ * costs. Only the blocks of the winning chain are built.
+ * {@link St4FastOptimizer} and {@link St4EventOptimizer} both feed it; their
+ * winners may differ where candidates tie, their packed size cannot.
  */
 final class St4ChainRebuilder {
 
@@ -60,8 +52,8 @@ final class St4ChainRebuilder {
 
     /**
      * A pending resolution: the winner chain at {@code index}, or the state an
-     * offset held when it last matched at {@code index}. Frames form a chain of
-     * single dependencies, resolved with an explicit stack because a chain of
+     * offset held when it last matched at {@code index}. Frames form a chain
+     * of single dependencies, resolved on an explicit stack, since a chain of
      * one-unit blocks is as deep as the input is long.
      */
     private static final class Frame {
@@ -82,11 +74,10 @@ final class St4ChainRebuilder {
     }
 
     /**
-     * Builds the winning chain from the descriptors. Each winner's parent is
-     * either an earlier winner - recorded - or the state some offset held at a
-     * recorded position; a state is re-derived from its match run, the recorded
-     * winning costs and, when it reused its offset, the state before it. Only
-     * what the chain reaches is ever built.
+     * Builds the winning chain from the descriptors. A winner's parent is an
+     * earlier winner, recorded, or the state an offset held at a recorded
+     * position; a state is derived from its match run, the recorded winning
+     * costs and, when it reused its offset, the state before it.
      */
     St4Block rebuild() {
         int last = units.length - 1;
@@ -157,9 +148,9 @@ final class St4ChainRebuilder {
 
     /**
      * Resolves the state offset {@code frame.offset} held after matching at
-     * {@code frame.index}: the cheaper of reusing the offset across the literal
-     * run before this match run, and a new-offset match at the best split - the
-     * same two candidates the forward pass weighed, with the same tie rule.
+     * {@code frame.index}: the cheaper of reusing the offset across the
+     * literal run before this match run, and a new-offset match at the best
+     * split, the two candidates the forward pass weighed, with its tie rule.
      */
     private boolean resolveState(Frame frame, HashMap<Long, St4Block> states,
                                  @Nullable St4Block[] winner, ArrayDeque<Frame> stack) {
@@ -224,14 +215,14 @@ final class St4ChainRebuilder {
     /**
      * Where this offset's state ended at or before {@code from}, or NONE.
      *
-     * <p>That is the last match at the offset - but only once any state exists,
-     * because from then on every match updates it. State first appears at a
-     * match whose predecessor also matches (a run of two, which is when a
-     * new-offset match first fires); lone matches before that never created
-     * one. So the answer is the last match, provided some adjacent-pair match
-     * sits at or below it. Offset one is the exception: the fake block the
-     * whole parse hangs from is state before the first unit, so its every
-     * match counts - and with no match, the fake itself is the state.
+     * <p>That is the last match at the offset, once a state exists: from then
+     * on every match updates it. A state first appears at a match whose
+     * predecessor also matches, a run of two, where a new-offset match first
+     * fires; lone matches before that create none. So the answer is the last
+     * match, provided a run of two sits at or below it. Offset one is the
+     * exception: the fake block the parse hangs from is a state before the
+     * first unit, so its every match counts, and with no match the fake is
+     * the state.
      */
     private int previousStateEnd(int offset, int from) {
         int lastMatch = NONE;

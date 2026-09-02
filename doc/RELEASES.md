@@ -20,6 +20,22 @@ by someone deciding whether to take the release, not by someone
 reviewing it: the commits carry the reasoning and the measurements, and
 the section carries the list.
 
+## 0.10.0
+
+The player is 3,534 bytes at unit size 2, where 0.9.0 carried 3,534, and
+the PRG stub 3,038. Format version 0.9: a tune packed at 0.8 has to be
+repacked from its `.ym` source. Every packed section moves: its header is
+twenty-eight bytes where it was twenty, and its signature names ST4
+version 7.
+
+- **The ST4 container is version 7.** The packer, the three decoders and
+  the specification's Appendix A follow the ST4 repository at that
+  version. A container carries a rewind point and a window, and its end
+  code carries a repeat bit; a section of this version uses none of the
+  three - it ends, its rewind field is `$FFFFFFFF` and its window is
+  `N/k` - so a file decodes as it did, eight bytes longer a section. The
+  stream decoder is 320 bytes where it was 288.
+
 ## 0.9.0
 
 The player is 3,534 bytes at unit size 2, where 0.8.3 carried 3,434, and
