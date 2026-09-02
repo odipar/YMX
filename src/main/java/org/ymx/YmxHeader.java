@@ -112,9 +112,11 @@ public record YmxHeader(int ring, int chunk, int unit, int hz, int flags, int fr
             throw new IOException(path + ": its timer stream is not readable: "
                     + e.getMessage());
         }
+        // Decoded at the window the container carries: an offset past it is
+        // a copy from the literal stream, not a match.
         return St4Decompressor.decompress(section.control(), section.literal(),
                 section.byteOffsets(), section.wordOffsets(), section.unit(),
-                section.size())[0] & 0xFF;
+                section.size(), section.window())[0] & 0xFF;
     }
 
     /** The offset of one table's first section that is a container, or 0

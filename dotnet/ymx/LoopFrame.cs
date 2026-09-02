@@ -34,8 +34,9 @@ namespace Ymx
     {
         /// <summary>How far past the frame its source gives the packer looks
         /// for one it can enter, in seconds. The advance moves the repeat that
-        /// much later, which bounds it; past the bound the file carries 0 and
-        /// the tune starts over from its first frame.</summary>
+        /// much later, which bounds it; past the bound the tune starts over at
+        /// the source's frame anyway, and what an earlier frame left running
+        /// is not running on the second pass.</summary>
         public const int BudgetSeconds = 1;
 
         /// <summary>The budget in frames, for a tune at frameRate frames a
@@ -46,18 +47,18 @@ namespace Ymx
         }
 
         /// <summary>What the packer settled on: the Frame the file carries,
-        /// the RingSize it needs to reach it, whether the streams Rewind to
-        /// that frame every pass, and the Notes saying what moved and what it
+        /// the RingSize the file carries, whether the streams Rewind to that
+        /// frame every pass, and the Notes saying what moved and what it
         /// cost.</summary>
         public sealed record Plan(int Frame, int RingSize, bool Rewinds,
                 IReadOnlyList<string> Notes);
 
         /// <summary>Resolves the frame a file starts over from. loops is what
         /// the file's flag bit 0 will say; ringSize and chunk are the shape the
-        /// caller asked for, and the plan's ring size is that one or a larger
-        /// multiple of the chunk. unit is the size the sections are packed at,
-        /// which a rewind point has to fall on: each of the two parts is a whole
-        /// number of units.</summary>
+        /// caller asked for, and the plan carries the ring size it was given.
+        /// unit is the size the sections are packed at, which a rewind point
+        /// has to fall on: each of the two parts is a whole number of
+        /// units.</summary>
         public static Plan Resolve(Tune tune, EffectScript.Result script, bool loops,
                 int ringSize, int chunk, int unit)
         {

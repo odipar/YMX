@@ -30,18 +30,16 @@ import java.util.List;
  * <p>The second is how the player reaches the frame again, in one of two
  * ways. A wrap that moves the read position in every ring back {@code O - L}
  * bytes reaches only as far as the ring holds, so it needs {@code O - L} at or
- * under {@code N}; raising {@code N} to hold the body costs workspace and no
- * file bytes, so that is what the packer does, up to the format's cap. Past
- * the cap the file carries one container per stream whose rewind
- * point is {@code L}: frames {@code [L, O)} packed on their own -
- * which the player opens in turn (SPEC.md 1.4, 8). That one costs file bytes,
- * since the replayed frames are packed on their own, so the ring form is
- * taken where it reaches and the rewind only past it.
+ * under {@code N}, and the rings stay the size the caller asked for. Past that
+ * the file carries one container per stream whose rewind point is {@code L}:
+ * frames {@code [L, O)} packed on their own, which the player replays from the
+ * decoder state it saved there (SPEC.md 1.4, 8). That one costs file bytes, so
+ * the ring form is taken where it reaches and the rewind only past it.
  *
- * <p>Where the state rule holds for no frame within the budget, and where a
- * rewind has no frame it can start at, {@code L} is 0: the tune starts over from
- * its first frame, as every file before format version 0.5 did, and the packer
- * reports it.
+ * <p>Where a rewind has no frame it can start at, {@code L} is 0: the tune
+ * starts over from its first frame, and the packer reports it. Where the state
+ * rule holds for no frame within the budget, the tune starts over at the
+ * source's frame anyway, and the packer reports what that carries in.
  */
 public final class LoopFrame {
 
@@ -50,8 +48,9 @@ public final class LoopFrame {
     /**
      * How far past the frame its source gives the packer looks for one it can
      * enter, in seconds. The advance moves the repeat that much later, which
-     * bounds it; past the bound the file carries 0 and the tune starts over
-     * from its first frame.
+     * bounds it; past the bound the tune starts over at the source's frame
+     * anyway, and what an earlier frame left running is not running on the
+     * second pass.
      */
     public static final int BUDGET_SECONDS = 1;
 
@@ -62,9 +61,9 @@ public final class LoopFrame {
 
     /**
      * What the packer settled on: the {@code frame} the file carries, the
-     * {@code ringSize} it needs to reach it, whether the streams are
-     * {@code rewinds} to that frame every pass, and the {@code notes} saying what moved
-     * and what it cost.
+     * {@code ringSize} the file carries, whether the streams {@code rewind} to
+     * that frame every pass, and the {@code notes} saying what moved and what
+     * it cost.
      */
     public record Plan(int frame, int ringSize, boolean rewinds, List<String> notes) {
 
@@ -78,10 +77,10 @@ public final class LoopFrame {
      *
      * <p>{@code loops} is what the file's flag bit 0 will say: a tune that
      * plays once through has no loop frame and carries 0. {@code ringSize} and
-     * {@code chunk} are the shape the caller asked for; the plan's ring size is
-     * that one or a larger multiple of the chunk. {@code unit} is the size the
-     * sections are packed at, which a rewind point has to fall on: each of the two
-     * sections is a whole number of units.
+     * {@code chunk} are the shape the caller asked for, and the plan carries
+     * the ring size it was given. {@code unit} is the size the sections are
+     * packed at, which a rewind point has to fall on: each of the two parts is
+     * a whole number of units.
      */
     public static Plan resolve(Tune tune, EffectScript.Result script, boolean loops,
                                int ringSize, int chunk, int unit) {

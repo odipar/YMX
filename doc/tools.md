@@ -423,7 +423,7 @@ with `java -cp target/classes org.st4.St4 ...`.
 
 ## Holding the three trees together
 
-    ymx/parity.sh [-quick]
+    ymx/parity.sh [-quick | -corpus]
 
 Runs one command line through the Java, C# and Go trees and compares stdout,
 stderr, the exit status and every file the run leaves. Each case runs three
@@ -439,8 +439,11 @@ stack trace in the third. A sweep over output files alone sees none of it.
 
 `YM_CORPUS` names the directory holding the `.ym` collection, and the other
 two trees have to be built first. `-quick` is four tunes and the cases that
-have caught something; the default is eight tunes and every case.
-`ParityTest` runs `-quick` and is skipped where `YM_CORPUS` is unset.
+have caught something; the default is eight tunes and every case; `-corpus`
+adds every tune in the collection, packed by all three trees in parallel: the
+cases cover the options, and the collection covers the tunes. `ParityTest`
+runs `-quick` and is skipped where `YM_CORPUS` is unset; `verify.sh -full`
+runs `-corpus`.
 
 ## Every check, in one run
 

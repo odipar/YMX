@@ -101,6 +101,11 @@ sweep() {
         one_case st4-k1-$1   st4 -k1 @T out.st4
         one_case st4-k2-$1   st4 -k2 @T out.st4
         one_case st4-k4-$1   st4 -k4 @T out.st4
+        # copies from the literal stream, and loops: the search's opening
+        # passes are the same steps from the same seed in every tree
+        one_case copies-$1   ymx -copies @T out.ymx
+        one_case st4-c-$1    st4 -c -m1024 -k2 @T out.st4
+        one_case st4-r-$1    st4 -k1 -r0 @T out.st4
         one_case perf-$1     ymsndh -perf out.sndh @T
         one_case nomask-$1   ym-to-ymx -nomask out.prg @T
     fi
@@ -137,8 +142,9 @@ fixtures() {
     perl -e 'print "\0" x 13, "##", "\0"' > "$FX/hash16.bin"
     perl -e 'print pack("C*", map { ($_ * 7) % 256 } 0 .. 31)' > "$FX/notaymx.bin"
 
-    # a real ST4 container, and the same one cut short
+    # a real ST4 container, one that loops, and the first one cut short
     "$REPO/go/bin/st4" -f "$FX/in.bin" "$FX/good.st4" >/dev/null 2>&1
+    "$REPO/go/bin/st4" -f -r0 "$FX/in.bin" "$FX/loop.st4" >/dev/null 2>&1
     perl -e 'local $/; open F, "<", $ARGV[0]; binmode F; $d = <F>; print substr($d, 0, 30)' \
         "$FX/good.st4" > "$FX/short.st4"
 
@@ -260,6 +266,9 @@ refusals() {
     one_case play-empty-k  play -k @T
     one_case st4-no-input  st4 nosuch.bin out.st4
     one_case dst4-no-input dst4 nosuch.st4 out.bin
+    # a loop played twice, and a stream with no loop to play twice
+    SETUP="cp $WORK/fx/loop.st4 ."     ; one_case dst4-r-loop   dst4 -r2 loop.st4 out.bin
+    SETUP="cp $WORK/fx/good.st4 ."     ; one_case dst4-r-once   dst4 -r2 good.st4 out.bin
 }
 
 # Build the Go commands first. go/bin is not built by anything else, and a

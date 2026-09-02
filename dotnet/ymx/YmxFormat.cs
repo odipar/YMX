@@ -442,9 +442,11 @@ namespace Ymx
                 throw new IOException(path + ": its timer stream is not"
                         + " readable: " + e.Message);
             }
+            // Decoded at the window the container carries: an offset past it
+            // is a copy from the literal stream, not a match.
             return St4Decompressor.Decompress(section.Control, section.Literal,
                     section.ByteOffsets, section.WordOffsets, section.Unit,
-                    section.Size)[0];
+                    section.Size, section.Window)[0];
         }
 
         /// <summary>The offset of one table's first section that is a

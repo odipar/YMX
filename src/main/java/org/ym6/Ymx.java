@@ -432,11 +432,11 @@ public final class Ymx {
         try {
             result = YmxEncoder.encode(tune, ringSize, chunk, startsOver, true, unit,
                     timerMap, copies);
-            // A section is a whole number of units, so a cut falls on a unit
-            // boundary and a loop point that is not one leaves the tune
-            // starting over from frame 0. Every frame is a boundary at unit 1:
-            // where the unit was not asked for, the packer packs at 1 and
-            // keeps the loop point.
+            // A section is a whole number of units, so a rewind point falls
+            // on a unit boundary and a loop point that is not one leaves the
+            // tune starting over from frame 0. Every frame is a boundary at
+            // unit 1: where the unit was not asked for, the packer packs at 1
+            // and keeps the loop point.
             if (!unitAsked && unit > 1 && startsOver && unpadded.loopFrame() > 0
                     && result.loopFrame() != unpadded.loopFrame()) {
                 // The pack at the shape asked for has already succeeded, so
