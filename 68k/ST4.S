@@ -19,19 +19,22 @@
 ;       ST4_UNIT    equ     4
 ;               include "ST4.S"
 ;
-; ST4_WINDOW, the window M in units, is optional. A stream packed with st4 -c
-; writes a copy from the literal stream as an offset beyond M: it copies
-; offset-M literal units from behind the stream B read pointer, without moving
-; it. A build with ST4_WINDOW = M tells a copy from a match with one compare
-; per match segment. A build without ST4_WINDOW, or with 0, has no copy code.
+; ST4_WINDOW, set to 1, builds the copy code. A stream packed with st4 -c
+; writes a copy from the literal stream as an offset beyond its window M: it
+; copies offset-M literal units from behind the stream B read pointer, without
+; moving it. The window is a stream's, not the build's: ST4_init takes it in
+; d3.w, in bytes, and writes it into the two instructions that use it, the
+; compare that tells a copy from a match and the lea that finds a copy's
+; source. So the decoder is code in RAM, and a 68030 caller flushes the
+; instruction cache after ST4_init. A build without ST4_WINDOW, or with 0,
+; has no copy code and takes no window.
 ;
 ;       ST4_UNIT    equ     4
-;       ST4_WINDOW  equ     16
+;       ST4_WINDOW  equ     1
 ;               include "ST4.S"
 ;
-; A stream with copies needs the build made for its window, which the header
-; records at byte 24; a stream without copies decodes on any build whose
-; window is at least its own.
+; The window a stream was packed for is in its header at byte 24, in units; a
+; stream without copies decodes with any window at least its own.
 ;
 ; ALIGNMENT. Streams A and D are read a word at a time, so both start on an
 ; even address; the packer pads A to an even length and D holds whole words.
@@ -95,6 +98,7 @@
 ;
 ;   in and out   a0 a1 a2 a4 a5      the state; keep it between calls
 ;                d0.w d1.w d2.w
+;   init in      d3.w                the window in bytes, in a ST4_WINDOW build
 ;   resume in    d3.w                this call's budget in units, spent by it
 ;   clobbered    d3.w d4.l d5.l      no value in these survives a call
 ;                a3.l
@@ -115,9 +119,9 @@
 ;   4. streams A and D start on even addresses; A holds an even number of
 ;      bytes
 ;   5. the budget in d3.w is 1..65535 units; zero makes no progress
-;   6. a stream with copies was packed with -m equal to ST4_WINDOW, and every
-;      copy is shorter than its distance, so the offset never reaches zero:
-;      the packer keeps both
+;   6. a stream with copies was packed with -m equal to the window given to
+;      ST4_init, and every copy is shorter than its distance, so the offset
+;      never reaches zero: the packer keeps both
 ;
 ; TRUSTED INPUT ONLY. No stream, the destination or the budget is validated.
 ; A wrong value reads or writes arbitrary memory.
@@ -127,8 +131,8 @@
 ; against a file's first long checks all three.
 ST4_SIGNATURE   equ     $53340700+ST4_UNIT
 
-; ST4_WINDOW, the window in units, is optional: a build without it has no
-; copy code.
+; ST4_WINDOW is optional: a build with it set to 1 has the copy code, and
+; ST4_init writes the window into it.
         .if ^^defined ST4_WINDOW
         .else
 ST4_WINDOW      equ     0
@@ -153,16 +157,25 @@ ST4_WINDOW      equ     0
                 bra.w   ST4_resume
 
 ; ST4_init: a0 = stream A, a1 = destination, a2 = stream B, a4 = stream C,
-; a5 = stream D; seeds d0/d1/d2.
+; a5 = stream D, and in a build with ST4_WINDOW d3.w = the window in bytes,
+; M*ST4_UNIT; seeds d0/d1/d2.
 ST4_init:
         moveq   #-ST4_UNIT,d2           ; -lastOffset*UNIT, INITIAL_OFFSET = 1
         moveq   #0,d1                   ; remaining = 0
         move.w  #$8000,d0               ; an empty bit queue: $8000 is the sentinel
+        .if ST4_WINDOW
+        lea     window_lea+2(pc),a3
+        move.w  d3,(a3)                 ; the copy source's displacement: M*UNIT
+        neg.w   d3
+        lea     window_cmp+2(pc),a3
+        move.w  d3,(a3)                 ; the compare's immediate: -M*UNIT
+        .endif
         rts
 
-; ST4_decompress: a0/a1/a2/a4/a5 = streams A, destination, B, C and D.
-; Decodes until done and returns with a1 at the end of the output. A repeating
-; stream is never done, so this call would never return.
+; ST4_decompress: a0/a1/a2/a4/a5 = streams A, destination, B, C and D, and
+; d3.w = the window in bytes in a build with ST4_WINDOW. Decodes until done
+; and returns with a1 at the end of the output. A repeating stream is never
+; done, so this call would never return.
 ST4_decompress:
         bsr.s   ST4_init
 .drain:
@@ -188,12 +201,9 @@ copy_source:                            ; the offset is beyond the window, so
 ; where it is. The offset advances by what this segment copies: a copy the
 ; budget cuts continues where it stopped, and a rep after it starts past it.
 ; It stays beyond the window, since a copy is shorter than its distance.
-        .if ST4_WINDOW*ST4_UNIT<128
-        lea     ST4_WINDOW*ST4_UNIT(a2,d2.w),a3 ; B + M*UNIT + -offset*UNIT
-        .else
-        lea     ST4_WINDOW*ST4_UNIT(a2),a3 ; the same in two, past a byte
-        adda.w  d2,a3                   ; displacement
-        .endif
+window_lea:
+        lea     1024(a2),a3             ; patched by ST4_init to M*UNIT(a2),a3
+        adda.w  d2,a3                   ; + -offset*UNIT
         .rept   ST4_UNIT
         add.w   d4,d2                   ; -offset*UNIT += n*UNIT
         .endr
@@ -216,7 +226,7 @@ match_next:                             ; a 0 flag after a match means literals
         bra.s   resume_op               ; re-arms 65535 units, budget willing
 
 begin_literals:
-        neg.w   d2                      ; positive lastOffset = State.LITERALS
+        neg.w   d2                      ; positive lastOffset = literals
 gamma_seed0:
         moveq   #0,d4                   ; remaining = gamma + 0; fall through
 get_gamma:
@@ -245,8 +255,9 @@ budget_fits:
         tst.w   d2                      ; positive lastOffset means LITERALS
         bpl.s   literal_source
         .if ST4_WINDOW
-        cmp.w   #-ST4_WINDOW*ST4_UNIT,d2 ; beyond the window: a copy from B
-        blt.s   copy_source
+window_cmp:
+        cmp.w   #-32768,d2              ; patched by ST4_init to -M*UNIT: an
+        blt.s   copy_source             ; offset beyond the window is a copy
         .endif
         movea.l a1,a3                   ; match: destination plus -lastOffset*UNIT
         adda.w  d2,a3                   ; the offset is kept scaled for this

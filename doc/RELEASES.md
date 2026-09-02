@@ -22,7 +22,7 @@ the section carries the list.
 
 ## 0.10.0
 
-The player is 3,654 bytes at unit size 2, where 0.9.0 carried 3,534, and
+The player is 3,652 bytes at unit size 2, where 0.9.0 carried 3,534, and
 the PRG stub 3,038. Format version 0.9: a tune packed at 0.8 has to be
 repacked from its `.ym` source. Every packed section moves: its header is
 twenty-eight bytes where it was twenty, and its signature names ST4
@@ -45,16 +45,16 @@ version 7.
   section table follows at 38. The workspace before the rings holds a
   saved state per stream: 2,458 bytes where it held 1,658.
 - **Copies from the literal stream.** `ymx -copies` lets a match beyond
-  the ring copy from the literal stream, `-copiesS` searching S seconds a
-  stream for a better parse; `st4 -c[S]` and `-rR` and `dst4 -rN` are
-  ST4's own. Such a file sets flag bit 5 and plays only on a player built
-  for its ring as a window: the `-copies` cores, twelve more in the
-  binaries release, whose descriptor is version 2 and carries the window.
-  Those are built for the default ring; a copies tune at another ring
-  gets a core named for it, `-copies-nN`, which the Java and C#
-  combiners assemble on the spot and `mkcores.sh -copies -nN` assembles
-  for the Go tree. A player without a window rejects the file rather than
-  decode a copy to other bytes.
+  the ring copy from the literal stream, `-copiesS` searching S seconds
+  a stream for a better parse; `st4 -c[S]` and `-rR` and `dst4 -rN` are
+  ST4's own. Such a file sets flag bit 5 and plays only on a player
+  built with the copy code: the `-copies` cores, twelve more in the
+  binaries release, whose descriptor is version 2 and carries the flag.
+  The decoder takes the window off the ring size at init, so one core
+  serves every ring; it is code in RAM that init writes into, and the
+  SNDH glue clears the instruction cache of a 68020 or later after init.
+  A player without the copy code rejects the file rather than decode a
+  copy to other bytes.
 
 ## 0.9.0
 

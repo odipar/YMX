@@ -62,26 +62,26 @@ namespace Rig
                 string label, bool loops, int passes, int unit, int loopFrame)
         {
             return RunShape(frames, ring, chunk, label, loops, passes, unit,
-                    loopFrame, 0);
+                    loopFrame, false);
         }
 
-        /// <summary>The same on a build for window units, 0 for none: the
+        /// <summary>The same on a build with the copy code, where copies: the
         /// tune is packed with -copies, and the file's flag bit 5 says the
-        /// build must have one.</summary>
+        /// build must carry the code.</summary>
         public static string RunShape(int frames, int ring, int chunk,
                 string label, bool loops, int passes, int unit, int loopFrame,
-                int window)
+                bool copies)
         {
             byte[][] source = GenYm.Registers(frames);
-            byte[] packed = window == 0
+            byte[] packed = !copies
                     ? Rig.Pack(GenYm.Ym6File(frames, loopFrame, source),
                             ring, chunk, loops, unit)
                     : Rig.Pack(GenYm.Ym6File(frames, loopFrame, source),
                             ring, chunk, loops, unit, "-copies");
             // Whether the search found a copy worth taking is the data's: a
-            // file without one plays on the window build as well, since its
+            // file without one plays on the copies build as well, since its
             // offsets stay inside the window. The label says which it was.
-            if (window != 0)
+            if (copies)
             {
                 label += (Header(packed, 6, 2) & 0x20) != 0
                         ? ", with copies" : ", no copy taken";
@@ -96,7 +96,7 @@ namespace Rig
             List<GenYm.ChipState> expected = GenYm.ChipStates(frames, source,
                     loops, carried, played);
 
-            var player = new Player(packed, unit, false, window);
+            var player = new Player(packed, unit, false, copies);
             if (player.Init() != 0)
             {
                 return label + ": YMX_init rejected the file";
@@ -1140,15 +1140,17 @@ namespace Rig
                 // frame 0 is played.
                 new object[] {2688, 960, 24, "rewinds to frame 12, unit 2",
                     true, 2, 2, 12},
-                // Copies from the literal stream, on a build for the ring as
-                // its window: flag bit 5, and the descriptor's window word.
-                new object[] {600, 960, 24, "copies, unit 1", true, 2, 1, 0, 960},
-                new object[] {600, 960, 24, "copies, unit 2", true, 2, 2, 200, 480},
+                // Copies from the literal stream, on a build with the copy
+                // code, which reads the window off the ring at init: flag
+                // bit 5, and the descriptor's flag.
+                new object[] {600, 960, 24, "copies, unit 1", true, 2, 1, 0, true},
+                new object[] {600, 960, 24, "copies, unit 2", true, 2, 2, 200, true},
                 new object[] {2688, 960, 24, "copies, rewinds to frame 12, unit 2",
-                    true, 2, 2, 12, 480},
+                    true, 2, 2, 12, true},
                 // A ring too small to match across, where a copy from the
-                // literal stream is what reaches back: 48 bytes, unit 1.
-                new object[] {600, 48, 24, "copies at a 48-byte ring", true, 2, 1, 0, 48},
+                // literal stream is what reaches back: 48 bytes, unit 1, on
+                // the same build as the 960-byte rings above.
+                new object[] {600, 48, 24, "copies at a 48-byte ring", true, 2, 1, 0, true},
             };
             if (!quick)
             {
@@ -1168,10 +1170,10 @@ namespace Rig
                 string label = (string) shape[3];
                 bool loops = (bool) shape[4];
                 int loopFrame = shape.Length > 7 ? (int) shape[7] : 0;
-                int window = shape.Length > 8 ? (int) shape[8] : 0;
+                bool copies = shape.Length > 8 && (bool) shape[8];
                 string problem = RunShape((int) shape[0], (int) shape[1],
                         (int) shape[2], label, loops, (int) shape[5],
-                        (int) shape[6], loopFrame, window);
+                        (int) shape[6], loopFrame, copies);
                 if (problem.Length != 0)
                 {
                     Console.WriteLine("FAIL " + problem);

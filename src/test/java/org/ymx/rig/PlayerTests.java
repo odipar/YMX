@@ -75,26 +75,26 @@ final class PlayerTests {
      */
     static String runShape(int frames, int ring, int chunk, String label,
             boolean loops, int passes, int unit, int loopFrame) {
-        return runShape(frames, ring, chunk, label, loops, passes, unit, loopFrame, 0);
+        return runShape(frames, ring, chunk, label, loops, passes, unit, loopFrame, false);
     }
 
     /**
-     * The same on a build for {@code window} units, the tune packed with
-     * copies from the literal stream: the window is the ring in units, and
-     * the file's flag bit 5 says the build must have one.
+     * The same on a build with the copy code, the tune packed with copies
+     * from the literal stream: the build reads the window off the ring at
+     * init, and the file's flag bit 5 says the build must carry the code.
      */
     static String runShape(int frames, int ring, int chunk, String label,
-            boolean loops, int passes, int unit, int loopFrame, int window) {
+            boolean loops, int passes, int unit, int loopFrame, boolean copies) {
         byte[][] source = GenYm.registers(frames);
-        byte[] packed = window == 0
+        byte[] packed = !copies
                 ? Rig.pack(GenYm.ym6File(frames, loopFrame, source), ring, chunk,
                         loops, unit)
                 : Rig.pack(GenYm.ym6File(frames, loopFrame, source), ring, chunk,
                         loops, unit, "-copies");
         // Whether the search found a copy worth taking is the data's: a
-        // file without one plays on the window build as well, since its
+        // file without one plays on the copies build as well, since its
         // offsets stay inside the window. The label says which it was.
-        if (window != 0) {
+        if (copies) {
             label += (header(packed, 6, 2) & 0x20) != 0 ? ", with copies" : ", no copy taken";
         }
         int carried = header(packed, YMX_LOOP_FRAME, 4);
@@ -105,7 +105,7 @@ final class PlayerTests {
         List<GenYm.ChipState> expected = GenYm.chipStates(frames, source, loops,
                 carried, played);
 
-        Player player = new Player(packed, unit, false, window);
+        Player player = new Player(packed, unit, false, copies);
         if (player.init() != 0) {
             return label + ": YMX_init rejected the file";
         }
@@ -1020,15 +1020,17 @@ final class PlayerTests {
                 // frame 0 is played.
                 new Object[] {2688, 960, 24, "rewinds to frame 12, unit 2",
                     true, 2, 2, 12},
-                // Copies from the literal stream, on a build for the ring as
-                // its window: flag bit 5, and the descriptor's window word.
-                new Object[] {600, 960, 24, "copies, unit 1", true, 2, 1, 0, 960},
-                new Object[] {600, 960, 24, "copies, unit 2", true, 2, 2, 200, 480},
+                // Copies from the literal stream, on a build with the copy
+                // code, which reads the window off the ring at init: flag
+                // bit 5, and the descriptor's flag.
+                new Object[] {600, 960, 24, "copies, unit 1", true, 2, 1, 0, true},
+                new Object[] {600, 960, 24, "copies, unit 2", true, 2, 2, 200, true},
                 new Object[] {2688, 960, 24, "copies, rewinds to frame 12, unit 2",
-                    true, 2, 2, 12, 480},
+                    true, 2, 2, 12, true},
                 // A ring too small to match across, where a copy from the
-                // literal stream is what reaches back: 48 bytes, unit 1.
-                new Object[] {600, 48, 24, "copies at a 48-byte ring", true, 2, 1, 0, 48}));
+                // literal stream is what reaches back: 48 bytes, unit 1, on
+                // the same build as the 960-byte rings above.
+                new Object[] {600, 48, 24, "copies at a 48-byte ring", true, 2, 1, 0, true}));
         if (!quick) {
             shapes.add(new Object[] {4000, 960, 24, "four thousand frames",
                     true, 1, 1});
@@ -1045,10 +1047,10 @@ final class PlayerTests {
             String label = (String) shape[3];
             boolean loops = (Boolean) shape[4];
             int loopFrame = shape.length > 7 ? (Integer) shape[7] : 0;
-            int window = shape.length > 8 ? (Integer) shape[8] : 0;
+            boolean copies = shape.length > 8 && (Boolean) shape[8];
             String problem = runShape((Integer) shape[0], (Integer) shape[1],
                     (Integer) shape[2], label, loops, (Integer) shape[5],
-                    (Integer) shape[6], loopFrame, window);
+                    (Integer) shape[6], loopFrame, copies);
             if (!problem.isEmpty()) {
                 System.out.println("FAIL " + problem);
                 failures++;

@@ -21,7 +21,7 @@ namespace Ymx
     public static class MkRelease
     {
         /// <summary>One core build: a unit size, the two assembly flags, and
-        /// whether it is built for the default ring as a window.</summary>
+        /// whether it is carries the copy code.</summary>
         internal sealed record Variant(int Unit, bool Perf, bool Nomask, bool Copies)
         {
             internal string FileName()
@@ -36,13 +36,6 @@ namespace Ymx
                 return (Perf ? MkSndh.CoreFlagPerf : 0)
                         | (Nomask ? MkSndh.CoreFlagNomask : 0)
                         | (Copies ? MkSndh.CoreFlagCopies : 0);
-            }
-
-            /// <summary>The window the core is built for, in units: 0
-            /// without copies.</summary>
-            internal int Window()
-            {
-                return Copies ? YmxFormat.DefaultRingSize / Unit : 0;
             }
         }
 
@@ -608,12 +601,6 @@ namespace Ymx
                 throw new ArgumentException(variant.FileName() + " gives F = "
                         + fixedBytes + ", the workspace bytes before the rings:"
                         + " nonzero and even");
-            }
-            if (MkSndh.Word(core, MkSndh.CoreWindow) != variant.Window())
-            {
-                throw new ArgumentException(variant.FileName() + " carries window "
-                        + MkSndh.Word(core, MkSndh.CoreWindow) + ", its name says "
-                        + variant.Window());
             }
             if (!ZeroLong(core, MkSndh.CoreTableOff))
             {

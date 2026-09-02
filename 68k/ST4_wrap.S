@@ -16,21 +16,23 @@
 ;       ST4_UNIT    equ     4
 ;               include "ST4_wrap.S"
 ;
-; ST4_WINDOW, the ring size in units, is optional. A stream packed with st4 -c
-; writes a copy from the literal stream as an offset beyond the window: it
-; copies offset-M literal units from behind the stream B read pointer, without
-; moving it. A build with ST4_WINDOW = M tells a copy from a match with one
-; compare per match segment, and reads its source out of stream B without the
-; ring's wrap arithmetic. A build without ST4_WINDOW, or with 0, has no copy
-; code.
+; ST4_WINDOW, set to 1, builds the copy code. A stream packed with st4 -c for
+; the ring writes a copy from the literal stream as an offset beyond the ring:
+; it copies offset-M literal units from behind the stream B read pointer,
+; without moving it, and without the ring's wrap arithmetic. The window is
+; the ring size, so ST4_init has it already: it writes the size into the two
+; instructions that use it, the compare that tells a copy from a match and
+; the lea that finds a copy's source. So the decoder is code in RAM, and a
+; 68030 caller flushes the instruction cache after ST4_init. A build without
+; ST4_WINDOW, or with 0, has no copy code.
 ;
 ;       ST4_UNIT    equ     4
-;       ST4_WINDOW  equ     16          ; the ring is 64 bytes
+;       ST4_WINDOW  equ     1
 ;               include "ST4_wrap.S"
 ;
-; A stream with copies needs the build made for its window, which the header
-; records at byte 24; a stream without copies decodes on any build whose
-; window is at least its own.
+; A stream with copies was packed with -m equal to the ring in units, which
+; its header records at byte 24; a stream without copies decodes through any
+; ring at least its window.
 ;
 ; THERE IS NO DONE STATE. For an output of O units the caller makes
 ; T = ceil(O/C) calls and never calls again. A stream packed with st4 -r is
@@ -78,20 +80,20 @@
 ;      stream repeats: then any number of calls is fine
 ;   6. streams A and D start on even addresses, and A holds an even number of
 ;      bytes: the bit queue is refilled with a move.w, and so is a word offset
-;   7. a stream with copies was packed with -m equal to ST4_WINDOW, and every
-;      copy is shorter than its distance, so the offset never reaches zero:
-;      the packer keeps both
+;   7. a stream with copies was packed with -m equal to the ring in units,
+;      and every copy is shorter than its distance, so the offset never
+;      reaches zero: the packer keeps both
 ;
 ; Pack with st4 -k<UNIT> -m<ring/UNIT> -l65535, and -c for copies from the
-; literal stream on a build with ST4_WINDOW = ring/UNIT.
+; literal stream on a build with ST4_WINDOW.
 ; -----------------------------------------------------------------------------
 
 ; 'S4', format version 7 and this build's unit size in one long: one cmp.l
 ; against a file's first long checks all three.
 ST4_SIGNATURE   equ     $53340700+ST4_UNIT
 
-; ST4_WINDOW, the window in units, is optional: a build without it has no
-; copy code.
+; ST4_WINDOW is optional: a build with it set to 1 has the copy code, and
+; ST4_init writes the window into it.
         .if ^^defined ST4_WINDOW
         .else
 ST4_WINDOW      equ     0
@@ -135,6 +137,13 @@ ST4_init:
 ; "begin literals" and the queue is the empty sentinel. So ST4_resume has no
 ; first-call test.
         move.w  #$4000,d0
+        .if ST4_WINDOW
+        lea     window_lea+2(pc),a3
+        move.w  d3,(a3)                 ; the copy source's displacement: N
+        neg.w   d3
+        lea     window_cmp+2(pc),a3
+        move.w  d3,(a3)                 ; the compare's immediate: -N
+        .endif
         rts
 
 source_wrapped:
@@ -151,12 +160,9 @@ copy_source:                            ; the offset is beyond the window, so
 ; The offset advances by what this segment copies: a copy the budget or the
 ; ring end cuts continues where it stopped, and a rep after it starts past
 ; it. It stays beyond the window, since a copy is shorter than its distance.
-        .if ST4_WINDOW*ST4_UNIT<128
-        lea     ST4_WINDOW*ST4_UNIT(a2,d2.w),a3 ; B + M*UNIT + -offset*UNIT
-        .else
-        lea     ST4_WINDOW*ST4_UNIT(a2),a3 ; the same in two, past a byte
-        adda.w  d2,a3                   ; displacement
-        .endif
+window_lea:
+        lea     1024(a2),a3             ; patched by ST4_init to M*UNIT(a2),a3
+        adda.w  d2,a3                   ; + -offset*UNIT
         .rept   ST4_UNIT
         add.w   d4,d2                   ; -offset*UNIT += n*UNIT
         .endr
@@ -175,8 +181,9 @@ budget_fits:
         tst.w   d2                      ; positive lastOffset means LITERALS
         bpl.s   literal_source
         .if ST4_WINDOW
-        cmp.w   #-ST4_WINDOW*ST4_UNIT,d2 ; beyond the window: a copy from B
-        blt.s   copy_source
+window_cmp:
+        cmp.w   #-32768,d2              ; patched by ST4_init to -M*UNIT: an
+        blt.s   copy_source             ; offset beyond the window is a copy
         .endif
 ; MATCH: derive the source and split a segment that crosses the ring end.
         movea.l a1,a3                   ; raw source = dst + -lastOffset*UNIT

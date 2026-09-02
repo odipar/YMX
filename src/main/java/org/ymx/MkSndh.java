@@ -33,18 +33,16 @@ public final class MkSndh {
     public static final int MAX_SUBTUNES = 99;
 
     /** The core descriptor: 'YMXC' at this offset, then version, unit,
-     * flags, the format version the core reads, the workspace's fixed size
-     * and the window in units, words; then the two offsets this tool
-     * patches, longs. */
+     * flags, the format version the core reads and the workspace's fixed
+     * size, words; then the two offsets this tool patches, longs. */
     public static final int CORE_MAGIC = 12;
     public static final int CORE_VERSION = 16;
     public static final int CORE_UNIT = 18;
     public static final int CORE_FLAGS = 20;
     public static final int CORE_FORMAT = 22;
     public static final int CORE_WORK_FIXED = 24;
-    public static final int CORE_WINDOW = 26;
-    public static final int CORE_TABLE_OFF = 28;
-    public static final int CORE_WORK_OFF = 32;
+    public static final int CORE_TABLE_OFF = 26;
+    public static final int CORE_WORK_OFF = 30;
     public static final int CORE_DESCRIPTOR_VERSION = 2;
 
     /** Core flag bits, matching {@code YMX_sndh.S}. */
@@ -330,14 +328,14 @@ public final class MkSndh {
             return Path.of(named);
         }
         int unit = unitOf(options.tunes());
-        int ring = copiesRing(options.tunes());
-        String suffix = MkCores.windowSuffix(ring) + (options.perf() ? "-perf" : "")
+        boolean copies = copiesIn(options.tunes());
+        String suffix = (copies ? "-copies" : "") + (options.perf() ? "-perf" : "")
                 + (options.maskBurst() ? "" : "-nomask");
         Path core = Tools.repo().resolve("dist").resolve("ymxsndh-k"
                 + unit + suffix + Tools.binarySuffix() + ".bin");
         if (stale(core, "YMX_sndh.S", "YMX.S", "ST4_wrap.S")) {
             MkCores.cores(Tools.repo().resolve("dist"), options.perf(),
-                    !options.maskBurst(), ring);
+                    !options.maskBurst(), copies);
         }
         return core;
     }
@@ -372,21 +370,16 @@ public final class MkSndh {
         return false;
     }
 
-    /**
-     * The ring the set's core is built for as its window: the ring of the
-     * first tune that copies from its literal stream (flag bit 5), or 0
-     * where none does. A tune with copies plays only on a core whose window
-     * is its ring, and {@link #readCore} holds every tune of the set to the
-     * core's window.
-     */
-    private static int copiesRing(List<Path> tunes) {
+    /** Whether a tune of the set copies from its literal stream (flag bit
+     * 5), which asks for a core with the copy code; that core reads the
+     * window off each tune's ring at init, so it serves any ring. */
+    private static boolean copiesIn(List<Path> tunes) {
         for (Path tune : tunes) {
-            YmxHeader header = header(tune);
-            if ((header.flags() & YmxFormat.FLAG_COPIES) != 0) {
-                return header.ring();
+            if ((header(tune).flags() & YmxFormat.FLAG_COPIES) != 0) {
+                return true;
             }
         }
-        return 0;
+        return false;
     }
 
     /** The unit size the set's core must serve: the first tune's, or the
@@ -434,7 +427,7 @@ public final class MkSndh {
         } catch (IOException e) {
             throw Tools.fail("mksndh: cannot read the core " + path);
         }
-        if (core.length < 36 || core[CORE_MAGIC] != 'Y' || core[CORE_MAGIC + 1] != 'M'
+        if (core.length < 34 || core[CORE_MAGIC] != 'Y' || core[CORE_MAGIC + 1] != 'M'
                 || core[CORE_MAGIC + 2] != 'X' || core[CORE_MAGIC + 3] != 'C') {
             throw new IllegalArgumentException(path + " is not an SNDH core");
         }
@@ -451,28 +444,13 @@ public final class MkSndh {
                     + " from the binaries release, or reassemble it with"
                     + " ymx/mkcores.sh");
         }
-        boolean copies = copiesRing(options.tunes()) != 0;
+        boolean copies = copiesIn(options.tunes());
         int flags = (options.perf() ? CORE_FLAG_PERF : 0)
                 | (options.maskBurst() ? 0 : CORE_FLAG_NOMASK)
                 | (copies ? CORE_FLAG_COPIES : 0);
         if (word(core, CORE_FLAGS) != flags) {
             throw new IllegalArgumentException(path + " is built with flags "
                     + word(core, CORE_FLAGS) + ", the options ask for " + flags);
-        }
-        // A core built for a window reads an offset past it as a copy, so no
-        // tune of the set may carry a wider ring; a tune with copies needs
-        // the window to be its ring exactly (SPEC.md §9.1).
-        int window = word(core, CORE_WINDOW) * word(core, CORE_UNIT);
-        if (window != 0) {
-            for (Path tune : options.tunes()) {
-                YmxHeader header = header(tune);
-                boolean copied = (header.flags() & YmxFormat.FLAG_COPIES) != 0;
-                if (header.ring() > window || copied && header.ring() != window) {
-                    throw new IllegalArgumentException(tune + " is packed for rings of "
-                            + header.ring() + (copied ? " with copies" : "") + ", and "
-                            + path + " is built for a window of " + window + " bytes");
-                }
-            }
         }
         return core;
     }

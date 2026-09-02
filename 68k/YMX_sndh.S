@@ -19,19 +19,16 @@
 ;   18  .w  ST4_UNIT           the unit size this build decodes
 ;   20  .w  flags              bit 0 = the raster monitor is built in,
 ;                              bit 1 = the frame write runs unmasked,
-;                              bit 2 = built for a window: copies from
-;                              the literal stream decode
+;                              bit 2 = the copy code is built in: copies
+;                              from the literal stream decode, at any ring
 ;   22  .w  YMX_VERSION        the format version this build reads: a tool
 ;                              combines only tunes of the same version
 ;   24  .w  YMX_FIXED          workspace bytes before the rings: a tool
 ;                              sizes the workspace as this + 25 x the
 ;                              largest N in the combined tunes' headers
-;   26  .w  ST4_WINDOW         the window in units, 0 without copy code:
-;                              a tune with copies needs a core whose
-;                              window is its ring
-;   28  .l  0                  table offset, patched by the tool: a word
+;   26  .l  0                  table offset, patched by the tool: a word
 ;                              subtune count, then a long offset per tune
-;   32  .l  0                  workspace offset, patched by the tool
+;   30  .l  0                  workspace offset, patched by the tool
 ;
 ; Every patched offset is relative to sndh_core and even. The combined file
 ; is loaded anywhere even; nothing in here is absolute.
@@ -64,7 +61,7 @@ SAV_DATA        equ     20              ; 4 bytes: the data registers
 SAV_BITS        equ     24              ; byte: enable bits in the low nibble,
 SAV_SIZE        equ     26              ; mask bits in the high, timer order
 
-; The window is read in the descriptor before YMX.S defaults it.
+; The copy code switch is read in the descriptor before YMX.S defaults it.
         .if ^^defined ST4_WINDOW
         .else
 ST4_WINDOW      equ     0
@@ -80,7 +77,6 @@ sndh_core:
         dc.w    YMX_PERF+((1-YMX_MASK_BURST)*2)+((ST4_WINDOW<>0)*4)
         dc.w    YMX_VERSION
         dc.w    YMX_FIXED
-        dc.w    ST4_WINDOW
 sndh_table_off:
         dc.l    0
 sndh_work_off:
@@ -169,6 +165,35 @@ sndh_init:
         tst.l   d0
         bne.s   .rejected               ; a foreign file: stay silent
         st      (a6)                    ; live
+
+; The decoder is code in RAM: ST4_init writes the ring size into it as the
+; window. A 68020 or later holds instructions in a cache, and is told; the
+; _CPU cookie says which processor this is, and INIT runs in supervisor
+; mode, where the cookie jar and the cache control register are readable.
+        .if ST4_WINDOW
+        move.l  $5A0.w,d0               ; the cookie jar, or 0 without one
+        beq.s   .cache_done
+        movea.l d0,a0
+.cookie:
+        move.l  (a0)+,d0                ; the cookie's name, 0 at the end
+        beq.s   .cache_done
+        move.l  (a0)+,d1                ; its value
+        cmp.l   #$5F435055,d0           ; '_CPU'
+        bne.s   .cookie
+        cmp.l   #20,d1                  ; 68000 and 68010: no cache
+        blo.s   .cache_done
+        cmp.l   #40,d1
+        bhs.s   .push
+        .68030
+        movec   cacr,d0                 ; 68020 and 68030: clear the
+        ori.w   #8,d0                   ; instruction cache
+        movec   d0,cacr
+        .68000
+        bra.s   .cache_done
+.push:
+        dc.w    $F4F8                   ; cpusha bc: 68040 and 68060 push
+.cache_done:                            ; and invalidate both caches
+        .endif
 
 ; Record WHICH timers this tune claimed - YMX_stop clears the claims, so
 ; EXIT restores from this mask. Each claimed channel's descriptor holds a

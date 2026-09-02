@@ -117,7 +117,7 @@ tells them apart - and writes a `.ymx`.
 | `-nN` | ring size per stream, bytes (default 960). The packer raises it, up to the cap of 2520, where one pass of a tune needs a longer ring, and says so; the ring size the file carries is the header's, not this flag's |
 | `-cC` | values decoded per call, the round-robin group size (default 24) |
 | `-kK` | ST4 unit size 1, 2 or 4 (default 2); an odd tune length is padded with safe duplicate frames |
-| `-copies` | let a match beyond the ring copy from the literal stream (SPEC.md Appendix A.5); the file sets flag bit 5 and plays only on a player built with `ST4_WINDOW` = N/K, which `mksndh` and `mkprg` take from a core built for the ring: the release's `-copies` core at the default ring, one they assemble on the spot at another (`mkcores.sh -copies -nN`) |
+| `-copies` | let a match beyond the ring copy from the literal stream (SPEC.md Appendix A.5); the file sets flag bit 5 and plays only on a player built with the copy code (`ST4_WINDOW`), which `mksndh` and `mkprg` take from the `-copies` cores |
 | `-copiesS` | the same, searching S seconds a stream for a better parse |
 | `-minM` `-secS` | trim: drop everything before M:S |
 | `-startframeF` `-endframeF` `-framesN` | the same window in frames: start, end, or a length cap |
@@ -190,14 +190,11 @@ combiners run no assembler: `mksndh.sh` and `mkprg.sh` call this step in
 when a binary under `dist/` is missing or stale, and `mkrelease.sh` runs
 it for every variant.
 
-    ymx/mkcores.sh [-perf] [-nomask] [-copies [-nN]] [outdir]
+    ymx/mkcores.sh [-perf] [-nomask] [-copies] [outdir]
 
-`-copies` builds the cores for the default ring as the window, the ones
-the release carries; `-copies -nN` builds them for a ring of N bytes,
-named `-copies-nN`. A tune with copies plays only on a core whose window
-is its ring, so the combiners assemble that core when a set asks for a
-ring the release has no core for. A unit the ring is not a whole number
-of gets no core, and the run says so.
+`-copies` builds the cores with the copy code in, the ones a tune with
+copies from the literal stream needs: such a core reads the window off
+each tune's ring at init, so one build serves every ring.
 
 ### mkrelease.sh
 

@@ -76,24 +76,23 @@ final class Rig {
      * frame write is unmasked, the tools' -nomask.
      */
     static Build assemble(int unit, boolean perf) {
-        return assemble(unit, perf, System.getenv("YMX_NOMASK") == null, 0);
+        return assemble(unit, perf, System.getenv("YMX_NOMASK") == null, false);
     }
 
-    /** The same, built for {@code window} units: a build that decodes
-     * copies from the literal stream, and takes no ring wider than it. */
-    static Build assemble(int unit, boolean perf, int window) {
-        return assemble(unit, perf, System.getenv("YMX_NOMASK") == null, window);
+    /** The same with the copy code built in: a build that decodes copies
+     * from the literal stream, at the window it reads off the ring at init. */
+    static Build assemble(int unit, boolean perf, boolean copies) {
+        return assemble(unit, perf, System.getenv("YMX_NOMASK") == null, copies);
     }
 
     /** The masked build regardless of YMX_NOMASK: the README's byte
      * counts quote it, so the size check measures it. */
     static Build assembleMasked(int unit, boolean perf) {
-        return assemble(unit, perf, true, 0);
+        return assemble(unit, perf, true, false);
     }
 
-    private static Build assemble(int unit, boolean perf, boolean masked, int window) {
-        String tag = unit + (perf ? "p" : "") + (masked ? "" : "n")
-                + (window == 0 ? "" : "w" + window);
+    private static Build assemble(int unit, boolean perf, boolean masked, boolean copies) {
+        String tag = unit + (perf ? "p" : "") + (masked ? "" : "n") + (copies ? "c" : "");
         Build built = ASSEMBLED.get(tag);
         if (built != null) {
             return built;
@@ -102,7 +101,7 @@ final class Rig {
             Files.createDirectories(SCRATCH);
             Path source = SCRATCH.resolve("link" + tag + ".S");
             Files.writeString(source, "ST4_UNIT    equ     " + unit + "\n"
-                    + (window == 0 ? "" : "ST4_WINDOW  equ     " + window + "\n")
+                    + (copies ? "ST4_WINDOW  equ     1\n" : "")
                     + (perf ? "YMX_PERF    equ     1\n" : "")
                     + (masked ? "" : "YMX_MASK_BURST equ  0\n")
                     + "        include \"YMX.S\"\n"

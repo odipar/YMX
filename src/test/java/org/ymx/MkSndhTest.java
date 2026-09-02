@@ -216,13 +216,10 @@ final class MkSndhTest {
         assertTrue(reason.contains("not an SNDH core"), reason);
     }
 
-    /** A core built for {@code ring} bytes as its window, at unit 1: the
-     * copies flag, and the window word the ring in units. */
-    private static byte[] windowCore(int ring) {
+    /** A core with the copy code, at unit 1: the copies flag set. */
+    private static byte[] copiesCore() {
         byte[] core = core(1);
         core[21] = (byte) MkSndh.CORE_FLAG_COPIES;
-        core[26] = (byte) (ring >> 8);
-        core[27] = (byte) ring;
         return core;
     }
 
@@ -237,30 +234,28 @@ final class MkSndhTest {
     }
 
     @Test
-    void aTuneWithCopiesPlaysOnlyOnACoreWhoseWindowIsItsRing(@TempDir Path dir)
+    void aTuneWithCopiesNeedsTheCopyCodeAndPlaysAtAnyRing(@TempDir Path dir)
             throws IOException {
         Path tune = write(dir, "one.ymx", copiesTune(480));
-        Path wide = write(dir, "wide.bin", windowCore(960));
+        Path plain = write(dir, "plain.bin", core(1));
         MkSndh.Options options = new MkSndh.Options(dir.resolve("out.sndh"),
                 List.of(tune), "T", null, null, false, true);
         RuntimeException refused = assertThrows(RuntimeException.class,
-                () -> MkSndh.build(options, wide));
+                () -> MkSndh.build(options, plain));
         String reason = String.valueOf(refused.getMessage());
-        assertTrue(reason.contains("rings of 480 with copies"), reason);
-        assertTrue(reason.contains("window of 960 bytes"), reason);
+        assertTrue(reason.contains("flags"), reason);
 
-        Path fitted = write(dir, "fitted.bin", windowCore(480));
-        MkSndh.build(options, fitted);
+        // The copy code reads the window off the ring at init: one core
+        // serves a tune at 480 and one at 960 alike.
+        Path copies = write(dir, "copies.bin", copiesCore());
+        MkSndh.build(options, copies);
         assertTrue(Files.isRegularFile(dir.resolve("out.sndh")),
-                "the core built for the ring serves the tune");
-    }
-
-    @Test
-    void theCoreNameSaysItsWindow() {
-        assertEquals("", MkCores.windowSuffix(0), "no window");
-        assertEquals("-copies", MkCores.windowSuffix(YmxFormat.DEFAULT_RING_SIZE),
-                "the default ring: the release's core");
-        assertEquals("-copies-n480", MkCores.windowSuffix(480), "another ring");
+                "the copies core serves a tune at a ring of 480");
+        Path wide = write(dir, "wide.ymx", copiesTune(960));
+        MkSndh.build(new MkSndh.Options(dir.resolve("out2.sndh"),
+                List.of(tune, wide), "T", null, null, false, true), copies);
+        assertTrue(Files.isRegularFile(dir.resolve("out2.sndh")),
+                "the copies core serves a set at two rings");
     }
 
     @Test

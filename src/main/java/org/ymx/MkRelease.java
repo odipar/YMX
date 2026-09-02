@@ -27,7 +27,7 @@ import java.util.zip.ZipOutputStream;
 public final class MkRelease {
 
     /** One core build: a unit size, the two assembly flags, and whether
-     * it is built for the default ring as a window. */
+     * it carries the copy code. */
     record Variant(int unit, boolean perf, boolean nomask, boolean copies) {
 
         String name() {
@@ -40,11 +40,6 @@ public final class MkRelease {
             return (perf ? MkSndh.CORE_FLAG_PERF : 0)
                     | (nomask ? MkSndh.CORE_FLAG_NOMASK : 0)
                     | (copies ? MkSndh.CORE_FLAG_COPIES : 0);
-        }
-
-        /** The window the core is built for, in units: 0 without copies. */
-        int window() {
-            return copies ? YmxFormat.DEFAULT_RING_SIZE / unit : 0;
         }
     }
 
@@ -515,11 +510,6 @@ public final class MkRelease {
             throw new IllegalArgumentException(variant.name() + " gives F = "
                     + fixed + ", the workspace bytes before the rings:"
                     + " nonzero and even");
-        }
-        if (MkSndh.word(core, MkSndh.CORE_WINDOW) != variant.window()) {
-            throw new IllegalArgumentException(variant.name() + " carries window "
-                    + MkSndh.word(core, MkSndh.CORE_WINDOW) + ", its name says "
-                    + variant.window());
         }
         if (!zeroLong(core, MkSndh.CORE_TABLE_OFF)) {
             throw new IllegalArgumentException(variant.name() + " carries a"
