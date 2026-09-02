@@ -24,7 +24,7 @@ REPO=$(pwd)
 OUT=${1:-dist/standalone}
 TARGETS=${TARGETS:-"win-x64 win-arm64 osx-x64 osx-arm64 linux-x64 linux-arm64"}
 
-# the cores the executable embeds: this release's, all twelve and the stub
+# the cores the executable embeds: this release's, every core and the stub
 if [ ! -d dist/release ]; then
     ymx/mkrelease.sh >/dev/null
 fi
@@ -79,4 +79,34 @@ for target in $TARGETS; do
     (cd "$OUT/$target" && zip -q -X "../$zip" "$exe" "$launcher")
     echo "$OUT/$zip: $(wc -c < "$OUT/$zip" | tr -d ' ') bytes"
 done
+
+# The host's executable, tried out as a user would: from a directory that is
+# not the repository, on a tune packed with -copies, to an SNDH file and a
+# program. It carries only the cores it embeds, so a core it names and does
+# not carry fails here, where 0.10.0 shipped a standalone that refused its
+# own -copies tune.
+case "$(uname -s)-$(uname -m)" in
+    Darwin-arm64) host=osx-arm64 ;;
+    Darwin-x86_64) host=osx-x64 ;;
+    Linux-aarch64) host=linux-arm64 ;;
+    Linux-x86_64) host=linux-x64 ;;
+    *) host="" ;;
+esac
+case " $TARGETS " in
+    *" $host "*)
+        trial=$(mktemp -d)
+        cp "ym/test/Synergy Credits.ym" "$trial/tune.ym"
+        for out in out.sndh out.prg; do
+            (cd "$trial" && env -u YMX_REPO "$REPO/$OUT/$host/ym-to-ymx" \
+                -copies -k2 -c22 -n440 "$out" tune.ym > "$out.log" 2>&1) \
+                && [ -s "$trial/$out" ] || {
+                    echo "publish: $OUT/$host/ym-to-ymx cannot build $out from a" \
+                        "-copies tune:" >&2
+                    tail -3 "$trial/$out.log" >&2
+                    exit 1; }
+        done
+        rm -rf "$trial"
+        echo "$OUT/$host/ym-to-ymx: builds an SNDH file and a program from a -copies tune"
+        ;;
+esac
 echo "$OUT: $(echo $TARGETS | wc -w | tr -d ' ') platforms"

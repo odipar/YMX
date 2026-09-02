@@ -20,6 +20,18 @@ by someone deciding whether to take the release, not by someone
 reviewing it: the commits carry the reasoning and the measurements, and
 the section carries the list.
 
+## 0.10.1
+
+The player is 3,652 bytes at unit size 2, the PRG stub 3,038. Format
+0.9. The twenty-five binaries are byte-identical to 0.10.0's: this
+release changes the standalone tool only.
+
+- `ym-to-ymx` stages the core with the copy code where a tune it packed
+  sets flag bit 5, so the standalone builds an SNDH file or a program
+  from a `-copies` tune. 0.10.0's staged the plain core and stopped on
+  its own tune; `publish.sh` now runs the host's executable on a
+  `-copies` tune before the zips are made.
+
 ## 0.10.0
 
 The player is 3,652 bytes at unit size 2, where 0.9.0 carried 3,534, and
