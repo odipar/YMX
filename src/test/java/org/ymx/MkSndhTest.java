@@ -216,6 +216,53 @@ final class MkSndhTest {
         assertTrue(reason.contains("not an SNDH core"), reason);
     }
 
+    /** A core built for {@code ring} bytes as its window, at unit 1: the
+     * copies flag, and the window word the ring in units. */
+    private static byte[] windowCore(int ring) {
+        byte[] core = core(1);
+        core[21] = (byte) MkSndh.CORE_FLAG_COPIES;
+        core[26] = (byte) (ring >> 8);
+        core[27] = (byte) ring;
+        return core;
+    }
+
+    /** A packed tune with flag bit 5 set and the ring rewritten: what a
+     * tune with copies at that ring says in its header. */
+    private static byte[] copiesTune(int ring) {
+        byte[] bytes = tune(240, true);
+        bytes[YmxFormat.OFFSET_FLAGS + 1] |= (byte) YmxFormat.FLAG_COPIES;
+        bytes[YmxFormat.OFFSET_RING_SIZE] = (byte) (ring >> 8);
+        bytes[YmxFormat.OFFSET_RING_SIZE + 1] = (byte) ring;
+        return bytes;
+    }
+
+    @Test
+    void aTuneWithCopiesPlaysOnlyOnACoreWhoseWindowIsItsRing(@TempDir Path dir)
+            throws IOException {
+        Path tune = write(dir, "one.ymx", copiesTune(480));
+        Path wide = write(dir, "wide.bin", windowCore(960));
+        MkSndh.Options options = new MkSndh.Options(dir.resolve("out.sndh"),
+                List.of(tune), "T", null, null, false, true);
+        RuntimeException refused = assertThrows(RuntimeException.class,
+                () -> MkSndh.build(options, wide));
+        String reason = String.valueOf(refused.getMessage());
+        assertTrue(reason.contains("rings of 480 with copies"), reason);
+        assertTrue(reason.contains("window of 960 bytes"), reason);
+
+        Path fitted = write(dir, "fitted.bin", windowCore(480));
+        MkSndh.build(options, fitted);
+        assertTrue(Files.isRegularFile(dir.resolve("out.sndh")),
+                "the core built for the ring serves the tune");
+    }
+
+    @Test
+    void theCoreNameSaysItsWindow() {
+        assertEquals("", MkCores.windowSuffix(0), "no window");
+        assertEquals("-copies", MkCores.windowSuffix(YmxFormat.DEFAULT_RING_SIZE),
+                "the default ring: the release's core");
+        assertEquals("-copies-n480", MkCores.windowSuffix(480), "another ring");
+    }
+
     @Test
     void coreFlagsMustMatchTheOptions(@TempDir Path dir) throws IOException {
         Path tune = write(dir, "one.ymx", tune(240, true));

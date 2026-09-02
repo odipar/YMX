@@ -511,8 +511,17 @@ namespace Ym6
             TuneSet set = TuneSet.Of("play.sh", yms);
             Console.WriteLine("play.sh: packing " + string.Join(" ", yms));
             List<string> packed = Packing.Pack("play.sh", yms, work, flags);
-            MkPrg.Build(new MkPrg.Options(Path.Combine(work, "PLAY.PRG"), packed,
-                    set.Title, set.Composer, set.Names, perf, maskBurst, true));
+            try
+            {
+                MkPrg.Build(new MkPrg.Options(Path.Combine(work, "PLAY.PRG"), packed,
+                        set.Title, set.Composer, set.Names, perf, maskBurst, true));
+            }
+            catch (ArgumentException e)
+            {
+                // A set the core cannot serve: the combiner's own words, as
+                // the Go tree prints them.
+                throw Tools.Fail(e.Message);
+            }
 
             string marker = Path.Combine(work, "YMXDONE.MRK");
             File.Delete(marker);

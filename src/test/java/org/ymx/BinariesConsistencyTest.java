@@ -117,6 +117,19 @@ final class BinariesConsistencyTest {
                     "core k" + unit + "-copies workspace fixed size");
         }
 
+        // A window build for a ring other than the default: named for the
+        // ring, the window the ring in units, so a tune with copies at that
+        // ring plays on it and on no other.
+        MkCores.cores(dir, false, false, 440);
+        for (int unit : new int[] {1, 2, 4}) {
+            byte[] core = Files.readAllBytes(dir.resolve("ymxsndh-k" + unit
+                    + "-copies-n440" + Tools.binarySuffix() + ".bin"));
+            assertEquals(MkSndh.CORE_FLAG_COPIES, MkSndh.word(core, MkSndh.CORE_FLAGS),
+                    "core k" + unit + "-copies-n440 flags");
+            assertEquals(440 / unit, MkSndh.word(core, MkSndh.CORE_WINDOW),
+                    "core k" + unit + "-copies-n440 is built for a ring of 440");
+        }
+
         byte[] stub = Files.readAllBytes(
                 dir.resolve("ymxprg" + Tools.binarySuffix() + ".bin"));
         assertEquals('Y', stub[MkPrg.STUB_MAGIC]);

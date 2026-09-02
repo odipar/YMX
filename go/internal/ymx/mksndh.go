@@ -352,7 +352,7 @@ func sndhResolveCore(options SndhOptions) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	copies, err := sndhCopiesIn(options.Tunes)
+	ring, err := sndhCopiesRing(options.Tunes)
 	if err != nil {
 		return "", err
 	}
@@ -360,19 +360,28 @@ func sndhResolveCore(options SndhOptions) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	suffix := ""
-	if copies {
-		suffix += "-copies"
+	// The name says the window and the flags, and the mkcores command that
+	// assembles it says the same in its own words.
+	suffix := sndhWindowSuffix(ring)
+	assemble := "ymx/mkcores.sh"
+	if ring != 0 {
+		assemble += " -copies"
+		if ring != DefaultRingSize {
+			assemble += " -n" + strconv.Itoa(ring)
+		}
 	}
 	if options.Perf {
 		suffix += "-perf"
+		assemble += " -perf"
 	}
 	if !options.MaskBurst {
 		suffix += "-nomask"
+		assemble += " -nomask"
 	}
 	name := "ymxsndh-k" + strconv.Itoa(unit) + suffix +
 		sndhBinarySuffix() + ".bin"
-	core, err := sndhPrebuilt(repo, name,
+	published := ring == 0 || ring == DefaultRingSize
+	core, err := sndhPrebuilt(repo, name, assemble, published,
 		"YMX_sndh.S", "YMX.S", "ST4_wrap.S")
 	if err != nil {
 		return "", fmt.Errorf("mksndh: %w", err)
@@ -390,7 +399,12 @@ func sndhResolveCore(options SndhOptions) (string, error) {
 // staged a release already holds what this needs. Both are held to the same
 // rule: a binary older than a source it was assembled from is stale wherever
 // it sits.
-func sndhPrebuilt(repo, name string, sources ...string) (string, error) {
+//
+// published says the binaries release carries a core of this name; a core
+// for a ring other than the default is assembled and never published, and
+// the message says which.
+func sndhPrebuilt(repo, name, assemble string, published bool,
+	sources ...string) (string, error) {
 	beside := filepath.Join(repo, "dist", name)
 	if !sndhStale(repo, beside, sources...) {
 		return beside, nil
@@ -399,9 +413,14 @@ func sndhPrebuilt(repo, name string, sources ...string) (string, error) {
 	if !sndhStale(repo, staged, sources...) {
 		return staged, nil
 	}
+	if !published {
+		return "", fmt.Errorf("%s is missing or older than the sources it is"+
+			" assembled from, and so is %s; the binaries release carries no"+
+			" core for that ring - assemble it with %s", beside, staged, assemble)
+	}
 	return "", fmt.Errorf("%s is missing or older than the sources it is"+
 		" assembled from, and so is %s - take it from the binaries release,"+
-		" or assemble it with ymx/mkcores.sh", beside, staged)
+		" or assemble it with %s", beside, staged, assemble)
 }
 
 // sndhStale reports whether a prebuilt binary is missing or older than a
@@ -426,20 +445,36 @@ func sndhStale(repo, binary string, sources ...string) bool {
 	return false
 }
 
-// sndhCopiesIn reports whether a tune of the set copies from its literal
-// stream (flag bit 5), which asks for a core built with its ring as the
+// sndhCopiesRing is the ring the set's core is built for as its window: the
+// ring of the first tune that copies from its literal stream (flag bit 5),
+// or 0 where none does. A tune with copies plays only on a core whose window
+// is its ring, and sndhReadCore holds every tune of the set to the core's
 // window.
-func sndhCopiesIn(tunes []string) (bool, error) {
+func sndhCopiesRing(tunes []string) (int, error) {
 	for _, tune := range tunes {
 		header, err := ReadHeader(tune)
 		if err != nil {
-			return false, fmt.Errorf("mksndh: %w", err)
+			return 0, fmt.Errorf("mksndh: %w", err)
 		}
 		if header.Flags&FlagCopies != 0 {
-			return true, nil
+			return header.Ring, nil
 		}
 	}
-	return false, nil
+	return 0, nil
+}
+
+// sndhWindowSuffix is the part of a core's name that says its window:
+// nothing for none, -copies for the default ring, -copies-n<ring> for
+// another. The release carries the first two; mkcores.sh assembles the
+// third.
+func sndhWindowSuffix(ring int) string {
+	if ring == 0 {
+		return ""
+	}
+	if ring == DefaultRingSize {
+		return "-copies"
+	}
+	return "-copies-n" + strconv.Itoa(ring)
 }
 
 // sndhUnitOf gives the unit the set is packed at: the first tune that names
@@ -479,10 +514,11 @@ func sndhReadCore(path string, options SndhOptions) ([]byte, error) {
 			" reassemble it with ymx/mkcores.sh", path,
 			VersionName(sndhWord(core, CoreFormat)), FormatName(), FormatName())
 	}
-	copies, err := sndhCopiesIn(options.Tunes)
+	ring, err := sndhCopiesRing(options.Tunes)
 	if err != nil {
 		return nil, err
 	}
+	copies := ring != 0
 	flags := 0
 	if options.Perf {
 		flags |= CoreFlagPerf

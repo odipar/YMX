@@ -131,8 +131,16 @@ public final class Play {
         TuneSet set = TuneSet.of(yms);
         System.out.println("play.sh: packing " + join(yms));
         List<Path> packed = Packing.pack(yms, work, flags);
-        MkPrg.build(new MkPrg.Options(work.resolve("PLAY.PRG"), packed, set.title(),
-                set.composer(), set.names(), perf, maskBurst, true));
+        try {
+            MkPrg.build(new MkPrg.Options(work.resolve("PLAY.PRG"), packed, set.title(),
+                    set.composer(), set.names(), perf, maskBurst, true));
+        } catch (IllegalArgumentException e) {
+            // A set the core cannot serve: the combiner's own words, as
+            // the Go tree prints them. getMessage() is @Nullable, so give
+            // it something to fall back on.
+            String reason = e.getMessage();
+            throw Tools.fail(reason != null ? reason : "play.sh: cannot build the program");
+        }
 
         Path marker = work.resolve("YMXDONE.MRK");
         Packing.deleteQuietly(marker);

@@ -15,6 +15,7 @@ Two kinds of binary:
 |---|---|
 | `ymxsndh-k1-v<release>.bin`, `-k2`, `-k4` | an **SNDH core**: the player and its SNDH glue, one per ST4 unit size |
 | `ymxsndh-k1-copies-v<release>.bin`, `-k2-copies`, `-k4-copies` | the same, built for the default ring as a window: the core a tune with copies from the literal stream needs (`SPEC.md` §1.2, flag bit 5), and one that takes no ring wider than 960 bytes |
+| `ymxsndh-k1-copies-n<N>-v<release>.bin`, `-k2-copies-n<N>`, `-k4-copies-n<N>` | the same for a ring of N bytes, which `ymx/mkcores.sh -copies -nN` assembles; a combiner with rmac at hand assembles it on the spot, and the release carries none |
 | `ymxprg-v<release>.bin` | the **PRG stub**: a TOS program that drives an appended SNDH file |
 
 Every name ends with the release version, the binaries' own, which moves
@@ -273,7 +274,9 @@ The whole build for a system with no assembler and no JVM.
 2. **Pick the core** for the unit size the tunes are packed at - the
    fourth byte of any packed section's ST4 signature (`SPEC.md` §1.4) -
    and for the flags wanted, the `-copies` core where any tune's header
-   has flag bit 5 set. Verify its descriptor (§1): `'YMXC'`, descriptor
+   has flag bit 5 set, built for that tune's ring as the window: the
+   release's at the default ring, `-copies-n<N>` at another. Verify its
+   descriptor (§1): `'YMXC'`, descriptor
    version 2, the tunes' format version, the unit, the flags, and the
    window against every tune's ring.
 3. **Read each tune's header** (`SPEC.md` §1.1; flag bit 0 in §1.2):

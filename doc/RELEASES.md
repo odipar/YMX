@@ -50,8 +50,11 @@ version 7.
   ST4's own. Such a file sets flag bit 5 and plays only on a player built
   for its ring as a window: the `-copies` cores, twelve more in the
   binaries release, whose descriptor is version 2 and carries the window.
-  A player without a window rejects the file rather than decode a copy to
-  other bytes.
+  Those are built for the default ring; a copies tune at another ring
+  gets a core named for it, `-copies-nN`, which the Java and C#
+  combiners assemble on the spot and `mkcores.sh -copies -nN` assembles
+  for the Go tree. A player without a window rejects the file rather than
+  decode a copy to other bytes.
 
 ## 0.9.0
 

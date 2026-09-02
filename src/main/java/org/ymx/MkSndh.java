@@ -330,14 +330,14 @@ public final class MkSndh {
             return Path.of(named);
         }
         int unit = unitOf(options.tunes());
-        boolean copies = copiesIn(options.tunes());
-        String suffix = (copies ? "-copies" : "") + (options.perf() ? "-perf" : "")
+        int ring = copiesRing(options.tunes());
+        String suffix = MkCores.windowSuffix(ring) + (options.perf() ? "-perf" : "")
                 + (options.maskBurst() ? "" : "-nomask");
         Path core = Tools.repo().resolve("dist").resolve("ymxsndh-k"
                 + unit + suffix + Tools.binarySuffix() + ".bin");
         if (stale(core, "YMX_sndh.S", "YMX.S", "ST4_wrap.S")) {
             MkCores.cores(Tools.repo().resolve("dist"), options.perf(),
-                    !options.maskBurst(), copies);
+                    !options.maskBurst(), ring);
         }
         return core;
     }
@@ -372,15 +372,21 @@ public final class MkSndh {
         return false;
     }
 
-    /** Whether a tune of the set copies from its literal stream (flag bit
-     * 5), which asks for a core built with its ring as the window. */
-    private static boolean copiesIn(List<Path> tunes) {
+    /**
+     * The ring the set's core is built for as its window: the ring of the
+     * first tune that copies from its literal stream (flag bit 5), or 0
+     * where none does. A tune with copies plays only on a core whose window
+     * is its ring, and {@link #readCore} holds every tune of the set to the
+     * core's window.
+     */
+    private static int copiesRing(List<Path> tunes) {
         for (Path tune : tunes) {
-            if ((header(tune).flags() & YmxFormat.FLAG_COPIES) != 0) {
-                return true;
+            YmxHeader header = header(tune);
+            if ((header.flags() & YmxFormat.FLAG_COPIES) != 0) {
+                return header.ring();
             }
         }
-        return false;
+        return 0;
     }
 
     /** The unit size the set's core must serve: the first tune's, or the
@@ -445,7 +451,7 @@ public final class MkSndh {
                     + " from the binaries release, or reassemble it with"
                     + " ymx/mkcores.sh");
         }
-        boolean copies = copiesIn(options.tunes());
+        boolean copies = copiesRing(options.tunes()) != 0;
         int flags = (options.perf() ? CORE_FLAG_PERF : 0)
                 | (options.maskBurst() ? 0 : CORE_FLAG_NOMASK)
                 | (copies ? CORE_FLAG_COPIES : 0);

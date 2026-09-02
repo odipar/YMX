@@ -371,8 +371,8 @@ namespace Ymx
                 return named;
             }
             int unit = UnitOf(options.Tunes);
-            bool copies = CopiesIn(options.Tunes);
-            string suffix = (copies ? "-copies" : "") + (options.Perf ? "-perf" : "")
+            int ring = CopiesRing(options.Tunes);
+            string suffix = MkCores.WindowSuffix(ring) + (options.Perf ? "-perf" : "")
                     + (options.MaskBurst ? "" : "-nomask");
             string core = Path.Combine(Tools.Repo(), "dist",
                     "ymxsndh-k" + unit + suffix + Tools.BinarySuffix()
@@ -380,7 +380,7 @@ namespace Ymx
             if (Stale(core, "YMX_sndh.S", "YMX.S", "ST4_wrap.S"))
             {
                 MkCores.Cores(Path.Combine(Tools.Repo(), "dist"), options.Perf,
-                        !options.MaskBurst, copies);
+                        !options.MaskBurst, ring);
             }
             return core;
         }
@@ -414,19 +414,22 @@ namespace Ymx
             }
         }
 
-        /// <summary>Whether a tune of the set copies from its literal stream
-        /// (flag bit 5), which asks for a core built with its ring as the
-        /// window.</summary>
-        private static bool CopiesIn(List<string> tunes)
+        /// <summary>The ring the set's core is built for as its window: the
+        /// ring of the first tune that copies from its literal stream (flag
+        /// bit 5), or 0 where none does. A tune with copies plays only on a
+        /// core whose window is its ring, and ReadCore holds every tune of
+        /// the set to the core's window.</summary>
+        private static int CopiesRing(List<string> tunes)
         {
             foreach (string tune in tunes)
             {
-                if ((HeaderOf(tune).Flags & YmxFormat.FlagCopies) != 0)
+                YmxHeader header = HeaderOf(tune);
+                if ((header.Flags & YmxFormat.FlagCopies) != 0)
                 {
-                    return true;
+                    return header.Ring;
                 }
             }
-            return false;
+            return 0;
         }
 
         private static YmxHeader HeaderOf(string tune)
@@ -496,7 +499,7 @@ namespace Ymx
                         + " from the binaries release, or reassemble it with"
                         + " ymx/mkcores.sh");
             }
-            bool copies = CopiesIn(options.Tunes);
+            bool copies = CopiesRing(options.Tunes) != 0;
             int flags = (options.Perf ? CoreFlagPerf : 0)
                     | (options.MaskBurst ? 0 : CoreFlagNomask)
                     | (copies ? CoreFlagCopies : 0);

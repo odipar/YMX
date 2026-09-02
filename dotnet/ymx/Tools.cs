@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 
 namespace Ymx
@@ -170,7 +171,7 @@ namespace Ymx
         /// <summary>The three cores for one flag combination, named for it.</summary>
         public static void Cores(string outDir, bool perf, bool nomask)
         {
-            Cores(outDir, perf, nomask, false);
+            Cores(outDir, perf, nomask, 0);
         }
 
         /// <summary>As above, copies building for the default ring as the
@@ -178,17 +179,34 @@ namespace Ymx
         /// takes no ring wider than that window.</summary>
         public static void Cores(string outDir, bool perf, bool nomask, bool copies)
         {
+            Cores(outDir, perf, nomask, copies ? YmxFormat.DefaultRingSize : 0);
+        }
+
+        /// <summary>As above, built for ring bytes as the window, 0 for
+        /// none. A tune with copies plays only on a core whose window is its
+        /// ring, so a ring other than the default gets a core of its own,
+        /// named for it; the default ring's is the release's -copies core.
+        /// The window counts units, so a unit the ring is not a whole number
+        /// of gets no core, and the run says so.</summary>
+        public static void Cores(string outDir, bool perf, bool nomask, int ring)
+        {
             Directory.CreateDirectory(outDir);
-            string suffix = (copies ? "-copies" : "") + (perf ? "-perf" : "")
+            string suffix = WindowSuffix(ring) + (perf ? "-perf" : "")
                     + (nomask ? "-nomask" : "");
             string work = Path.Combine(outDir, ".cores_work");
             Directory.CreateDirectory(work);
             foreach (int unit in new[] {1, 2, 4})
             {
+                if (ring % unit != 0)
+                {
+                    Console.WriteLine("ymxsndh-k" + unit + suffix + ": a ring of " + ring
+                            + " bytes is not a whole number of " + unit
+                            + "-byte units, so there is no core");
+                    continue;
+                }
                 File.WriteAllText(Path.Combine(work, "core.S"),
                         "ST4_UNIT        equ     " + unit + "\n"
-                        + "ST4_WINDOW      equ     "
-                        + (copies ? YmxFormat.DefaultRingSize / unit : 0) + "\n"
+                        + "ST4_WINDOW      equ     " + (ring / unit) + "\n"
                         + "YMX_PERF        equ     " + (perf ? 1 : 0) + "\n"
                         + "YMX_MASK_BURST  equ     " + (nomask ? 0 : 1) + "\n"
                         + "        include \"YMX_sndh.S\"\n");
@@ -201,6 +219,18 @@ namespace Ymx
             }
             File.Delete(Path.Combine(work, "core.S"));
             Directory.Delete(work);
+        }
+
+        /// <summary>The part of a core's name that says its window: nothing
+        /// for none, -copies for the default ring, -copies-n(ring) for
+        /// another. The combiners resolve a core by this name.</summary>
+        internal static string WindowSuffix(int ring)
+        {
+            if (ring == 0)
+            {
+                return "";
+            }
+            return "-copies" + (ring == YmxFormat.DefaultRingSize ? "" : "-n" + ring);
         }
 
         /// <summary>The PRG stub.</summary>
@@ -216,13 +246,14 @@ namespace Ymx
         }
 
         private const string UsageText =
-                "usage: mkcores.sh [-perf] [-nomask] [-copies] [outdir]";
+                "usage: mkcores.sh [-perf] [-nomask] [-copies [-nN]] [outdir]";
 
         public static void Main(string[] args)
         {
             bool perf = false;
             bool nomask = false;
             bool copies = false;
+            int ring = YmxFormat.DefaultRingSize;
             int i = 0;
             for (; i < args.Length; i++)
             {
@@ -238,6 +269,20 @@ namespace Ymx
                 {
                     copies = true;
                 }
+                else if (args[i].StartsWith("-n"))
+                {
+                    // The ring the copies core is built for as its window: a
+                    // tune with copies at that ring plays on no other core.
+                    if (!int.TryParse(args[i].Substring(2), NumberStyles.None,
+                            CultureInfo.InvariantCulture, out ring))
+                    {
+                        throw Tools.Fail("mkcores: not a number: " + args[i].Substring(2));
+                    }
+                    if (ring <= 0)
+                    {
+                        throw Tools.Fail("mkcores: a ring is at least one byte: " + args[i]);
+                    }
+                }
                 else if (args[i].StartsWith('-'))
                 {
                     throw Tools.Fail(UsageText);
@@ -247,13 +292,13 @@ namespace Ymx
                     break;
                 }
             }
-            if (args.Length - i > 1)
+            if (args.Length - i > 1 || (!copies && ring != YmxFormat.DefaultRingSize))
             {
                 throw Tools.Fail(UsageText);
             }
             string outDir = i < args.Length ? args[i]
                     : Path.Combine(Tools.Repo(), "dist");
-            Cores(outDir, perf, nomask, copies);
+            Cores(outDir, perf, nomask, copies ? ring : 0);
             if (!perf && !nomask && !copies)
             {
                 Stub(outDir);

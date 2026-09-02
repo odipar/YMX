@@ -277,7 +277,7 @@ func prgResolveStub() (string, error) {
 		return "", err
 	}
 	stub, err := sndhPrebuilt(repo, "ymxprg"+sndhBinarySuffix()+".bin",
-		"YMX_player.S")
+		"ymx/mkcores.sh", true, "YMX_player.S")
 	if err != nil {
 		return "", fmt.Errorf("mkprg: %w", err)
 	}
