@@ -26,12 +26,15 @@ namespace Ymx
         public const int CoreFlags = 20;
         public const int CoreFormat = 22;
         public const int CoreWorkFixed = 24;
-        public const int CoreTableOff = 26;
-        public const int CoreWorkOff = 30;
+        public const int CoreWindow = 26;
+        public const int CoreTableOff = 28;
+        public const int CoreWorkOff = 32;
+        public const int CoreDescriptorVersion = 2;
 
         /// <summary>Core flag bits, matching YMX_sndh.S.</summary>
         public const int CoreFlagPerf = 1;
         public const int CoreFlagNomask = 2;
+        public const int CoreFlagCopies = 4;
 
         /// <summary>What the caller requested; every field but the tunes has
         /// a default.</summary>
@@ -368,7 +371,8 @@ namespace Ymx
                 return named;
             }
             int unit = UnitOf(options.Tunes);
-            string suffix = (options.Perf ? "-perf" : "")
+            bool copies = CopiesIn(options.Tunes);
+            string suffix = (copies ? "-copies" : "") + (options.Perf ? "-perf" : "")
                     + (options.MaskBurst ? "" : "-nomask");
             string core = Path.Combine(Tools.Repo(), "dist",
                     "ymxsndh-k" + unit + suffix + Tools.BinarySuffix()
@@ -376,7 +380,7 @@ namespace Ymx
             if (Stale(core, "YMX_sndh.S", "YMX.S", "ST4_wrap.S"))
             {
                 MkCores.Cores(Path.Combine(Tools.Repo(), "dist"), options.Perf,
-                        !options.MaskBurst);
+                        !options.MaskBurst, copies);
             }
             return core;
         }
@@ -407,6 +411,33 @@ namespace Ymx
                     || e is UnauthorizedAccessException)
             {
                 return true;
+            }
+        }
+
+        /// <summary>Whether a tune of the set copies from its literal stream
+        /// (flag bit 5), which asks for a core built with its ring as the
+        /// window.</summary>
+        private static bool CopiesIn(List<string> tunes)
+        {
+            foreach (string tune in tunes)
+            {
+                if ((HeaderOf(tune).Flags & YmxFormat.FlagCopies) != 0)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static YmxHeader HeaderOf(string tune)
+        {
+            try
+            {
+                return YmxHeader.Read(tune);
+            }
+            catch (IOException e)
+            {
+                throw Tools.Fail("mksndh: " + e.Message);
             }
         }
 
@@ -444,16 +475,17 @@ namespace Ymx
             {
                 throw Tools.Fail("mksndh: cannot read the core " + path);
             }
-            if (core.Length < 34 || core[CoreMagic] != 'Y'
+            if (core.Length < 36 || core[CoreMagic] != 'Y'
                     || core[CoreMagic + 1] != 'M' || core[CoreMagic + 2] != 'X'
                     || core[CoreMagic + 3] != 'C')
             {
                 throw new ArgumentException(path + " is not an SNDH core");
             }
-            if (Word(core, CoreVersion) != 1)
+            if (Word(core, CoreVersion) != CoreDescriptorVersion)
             {
                 throw new ArgumentException(path + " is core descriptor version "
-                        + Word(core, CoreVersion) + ", this tool writes 1");
+                        + Word(core, CoreVersion) + ", this tool writes "
+                        + CoreDescriptorVersion);
             }
             if (Word(core, CoreFormat) != YmxFormat.Version)
             {
@@ -464,12 +496,32 @@ namespace Ymx
                         + " from the binaries release, or reassemble it with"
                         + " ymx/mkcores.sh");
             }
+            bool copies = CopiesIn(options.Tunes);
             int flags = (options.Perf ? CoreFlagPerf : 0)
-                    | (options.MaskBurst ? 0 : CoreFlagNomask);
+                    | (options.MaskBurst ? 0 : CoreFlagNomask)
+                    | (copies ? CoreFlagCopies : 0);
             if (Word(core, CoreFlags) != flags)
             {
                 throw new ArgumentException(path + " is built with flags "
                         + Word(core, CoreFlags) + ", the options ask for " + flags);
+            }
+            // A core built for a window reads an offset past it as a copy, so
+            // no tune of the set may carry a wider ring; a tune with copies
+            // needs the window to be its ring exactly (SPEC.md section 9.1).
+            int window = Word(core, CoreWindow) * Word(core, CoreUnit);
+            if (window != 0)
+            {
+                foreach (string tune in options.Tunes)
+                {
+                    YmxHeader header = HeaderOf(tune);
+                    bool copied = (header.Flags & YmxFormat.FlagCopies) != 0;
+                    if (header.Ring > window || copied && header.Ring != window)
+                    {
+                        throw new ArgumentException(tune + " is packed for rings of "
+                                + header.Ring + (copied ? " with copies" : "") + ", and "
+                                + path + " is built for a window of " + window + " bytes");
+                    }
+                }
             }
             return core;
         }

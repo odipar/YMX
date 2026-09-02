@@ -74,6 +74,8 @@ namespace Ym6
             int loopFrame = -1;             // -1 until -lF: the header's own
             int drumHz = YmEffects.MaxTimerHz;
             int timerMap = YmxFormat.DefaultTimers;
+            double copies = -1;             // -copies: 0 the opening passes,
+                                            // S a search of S seconds
             int i = 0;
             for (; i < args.Length && args[i].StartsWith('-'); i++)
             {
@@ -121,6 +123,14 @@ namespace Ym6
                         {
                             ringSize = ParseNumber(args[i][2..]);
                         }
+                        else if (args[i] == "-copies")
+                        {
+                            copies = 0;
+                        }
+                        else if (args[i].StartsWith("-copies"))
+                        {
+                            copies = ParseNumber(args[i][7..]);
+                        }
                         else if (args[i].StartsWith("-c"))
                         {
                             chunk = ParseNumber(args[i][2..]);
@@ -163,7 +173,7 @@ namespace Ym6
                     PackOne(args[input], Path.Combine(dir, stem + ".ymx"),
                             ringSize, chunk, unit, playOnce, forcedMode,
                             drumHz, sidResume, timerMap, 0, 0, -1, -1, -1,
-                            loopFrame);
+                            loopFrame, copies);
                 }
                 return;
             }
@@ -184,7 +194,7 @@ namespace Ym6
             }
             PackOne(args[i], outputName, ringSize, chunk, unit, playOnce,
                     forcedMode, drumHz, sidResume, timerMap, startMin, startSec,
-                    startFrame, endFrame, frameCount, loopFrame);
+                    startFrame, endFrame, frameCount, loopFrame, copies);
         }
 
         private static Ym6Reader.Song ReadSong(string path)
@@ -264,7 +274,7 @@ namespace Ym6
                 int ringSize, int chunk, int unit, bool playOnce, bool forcedMode,
                 int drumHz, bool sidResume, int timerMap, int startMin,
                 int startSec, int startFrame, int endFrame, int frameCount,
-                int loopFrame)
+                int loopFrame, double copies)
         {
             string problem = YmxFormat.CheckShape(ringSize, chunk,
                     Math.Max(unit, 1), YmxFormat.StreamA0);
@@ -409,7 +419,7 @@ namespace Ym6
             try
             {
                 result = YmxEncoder.Encode(tune, ringSize, chunk, startsOver,
-                        true, unit, timerMap);
+                        true, unit, timerMap, copies);
             }
             catch (ArgumentException e)
             {
@@ -430,7 +440,7 @@ namespace Ym6
                 try
                 {
                     atOne = YmxEncoder.Encode(unpadded, ringSize, chunk,
-                            startsOver, true, 1, timerMap);
+                            startsOver, true, 1, timerMap, copies);
                 }
                 catch (ArgumentException)
                 {
@@ -586,10 +596,7 @@ namespace Ym6
                 Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
                         "  {0} {1,6} -> {2,6} bytes ({3,5:F1}%){4}", name,
                         stream.Frames, stream.PackedSize,
-                        Percent(stream.PackedSize, stream.Frames),
-                        stream.LoopSize == 0 ? "" : string.Format(
-                                CultureInfo.InvariantCulture, "  {0,6} + {1}",
-                                stream.FirstSize, stream.LoopSize)));
+                        Percent(stream.PackedSize, stream.Frames), ""));
             }
             Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
                     "Packed {0} register bytes into {1} ({2:F1}%), file {3} bytes",
@@ -675,6 +682,11 @@ namespace Ym6
                 "          tune length is padded with safe duplicate frames",
                 "          - inaudible - to fit the unit. The player must be",
                 "          built with the same ST4_UNIT",
+                "  -copies Let a match beyond the ring copy from the literal",
+                "          stream; the player must then be built with",
+                "          ST4_WINDOW = N/K, and mksndh takes the -copies core",
+                "  -copiesS   The same, searching S seconds a stream for a",
+                "          better parse",
                 "  -minM -secS   Trim: drop everything before M:S, so a",
                 "          moment deep in a long tune plays immediately",
                 "  -drumhzH   The drum rate ceiling (default 25600): a drum",

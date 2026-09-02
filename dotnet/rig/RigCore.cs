@@ -34,7 +34,7 @@ namespace Rig
 
         public const int Streams = 25;      // fourteen register, eleven script
         public const int YmxDefaultMap = 0x9C;  // the packer's: 0->A 1->D 2->B 3->C
-        public const int YmxFixed = 58 + Streams * 64;  // before the rings
+        public const int YmxFixed = 58 + Streams * 64 + Streams * 32;  // before the rings
 
         public const int OffsetRingSize = 16;   // the header's ring word
 
@@ -63,19 +63,31 @@ namespace Rig
         public static Build Assemble(int unit, bool perf)
         {
             return Assemble(unit, perf,
-                    Environment.GetEnvironmentVariable("YMX_NOMASK") == null);
+                    Environment.GetEnvironmentVariable("YMX_NOMASK") == null, 0);
+        }
+
+        /// <summary>The same, built for window units: a build that decodes
+        /// copies from the literal stream, and takes no ring wider than
+        /// it.</summary>
+        public static Build Assemble(int unit, bool perf, int window)
+        {
+            return Assemble(unit, perf,
+                    Environment.GetEnvironmentVariable("YMX_NOMASK") == null,
+                    window);
         }
 
         /// <summary>The masked build regardless of YMX_NOMASK: the README's
         /// byte counts quote it, so the size check measures it.</summary>
         public static Build AssembleMasked(int unit, bool perf)
         {
-            return Assemble(unit, perf, true);
+            return Assemble(unit, perf, true, 0);
         }
 
-        private static Build Assemble(int unit, bool perf, bool masked)
+        private static Build Assemble(int unit, bool perf, bool masked,
+                int window)
         {
-            string tag = unit + (perf ? "p" : "") + (masked ? "" : "n");
+            string tag = unit + (perf ? "p" : "") + (masked ? "" : "n")
+                    + (window == 0 ? "" : "w" + window);
             if (Assembled.TryGetValue(tag, out Build? held))
             {
                 return held;
@@ -83,6 +95,7 @@ namespace Rig
             Directory.CreateDirectory(Scratch);
             string source = Path.Combine(Scratch, "link" + tag + ".S");
             File.WriteAllText(source, "ST4_UNIT    equ     " + unit + "\n"
+                    + (window == 0 ? "" : "ST4_WINDOW  equ     " + window + "\n")
                     + (perf ? "YMX_PERF    equ     1\n" : "")
                     + (masked ? "" : "YMX_MASK_BURST equ  0\n")
                     + "        include \"YMX.S\"\n"

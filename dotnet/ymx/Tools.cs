@@ -170,14 +170,25 @@ namespace Ymx
         /// <summary>The three cores for one flag combination, named for it.</summary>
         public static void Cores(string outDir, bool perf, bool nomask)
         {
+            Cores(outDir, perf, nomask, false);
+        }
+
+        /// <summary>As above, copies building for the default ring as the
+        /// window: a core that decodes copies from the literal stream, and
+        /// takes no ring wider than that window.</summary>
+        public static void Cores(string outDir, bool perf, bool nomask, bool copies)
+        {
             Directory.CreateDirectory(outDir);
-            string suffix = (perf ? "-perf" : "") + (nomask ? "-nomask" : "");
+            string suffix = (copies ? "-copies" : "") + (perf ? "-perf" : "")
+                    + (nomask ? "-nomask" : "");
             string work = Path.Combine(outDir, ".cores_work");
             Directory.CreateDirectory(work);
             foreach (int unit in new[] {1, 2, 4})
             {
                 File.WriteAllText(Path.Combine(work, "core.S"),
                         "ST4_UNIT        equ     " + unit + "\n"
+                        + "ST4_WINDOW      equ     "
+                        + (copies ? YmxFormat.DefaultRingSize / unit : 0) + "\n"
                         + "YMX_PERF        equ     " + (perf ? 1 : 0) + "\n"
                         + "YMX_MASK_BURST  equ     " + (nomask ? 0 : 1) + "\n"
                         + "        include \"YMX_sndh.S\"\n");
@@ -205,12 +216,13 @@ namespace Ymx
         }
 
         private const string UsageText =
-                "usage: mkcores.sh [-perf] [-nomask] [outdir]";
+                "usage: mkcores.sh [-perf] [-nomask] [-copies] [outdir]";
 
         public static void Main(string[] args)
         {
             bool perf = false;
             bool nomask = false;
+            bool copies = false;
             int i = 0;
             for (; i < args.Length; i++)
             {
@@ -221,6 +233,10 @@ namespace Ymx
                 else if (args[i] == "-nomask")
                 {
                     nomask = true;
+                }
+                else if (args[i] == "-copies")
+                {
+                    copies = true;
                 }
                 else if (args[i].StartsWith('-'))
                 {
@@ -237,8 +253,8 @@ namespace Ymx
             }
             string outDir = i < args.Length ? args[i]
                     : Path.Combine(Tools.Repo(), "dist");
-            Cores(outDir, perf, nomask);
-            if (!perf && !nomask)
+            Cores(outDir, perf, nomask, copies);
+            if (!perf && !nomask && !copies)
             {
                 Stub(outDir);
             }

@@ -43,6 +43,12 @@ namespace Rig
         /// size it was asked for. No caller passes a size, so none can pass a
         /// short one.</summary>
         public Player(byte[] packed, int unit, bool perf)
+                : this(packed, unit, perf, 0)
+        {
+        }
+
+        /// <summary>The same on a build for window units, 0 for none.</summary>
+        public Player(byte[] packed, int unit, bool perf, int window)
         {
             int workspaceSize = Rig.WorkspaceFor(packed);
             ulong[][] map = {new[] {Rig.Code, 0x4000UL},
@@ -54,7 +60,7 @@ namespace Rig
             {
                 Uc.Map(region[0], region[1]);
             }
-            Rig.Build build = Rig.Assemble(unit, perf);
+            Rig.Build build = Rig.Assemble(unit, perf, window);
             Binary = build.Binary;
             Symbols = build.Symbols;
             Uc.Write(Rig.Code, Binary);
