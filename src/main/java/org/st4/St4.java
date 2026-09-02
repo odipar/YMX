@@ -164,8 +164,7 @@ public final class St4 {
         if (!copies) {
             return St4EventOptimizer.optimize(units, unit, window);
         }
-        return St4LiteralCopySearch.optimize(units, unit, window, maxOpLength, seconds,
-                seconds > 0);
+        return St4LiteralCopySearch.optimize(units, unit, window, maxOpLength, seconds, true);
     }
 
     /**

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/bits"
+	"os"
 	"time"
 )
 
@@ -60,12 +61,12 @@ func gammaBits(value int) int {
 // and returns the best parse found: copies from the literal stream as
 // negative offsets, matches within window as positive ones. maxOpLength is
 // the compressor's operation limit, which the score counts; progress reports
-// improvements on stdout.
+// on stdout: the opening passes as the Meter does, then each improvement.
 func OptimizeCopies(units []uint32, unit, window, maxOpLength int,
 	seconds float64, progress bool) *Block {
 	deadline := time.Now().Add(time.Duration(seconds * 1e9))
-	return newCopySearch(units, unit, window, maxOpLength, 1).run(deadline,
-		math.MaxInt64, progress)
+	return newCopySearch(units, unit, window, maxOpLength, 1, progress).run(
+		deadline, math.MaxInt64)
 }
 
 // ---------------------------------------------------------------- search
@@ -94,12 +95,13 @@ type copySearch struct {
 	stepsAllowed int64
 	started      time.Time
 	step         int64
+	accepted     int64
 	lastBest     int64
 	progress     bool
 }
 
 func newCopySearch(units []uint32, unit, window, maxOpLength int,
-	seed int64) *copySearch {
+	seed int64, progress bool) *copySearch {
 	s := &copySearch{
 		units:       units,
 		unit:        unit,
@@ -107,33 +109,47 @@ func newCopySearch(units []uint32, unit, window, maxOpLength int,
 		maxOpLength: maxOpLength,
 		count:       len(units),
 		random:      newJavaRandom(seed),
+		progress:    progress,
 		parser:      newCopyParser(units, unit, window),
+		started:     time.Now(),
 	}
 	// The opening passes: the full-window parse's literals, holes filled,
 	// shrunk to what gets copied from.
 	reach := MaxOffsetUnits(unit)
-	dictionary := filled(literalMask(OptimizeEvents(units, unit, reach, false),
+	dictionary := filled(literalMask(OptimizeEvents(units, unit, reach, progress),
 		s.count))
-	first := s.parser.parse(dictionary)
+	first := s.parser.parseReporting(dictionary, progress)
 	s.chain = first
 	s.forced = literalMask(first, s.count)
 	s.adopt(first)
 	s.best = s.chain
 	s.bestBits = s.bits
+	s.reportPass(1)
 	for pass := 1; pass < searchPasses; pass++ {
 		next := filled(s.referenced())
 		if equalBools(next, dictionary) {
 			break
 		}
 		dictionary = next
-		s.adopt(s.parser.parse(dictionary))
+		s.adopt(s.parser.parseReporting(dictionary, progress))
 		if s.bits < s.bestBits {
 			s.best = s.chain
 			s.bestBits = s.bits
 		}
+		s.reportPass(pass + 1)
 	}
 	s.returnToBest()
 	return s
+}
+
+// reportPass prints a pass's bits and bytes. The line carries the time, so
+// it draws only where the meter draws: at a terminal, not into a redirected
+// log.
+func (s *copySearch) reportPass(pass int) {
+	if s.progress && isTerminal(os.Stdout) {
+		fmt.Printf("%7.1fs pass %d: %d bits, %d bytes\n",
+			time.Since(s.started).Seconds(), pass, s.bits, (s.bits+7)/8)
+	}
 }
 
 // returnToBest parses the best dictionary again, so the parser's base is
@@ -191,15 +207,9 @@ func (s *copySearch) referenced() []bool {
 	return referenced
 }
 
-func (s *copySearch) run(deadline time.Time, steps int64, progress bool) *Block {
+func (s *copySearch) run(deadline time.Time, steps int64) *Block {
 	s.deadline = deadline
 	s.stepsAllowed = steps
-	s.progress = progress
-	s.started = time.Now()
-	accepted := int64(0)
-	if progress {
-		s.report("start")
-	}
 	// Descend first: most of what the opening passes force packs smaller
 	// free, and a sweep finds that run by run.
 	s.sweep()
@@ -220,7 +230,7 @@ func (s *copySearch) run(deadline time.Time, steps int64, progress bool) *Block 
 		delta := score - s.bits
 		if delta <= 0 || s.random.nextDouble() < math.Exp(-float64(delta)/temperature) {
 			s.adopt(parsed)
-			accepted++
+			s.accepted++
 			s.noteBest(move)
 		}
 		if s.step-s.lastBest > searchPatience {
@@ -230,9 +240,9 @@ func (s *copySearch) run(deadline time.Time, steps int64, progress bool) *Block 
 			s.lastBest = s.step
 		}
 	}
-	if progress {
+	if s.progress && s.step > 0 {
 		fmt.Printf("%d steps, %d accepted: %d bits, %d bytes\n", s.step,
-			accepted, s.bestBits, (s.bestBits+7)/8)
+			s.accepted, s.bestBits, (s.bestBits+7)/8)
 	}
 	return s.best
 }
@@ -297,6 +307,7 @@ func (s *copySearch) improve(from, to int, move string) bool {
 	score := s.evaluate(parsed)
 	if score < s.bits {
 		s.adopt(parsed)
+		s.accepted++
 		s.noteBest(move)
 		return true
 	}
@@ -695,6 +706,11 @@ func newCopySnapshot(size, count int) *copySnapshot {
 }
 
 func (p *copyParser) parse(dictionary []bool) *Block {
+	return p.parseReporting(dictionary, false)
+}
+
+// parseReporting is parse, reporting on stdout as the Meter does.
+func (p *copyParser) parseReporting(dictionary []bool, progress bool) *Block {
 	from := 0
 	if p.hasBase {
 		from = p.count - 1
@@ -724,6 +740,7 @@ func (p *copyParser) parse(dictionary []bool) *Block {
 			p.forcedBefore[q+1]++
 		}
 	}
+	meter := NewMeter(TotalSteps(p.count, start, p.window), progress)
 	for index := start; index < p.count; index++ {
 		if index > 0 && index%p.checkpoint == 0 {
 			p.snapshot(p.proposal[index/p.checkpoint], index)
@@ -860,7 +877,9 @@ func (p *copyParser) parse(dictionary []bool) *Block {
 			p.update(index+1, int64(p.bestMatch-index*p.literalBits)<<32|
 				int64(index+1))
 		}
+		meter.Advance(int64(clampIndex(index, InitialOffset, p.window)))
 	}
+	meter.Finish()
 	return p.rebuild(p.winNode[p.count-1])
 }
 

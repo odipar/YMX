@@ -281,14 +281,15 @@ func packSection(values []byte, offsetLimit, unit, rewindAt int,
 }
 
 // parseUnits is the parse: the event-driven optimizer, or with copies the
-// search that copies from the literal stream, for copies seconds.
+// search that copies from the literal stream, for copies seconds. Both
+// report as they go where progress asks: the search its opening passes, then
+// each improvement.
 func parseUnits(units []uint32, unit, window int, copies float64,
 	progress bool) *st4.Block {
 	if copies < 0 {
 		return st4.OptimizeEvents(units, unit, window, progress)
 	}
-	return st4.OptimizeCopies(units, unit, window, st4.MaxOp, copies,
-		progress && copies > 0)
+	return st4.OptimizeCopies(units, unit, window, st4.MaxOp, copies, progress)
 }
 
 // loopsAlign checks that every container of the file carries the one loop

@@ -241,7 +241,7 @@ public static class St4Cli
         {
             return St4EventOptimizer.Optimize(units, unit, window);
         }
-        return St4LiteralCopySearch.Optimize(units, unit, window, maxOpLength, seconds, seconds > 0);
+        return St4LiteralCopySearch.Optimize(units, unit, window, maxOpLength, seconds, true);
     }
 
     /// <summary>

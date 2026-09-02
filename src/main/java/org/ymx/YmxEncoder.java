@@ -333,14 +333,16 @@ public final class YmxEncoder {
     }
 
     /** The parse: the event-driven optimizer, or with copies the search
-     * that copies from the literal stream, for {@code copies} seconds. */
+     * that copies from the literal stream, for {@code copies} seconds. Both
+     * report as they go where {@code progress} asks: the search its opening
+     * passes, then each improvement. */
     private static org.st4.St4Block parse(int[] units, int unit, int window,
                                           double copies, boolean progress) {
         if (copies < 0) {
             return St4EventOptimizer.optimize(units, unit, window, progress);
         }
         return St4LiteralCopySearch.optimize(units, unit, window, St4Format.MAX_OP,
-                copies, progress && copies > 0);
+                copies, progress);
     }
 
     /**

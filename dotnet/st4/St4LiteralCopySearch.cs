@@ -79,14 +79,14 @@ public static class St4LiteralCopySearch
     {
         ArgumentNullException.ThrowIfNull(units);
         long deadline = Stopwatch.GetTimestamp() + (long)(seconds * Stopwatch.Frequency);
-        return new Search(units, unit, window, maxOpLength, 1).Run(deadline, long.MaxValue,
-            progress);
+        return new Search(units, unit, window, maxOpLength, 1, progress)
+            .Run(deadline, long.MaxValue);
     }
 
     /// <summary>Searches for <paramref name="steps"/> steps from <paramref name="seed"/>, reproducibly; for the tests.</summary>
     internal static St4Block Optimize(int[] units, int unit, int window, int maxOpLength,
                                    long steps, long seed) =>
-        new Search(units, unit, window, maxOpLength, seed).Run(long.MaxValue, steps, false);
+        new Search(units, unit, window, maxOpLength, seed, false).Run(long.MaxValue, steps);
 
     // ---------------------------------------------------------------- search
 
@@ -115,10 +115,12 @@ public static class St4LiteralCopySearch
         private long stepsAllowed;
         private long started;
         private long step;
+        private long accepted;
         private long lastBest;
-        private bool progress;
+        private readonly bool progress;
 
-        internal Search(int[] units, int unit, int window, int maxOpLength, long seed)
+        internal Search(int[] units, int unit, int window, int maxOpLength, long seed,
+                        bool progress)
         {
             this.units = units;
             this.unit = unit;
@@ -126,18 +128,21 @@ public static class St4LiteralCopySearch
             this.maxOpLength = maxOpLength;
             count = units.Length;
             random = new JavaRandom(seed);
+            this.progress = progress;
             parser = new Parser(units, unit, window);
+            started = Stopwatch.GetTimestamp();
             // The opening passes: the full-window parse's literals, holes
             // filled, shrunk to what gets copied from.
             int reach = St4Format.MaxOffsetUnits(unit);
             bool[] dictionary = Filled(St4LiteralCopySearch.LiteralMask(
-                St4EventOptimizer.Optimize(units, unit, reach, false), count));
-            St4Block first = parser.Parse(dictionary);
+                St4EventOptimizer.Optimize(units, unit, reach, progress), count));
+            St4Block first = parser.Parse(dictionary, progress);
             chain = first;
             forced = St4LiteralCopySearch.LiteralMask(first, count);
             Adopt(first);
             best = chain;
             bestBits = bits;
+            ReportPass(1);
             for (int pass = 1; pass < Passes; pass++)
             {
                 bool[] next = Filled(Referenced());
@@ -146,14 +151,28 @@ public static class St4LiteralCopySearch
                     break;
                 }
                 dictionary = next;
-                Adopt(parser.Parse(dictionary));
+                Adopt(parser.Parse(dictionary, progress));
                 if (bits < bestBits)
                 {
                     best = chain;
                     bestBits = bits;
                 }
+                ReportPass(pass + 1);
             }
             ReturnToBest();
+        }
+
+        private void ReportPass(int pass)
+        {
+            // The line carries the time, so it draws only where the meter
+            // draws: at a terminal, not into a redirected log.
+            if (progress && !Console.IsOutputRedirected)
+            {
+                Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
+                    "{0,7:F1}s pass {1}: {2} bits, {3} bytes",
+                    (Stopwatch.GetTimestamp() - started) / (double)Stopwatch.Frequency, pass,
+                    bits, (bits + 7) / 8));
+            }
         }
 
         /// <summary>Parses the best dictionary again, so the parser's base is the best.</summary>
@@ -213,17 +232,10 @@ public static class St4LiteralCopySearch
             return referenced;
         }
 
-        internal St4Block Run(long deadline, long steps, bool progress)
+        internal St4Block Run(long deadline, long steps)
         {
             this.deadline = deadline;
             stepsAllowed = steps;
-            this.progress = progress;
-            started = Stopwatch.GetTimestamp();
-            long accepted = 0;
-            if (progress)
-            {
-                Report("start");
-            }
             // Descend first: most of what the opening passes force packs
             // smaller free, and a sweep finds that run by run.
             Sweep();
@@ -252,7 +264,7 @@ public static class St4LiteralCopySearch
                     lastBest = step;
                 }
             }
-            if (progress)
+            if (progress && step > 0)
             {
                 Console.WriteLine(string.Format(CultureInfo.InvariantCulture,
                     "{0} steps, {1} accepted: {2} bits, {3} bytes", step, accepted, bestBits,
@@ -331,6 +343,7 @@ public static class St4LiteralCopySearch
             if (score < bits)
             {
                 Adopt(parsed);
+                accepted++;
                 NoteBest(move);
                 return true;
             }
@@ -718,7 +731,10 @@ public static class St4LiteralCopySearch
             }
         }
 
-        internal St4Block Parse(bool[] dictionary)
+        internal St4Block Parse(bool[] dictionary) => Parse(dictionary, false);
+
+        /// <summary>As above, reporting on stdout as <see cref="ProgressMeter"/> does.</summary>
+        internal St4Block Parse(bool[] dictionary, bool progress)
         {
             int from = 0;
             if (hasBase)
@@ -754,6 +770,7 @@ public static class St4LiteralCopySearch
             {
                 forcedBefore[p + 1] = forcedBefore[p] + (forced[p] ? 1 : 0);
             }
+            var meter = new ProgressMeter(ProgressMeter.TotalSteps(count, start, window), progress);
             for (int index = start; index < count; index++)
             {
                 if (index > 0 && index % checkpoint == 0)
@@ -917,7 +934,9 @@ public static class St4LiteralCopySearch
                     Update(index + 1, ((long)(bestMatch - index * literalBits) << 32)
                         | (long)(index + 1));
                 }
+                meter.Advance(Math.Clamp(index, St4Optimizer.InitialOffset, window));
             }
+            meter.Finish();
             return Rebuild(winNode[count - 1]);
         }
 
