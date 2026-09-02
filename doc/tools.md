@@ -80,7 +80,10 @@ release's cores embedded, and zips each one with its launcher for
 `dist/release` is not there yet, copies them where `//go:embed` takes
 them, and removes every zip of this release at the start of a run and
 each platform's directory before its build, so what a run leaves behind
-is what that run built.
+is what that run built. It then runs the host's executable from a
+directory outside the repository on a tune packed with `-copies`, to an
+SNDH file and to a program, and stops where either fails: a core the
+executable names and does not carry shows there and nowhere else.
 
     ymx/publish.sh [outdir]
     TARGETS="linux-x64" ymx/publish.sh

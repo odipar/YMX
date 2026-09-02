@@ -211,6 +211,7 @@ func main() {
 	fmt.Println(pack.Banner())
 	packed := make([]string, 0, len(yms))
 	unit := 2
+	copies := false
 	for _, name := range yms {
 		input, err := os.ReadFile(name)
 		if err != nil {
@@ -242,6 +243,11 @@ func main() {
 		}
 		packed = append(packed, out)
 		unit = result.Result.Unit
+		// A tune that took a copy from its literal stream sets flag bit 5,
+		// and the set then needs the core with the copy code.
+		file := result.Result.File
+		flags := int(file[ymx.OffsetFlags])<<8 | int(file[ymx.OffsetFlags+1])
+		copies = copies || flags&ymx.FlagCopies != 0
 	}
 	if kind == ".ymx" {
 		return
@@ -259,6 +265,9 @@ func main() {
 
 	// The core this run needs, and the stub where a program is asked for.
 	suffix := ""
+	if copies {
+		suffix += "-copies"
+	}
 	if perf {
 		suffix += "-perf"
 	}
