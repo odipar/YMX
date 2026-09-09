@@ -732,3 +732,63 @@ func hex(value int) string {
 func letter(names string, index int) string {
 	return names[index : index+1]
 }
+
+// -----------------------------------------------------------------
+// Reading a file out, for a tool that converts rather than checks
+// -----------------------------------------------------------------
+
+// Read is a file's header and its streams decoded, one byte a frame each
+// (SPEC.md 2). The rules Check reads are not read here: a tool that
+// converts a file wants what the file holds, and Check says whether it
+// holds it lawfully.
+type Read struct {
+	Frames    int
+	Rate      int
+	LoopFrame int
+	Flags     int
+	Ring      int
+	Streams   [][]byte
+	Lengths   []int
+	Loops     []int
+}
+
+// ReadFile decodes every stream of a .ymx file. The error names the first
+// thing that stopped it.
+func ReadFile(file []byte) (*Read, error) {
+	if len(file) < ymx.HeaderSize || longAt(file, ymx.OffsetMagic) != ymx.Magic {
+		return nil, fmt.Errorf("the file does not open with 'YMX!'")
+	}
+	if version := wordAt(file, ymx.OffsetVersion); version != ymx.Version {
+		return nil, fmt.Errorf("format %s, not %s",
+			ymx.VersionName(version), ymx.FormatName())
+	}
+	out := &Read{
+		Frames:    longAt(file, ymx.OffsetFrames),
+		Rate:      wordAt(file, ymx.OffsetPlayerHz),
+		LoopFrame: longAt(file, ymx.OffsetLoopFrame),
+		Flags:     wordAt(file, ymx.OffsetFlags),
+		Ring:      wordAt(file, ymx.OffsetRingSize),
+	}
+	if table := longAt(file, ymx.OffsetSampleTable); table != 0 {
+		count := wordAt(file, ymx.OffsetSampleCount)
+		out.Lengths = make([]int, count)
+		out.Loops = make([]int, count)
+		for sample := 0; sample < count; sample++ {
+			at := table + ymx.SampleEntrySize*sample
+			if at < 0 || at > len(file)-ymx.SampleEntrySize {
+				return nil, fmt.Errorf("sample entry %d lies outside the file", sample)
+			}
+			out.Lengths[sample] = wordAt(file, at+4)
+			out.Loops[sample] = wordAt(file, at+6)
+		}
+	}
+	out.Streams = make([][]byte, ymx.Streams)
+	for stream := 0; stream < ymx.Streams; stream++ {
+		decoded, err := streamOf(file, stream, out.Frames)
+		if err != nil {
+			return nil, fmt.Errorf("stream %d does not decode: %s", stream, err)
+		}
+		out.Streams[stream] = decoded
+	}
+	return out, nil
+}
