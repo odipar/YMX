@@ -14,9 +14,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/odipar/ymx/internal/cores"
-	"github.com/odipar/ymx/internal/pack"
-	"github.com/odipar/ymx/internal/ymx"
+	"github.com/odipar/ymx/go/internal/cores"
+	"github.com/odipar/ymx/go/internal/pack"
+	"github.com/odipar/ymx/go/internal/ymx"
 )
 
 const usageText = `usage: ym-to-ymx [options] output.{ymx|sndh|prg} tune.ym [more.ym ...]

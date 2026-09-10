@@ -3,7 +3,7 @@ package ymx
 import (
 	"fmt"
 
-	"github.com/odipar/ymx/internal/st4"
+	"github.com/odipar/ymx/go/internal/st4"
 )
 
 // The encoder turns a Tune into a .ymx file: fourteen register vectors

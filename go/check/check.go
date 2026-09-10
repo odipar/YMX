@@ -10,6 +10,10 @@
 // sample table's own bounds, which this reads without checking, and R13's
 // $FF on every frame that must not restart the envelope - a marker whose
 // absence is a value the file is free to carry.
+//
+// The package stands outside go/internal, so a program in another module
+// reads a .ymx file by importing ReadFile rather than by running ymx-dump
+// and parsing what it prints.
 package check
 
 import (
@@ -18,8 +22,8 @@ import (
 	"math/bits"
 	"sort"
 
-	"github.com/odipar/ymx/internal/st4"
-	"github.com/odipar/ymx/internal/ymx"
+	"github.com/odipar/ymx/go/internal/st4"
+	"github.com/odipar/ymx/go/internal/ymx"
 )
 
 // mask is the bits §2's table leaves in each register's value.
@@ -738,9 +742,9 @@ func letter(names string, index int) string {
 // -----------------------------------------------------------------
 
 // Read is a file's header and its streams decoded, one byte a frame each
-// (SPEC.md 2). The rules Check reads are not read here: a tool that
-// converts a file wants what the file holds, and Check says whether it
-// holds it lawfully.
+// (SPEC.md 2). The rules Check reads are not read here: a converter reads
+// the values a file has in it, and Check verifies that those values are
+// lawful.
 type Read struct {
 	Frames    int
 	Rate      int

@@ -11,8 +11,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/odipar/ymx/internal/check"
-	"github.com/odipar/ymx/internal/ymx"
+	"github.com/odipar/ymx/go/check"
+	"github.com/odipar/ymx/go/internal/ymx"
 )
 
 const usage = `Usage: ymx-dump file.ymx

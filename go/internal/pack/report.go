@@ -6,8 +6,8 @@ import (
 	"math"
 	"strings"
 
-	"github.com/odipar/ymx/internal/ym"
-	"github.com/odipar/ymx/internal/ymx"
+	"github.com/odipar/ymx/go/internal/ym"
+	"github.com/odipar/ymx/go/internal/ymx"
 )
 
 // What a pack cost, stream by stream. Every command that packs writes this

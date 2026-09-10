@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/odipar/ymx/internal/ym"
-	"github.com/odipar/ymx/internal/ymx"
+	"github.com/odipar/ymx/go/internal/ym"
+	"github.com/odipar/ymx/go/internal/ymx"
 )
 
 // Options is what a caller may choose. Unit 0 means the packer picks: two

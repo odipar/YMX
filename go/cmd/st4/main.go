@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/odipar/ymx/internal/pack"
-	"github.com/odipar/ymx/internal/st4"
+	"github.com/odipar/ymx/go/internal/pack"
+	"github.com/odipar/ymx/go/internal/st4"
 )
 
 const banner = "ST4: aligned split-stream packer v7.0 by Robbert van Dalen," +

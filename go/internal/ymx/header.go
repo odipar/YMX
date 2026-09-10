@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/odipar/ymx/internal/st4"
+	"github.com/odipar/ymx/go/internal/st4"
 )
 
 // Header is the .ymx header fields the build tools read, ported from
