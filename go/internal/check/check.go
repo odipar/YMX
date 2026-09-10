@@ -750,6 +750,9 @@ type Read struct {
 	Streams   [][]byte
 	Lengths   []int
 	Loops     []int
+	// Samples is each sample's level bytes and the end marker after them
+	// (SPEC.md 6), the bytes a PCM tick writes to a volume register.
+	Samples [][]byte
 }
 
 // ReadFile decodes every stream of a .ymx file. The error names the first
@@ -773,6 +776,7 @@ func ReadFile(file []byte) (*Read, error) {
 		count := wordAt(file, ymx.OffsetSampleCount)
 		out.Lengths = make([]int, count)
 		out.Loops = make([]int, count)
+		out.Samples = make([][]byte, count)
 		for sample := 0; sample < count; sample++ {
 			at := table + ymx.SampleEntrySize*sample
 			if at < 0 || at > len(file)-ymx.SampleEntrySize {
@@ -780,6 +784,12 @@ func ReadFile(file []byte) (*Read, error) {
 			}
 			out.Lengths[sample] = wordAt(file, at+4)
 			out.Loops[sample] = wordAt(file, at+6)
+			from := longAt(file, at)
+			to := from + out.Lengths[sample] + 1
+			if from < 0 || to > len(file) || to < from {
+				return nil, fmt.Errorf("sample %d lies outside the file", sample)
+			}
+			out.Samples[sample] = file[from:to]
 		}
 	}
 	out.Streams = make([][]byte, ymx.Streams)

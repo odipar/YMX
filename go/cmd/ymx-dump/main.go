@@ -42,7 +42,11 @@ func main() {
 		read.Frames, read.Rate, read.LoopFrame, read.Flags, read.Ring, ymx.Streams)
 	fmt.Fprintf(out, "samples %d\n", len(read.Lengths))
 	for i := range read.Lengths {
-		fmt.Fprintf(out, "sample %d %d %d\n", i, read.Lengths[i], read.Loops[i])
+		fmt.Fprintf(out, "sample %d %d %d", i, read.Lengths[i], read.Loops[i])
+		for _, level := range read.Samples[i] {
+			fmt.Fprintf(out, " %d", level)
+		}
+		fmt.Fprintln(out)
 	}
 	for frame := 0; frame < read.Frames; frame++ {
 		fmt.Fprintf(out, "%d", frame)
