@@ -6,7 +6,7 @@ package ymx
 import (
 	"fmt"
 
-	"github.com/odipar/ymx/internal/st4"
+	"github.com/odipar/ymx/go/internal/st4"
 )
 
 // Magic opens every file: 'YMX!'.

@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/odipar/ymx/internal/pack"
-	"github.com/odipar/ymx/internal/ymx"
+	"github.com/odipar/ymx/go/internal/pack"
+	"github.com/odipar/ymx/go/internal/ymx"
 )
 
 const usageText = "usage: ym_sndh.sh [-perf] [-tTitle] [packer flags]" +

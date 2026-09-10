@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/odipar/ymx/internal/check"
+	"github.com/odipar/ymx/go/check"
 )
 
 func main() {

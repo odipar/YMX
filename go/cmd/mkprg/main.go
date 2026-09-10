@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/odipar/ymx/internal/ymx"
+	"github.com/odipar/ymx/go/internal/ymx"
 )
 
 const usageText = "usage: mkprg.sh [-m] [-perf] [-nomask] [-tTitle]" +

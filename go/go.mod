@@ -1,3 +1,3 @@
-module github.com/odipar/ymx
+module github.com/odipar/ymx/go
 
 go 1.26

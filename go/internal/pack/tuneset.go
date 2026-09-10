@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/odipar/ymx/internal/ym"
+	"github.com/odipar/ymx/go/internal/ym"
 )
 
 // TuneSet is what a set of dumps calls itself: each tune's name, a composer

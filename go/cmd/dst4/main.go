@@ -11,8 +11,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/odipar/ymx/internal/pack"
-	"github.com/odipar/ymx/internal/st4"
+	"github.com/odipar/ymx/go/internal/pack"
+	"github.com/odipar/ymx/go/internal/st4"
 )
 
 const banner = "DST4: aligned split-stream unpacker v7.0 by Robbert van" +

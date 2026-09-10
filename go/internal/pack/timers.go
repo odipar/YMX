@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/odipar/ymx/internal/ymx"
+	"github.com/odipar/ymx/go/internal/ymx"
 )
 
 // ParseTimers reads the map naming the MFP timer each channel runs on, one

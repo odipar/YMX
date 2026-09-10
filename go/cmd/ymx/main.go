@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/odipar/ymx/internal/pack"
-	"github.com/odipar/ymx/internal/ym"
-	"github.com/odipar/ymx/internal/ymx"
+	"github.com/odipar/ymx/go/internal/pack"
+	"github.com/odipar/ymx/go/internal/ym"
+	"github.com/odipar/ymx/go/internal/ymx"
 )
 
 // The usage text, held to the other two trees word for word. A flag

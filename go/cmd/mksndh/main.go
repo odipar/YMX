@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/odipar/ymx/internal/ymx"
+	"github.com/odipar/ymx/go/internal/ymx"
 )
 
 const usageText = "usage: mksndh.sh [-perf] [-nomask] [-tTitle] [-cComposer]" +

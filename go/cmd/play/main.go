@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/odipar/ymx/internal/pack"
-	"github.com/odipar/ymx/internal/ymx"
+	"github.com/odipar/ymx/go/internal/pack"
+	"github.com/odipar/ymx/go/internal/ymx"
 )
 
 // The help text and the one-line failure the other two trees print. A
