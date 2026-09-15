@@ -1,65 +1,7 @@
-.idea
-target/
-*.class
-!.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
-.kotlin
-
-### IntelliJ IDEA ###
-.idea/modules.xml
-.idea/jarRepositories.xml
-.idea/compiler.xml
-.idea/libraries/
-*.iws
-*.iml
-*.ipr
-
-### Eclipse ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-### VS Code ###
-.vscode/
-
 ### Mac OS ###
 .DS_Store
+
+### IntelliJ IDEA ###
+.idea
+
 .claude/worktrees/
-
-# the SNDH/PRG build scripts leave their scratch next to the output
-.ym_work/
-.prg_work/
-
-# an assembler run by hand leaves an object file beside the source
-*.o
-
-# rig scratch: assembled builds, packed tunes, the SNDH build
-ymx/test/.work/
-
-# the C# tree's build outputs
-dotnet/bin/
-dotnet/obj/
-
-# the rig's output for the real-hardware harness
-ymx/test/tune.ymx
-ymx/test/ymxdata.inc
-ymx/test/YMXTEST.PRG
-
-# The play scripts build <stem>-n<ring>-c<chunk>[-k<unit>]/ beside the tune
-*-n[0-9]*-c[0-9]*/
-dist/

@@ -1,243 +1,207 @@
-# YMX - a streaming YM format for the Atari ST
+# YMX
 
 ## Read this first
 
-**AI wrote most of YMX.** Claude wrote the Java and C# tools, the 68000
-player and its SNDH core, the tests, the emulation rigs and most of what is
-written here, under direction. The attribution section below says who did
-what. If you would rather not use software written that way, this is not
-the repository for you, and nothing here is meant to talk you out of that.
+**AI wrote most of YMX.** Claude (Anthropic's Claude Code) wrote this
+document, and the format, the players and the tools in this repository's
+history, under Robbert van Dalen's direction: he requested, read and
+merged every change. [LICENSE](LICENSE) is the terms, and its
+attribution records who did what. Whether to use software written that
+way is the reader's decision, and this section is here so that the
+decision is informed.
 
-What it is built on is human, and older. The Atari ST chiptune scene comes
-first: the musicians and coders who worked out what three voices and a noise
-generator could be made to do, and who are the reason there is anything here
-worth streaming. Arnaud Carré's YM format and ST-Sound recorded those tunes
-and gave every file in the collection its shape. Grazey's long work got the
-chiptunes into the open and keeps them there, which is why there is a
-collection here to measure against. GwEm's maxYMiser is still the most
-advanced tracker and player the ST has, and this player's timer code is
-close to maxYMiser's. Tat's MinYMiser is what the rest is modelled on.
-Every cycle figure in this repository was measured on Hatari. Behind it is
-the wider body of Atari work. YMX rearranges what those established, and
-could not exist without them.
+What it is built on is older than it. The Atari ST chiptune scene comes
+first: the musicians and coders who worked out what three voices and a
+noise generator could be made to do. Arnaud Carré's YM format and
+ST-Sound recorded those tunes. GwEm's maxYMiser is the tracker the scene
+writes them in, Steven Tattersall's MinYMiser is the model for the
+player, and Einar Saukas's ZX1 is the compressor underneath.
 
-**It is a tool for the people who make the music.** It was written by
-odipar to put that tool in their hands: a musician writes the tune with a
-tracker, the tracker writes the format, the player plays it on an Atari
-ST with the RAM a real machine has, and the rest of us get to hear what
-they made. Everything below is in service of that.
+## What YMX is
 
-## The format
+YMX is a family of four repositories: a specification of a tune, a
+player for the Atari ST, and the two formats a tune file is built on.
+Each repository defines one thing, and this document defines how they
+fit.
 
-YMX extends the YM family - its packer reads YM5 and YM6 - into a format a
-68000 plays without ever holding the tune in memory. A `.ymx` file carries
-twenty-five independently compressed streams: fourteen for the sound
-registers of the YM2149, the ST's sound chip, one value per frame, and
-eleven carrying a **compiled effect script** that drives the timers of the
-MFP, the ST's timer chip. Each stream decodes through its own small ring,
-refilled one stream per frame, so a tune's cost in RAM follows the player's
-configuration, not the tune's length.
+This repository is the document. The format, the player and the tools it
+used to contain are replaced by
+[YMXR](https://github.com/odipar/YMXR); [Where the code
+went](#where-the-code-went) names each part and where it is now.
 
-YMX changes one thing about the YM lineage: where the work happens.
-What those formats call a "special effect" - a SID voice, a digidrum, a
-sync-buzzer - is carried in spare register bits, and the player has to
-re-derive on every frame what it means. YMX resolves that at pack time and
-writes down the outcome, so the player compares nothing and every frame
-costs the same.
+## The four repositories
 
-[**doc/SPEC.md**](doc/SPEC.md) is the format: the container, the streams, the
-opcodes and the frame contract. The rest of the documentation is beside it.
-
-| | |
+| repository | what it defines |
 |---|---|
-| [doc/SPEC.md](doc/SPEC.md) | the format specification |
-| [ym/CONVERSION.md](ym/CONVERSION.md) | what a YM file loses on the way in |
-| [doc/BINARIES.md](doc/BINARIES.md) | the prebuilt binaries, and how a tool combines them without an assembler |
-| [doc/tools.md](doc/tools.md) | every tool's usage, flags and environment |
-| [doc/terminology.md](doc/terminology.md) | the vocabulary all of these use |
-| [doc/performance.md](doc/performance.md) | what a play call costs, in cycles, on real songs |
-| [doc/experiments.md](doc/experiments.md) | ideas measured against the real corpus, and what the measurements said |
-| [doc/RELEASES.md](doc/RELEASES.md) | what changed in each published set of binaries |
+| [YMXS](https://github.com/odipar/YMXS) | a tune, and what a player does with one |
+| [YMXR](https://github.com/odipar/YMXR) | one encoding of a tune, and a 68000 player that reads it |
+| [DTX](https://github.com/odipar/DTX) | a table of rows and columns, and 68000 readers of one |
+| [ST4](https://github.com/odipar/ST4) | compression for the 68000 |
 
-## From a YM dump, with nothing installed
-
-Each release carries **`ym-to-ymx`**, one standalone executable per
-platform, at
-[github.com/odipar/YMX/releases](https://github.com/odipar/YMX/releases).
-No JVM, no .NET, no checkout: the player binaries travel inside it.
-
-```sh
-ym-to-ymx tune.prg song.ym          # a TOS program that plays the tune
-ym-to-ymx tune.sndh song.ym         # an SNDH file any host plays
-ym-to-ymx tune.ymx song.ym          # just the packed tune
-ym-to-ymx -h                        # every option
-./ymxplay.sh song.ym                # the same, then Hatari plays it
+```mermaid
+flowchart TD
+    ymxr["YMXR: columns, a tune file, a 68000 player"]
+    other["Another player: a game, a demo, a host"]
+    ymxs["YMXS: a tune, a frame, a tick"]
+    dtx["DTX: a table, and 68000 readers"]
+    st4["ST4: compression for the 68000"]
+    ymxr --> ymxs
+    other --> ymxs
+    ymxr --> dtx
+    dtx --> st4
 ```
 
-The output's extension picks what is written. `ymxplay.sh` and
-`ymxplay.cmd` travel beside it; `HATARI` names the emulator and `TOS` its
-ROM image.
+An arrow points from a layer to what it rests on. Every player rests on
+YMXS for the tune; YMXR rests on DTX as well, for the bytes, and DTX
+rests on ST4 for a packed column.
 
-## Hearing a tune from the repository
+### YMXS
 
-Four tunes to try are under [ym/examples](ym/examples), chosen to be heard
-rather than to cover a format feature:
+YMXS defines a tune: a rate in frames a second, and a table of rows
+where each row sets registers and performs one operation on each of the
+four timers. It defines what a frame does with a row, what a tick does
+with a source, the range of every register on the YM2149 and the
+MC68901, and the rules a writer satisfies. JSON and CSV encode the
+structure, so a tracker emits a tune as text.
 
-```
-ym/play.sh "ym/examples/Cuddly - main menu.ym"
-```
+The layout a player reads is left to that player. YMXR is one such
+layout; a second player defines another, and a tune written once plays
+under both.
 
-```sh
-mvn -q compile
-ym/play.sh song.ym                  # pack a YM tune, build a player, run it
-ym/play.sh -n2048 -c32 song.ym      # bigger rings and refills: cheaper on average
-ym/play.sh -h                       # every flag
-```
+### YMXR
 
-Both need `rmac`, and `hatari` with a TOS image. Press SPACE in the Hatari
-window to stop.
+YMXR encodes a YMXS tune as DTX tables and defines what each column
+reaches on the two chips. A register is one column. An effect is four:
+the target, the source, the control and the count. A tune file has the
+tables, an index of the sources and the values fixed for a whole tune.
+YMXR also contains the 68000 player, the SNDH core around it and the
+program stub in front of that, each assembled once, so combining a tune
+into an SNDH file or a TOS program is byte appending and patching.
 
-To pack without playing:
+### DTX
 
-```sh
-mvn -q compile exec:exec@ymx -Dargs="song.ym song.ymx"
-```
+DTX defines a table: `R` rows, `C` columns, every value one width of 1,
+2 or 4 bytes, and a row `RR` the table repeats to after the last. Three
+variants lay one table out three ways, and DTX2 packs each column as an
+ST4 data set. DTX defines the 68000 readers and the calls that reach a
+row. The meaning of a column is left to the format built on DTX, which
+is why YMXR defines the columns and DTX defines the bytes.
 
-## Building a tune into something runnable
+### ST4
 
-```sh
-ymx/mkcores.sh                           # assemble the player binaries, once
-ymx/mksndh.sh MY.SNDH build/*.ymx        # an SNDH v2.2 file: the canonical build
-ymx/mkprg.sh MY.PRG build/*.ymx          # a TOS program around those same bytes
-ym/ym_sndh.sh -t"My Set" my.sndh *.ym    # pack and combine in one
-```
+ST4 compresses for the plain 68000: four streams rather than one,
+lengths and offsets counting units of 1, 2 or 4 bytes, and decoders
+small enough to include with a player. It derives from Einar Saukas's
+ZX1 through ST1. A DTX2 column is packed with it, and a format above DTX
+reaches it through DTX.
 
-The combiners run no assembler: `mkcores.sh` assembles the binaries, and
-`mksndh.sh` runs it for you the first time. Combining is byte appending and
-patching - a tracker or another build system does it without a 68000
-toolchain; [doc/BINARIES.md](doc/BINARIES.md) is the contract, and
-`ymx/mkrelease.sh -publish` puts every prebuilt variant in a GitHub release
-for systems without the repository.
+## How a tune reaches the chips
 
-SNDH is the Atari ST scene's shared music container, and where the player
-lives: the `.PRG` is a thin stub in front of the same bytes, so the two share
-the player byte for byte.
-
-## Using the player
-
-```
-        lea     song,a0                 ; the .ymx file, loaded anywhere
-        lea     workspace,a1            ; even address, YMX_SIZE bytes
-        bsr     YMX_init                ; d0 = 0 when the file was accepted
-   vbl:                                 ; once per frame, in supervisor mode
-        lea     workspace,a0
-        bsr     YMX_play                ; d0 = 0 played, 1 wrapped, -1 ended
-        ...
-        lea     workspace,a0
-        bsr     YMX_stop                ; chip quiet, timers stopped
+```mermaid
+flowchart TD
+    tracker["Tracker or converter"] -->|"JSON or CSV"| tune["A YMXS tune"]
+    dump["YM5 or YM6 register dump"] -->|"ym-to-ymxs"| tune
+    tune -->|"YMXR converter"| file["Tune file: DTX tables"]
+    file -->|"YMXR combiner"| sndh["SNDH file or TOS program"]
+    sndh --> player["The player, on the 68000"]
+    player -->|"frame: the register columns"| ym["YM2149"]
+    player -->|"frame: the effect columns"| mfp["MFP timers"]
+    mfp -->|"tick: one row of a source"| ym
 ```
 
-How big is the workspace? The tune's own header says: the packer records
-the ring size it used, which can be larger than the `-n` it was
-asked for when one pass of the tune needs a longer ring. So a program either
-reads that header word, or reserves enough for the format's maximum and
-stops caring. [68k/YMX.S](68k/YMX.S) gives both forms.
+Two clocks run a tune. The host calls the player once a frame, at the
+tune's rate: the player reads one row, writes the effect columns to the
+timers and the register columns to the sound chip. Each timer an effect
+uses raises a tick at the effect's rate: the player reads one row of the
+source connected to that timer and writes it through the target, a
+register of the sound chip. A SID voice, a sync buzzer and a sample are
+each a source on a timer, at rates above the frame rate. Sections 4 and
+5 of [the YMXS specification](https://github.com/odipar/YMXS/blob/main/doc/SPEC.md)
+define both procedures.
 
-<!-- The two byte counts below are measured by the rig (ymx/test/rig.sh),
-     which reads them back out of this sentence: keep the shape of it. -->
-[68k/YMX.S](68k/YMX.S) is the player, 3,652 bytes at the `ST4_UNIT` 2 below,
-plus the 320 of [68k/ST4_wrap.S](68k/ST4_wrap.S), the stream decoder it is
-built on. Include both, with the unit size defined first:
+## Building another player
 
-```
-ST4_UNIT    equ     2
-        include "YMX.S"
-        include "ST4_wrap.S"
-```
+YMXR is the player of this family. A second player reads the same
+tunes, `ymxs-check` reports the same errors in them, and a tracker that
+emits YMXS JSON reaches every player at once.
 
-## What's here
+A player defines the layout it reads, and YMXS section 8 lists what else
+it settles: the registers of the MC68901 a timer operation writes, the
+timing of a tick within a frame, and how a write of R7 obtains the two
+bits the host owns. YMXR settles each of those, and a second player
+settles them again; the tune is the same under both, and the two differ
+in what a file contains and what a frame costs.
 
-| | |
+**A player for a game.** YMXR reads one row a frame and writes every
+column that row sets. A game plays sound effects on the same three
+voices, so while an effect runs, the effect reaches that voice and the
+tune reaches the other two. A player for a game selects, voice by voice,
+which of the two reaches the chip, and that selection is outside YMXS at
+version 3: the structure defines one tune reaching the chip (1.2).
+
+Two parts of that are defined already. The host owns the timers outside
+the tune's (1.10), so a tune using two timers leaves two for the
+effects. A sound effect is a source on one of those timers, or a second
+tune in the same structure, written by the same tracker and checked by
+the same tool. The selection is left to define: which voice the tune
+reaches while an effect runs, and what that voice returns to when the
+effect ends.
+
+**A player on a machine with the RAM for a tune.** DTX and ST4 are in
+this family because a tune larger than the RAM has to stream. A player
+with the RAM for the tune skips both: it reads the JSON, or a layout it
+defines, and performs sections 4 and 5. The frame and the tick are the
+same procedures, and a table is a list in memory rather than a packed
+column.
+
+## Where the code went
+
+Up to commit `0cab58a` this repository contained the YMX format, its
+specification, the 68000 player, the SNDH core, the packer and the
+combiners in Java, C# and Go, and the emulation rigs. The tags
+`binaries-v0.4.1` to `binaries-v0.10.1` reach the releases built from
+it, and `git log` reaches the sources. Every part is replaced:
+
+| what was here | where it is now |
 |---|---|
-| [`org.ym6.Ymx`](src/main/java/org/ym6/Ymx.java) | the packer: `YM5!`/`YM6!` in, `.ymx` out |
-| [`org.ymx.Tune`](src/main/java/org/ymx/Tune.java) | what a front end produces and the engine works on - no format anywhere in it |
-| [`org.ymx.EffectScript`](src/main/java/org/ymx/EffectScript.java) | the script compiler: a `Tune` in, prepared actions out |
-| [68k/YMX.S](68k/YMX.S) | the player |
-| [68k/YMX_sndh.S](68k/YMX_sndh.S), [68k/YMX_player.S](68k/YMX_player.S) | the SNDH core and the PRG stub, prebuilt by [ymx/mkcores.sh](ymx/mkcores.sh) |
-| [`org.st4`](src/main/java/org/st4) | the ST4 compressor, a copy carried here |
-| [68k/](68k) | all the 68000 sources: the player, its wrappers, the ST4 decoders |
-| [dotnet/](dotnet) | the C# tree: every tool and rig again, producing the same bytes |
-| [go/](go) | the Go tree: the tools again, producing the same bytes |
+| `doc/SPEC.md`, the format | YMXR, `doc/SPEC.md`, over DTX tables |
+| `doc/BINARIES.md`, the binary layouts | YMXR, `doc/BINARIES.md` |
+| `68k/YMX.S`, the player | YMXR, `68k/YMXR.S` |
+| `68k/ST4*.S`, the stream decoders | DTX, `68k/`, under DTX's reader |
+| `org.ymx.Tune`, the tune a front end produces | YMXS, the structure |
+| `org.ym6`, the YM reader | YMXS, `ym-to-ymxs` |
+| `org.st4`, the compressor | ST4, copied into DTX |
+| `doc/experiments.md`, `doc/performance.md` | YMXR, under the same names |
+| `doc/conformance/`, the kit | YMXR, `doc/conformance/` |
 
-The front end stops at a `Tune`, and no field past that point records what
-format a tune came out of: the engine works on the `Tune` alone.
+YMXR converts a `.ymx` file at this release, so a tune packed by the old
+tools reaches the new player. That conversion is planned to go once the
+tunes are converted.
 
-## Tests
-
-```sh
-mvn test                              # the packer, 42 pinned tunes, a rig slice
-ymx/test/rig.sh                       # the player, under emulation
-ymx/test/sweep.sh songs/*.ym          # a YM collection, differentially
-ymx/test/check.sh tune.ymx            # a packed tune against §9.3
-ymx/test/damage.sh                    # the same, its bytes changed one at a time
-ymx/test/ticks.sh                     # the ticks against a real MFP
-ymx/test/cost.sh tune.ymx             # what a play call costs, in cycles
-```
-
-The three player tests run the 68000 player under emulation and need rmac
-and libunicorn (`brew install unicorn`, or `UNICORN_LIB` names the
-library). `ticks.sh` and `cost.sh` run under Hatari instead and need a TOS
-image; `check.sh` and `damage.sh` drive nothing and need neither.
-
-Two tests read the documents' figures back against the YM collection they
-count, which is not in the tree. `YM_CORPUS` says which directory holds
-it, and `mvn test` skips those two without it:
-
-```sh
-YM_CORPUS=/path/to/ym_collection mvn test
-```
-
-Every shell script also takes `-dotnet` as its first argument, which runs
-the C# tree in [dotnet/](dotnet) instead of the Java one - the same tools
-and rigs, producing the same bytes, built by the .NET SDK on first use.
-
-The Go tree in [go/](go) is the third, carrying the tools rather than the
-rigs. [ymx/parity.sh](ymx/parity.sh) runs one command line through all three
-and compares everything it leaves.
-
-The sweep is the broadest of these. It replays a converted tune on the
-real player under emulation and compares every write it makes to the sound
-chip - and which MFP timers it claimed - against an independent model of the
-source file. A disagreement is reported exactly where it happened, which is
-how most of the bugs in this player were found.
-
-## Where this came from
-
-YMX began as the `.yx6` container from the
-[ST4](https://github.com/odipar/ST4) repository, adopted whole and
-renumbered. ST4 is the compression format underneath, and stays there; this
-repository keeps a copy of the parts it needs, and ST4 goes on being
-developed in its own.
-
-The results of the experiments that shaped the player came across too, in
-[doc/experiments.md](doc/experiments.md). What stayed behind is their full
-logs - the false trails and the instrument readings - and the
-version-by-version argument for a container that is now what
-[doc/SPEC.md](doc/SPEC.md) says. Both are in ST4's history if anyone wants
-them.
+YMX began as the `.yx6` container from
+[ST4](https://github.com/odipar/ST4), adopted whole and renumbered. ST4
+goes on being developed there.
 
 ## License and attribution
 
-ST4 is built on [ZX1](https://github.com/einar-saukas/ZX1) by Einar Saukas,
-through [ST1](https://github.com/odipar/ST1). Use it freely, including
-commercially, as long as you indicate somehow in your documentation that you
-have used ZX1, via ST4 or YMX. See [LICENSE](LICENSE).
+The YMX name and this document are © 2026 Robbert van Dalen. Claude
+(Anthropic's Claude Code) wrote the document, and the format, the
+players and the tools in this repository's history, under Robbert's
+direction.
 
-The YMX format and its additions are © 2026 Robbert van Dalen. Claude
-(Anthropic's Claude Code) wrote the Java and C# tools, the 68000 player and
-its SNDH core, the tests and the emulation rigs, under Robbert's direction.
+Each format is licensed where it is defined: YMXS, YMXR, DTX and ST4
+each have a LICENSE. [LICENSE](LICENSE) here covers this document and
+the history behind it.
 
-The player was inspired by Steven Tattersall's MinYMiser.
+The YM5 and YM6 register-dump formats are by Arnaud Carré
+(Leonard/Oxygene). ST4 derives from
+[ZX1](https://github.com/einar-saukas/ZX1) by Einar Saukas through
+[ST1](https://github.com/odipar/ST1). The player was inspired by Steven
+Tattersall's MinYMiser. SNDH is the Atari ST scene's shared music
+container. Grazey's long work put the ST chiptunes in the open and keeps
+them there.
 
-Special thanks to Sandor Drieënhuizen and Wietze Spijkerman for their support,
-proofreading, and ideas.
+Special thanks to Sandor Drieënhuizen and Wietze Spijkerman for their
+support, proofreading and ideas.
+
+[AGENTS.md](AGENTS.md) is the house style this document follows.
