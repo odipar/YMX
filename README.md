@@ -174,9 +174,9 @@ it, and `git log` reaches the sources. Every part is replaced:
 | `doc/experiments.md`, `doc/performance.md` | YMXR, under the same names |
 | `doc/conformance/`, the kit | YMXR, `doc/conformance/` |
 
-YMXR converts a `.ymx` file at this release, so a tune packed by the old
-tools reaches the new player. That conversion is planned to go once the
-tunes are converted.
+A tune packed by the old tools reaches the new player through YMXR
+0.3.12, the last release that reads a `.ymx` file. Releases after it
+convert a YM dump or a YMXS tune alone.
 
 YMX began as the `.yx6` container from
 [ST4](https://github.com/odipar/ST4), adopted whole and renumbered. ST4
