@@ -1,4 +1,4 @@
-# YMX
+# YMX - chiptunes for the Atari ST, in four repositories
 
 ## Read this first
 
@@ -19,6 +19,13 @@ player, and Einar Saukas's ZX1 is the compressor underneath.
 
 ## What YMX is
 
+The Atari ST plays music on a Yamaha YM2149 sound chip: three voices
+and a noise generator. The timers of its MC68901, the MFP, run effects
+that change the chip faster than once a frame, such as a sample or a
+SID voice. The chiptunes of the ST scene are written for those two
+chips, and a program on the ST's 68000 processor, the player, plays
+them.
+
 YMX is a family of four repositories: a specification of a tune, a
 player for the Atari ST, and the two formats a tune file is built on.
 Each repository defines one thing, and this document defines how they
@@ -28,6 +35,34 @@ This repository is the document. The format, the player and the tools it
 used to contain are replaced by
 [YMXR](https://github.com/odipar/YMXR); [Where the code
 went](#where-the-code-went) names each part and where it is now.
+
+## Where to start
+
+| to | start with |
+|---|---|
+| convert a YM dump and play it on an ST or an emulator | [YMXR](https://github.com/odipar/YMXR) |
+| write a tracker, a converter or a second player | [YMXS](https://github.com/odipar/YMXS) |
+| store tables of values for a 68000 program | [DTX](https://github.com/odipar/DTX) |
+| compress data for a 68000 program | [ST4](https://github.com/odipar/ST4) |
+
+Each of the four publishes its tools as executables for Windows, macOS
+and Linux, on x64 and arm64, on its releases page.
+
+## Words used here
+
+| word | definition |
+|---|---|
+| 68000 | the Motorola 68000, the processor of the Atari ST |
+| YM2149 | the sound chip of the Atari ST, with three voices, A, B and C |
+| register | one byte of the settings of the YM2149; fourteen of the sixteen are the sound |
+| MFP | the MC68901: four timers, A to D, on a clock of 2,457,600 a second |
+| tune | a rate in frames a second, and a table of rows; each row sets registers and performs one operation on each timer |
+| frame | one call of the player, at the tune's rate |
+| tick | one interrupt of a timer, at the rate of an effect |
+| YM dump | a YM5 or YM6 file: the sixteen registers of the YM2149, recorded one frame at a time |
+| tracker | a program that produces tunes, such as maxYMiser |
+| SNDH | the Atari ST scene's shared music container |
+| TOS program | a program for TOS, the operating system of the Atari ST |
 
 ## The four repositories
 
