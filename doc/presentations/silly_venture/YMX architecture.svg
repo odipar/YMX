@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720" role="img" aria-labelledby="title description">
+<title id="title">YMX architecture</title>
+<desc id="description">RhYMe prepares YMXS data offline. The YMXR tools package it as SNDH or a TOS program. On the Atari ST, the host frame clock and ST4-compressed DTX3 frame rows drive the YMXR frame procedure. The frame procedure writes YM2149 registers and controls the MFP timer. Timer ticks read a DTX1 source row and write target registers through an optional lookup.</desc>
+<rect width="1280" height="720" fill="#101B20"/>
+<text x="72" y="86" text-anchor="start" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="55" font-weight="700">YMX architecture</text>
+<text x="73" y="147.5" text-anchor="start" dominant-baseline="central" fill="#D1F879" font-family="Arial" font-size="24" font-weight="700">Offline</text>
+<text x="159.5" y="198" text-anchor="middle" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="36" font-weight="700">RhYMe</text>
+<rect x="253" y="196.5" width="82.5" height="3" fill="#B9CCC7"/>
+<polygon points="349,198 335.5,204.3 335.5,191.7" fill="#B9CCC7"/>
+<text x="445.5" y="198" text-anchor="middle" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="36" font-weight="700">YMXS</text>
+<rect x="539" y="196.5" width="83.5" height="3" fill="#B9CCC7"/>
+<polygon points="636,198 622.5,204.3 622.5,191.7" fill="#B9CCC7"/>
+<text x="755.5" y="198" text-anchor="middle" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="36" font-weight="700">YMXR tools</text>
+<rect x="872" y="196.5" width="75.5" height="3" fill="#B9CCC7"/>
+<polygon points="961,198 947.5,204.3 947.5,191.7" fill="#B9CCC7"/>
+<text x="1086.5" y="198" text-anchor="middle" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="36" font-weight="700">SNDH / PRG</text>
+<rect x="74" y="259" width="1131" height="2" fill="#56716E"/>
+<text x="74" y="302.5" text-anchor="start" dominant-baseline="central" fill="#D1F879" font-family="Arial" font-size="24" font-weight="700">On the Atari ST</text>
+<text x="74" y="393.5" text-anchor="start" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="30" font-weight="700">DTX3 frame rows</text>
+<text x="75" y="431" text-anchor="start" dominant-baseline="central" fill="#B9CCC7" font-family="Arial" font-size="21" font-weight="400">ST4 compression</text>
+<text x="74" y="578" text-anchor="start" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="30" font-weight="700">DTX1 source rows</text>
+<rect x="345" y="392.5" width="72.5" height="3" fill="#B9CCC7"/>
+<polygon points="431,394 417.5,400.3 417.5,387.7" fill="#B9CCC7"/>
+<rect x="345" y="575.5" width="72.5" height="3" fill="#B9CCC7"/>
+<polygon points="431,577 417.5,583.3 417.5,570.7" fill="#B9CCC7"/>
+<text x="556" y="295.5" text-anchor="middle" dominant-baseline="central" fill="#B9CCC7" font-family="Arial" font-size="21" font-weight="400">Host frame clock</text>
+<rect x="555" y="316" width="2" height="32" fill="#B9CCC7"/>
+<polygon points="556,357 551.8,348 560.2,348" fill="#B9CCC7"/>
+<text x="556" y="394" text-anchor="middle" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="31" font-weight="700">YMXR frame</text>
+<rect x="554.5" y="424" width="3" height="17.5" fill="#D1F879"/>
+<polygon points="556,455 549.7,441.5 562.3,441.5" fill="#D1F879"/>
+<text x="556" y="484.5" text-anchor="middle" dominant-baseline="central" fill="#D1F879" font-family="Arial" font-size="29" font-weight="700">MFP timer</text>
+<rect x="554.5" y="515" width="3" height="15.5" fill="#D1F879"/>
+<polygon points="556,544 549.7,530.5 562.3,530.5" fill="#D1F879"/>
+<text x="556" y="577" text-anchor="middle" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="31" font-weight="700">YMXR tick</text>
+<text x="556" y="626.5" text-anchor="middle" dominant-baseline="central" fill="#B9CCC7" font-family="Arial" font-size="22" font-weight="400">Optional lookup</text>
+<text x="805" y="368" text-anchor="middle" dominant-baseline="central" fill="#B9CCC7" font-family="Arial" font-size="21" font-weight="400">Register writes</text>
+<text x="805" y="554" text-anchor="middle" dominant-baseline="central" fill="#B9CCC7" font-family="Arial" font-size="21" font-weight="400">Target writes</text>
+<rect x="690" y="392.5" width="239" height="3" fill="#D1F879"/>
+<rect x="927.5" y="394" width="3" height="183" fill="#D1F879"/>
+<rect x="690" y="575.5" width="239" height="3" fill="#D1F879"/>
+<circle cx="929" cy="486" r="5" fill="#D1F879"/>
+<rect x="929" y="484.5" width="43.5" height="3" fill="#D1F879"/>
+<polygon points="986,486 972.5,492.3 972.5,479.7" fill="#D1F879"/>
+<text x="1100.5" y="485.5" text-anchor="middle" dominant-baseline="central" fill="#D1F879" font-family="Courier New" font-size="43" font-weight="700">YM2149</text>
+<text x="1100.5" y="531" text-anchor="middle" dominant-baseline="central" fill="#B9CCC7" font-family="Arial" font-size="22" font-weight="400">Sound chip</text>
+</svg>
