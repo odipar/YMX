@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720" role="img" aria-labelledby="title description">
+<title id="title">YMX architecture</title>
+<desc id="description">The RhYMe export group prepares a YMXS tune and uses the YMXR tools to package it as SNDH or a TOS program. Tune file data includes the DTX3 tune table and DTX1 sources. In Atari ST playback, a frame applies a DTX3 row, writes registers, controls MFP timers and selects the active mapping. Each timer tick reads a DTX1 source row and applies the active mapping to its last value. Both paths write to the YM2149.</desc>
+<rect width="1280" height="720" fill="#101B20"/>
+<text x="72" y="86" text-anchor="start" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="55" font-weight="700">YMX architecture</text>
+<rect x="72" y="149" width="150" height="504" fill="#1C302D" stroke="#425B56" stroke-width="1.5"><title>RhYMe export group</title></rect>
+<rect x="250" y="149" width="191" height="504" fill="#243735" stroke="#425B56" stroke-width="1.5"><title>Tune file data group</title></rect>
+<rect x="469" y="149" width="739" height="504" fill="#17272B" stroke="#425B56" stroke-width="1.5"><title>Atari ST playback group</title></rect>
+<rect x="488" y="208" width="666" height="236" fill="#203330" stroke="#3A524C" stroke-width="1.5"><title>Frame playback group</title></rect>
+<rect x="488" y="481" width="513" height="146" fill="#232F38" stroke="#3F505C" stroke-width="1.5"><title>Timer tick group</title></rect>
+<rect x="1046" y="523" width="124" height="56" fill="#203330" stroke="#78935D" stroke-width="1.5"><title>YM2149 sound chip</title></rect>
+<text x="147" y="176" text-anchor="middle" dominant-baseline="central" fill="#D1F879" font-family="Arial" font-size="21" font-weight="700">RhYMe export</text>
+<text x="265" y="176" text-anchor="start" dominant-baseline="central" fill="#D1F879" font-family="Arial" font-size="22" font-weight="700">Tune file data</text>
+<text x="488" y="176" text-anchor="start" dominant-baseline="central" fill="#D1F879" font-family="Arial" font-size="22" font-weight="700">Atari ST playback</text>
+<text x="502" y="229" text-anchor="start" dominant-baseline="central" fill="#B9CCC7" font-family="Arial" font-size="20" font-weight="700">Frame</text>
+<text x="502" y="502" text-anchor="start" dominant-baseline="central" fill="#B9CCC7" font-family="Arial" font-size="19" font-weight="700">Timer tick</text>
+<text x="147" y="242" text-anchor="middle" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="22" font-weight="700">RhYMe</text>
+<rect x="146" y="267" width="2" height="32" fill="#B9CCC7"/>
+<polygon points="147,308 142.8,299 151.2,299" fill="#B9CCC7"/>
+<text x="147" y="333" text-anchor="middle" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="22" font-weight="700">YMXS tune</text>
+<rect x="146" y="358" width="2" height="32" fill="#B9CCC7"/>
+<polygon points="147,399 142.8,390 151.2,390" fill="#B9CCC7"/>
+<text x="147" y="424" text-anchor="middle" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="22" font-weight="700">YMXR tools</text>
+<rect x="146" y="449" width="2" height="32" fill="#B9CCC7"/>
+<polygon points="147,490 142.8,481 151.2,481" fill="#B9CCC7"/>
+<text x="147" y="515" text-anchor="middle" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="22" font-weight="700">SNDH / PRG</text>
+<rect x="222" y="513.75" width="16.75" height="2.5" fill="#D1F879"/>
+<polygon points="250,515 238.75,520.25 238.75,509.75" fill="#D1F879"/>
+<text x="265" y="305" text-anchor="start" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="21" font-weight="700">DTX3 tune table</text>
+<text x="265" y="338.5" text-anchor="start" dominant-baseline="central" fill="#B9CCC7" font-family="Arial" font-size="18" font-weight="400">ST4 compression</text>
+<text x="265" y="551" text-anchor="start" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="21" font-weight="700">DTX1 sources</text>
+<text x="602" y="250" text-anchor="middle" dominant-baseline="central" fill="#B9CCC7" font-family="Arial" font-size="20" font-weight="400">Host frame clock</text>
+<rect x="601" y="266" width="2" height="10" fill="#B9CCC7"/>
+<polygon points="602,285 597.8,276 606.2,276" fill="#B9CCC7"/>
+<text x="602" y="305" text-anchor="middle" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="25" font-weight="700">Apply tune row</text>
+<rect x="441" y="304" width="52" height="2" fill="#B9CCC7"/>
+<polygon points="502,305 493,309.2 493,300.8" fill="#B9CCC7"/>
+<text x="729" y="282.5" text-anchor="start" dominant-baseline="central" fill="#D1F879" font-family="Arial" font-size="19" font-weight="400">Register writes</text>
+<rect x="703" y="303.75" width="483" height="2.5" fill="#D1F879"/>
+<rect x="1184.75" y="305" width="2.5" height="246" fill="#D1F879"/>
+<rect x="1181.25" y="549.75" width="4.75" height="2.5" fill="#D1F879"/>
+<polygon points="1170,551 1181.25,545.75 1181.25,556.25" fill="#D1F879"/>
+<rect x="601" y="327" width="2" height="38" fill="#D1F879"/>
+<polygon points="602,374 597.8,365 606.2,365" fill="#D1F879"/>
+<text x="615" y="351" text-anchor="start" dominant-baseline="central" fill="#D1F879" font-family="Arial" font-size="18" font-weight="400">Timer control</text>
+<text x="602" y="396" text-anchor="middle" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="24" font-weight="700">MFP timers</text>
+<rect x="601" y="417" width="2" height="104" fill="#D1F879"/>
+<polygon points="602,530 597.8,521 606.2,521" fill="#D1F879"/>
+<text x="615" y="460.5" text-anchor="start" dominant-baseline="central" fill="#D1F879" font-family="Arial" font-size="18" font-weight="400">Interrupt</text>
+<rect x="703" y="326" width="136" height="2" fill="#CFB9EF"/>
+<rect x="838" y="327" width="2" height="38" fill="#CFB9EF"/>
+<polygon points="839,374 834.8,365 843.2,365" fill="#CFB9EF"/>
+<text x="851" y="351" text-anchor="start" dominant-baseline="central" fill="#CFB9EF" font-family="Arial" font-size="18" font-weight="400">Start / remap</text>
+<text x="839" y="396" text-anchor="middle" dominant-baseline="central" fill="#CFB9EF" font-family="Arial" font-size="23" font-weight="700">Active mapping</text>
+<text x="1062.5" y="396" text-anchor="middle" dominant-baseline="central" fill="#CFB9EF" font-family="Arial" font-size="20" font-weight="400">Lookup tables</text>
+<text x="1062.5" y="424.5" text-anchor="middle" dominant-baseline="central" fill="#B9CCC7" font-family="Arial" font-size="17" font-weight="400">Optional</text>
+<rect x="945" y="395" width="39" height="2" fill="#CFB9EF"/>
+<polygon points="936,396 945,391.8 945,400.2" fill="#CFB9EF"/>
+<rect x="838" y="417" width="2" height="104" fill="#CFB9EF"/>
+<polygon points="839,530 834.8,521 843.2,521" fill="#CFB9EF"/>
+<text x="602" y="551" text-anchor="middle" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="24" font-weight="700">Read source row</text>
+<rect x="441" y="550" width="52" height="2" fill="#B9CCC7"/>
+<polygon points="502,551 493,555.2 493,546.8" fill="#B9CCC7"/>
+<rect x="703" y="550" width="35" height="2" fill="#B9CCC7"/>
+<polygon points="747,551 738,555.2 738,546.8" fill="#B9CCC7"/>
+<text x="839" y="551" text-anchor="middle" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="23" font-weight="700">Map last value</text>
+<text x="839" y="588.5" text-anchor="middle" dominant-baseline="central" fill="#CFB9EF" font-family="Arial" font-size="18" font-weight="400">Identity or lookup</text>
+<text x="983" y="529.5" text-anchor="middle" dominant-baseline="central" fill="#D1F879" font-family="Arial" font-size="18" font-weight="400">Target writes</text>
+<rect x="931" y="549.75" width="103.75" height="2.5" fill="#D1F879"/>
+<polygon points="1046,551 1034.75,556.25 1034.75,545.75" fill="#D1F879"/>
+<text x="1108" y="551" text-anchor="middle" dominant-baseline="central" fill="#D1F879" font-family="Courier New" font-size="28" font-weight="700">YM2149</text>
+</svg>

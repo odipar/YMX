@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720" role="img" aria-labelledby="title description">
+<title id="title">YMX architecture</title>
+<desc id="description">RhYMe prepares YMXS data offline. The YMXR tools package it as SNDH or a TOS program. On the Atari ST, the host frame clock and ST4-compressed DTX3 frame rows drive the YMXR frame procedure. The frame procedure writes YM2149 registers and controls the MFP timer. Timer ticks read a DTX1 source row and write target registers through an optional lookup.</desc>
+<rect width="1280" height="720" fill="#101B20"/>
+<text x="72" y="86" text-anchor="start" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="55" font-weight="700">YMX architecture</text>
+<text x="74" y="163" text-anchor="start" dominant-baseline="central" fill="#D1F879" font-family="Arial" font-size="27" font-weight="700">Offline export</text>
+<text x="454" y="163" text-anchor="start" dominant-baseline="central" fill="#D1F879" font-family="Arial" font-size="27" font-weight="700">Atari ST playback</text>
+<text x="210" y="239" text-anchor="middle" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="40" font-weight="700">RhYMe</text>
+<rect x="208.5" y="273" width="3" height="23.5" fill="#B9CCC7"/>
+<polygon points="210,310 203.7,296.5 216.3,296.5" fill="#B9CCC7"/>
+<text x="210" y="346" text-anchor="middle" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="38" font-weight="700">YMXS tune</text>
+<rect x="208.5" y="382" width="3" height="44.5" fill="#B9CCC7"/>
+<polygon points="210,440 203.7,426.5 216.3,426.5" fill="#B9CCC7"/>
+<text x="224" y="410" text-anchor="start" dominant-baseline="central" fill="#B9CCC7" font-family="Arial" font-size="22" font-weight="400">YMXR tools</text>
+<text x="210" y="479.5" text-anchor="middle" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="37" font-weight="700">SNDH / PRG</text>
+<rect x="346" y="477.5" width="62" height="3" fill="#D1F879"/>
+<rect x="406.5" y="247" width="3" height="232" fill="#D1F879"/>
+<rect x="408" y="245.5" width="23.5" height="3" fill="#D1F879"/>
+<polygon points="445,247 431.5,253.3 431.5,240.7" fill="#D1F879"/>
+<rect x="453" y="209" width="546" height="412" fill="#29413F"/>
+<text x="480" y="247" text-anchor="start" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="30" font-weight="700">YMXR playback</text>
+<rect x="480" y="280" width="490" height="2" fill="#56716E"/>
+<text x="480" y="324" text-anchor="start" dominant-baseline="central" fill="#D1F879" font-family="Arial" font-size="36" font-weight="700">Frame</text>
+<text x="650" y="320" text-anchor="start" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="28" font-weight="700">Tune row</text>
+<text x="650" y="358.5" text-anchor="start" dominant-baseline="central" fill="#B9CCC7" font-family="Arial" font-size="22" font-weight="400">DTX3 + ST4</text>
+<rect x="530.5" y="352" width="3" height="26.5" fill="#D1F879"/>
+<polygon points="532,392 525.7,378.5 538.3,378.5" fill="#D1F879"/>
+<text x="480" y="424" text-anchor="start" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="27" font-weight="700">MFP timer</text>
+<rect x="530.5" y="453" width="3" height="26.5" fill="#D1F879"/>
+<polygon points="532,493 525.7,479.5 538.3,479.5" fill="#D1F879"/>
+<text x="480" y="528.5" text-anchor="start" dominant-baseline="central" fill="#D1F879" font-family="Arial" font-size="36" font-weight="700">Tick</text>
+<text x="650" y="525.5" text-anchor="start" dominant-baseline="central" fill="#F5F3EB" font-family="Arial" font-size="28" font-weight="700">Source row</text>
+<text x="650" y="565" text-anchor="start" dominant-baseline="central" fill="#B9CCC7" font-family="Arial" font-size="22" font-weight="400">DTX1</text>
+<text x="807" y="565" text-anchor="start" dominant-baseline="central" fill="#B9CCC7" font-family="Arial" font-size="20" font-weight="400">Optional lookup</text>
+<rect x="825" y="322.5" width="208" height="3" fill="#D1F879"/>
+<rect x="1031.5" y="324" width="3" height="205" fill="#D1F879"/>
+<rect x="825" y="527.5" width="208" height="3" fill="#D1F879"/>
+<circle cx="1033" cy="430" r="5" fill="#D1F879"/>
+<rect x="1033" y="428.5" width="16.5" height="3" fill="#D1F879"/>
+<polygon points="1063,430 1049.5,436.3 1049.5,423.7" fill="#D1F879"/>
+<text x="1073" y="430.5" text-anchor="start" dominant-baseline="central" fill="#D1F879" font-family="Courier New" font-size="35" font-weight="700">YM2149</text>
+</svg>
