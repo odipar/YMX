@@ -29,21 +29,6 @@ Prepared register rows
 
 A blank marks an omitted write.
 
-**Speaker notes**
-
-RhYMe, Sandor Drieënhuizen's Atari ST tracker, was the first
-application to use YMX and is its primary user. A musician enters
-notes and shapes instruments in RhYMe. My premise for YMX was
-to work out the instrument's behavior offline and store it as
-register data. The Atari ST can then stream that data to the
-YM2149 using the same playback procedures for different instruments.
-
-This example uses a square instrument on voice A and six frames per
-tracker row. R0 and R1 encode its tone period and R8 sets its volume.
-The table shows the writes for those registers at the three notes.
-[RhYMe tracker][rhyme] · [RhYMe tone periods][rhyme-tone]
-[RhYMe YMXS export][rhyme-export]
-
 **Visual**
 
 Place the violet tracker pattern above its green register table.
@@ -74,31 +59,6 @@ YMX is a family of technologies.
 
 YM format family by Leonard / Oxygene (Arnaud Carré)
 
-**Speaker notes**
-
-I started from an idea familiar from Arnaud Carré's YM5 and YM6
-formats. Record the settings that reach the sound chip each frame
-and play them back in order. YM6 also carries instructions for
-effects between frames. It encodes them in spare bits and the
-last two bytes of a frame. I kept the frame rows and made the
-timer operations explicit in the tune data.
-
-Carré's published notes mention YM2 and specify YM3 through
-YM6. The YM1 label appears in public references. I could not
-verify a release or a specification from Carré.
-[Carré's YM format notes][ym] · [YM-Player notes][ym1-reference]
-
-Arnaud Carré mentions writing a YM7 player for an embedded
-device. I found no public YM7 source code or format
-specification. [Carré's YM7 reference][ym7]
-
-YMX follows the YM numbering. X stands for any number. YMXS
-defines the tune abstraction. YMXR encodes a tune as DTX tables
-and plays it on the Atari ST. DTX defines the table abstraction,
-and ST4 compresses columns for the 68000.
-[YMXS import rules][import]
-[YMX family][ymx-family] · [Leonard / Oxygene][leonard-scene]
-
 **Visual**
 
 Show YM1 through YM7 before the ellipsis leading to YMX.
@@ -118,17 +78,6 @@ LZSA-style compression with a 68000 decoder
 
 minymiser by Tat / Avena (Steven Tattersall)
 
-**Speaker notes**
-
-I drew on Steven Tattersall's minymiser for streaming playback. Tat
-groups the values by register, with the mixer bits stored alongside
-the volumes. The player decodes the compressed streams as the tune
-plays and keeps the recent output in rolling buffers. The decoder
-can copy earlier values from those buffers while the tune stays
-packed in memory.
-[Tat's minymiser notes][minymiser] · [Decoder source][minymiser-decoder]
-[minymiser format][minymiser-format] · [Tat / Avena][tat-scene]
-
 **Visual**
 
 Show a short grid of register values. Mark one row as a frame and
@@ -147,24 +96,6 @@ One numbered row per playback frame.
 | 2 | A2 | B2 | C2 | D2 | B | B5, B6, B7, B8 |
 | 3 | A3 | B3 | C3 | D3 | C | C5, C6, C7, C8 |
 | 4 | A4 | B4 | C4 | D4 | D | D5, D6, D7, D8 |
-
-**Speaker notes**
-
-I separated reading a row from refilling the buffers. Before
-playback, each buffer has its bytes for frames 1 to 4. In frame 1,
-the player reads A1, B1, C1 and D1. That frame's refill writes A5
-through A8 to column A's buffer. The next frame reads row 2 and
-refills B. The number on each byte is the frame that will read it.
-
-With `N` columns of one-byte values, a refill writes `N` bytes to
-one column's buffer. Loading and saving decoder state once per
-batch spreads that cost over `N` bytes.
-[ST1 streaming design][st1-streaming] · [DTX refill schedule][dtx-refill]
-
-With four columns of one-byte values, four one-byte decoder calls
-become one four-byte call per frame. DTX3 stores constant columns
-as values. The refill period can exceed the column count to fit
-the ring and decoding unit.
 
 **Visual**
 
@@ -203,41 +134,6 @@ ST4 streams are bits, literals, byte offsets and word offsets.
 
 ZX0 and ZX1 by Einar Saukas
 
-**Speaker notes**
-
-I tried Einar Saukas's ZX0 first. I was aiming for a similar
-compression ratio and a decoder suited to the 68000. The ZX0
-decoder I tried unpacked in one pass. I needed to pause partway
-through a stream and resume later. ST1 did that with ZX1, Saukas's
-successor to ZX0. ST1 still read a format designed for 8-bit
-machines.
-
-I ran the ZX1 encoder on `ABCABCABC` and decoded the result back
-to the same input. The encoder reserves a byte for bits and fills
-it as it emits literals and offsets to the same stream. The
-decoder loads the first bit byte, `DB`, to read a literal length
-of three. It reads `41 42 43` as literals while keeping the
-remaining bits from `DB`. After the new offset `FA`, it reads the
-rest of the match length from `DB` and `40`. The match copies
-six bytes from three bytes back. The offset `FF FF` ends the
-stream.
-
-ST4 split the compressed data into four streams. That let the
-68000 refill its bit buffer a word at a time and copy aligned
-literals in words or longwords.
-
-ST1's ZX1 decoder copies one byte per move with
-`move.b (a2)+,(a1)+`. With a two-byte unit, the ST4 copy ladder
-repeats `move.w (a3)+,(a1)+`. Each move copies a word and advances
-both pointers. A jump enters
-the short match ladder at the first move needed for that segment.
-Longer matches and literals use the counted ladder.
-[ZX0][zx0] · [ZX1][zx1] · [ST1][st1] · [ST4][st4]
-[ZX0 credit in an Atari ST release][zx0-st-credit]
-
-[ZX1 encoder][zx1-encoder] · [ZX1 decoder][zx1-decoder]
-[ST1 byte-copy ladder][st1-copy] · [ST4 copy ladders][st4-copy]
-
 **Visual**
 
 Show the eight encoded bytes between the encoder and decoder.
@@ -275,30 +171,6 @@ Digidrum · 20 frames
 
 Wavetable · 30 frames
 
-**Speaker notes**
-
-The host reads one tune row per frame. The player applies the
-row's timer operations before writing its sound registers. At a
-timer tick, it reads the next row of the running source. The
-prescaler and count set that timer's rate.
-
-Timer A starts a SID at frame 100 and stops it at frame 120.
-After 10 idle frames, it starts a wavetable at frame 130 with
-a new source at 1.2 kHz. Frame 140 retunes it to 2.4 kHz.
-Frame 150 switches the volume lookup. The next tick uses the
-new lookup at the same rate and source position. Frame 160
-stops the wavetable after 30 frames.
-
-Timer D plays a 20-frame digidrum from frame 120 to frame 140.
-Timer B runs independently.
-
-The zoom shows one host frame from the start of frame 140 to
-the start of frame 141. At 50 Hz each frame lasts 20 ms. The
-wavetable uses a prescaler of 64. The retune changes the count
-from 32 to 16, so the timer goes from 24 to 48 ticks per frame.
-[YMXS frame and tick procedures][ymxs] · [RhYMe effects][rhyme-effects]
-[YMXR effect rate][ymxr-effect-rate] · [YMXR mapping][ymxr-mapping]
-
 **Visual**
 
 Enlarge frame 140 above the overview and show 48 timer ticks
@@ -332,21 +204,6 @@ YM2149 playback
 **Another YMXS player**
 
 A layout suited to the host
-
-**Speaker notes**
-
-YMXS defines the tune data and what playback does on a frame or
-timer tick. JSON and CSV encode that data as text. JSON supports
-every tune. CSV supports text fields free of line breaks.
-
-YMXR defines an Atari ST binary tune format. The tune file
-stores its frame table and timer sources as DTX tables. YMXR
-also includes a 68000 player. Another implementation can follow
-the YMXR specification and read the same tune files. A separate
-YMXS player can define a different playback layout, for example
-for a game that shares voices between music and sound effects.
-[YMXS specification][ymxs] · [YMXS JSON][ymxs-json] · [YMXS CSV][ymxs-csv]
-[YMXR specification][ymxr-columns] · [Building another player][players]
 
 **Visual**
 
@@ -382,30 +239,6 @@ Count and Control show column positions.
 
 Mapping 0 uses identity. 1 and 2 select lookups.
 
-**Speaker notes**
-
-YMXR encodes the YMXS frame rows in a DTX table. The player reads
-one row per frame. Columns 0 to 13 correspond to the YM2149 sound
-registers. The timer columns set the target, source, control and
-count for each effect. The file groups those fields in Timer A, D,
-B, C order. Count and Control show column positions. Version 10
-appends mapping columns 30 to 33 in the same timer order.
-
-The other cells show example indices. Source 2 is a digidrum on
-R8. Source 1 is a SID loop on R9. Source 3 writes a tone period
-to R0 and R1. Source 4 writes pitch and volume to R4, R5 and R10
-through target 19. Mapping 0 writes source values unchanged.
-Mappings 1 and 2 select lookups.
-
-Bits 0 to 2 of Control select the prescaler divisor. The upper
-bits carry flags for the write and timer operation. Count is the
-reload value in the timer's data register. The prescaler divisor
-and reload count together set the tick rate. A Count byte of zero
-counts as 256 when Control marks it as a value.
-[YMXR column layout][ymxr-columns] · [YMXR effect rate][ymxr-effect-rate]
-[YMXS prescaler and count][ymxs-prescaler] · [YMXR mapping][ymxr-mapping]
-[YMXR target map][ymxr-target-map]
-
 **Visual**
 
 Use a teal register strip and a table with one row per timer.
@@ -422,24 +255,6 @@ and Target index colors to the source and target tables.
 | Digidrum | 8, 9, 10, 11, … | Sample plays once | R8 |
 | Wavetable | 0, 4, 8, 12, 15, 12, 8, 4 | One cycle on repeat | R8 |
 | Sync buzzer | 0 | One value on repeat | R13 |
-
-**Speaker notes**
-
-The player writes one source value to the target at each timer
-tick. The first three sources supply volume levels. The examples
-use R8 for voice A. Voices B and C use R9 and R10.
-
-The SID loops two levels, the digidrum plays a sample once in this
-example, and the wavetable loops one cycle. The SID and digidrum
-values come from the YMXS test tune, where the drum replaces the
-SID on voice A. The wavetable values are illustrative.
-
-The sync buzzer source has one row with one value, the envelope
-shape. Writing the same shape to R13 restarts the envelope on
-every tick. The value 0 comes from the RhYMe export of Doclands'
-Deeper.
-[YMXS digidrum test tune][drum] · [RhYMe timer effects][rhyme-effects]
-[YMXS register behavior][ymxs] · [RhYMe demo song][rhyme-demo]
 
 **Visual**
 
@@ -484,31 +299,6 @@ Fixed target codes
 
 Each tick reads a row, maps its last value and writes the target registers.
 
-**Speaker notes**
-
-The Source field selects a DTX1 table from the tune's source index.
-A tune can use several SID loops and samples. Source numbers start
-at 1. Setting the Source field to 0 stops the timer.
-
-The Target field selects a procedure from the fixed YMXR target
-map. Targets 8, 9 and 10 write the volume registers R8, R9 and
-R10 for voices A, B and C. The player can route both SID loops and
-both digidrum samples to any of these targets. Target 14 writes the
-tone period to R0 and R1. Target 17 writes pitch and volume to R0,
-R1 and R8.
-
-The example uses Timer B from the YMXR frame table. Source 3
-supplies 63 and 1. Mapping 1 selects a lookup that maps 1 to 2.
-Target 14 writes 63 to R0 and 2 to R1. The lookup applies to the
-last source column. Mapping 0 writes each value unchanged.
-
-The numbers shown are the decoded fields. Bit 7 marks a set
-field, and bits 0 to 6 encode the source number or target code.
-The source index is specific to each tune. The target map is
-part of the format.
-[YMXR effect columns][ymxr-effect-fields] · [YMXR target map][ymxr-target-map]
-[YMXR source index][ymxr-source-index] · [YMXR mapping][ymxr-mapping]
-
 **Visual**
 
 Place Mapping 1 between Source 3 and Target 14 above the index
@@ -545,25 +335,6 @@ GitHub activity as of 8 November 2026
 | YMXS | 110 | 24 |
 | DTX | 143 | 25 |
 
-**Speaker notes**
-
-YX6 first streamed register dumps. After moving it to ST4, we added
-timer playback for SID voices, digidrums and the sync buzzer. The
-first YMX format came from that player. RhYMe used it for Atari ST
-exports that August. Once YMXS separated the tune model from the
-playback format, RhYMe could prepare the tune as YMXS and pass it
-to the YMXR tools.
-[RhYMe adopts YMX][rhyme-ymx] · [RhYMe moves to YMXR][rhyme-ymxr]
-[Git commits and release notes][timeline]
-
-The commit counts cover the history reachable from `main`. The
-release counts cover published GitHub releases.
-[ST4][stats-st4] · [YMX][stats-ymx] · [YMXR][stats-ymxr] · [YMXS][stats-ymxs] · [DTX][stats-dtx]
-
-Claude Code wrote most of the suite under my direction. I used
-Claude Opus 5 and 5.5 for most of that work.
-[YMX attribution][credits] · [Claude Opus][claude-opus]
-
 **Visual**
 
 Place a vector chip icon beside the AI assistance credit. Show
@@ -575,23 +346,6 @@ for individual releases.
 **On screen**
 
 RhYMe export and YMXR playback
-
-**Speaker notes**
-
-RhYMe prepares a YMXS tune offline. The YMXR tools package the
-tune and its player as SNDH or a TOS program.
-
-The host frame clock calls YMXR to apply a DTX3 tune row. ST4
-decompresses the changing columns. The frame writes the registers
-the row sets, controls the MFP timers and selects the active
-mapping when the row starts or remaps an effect.
-
-On an MFP interrupt, YMXR reads a DTX1 source row at the current
-source position. The active mapping selects identity or a lookup.
-YMXR maps the last value, preserves earlier values and writes the
-target registers. Frame writes and tick writes reach the YM2149.
-[YMXR playback diagram][ymxr-playback] · [RhYMe export][rhyme-export]
-[DTX tables][dtx]
 
 **Visual**
 
@@ -633,37 +387,6 @@ Standalone YMXR tune · 101,036 bytes
 
 Music by Scavenger / Synergy
 
-**Speaker notes**
-
-Scavenger wrote the music for Rapido's 3D screen in the Synergy
-Megademo. The combined dump in the archive has a truncated
-payload. I joined the two complete YM5 parts in frame order and
-encoded the square-wave effect in YM6. The result has 79,900
-frames at 50 Hz.
-
-I compared the uncompressed YM6 with the DTX image from the
-smallest SNDH I measured. The separate SNDH breakdown includes
-the YMXR player and its workspace.
-
-I tested ST4 unit widths and ring sizes with and without
-literal-stream copies. This build uses 1-byte units and a
-780-byte ring per live column, with copies enabled. A 1,920-byte
-ring reduced the standalone tune to 96,072 bytes, but increased
-the SNDH to 139,308 bytes because it used more workspace.
-
-The linked player core is 3,402 bytes. The bound tune data
-includes the timer sources. The workspace includes 15,600 bytes
-of DTX state, 2,136 bytes of YMXR state and 2 bytes for alignment.
-SNDH headers, subtune offsets and file alignment add 124 bytes.
-The DTX image has 100,604 bytes of packed frame table and
-1,476 bytes for its reader and column offsets.
-
-Pack with `ym-to-ymxr -k1 -m780 -copies`. Build the SNDH with
-`ymxr-sndh -link -t'Wicked Polygons' -c'Scavenger / Synergy'`.
-[Synergy 3D screen and credits][synergy-3d] · [YM soundtrack archive][synergy-ym]
-[YM slot encoding][ym-import-slots] · [YMXR packer][ymxr-packer]
-[YMXR packing options][ymxr-pack-options] · [YMXR SNDH layout][ymxr-sndh-layout]
-
 **Visual**
 
 Show the uncompressed YM6 and the DTX image on one scale. Below
@@ -686,27 +409,6 @@ Average 68000 cycles per frame
 
 160,000 cycles per frame at 8 MHz and 50 Hz.
 
-**Speaker notes**
-
-The YMXR cycle rig counts 68000 instructions with zero wait states.
-The looping tunes ran through one wrap. The digidrum version of
-Doclands' Deeper came from RhYMe as YMXS and was packed with
-two-byte ST4 units, as were the other tunes. Deeper ran through
-the end of the song.
-
-The frame call includes the DTX advance and the rest of the
-player's frame work. The timer figures count the handler cycles
-and 64 cycles per interrupt for entry and return. Count each
-interrupt in the rig's tick trace. Add that cost to the frame
-call. The host's frame clock is outside these figures.
-
-All four tunes run at 50 Hz. At a nominal 8 MHz, the frame
-budget is 160,000 cycles. Divide total cycles by that budget
-to get the percentage.
-[YMXR frame measurements][ymxr-performance] · [YMXR tick costs][ymxr-ticks]
-[YMXR cycle rig][ymxr-cycle-rig] · [Benchmark tunes][ymxr-fixtures]
-[RhYMe demo song][rhyme-demo]
-
 **Visual**
 
 Compare four real tunes on one scale. Stack DTX advance, other
@@ -728,15 +430,6 @@ RhYMe export
 Atari ST playback
 
 `IMPERIUM.PRG`
-
-**Speaker notes**
-
-To close, I play iSo's YM remake of Madeon's Imperium. RhYMe can
-save its YMXS data or use the YMXR tools to package the tune as
-SNDH or a TOS program.
-Another player can read that same YMXS tune and choose a layout
-suited to its host.
-[RhYMe export][rhyme-export] · [YMX player design][players]
 
 **Visual**
 
