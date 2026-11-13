@@ -308,40 +308,7 @@ branch from the two SID loops and two samples to targets 8, 9 and
 10. Draw separate arrows from source 3 to target 14 and source 4
 to target 17. Give the three voice volume targets distinct colors.
 
-## 11. Development timeline
-
-**On screen**
-
-AI-assisted development
-
-Mostly Claude Opus 5 and 5.5
-
-| 2026 | Milestone |
-|---|---|
-| 16 August | YX6 streams YM dumps with ST1 |
-| 25 August | RhYMe adopts YMX for Atari ST exports |
-| 10 September | YMXS defines the tune model |
-| 11 September | RhYMe switches to the YMXR tools |
-| 21 October | YMXR adopts DTX3 |
-| 3 November | YMXR plays sources through lookup tables |
-
-GitHub activity as of 8 November 2026
-
-| Repository | Commits on main | Published releases |
-|---|---:|---:|
-| ST4 | 280 | 25 |
-| YMX | 185 | 9 |
-| YMXR | 389 | 67 |
-| YMXS | 110 | 24 |
-| DTX | 143 | 25 |
-
-**Visual**
-
-Place a vector chip icon beside the AI assistance credit. Show
-the milestones above the GitHub table. Use the full timeline
-for individual releases.
-
-## 12. YMX architecture
+## 11. YMX architecture
 
 **On screen**
 
@@ -355,7 +322,7 @@ within playback. Trace the DTX3 tune table into the frame block
 and the DTX1 sources into the timer tick block. Both paths end at
 the YM2149.
 
-## 13. YM6 and DTX sizes
+## 12. YM6 and DTX sizes
 
 **On screen**
 
@@ -394,7 +361,7 @@ the chart, show the SNDH total with its player and a proportional
 bar the same height as the table header. Show the byte counts in
 the table and the packing options and tune size at the bottom.
 
-## 14. YMXR frame cost
+## 13. YMXR frame cost
 
 **On screen**
 
@@ -414,6 +381,39 @@ Average 68000 cycles per frame
 Compare four real tunes on one scale. Stack DTX advance, other
 frame work and effect timer interrupts. Label the frame call,
 timer interrupts, total cycles and share of the frame budget.
+
+## 14. Development timeline
+
+**On screen**
+
+AI-assisted development
+
+Mostly Claude Opus 5 and 5.5
+
+| 2026 | Milestone |
+|---|---|
+| 16 August | YX6 streams YM dumps with ST1 |
+| 25 August | RhYMe adopts YMX for Atari ST exports |
+| 10 September | YMXS defines the tune model |
+| 11 September | RhYMe switches to the YMXR tools |
+| 21 October | YMXR adopts DTX3 |
+| 3 November | YMXR plays sources through lookup tables |
+
+GitHub activity as of 8 November 2026
+
+| Repository | Commits on main | Published releases |
+|---|---:|---:|
+| ST4 | 280 | 25 |
+| YMX | 185 | 9 |
+| YMXR | 389 | 67 |
+| YMXS | 110 | 24 |
+| DTX | 143 | 25 |
+
+**Visual**
+
+Place a vector chip icon beside the AI assistance credit. Show
+the milestones above the GitHub table. Use the full timeline
+for individual releases.
 
 ## 15. A RhYMe song on the Atari ST
 
